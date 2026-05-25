@@ -32,7 +32,7 @@
 ## 2. 클라이언트 (Unreal Engine 5)
 
 ### 2.1 버전 / 환경
-- **UE5 5.4 (LTS)**
+- **UE5 5.7.4** (사용자 명시, 2026-05 기준 최신 5.x 라인. LTS 보다 최신 기능 우선)
 - 빌드 타깃: Win64 (1차), Mac (선택)
 - Editor: Windows 11 + JetBrains Rider 또는 VS 2022
 - 그래픽 API: DirectX 12 (PC), Metal (Mac)
@@ -309,7 +309,7 @@ MVP 단계에는 로그만, 1.0 에서 메트릭/대시보드.
 
 - ADR-0001 — Node.js vs Go 서버 선택 (Node.js 채택)
 - ADR-0002 — PostgreSQL vs MongoDB (PostgreSQL 채택)
-- ADR-0003 — UE5 5.4 vs 5.5 (5.4 LTS 채택)
+- ADR-0005 — UE5 5.7.4 채택 (5.4 LTS 대비 최신 기능 우선) — 클라이언트 슬라이스 (UE5 설치 완료 후) PR 에서 작성
 - ADR-0004 — Drizzle vs Prisma (Drizzle 채택 — 가벼움, 마이그레이션 명료)
 
 ADR 작성은 백엔드 슬라이스 PR (#7) 에서 시작.
