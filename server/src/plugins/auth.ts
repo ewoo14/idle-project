@@ -47,7 +47,9 @@ export const authPlugin = fp(async (app) => {
     try {
       await request.jwtVerify();
     } catch {
-      throw new AuthError("access 토큰이 없거나 올바르지 않습니다.");
+      throw new AuthError("access 토큰이 없거나 올바르지 않습니다.", {
+        code: "AUTH_ACCESS_TOKEN_INVALID",
+      });
     }
   });
 });

@@ -52,3 +52,11 @@
 ## 현재 백엔드 정합 상태
 
 PR #2 백엔드 V1은 이미 `{ ok: true, data }`, `{ ok: false, error }` envelope를 사용한다. 다만 에러 코드는 현재 `AUTH_ERROR`, `VALIDATION_ERROR`, `NOT_FOUND` 같은 공통 코드 중심이다. `AUTH_*`, `SAVE_*`, `LEADERBOARD_*`, `CHARACTER_*` 세부 prefix 정합 작업은 후속 fix 단계 또는 별도 PR에서 서버 코드와 함께 반영한다.
+## 에러 코드 형식
+
+실패 envelope의 `error.code`는 도메인 prefix를 포함한 안정적인 문자열을 사용한다. 예: `AUTH_INVALID_CREDENTIALS`, `SAVE_VALIDATION_FAILED`, `LEADERBOARD_RANGE_INVALID`, `CHARACTER_CLASS_UNAVAILABLE`, `SYSTEM_INTERNAL`.
+
+## nullable 필드 컨벤션
+
+- 선택 필드는 응답에서 키 자체를 생략 (undefined 의미).
+- 명시적 null 은 의도적으로 비어있음 (예: lastSaveAt null = 아직 세이브 없음).

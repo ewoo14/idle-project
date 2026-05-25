@@ -25,9 +25,9 @@ export class CharacterService {
 
   async create(userId: string, input: { classId: number }) {
     if (input.classId !== 1) {
-      throw new ValidationError(
-        "PR #2 범위에서는 전사(class_id=1)만 생성할 수 있습니다.",
-      );
+      throw new ValidationError("MVP 단계는 전사 (classId=1) 만 지원합니다.", {
+        code: "CHARACTER_CLASS_UNAVAILABLE",
+      });
     }
     const primary = defaultPrimaryStats(1, 1);
     return this.repo.createCharacter({
@@ -47,7 +47,9 @@ export class CharacterService {
   async get(userId: string, characterId: string) {
     const character = await this.repo.findByIdForUser(userId, characterId);
     if (!character) {
-      throw new NotFoundError("캐릭터를 찾을 수 없습니다.");
+      throw new NotFoundError("캐릭터를 찾을 수 없습니다.", {
+        code: "CHARACTER_NOT_FOUND",
+      });
     }
     return character;
   }

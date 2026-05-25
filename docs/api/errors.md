@@ -36,3 +36,21 @@
 
 - PR #2 백엔드 V1의 실제 서버 코드는 `AUTH_ERROR`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`를 반환한다.
 - 세부 prefix 코드로의 변경은 클라이언트 분기 영향이 있으므로 후속 fix 단계 또는 별도 PR에서 서버 코드, API 문서, QA 시나리오를 함께 갱신한다.
+## PR #2 서버 반환 코드
+
+서버 구현은 공통 클래스의 기본 코드 대신 도메인 prefix 코드를 명시적으로 반환한다.
+
+| HTTP | 코드 | 상황 |
+| --- | --- | --- |
+| 400 | `SAVE_VALIDATION_FAILED` | 세이브 payload 권위 검증 실패 |
+| 400 | `CHARACTER_CLASS_UNAVAILABLE` | MVP 범위 밖 classId 요청 |
+| 401 | `AUTH_INVALID_CREDENTIALS` | 로그인 이메일/비밀번호 불일치 |
+| 401 | `AUTH_ACCESS_TOKEN_INVALID` | access token 누락 또는 검증 실패 |
+| 401 | `AUTH_REFRESH_TOKEN_INVALID` | refresh 엔드포인트에 refresh typ이 아닌 토큰 사용 |
+| 401 | `AUTH_REFRESH_TOKEN_REVOKED` | 이미 폐기된 refresh token 사용 |
+| 401 | `AUTH_REFRESH_TOKEN_INACTIVE` | Redis active jti가 없는 refresh token 사용 |
+| 404 | `SAVE_CHARACTER_NOT_FOUND` | 세이브 대상 캐릭터 없음 또는 소유권 불일치 |
+| 404 | `CHARACTER_NOT_FOUND` | 캐릭터 없음 또는 소유권 불일치 |
+| 409 | `AUTH_EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일 |
+| 429 | `AUTH_RATE_LIMITED` | auth rate limit 초과 |
+| 500 | `SYSTEM_INTERNAL` | 처리되지 않은 서버 오류 |
