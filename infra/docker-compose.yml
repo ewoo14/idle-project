@@ -1,0 +1,126 @@
+name: idle-project
+
+# 개발용 기본 스택 — PostgreSQL + Redis.
+# 서버 구현(server/) 이 추가되는 PR #7 시점에 'server' 서비스가 실제로 활성화됩니다.
+#
+# 사용:
+#   cp .env.example .env
+#   docker compose up -d                       # 기본 (postgres + redis)
+#   docker compose --profile dev up -d         # + pgadmin
+#   docker compose --profile app up -d         # + server (PR #7 이후)
+#   docker compose --profile ops up -d         # + prometheus + grafana (1.0)
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: idle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-idle}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_local_only}
+      POSTGRES_DB: ${POSTGRES_DB:-idle}
+      TZ: Asia/Seoul
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: idle-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: idle-pgadmin
+    profiles: ["dev"]
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@idle.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-change_me_local_only}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    # PR #7 (백엔드 V1) 시점에 활성화. 그 전까지는 profiles=app 으로 시작 안 함.
+    #
+    # 주의: 아래 JWT_*_PATH 가 가리키는 /run/secrets/jwt_*.pem 은
+    # PR #7 에서 top-level 'secrets:' 블록과 키 파일 (infra/secrets/jwt_*.pem)
+    # 을 추가하면서 함께 활성화됩니다. 현재 그대로 'docker compose --profile app up'
+    # 을 시도하면 secrets 미정의로 실패합니다 (의도된 가드).
+    profiles: ["app"]
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    container_name: idle-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: postgres://${POSTGRES_USER:-idle}:${POSTGRES_PASSWORD:-change_me_local_only}@postgres:5432/${POSTGRES_DB:-idle}
+      REDIS_URL: redis://redis:6379
+      JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private.pem
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public.pem
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  prometheus:
+    # 1.0 (관측성 슬라이스) 에서 활성화. 그 전까지 profiles=ops 로 시작 안 함.
+    # 주의: 아래 ./prometheus.yml 마운트 대상 파일은 1.0 슬라이스에서
+    # infra/prometheus.yml 로 추가합니다. 현재 'docker compose --profile ops up'
+    # 을 시도하면 마운트 대상 누락으로 실패합니다 (의도된 가드).
+    image: prom/prometheus:latest
+    container_name: idle-prometheus
+    profiles: ["ops"]
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: idle-grafana
+    profiles: ["ops"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-change_me_local_only}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

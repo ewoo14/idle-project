@@ -1,0 +1,45 @@
+name: client-ci
+
+# UE5 헤드리스 빌드는 무거우므로 PR 라벨 `build/client` 또는 main push 시에만 실행.
+# M1 클라이언트 슬라이스 머지 이후 실제 빌드 단계 활성화 예정.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+
+jobs:
+  guard:
+    name: guard (라벨/파일 조건)
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+    steps:
+      - id: decide
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'build/client') }}" == "true" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ue5-build:
+    name: UE5 헤드리스 빌드 (placeholder)
+    needs: guard
+    if: needs.guard.outputs.should_build == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: 안내
+        run: |
+          Write-Host "UE5 빌드는 자체 호스팅 러너 또는 Epic 권한이 필요합니다."
+          Write-Host "이 step 은 PR #1 단계에서는 placeholder 입니다."
+          Write-Host "M1 클라이언트 슬라이스 머지 이후 실제 RunUAT 호출로 교체합니다."
