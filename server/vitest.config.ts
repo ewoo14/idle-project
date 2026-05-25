@@ -8,8 +8,18 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/**/*.ts"],
-      exclude: ["src/main.ts", "src/scripts/**", "src/**/*.schema.ts"],
+      include: [
+        "src/core/formulas/**/*.ts",
+        "src/modules/**/*.service.ts",
+        "src/plugins/rate-limit.ts",
+      ],
+      exclude: ["src/**/*.schema.ts"],
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        branches: 70,
+        functions: 80,
+      },
     },
   },
 });

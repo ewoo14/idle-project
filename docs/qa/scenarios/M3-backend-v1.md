@@ -41,7 +41,7 @@
 
 - **도구**: vitest 통합
 - **Given** 사용자 소유 캐릭터가 있고 payload의 `level`, `rebirthCount`, `maxEquipmentGrade`가 서버 검증 범위 안에 있다.
-- **When** `POST /v1/saves`를 호출한다.
+- **When** `POST /v1/save`를 호출한다.
 - **Then** 세이브가 저장되고 `serverValidated=true`가 기록된다.
 
 ## 7. 세이브 업로드 실패 — 조작된 payload reject
@@ -55,14 +55,14 @@
 
 - **도구**: vitest 통합
 - **Given** 해당 캐릭터에 저장된 세이브 이력이 있다.
-- **When** `GET /v1/saves/:characterId/current`를 호출한다.
+- **When** `GET /v1/save/:characterId/current`를 호출한다.
 - **Then** 가장 최근 세이브 1건이 `{ ok: true, data }`로 반환된다.
 
 ## 9. 리더보드 조회
 
 - **도구**: vitest 통합
 - **Given** 여러 캐릭터의 power 또는 rebirth 값이 저장되어 있다.
-- **When** `GET /v1/leaderboards/power`, `GET /v1/leaderboards/rebirth`를 호출한다.
+- **When** `GET /v1/leaderboard/power`, `GET /v1/leaderboard/rebirth`를 호출한다.
 - **Then** 정렬된 상위 목록이 반환되고 limit 범위가 보정된다.
 
 ## 10. 캐릭터 생성 — 전사
