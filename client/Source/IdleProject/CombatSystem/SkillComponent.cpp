@@ -20,6 +20,7 @@ const FName EagleEyeId(TEXT("eagle_eye"));
 
 FSkillDefinition MakeSkill(
 	const TCHAR* SkillId,
+	EClassId ClassId,
 	const TCHAR* DisplayName,
 	ESkillType Type,
 	ESkillEffectType EffectType,
@@ -32,6 +33,7 @@ FSkillDefinition MakeSkill(
 {
 	FSkillDefinition Skill;
 	Skill.SkillId = FName(SkillId);
+	Skill.ClassId = ClassId;
 	Skill.DisplayName = FText::FromString(DisplayName);
 	Skill.Type = Type;
 	Skill.EffectType = EffectType;
@@ -54,39 +56,39 @@ void USkillComponent::LoadDefaultWarriorSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("heavy_strike"), TEXT("강타"), ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.5f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("whirlwind"), TEXT("회전베기"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("shield_up"), TEXT("방패 올리기"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("charge"), TEXT("돌진"), ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("weapon_mastery"), TEXT("무기 숙련"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("toughness"), TEXT("강인함"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("berserkers_fury"), TEXT("광전사의 분노"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f));
+	Skills.Add(MakeSkill(TEXT("heavy_strike"), EClassId::Warrior, TEXT("강타"), ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.5f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("whirlwind"), EClassId::Warrior, TEXT("회전베기"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("shield_up"), EClassId::Warrior, TEXT("방패 올리기"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("charge"), EClassId::Warrior, TEXT("돌진"), ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("weapon_mastery"), EClassId::Warrior, TEXT("무기 숙련"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("toughness"), EClassId::Warrior, TEXT("강인함"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("berserkers_fury"), EClassId::Warrior, TEXT("광전사의 분노"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f));
 }
 
 void USkillComponent::LoadDefaultMageSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("arcane_bolt"), TEXT("Arcane Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("chain_lightning"), TEXT("Chain Lightning"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("mana_shield"), TEXT("Mana Shield"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("meteor"), TEXT("Meteor"), ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("spell_mastery"), TEXT("Spell Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("mana_flow"), TEXT("Mana Flow"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("arcane_overload"), TEXT("Arcane Overload"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f));
+	Skills.Add(MakeSkill(TEXT("arcane_bolt"), EClassId::Mage, TEXT("Arcane Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("chain_lightning"), EClassId::Mage, TEXT("Chain Lightning"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("mana_shield"), EClassId::Mage, TEXT("Mana Shield"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("meteor"), EClassId::Mage, TEXT("Meteor"), ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("spell_mastery"), EClassId::Mage, TEXT("Spell Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("mana_flow"), EClassId::Mage, TEXT("Mana Flow"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("arcane_overload"), EClassId::Mage, TEXT("Arcane Overload"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f));
 }
 
 void USkillComponent::LoadDefaultArcherSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("precision_shot"), TEXT("Precision Shot"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.2f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("arrow_rain"), TEXT("Arrow Rain"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("focus"), TEXT("Focus"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("piercing_arrow"), TEXT("Piercing Arrow"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.0f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("critical_eye"), TEXT("Critical Eye"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("quick_draw"), TEXT("Quick Draw"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("eagle_eye"), TEXT("Eagle Eye"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f));
+	Skills.Add(MakeSkill(TEXT("precision_shot"), EClassId::Archer, TEXT("Precision Shot"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.2f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("arrow_rain"), EClassId::Archer, TEXT("Arrow Rain"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("focus"), EClassId::Archer, TEXT("Focus"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("piercing_arrow"), EClassId::Archer, TEXT("Piercing Arrow"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("critical_eye"), EClassId::Archer, TEXT("Critical Eye"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("quick_draw"), EClassId::Archer, TEXT("Quick Draw"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("eagle_eye"), EClassId::Archer, TEXT("Eagle Eye"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f));
 }
 
 void USkillComponent::LoadSkillsForClass(EClassId ClassId)

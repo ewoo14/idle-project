@@ -27,6 +27,45 @@ bool HasSkill(const USkillComponent& Skills, FName SkillId)
 		return Skill.SkillId == SkillId;
 	});
 }
+
+struct FExpectedSkillDefinition
+{
+	FName SkillId;
+	EClassId ClassId;
+	ESkillType Type;
+	ESkillEffectType EffectType;
+	float Cooldown;
+	float DamageCoeff;
+	float BuffMagnitude;
+	float BuffDuration;
+	float GaugeGainOnHit;
+	float GaugeGainOnTakeDamage;
+};
+
+bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent& Skills, const FExpectedSkillDefinition& Expected)
+{
+	const FSkillDefinition* Actual = Skills.Skills.FindByPredicate([&Expected](const FSkillDefinition& Skill)
+	{
+		return Skill.SkillId == Expected.SkillId;
+	});
+
+	Test.TestNotNull(*FString::Printf(TEXT("%s exists"), *Expected.SkillId.ToString()), Actual);
+	if (!Actual)
+	{
+		return false;
+	}
+
+	Test.TestEqual(*FString::Printf(TEXT("%s ClassId"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->ClassId), static_cast<int32>(Expected.ClassId));
+	Test.TestEqual(*FString::Printf(TEXT("%s Type"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->Type), static_cast<int32>(Expected.Type));
+	Test.TestEqual(*FString::Printf(TEXT("%s EffectType"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->EffectType), static_cast<int32>(Expected.EffectType));
+	Test.TestEqual(*FString::Printf(TEXT("%s Cooldown"), *Expected.SkillId.ToString()), Actual->Cooldown, Expected.Cooldown);
+	Test.TestEqual(*FString::Printf(TEXT("%s DamageCoeff"), *Expected.SkillId.ToString()), Actual->DamageCoeff, Expected.DamageCoeff);
+	Test.TestEqual(*FString::Printf(TEXT("%s BuffMagnitude"), *Expected.SkillId.ToString()), Actual->BuffMagnitude, Expected.BuffMagnitude);
+	Test.TestEqual(*FString::Printf(TEXT("%s BuffDuration"), *Expected.SkillId.ToString()), Actual->BuffDuration, Expected.BuffDuration);
+	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnHit"), *Expected.SkillId.ToString()), Actual->GaugeGainOnHit, Expected.GaugeGainOnHit);
+	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnTakeDamage"), *Expected.SkillId.ToString()), Actual->GaugeGainOnTakeDamage, Expected.GaugeGainOnTakeDamage);
+	return true;
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -171,6 +210,50 @@ bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Class loader selects mage skills"), HasSkill(*Skills, TEXT("arcane_bolt")));
 	Skills->LoadSkillsForClass(EClassId::Archer);
 	TestTrue(TEXT("Class loader selects archer skills"), HasSkill(*Skills, TEXT("precision_shot")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillDefinitionParityTest,
+	"IdleProject.Combat.Skills.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+
+	Skills->LoadDefaultMageSkills();
+	const TArray<FExpectedSkillDefinition> MageSkills = {
+		{TEXT("arcane_bolt"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("chain_lightning"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("mana_shield"), EClassId::Mage, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f, 0.0f, 0.0f},
+		{TEXT("meteor"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("spell_mastery"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("mana_flow"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("arcane_overload"), EClassId::Mage, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : MageSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultArcherSkills();
+	const TArray<FExpectedSkillDefinition> ArcherSkills = {
+		{TEXT("precision_shot"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.2f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("arrow_rain"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("focus"), EClassId::Archer, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
+		{TEXT("piercing_arrow"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("critical_eye"), EClassId::Archer, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.0f},
+		{TEXT("quick_draw"), EClassId::Archer, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f},
+		{TEXT("eagle_eye"), EClassId::Archer, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : ArcherSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
 
 	return true;
 }

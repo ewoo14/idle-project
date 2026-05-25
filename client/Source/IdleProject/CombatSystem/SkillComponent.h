@@ -32,6 +32,9 @@ struct IDLEPROJECT_API FSkillDefinition
 	FName SkillId;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
+	EClassId ClassId = EClassId::Warrior;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
 	FText DisplayName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")

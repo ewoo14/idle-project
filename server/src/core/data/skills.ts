@@ -293,3 +293,18 @@ export const archerSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnTakeDamage: 2,
   },
 ];
+
+export function getSkillDefinitionsForClass(
+  classId: number,
+): SkillDefinition[] {
+  switch (classId) {
+    case 1:
+      return warriorSkillDefinitions;
+    case 2:
+      return mageSkillDefinitions;
+    case 3:
+      return archerSkillDefinitions;
+    default:
+      return [];
+  }
+}

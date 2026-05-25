@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   archerSkillDefinitions,
+  getSkillDefinitionsForClass,
   mageSkillDefinitions,
   warriorSkillDefinitions,
 } from "./skills.js";
@@ -233,5 +234,23 @@ describe("archerSkillDefinitions", () => {
         gaugeGainOnTakeDamage: 2,
       },
     ]);
+  });
+});
+
+describe("skill definition parity by class", () => {
+  it("returns the V1 skill set for every supported class id", () => {
+    expect(getSkillDefinitionsForClass(1)).toBe(warriorSkillDefinitions);
+    expect(getSkillDefinitionsForClass(2)).toBe(mageSkillDefinitions);
+    expect(getSkillDefinitionsForClass(3)).toBe(archerSkillDefinitions);
+  });
+
+  it("keeps mage and archer class ids aligned with their lookup keys", () => {
+    for (const skill of getSkillDefinitionsForClass(2)) {
+      expect(skill.classId).toBe(2);
+    }
+
+    for (const skill of getSkillDefinitionsForClass(3)) {
+      expect(skill.classId).toBe(3);
+    }
   });
 });
