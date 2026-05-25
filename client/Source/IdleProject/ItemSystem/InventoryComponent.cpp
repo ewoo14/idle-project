@@ -42,6 +42,8 @@ void UInventoryComponent::EquipItem(int32 ItemIndex)
 		return;
 	}
 
+	// PR #9 policy: equipping swaps the slot pointer only; the previously equipped item
+	// remains in Items. Inventory pruning / weakest-item discard is delegated to PR #11.
 	EquippedIndex.FindOrAdd(Slot) = ItemIndex;
 	OnEquippedChanged.Broadcast(Slot);
 }

@@ -17,6 +17,63 @@ const rareWeapon: ItemInstance = {
   enhanceLevel: 0,
 };
 
+const clientServerEquipmentAnchors = [
+  {
+    name: "rare weapon base",
+    item: rareWeapon,
+    clientPowerScore: 15,
+    clientBonus: { bonusAtk: 15, bonusDef: 0, bonusHp: 0 },
+  },
+  {
+    name: "enhanced weapon",
+    item: { ...rareWeapon, enhanceLevel: 2 },
+    clientPowerScore: 18,
+    clientBonus: { bonusAtk: 18, bonusDef: 0, bonusHp: 0 },
+  },
+  {
+    name: "helmet def and hp",
+    item: {
+      itemId: "rare_helmet",
+      slot: 2,
+      rarity: 3,
+      bonusAtk: 0,
+      bonusDef: 9,
+      bonusHp: 60,
+      enhanceLevel: 0,
+    } satisfies ItemInstance,
+    clientPowerScore: 15,
+    clientBonus: { bonusAtk: 0, bonusDef: 9, bonusHp: 60 },
+  },
+  {
+    name: "enhanced accessory mixed stats",
+    item: {
+      itemId: "uncommon_accessory",
+      slot: 8,
+      rarity: 2,
+      bonusAtk: 5,
+      bonusDef: 5,
+      bonusHp: 0,
+      enhanceLevel: 1,
+    } satisfies ItemInstance,
+    clientPowerScore: 11,
+    clientBonus: { bonusAtk: 5.5, bonusDef: 5.5, bonusHp: 0 },
+  },
+  {
+    name: "empty top low stats",
+    item: {
+      itemId: "common_top",
+      slot: 3,
+      rarity: 1,
+      bonusAtk: 0,
+      bonusDef: 2,
+      bonusHp: 10,
+      enhanceLevel: 0,
+    } satisfies ItemInstance,
+    clientPowerScore: 3,
+    clientBonus: { bonusAtk: 0, bonusDef: 2, bonusHp: 10 },
+  },
+];
+
 describe("equipment formulas", () => {
   it("computes item power score with the UE5 mirror formula", () => {
     expect(computeItemPowerScore(rareWeapon)).toBe(15);
@@ -85,5 +142,31 @@ describe("equipment formulas", () => {
 
     expect(typedItem.slot).toBe(8);
     expect(typedItem.rarity).toBe(3);
+  });
+
+  it.each(
+    clientServerEquipmentAnchors,
+  )("$name PowerScore cross-validation diff 0 anchor", ({
+    item,
+    clientPowerScore,
+  }) => {
+    const serverPowerScore = computeItemPowerScore(item);
+
+    expect(serverPowerScore).toBe(clientPowerScore);
+    expect(serverPowerScore - clientPowerScore).toBe(0);
+  });
+
+  it.each(
+    clientServerEquipmentAnchors,
+  )("$name equipment bonus cross-validation diff 0 anchor", ({
+    item,
+    clientBonus,
+  }) => {
+    const serverBonus = computeInventoryBonus([item]);
+
+    expect(serverBonus).toEqual(clientBonus);
+    expect(serverBonus.bonusAtk - clientBonus.bonusAtk).toBe(0);
+    expect(serverBonus.bonusDef - clientBonus.bonusDef).toBe(0);
+    expect(serverBonus.bonusHp - clientBonus.bonusHp).toBe(0);
   });
 });
