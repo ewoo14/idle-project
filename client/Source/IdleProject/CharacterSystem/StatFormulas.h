@@ -3,10 +3,15 @@
 #include "CoreMinimal.h"
 #include "StatFormulas.generated.h"
 
-/** 서버 ClassId와 1:1로 대응되는 직업 ID입니다. */
+/**
+ * 서버 ClassId와 1:1로 대응되는 직업 ID입니다.
+ * 0 (None) 은 UE5 reflection (UENUM) 요구사항에 따른 기본 sentinel 값으로,
+ * 실제 게임 로직에서는 잘못된 ClassId 로 취급해야 합니다.
+ */
 UENUM(BlueprintType)
 enum class EClassId : uint8
 {
+	None = 0 UMETA(Hidden),
 	Warrior = 1 UMETA(DisplayName = "Warrior"),
 	Mage = 2 UMETA(DisplayName = "Mage"),
 	Archer = 3 UMETA(DisplayName = "Archer"),
