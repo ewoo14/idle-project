@@ -10,11 +10,15 @@
 class UCameraComponent;
 class UBattleAIComponent;
 class UCombatComponent;
+class UFacialExpressionComponent;
+class UIdleAnimInstance;
 class UInventoryComponent;
 class UInputAction;
 class UInputMappingContext;
+class USkeletalMeshComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
+enum class EBattleState : uint8;
 
 /**
  * M1 클라이언트 코어 부트용 임시 플레이어 캐릭터입니다.
@@ -29,6 +33,7 @@ public:
 	AIdleCharacter();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	void RefreshDerivedStats();
@@ -45,6 +50,18 @@ protected:
 	/** BP 아트가 붙기 전까지 사용하는 큐브 플레이스홀더 메시입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Character")
 	TObjectPtr<UStaticMeshComponent> PlaceholderMesh;
+
+	/** VRoid/VRM4U import 후 적용되는 실제 캐릭터 Skeletal Mesh입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Character")
+	TObjectPtr<USkeletalMeshComponent> CharacterMesh;
+
+	/** AnimBlueprint parent class입니다. INI 경로가 있으면 BeginPlay에서 교체됩니다. */
+	UPROPERTY(EditDefaultsOnly, Category = "Idle|Character")
+	TSubclassOf<UIdleAnimInstance> AnimInstanceClass;
+
+	/** VRoid Blend Shape 기반 표정 제어 컴포넌트입니다. */
+	UPROPERTY(VisibleAnywhere, Category = "Idle|Character")
+	TObjectPtr<UFacialExpressionComponent> Facial;
 
 	/** 자동 전투에 사용하는 전투 능력치 컴포넌트입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
@@ -87,9 +104,24 @@ private:
 	UFUNCTION()
 	void HandleEquippedChanged(EItemSlot Slot);
 
+	UFUNCTION()
+	void HandleHpChanged(float NewHp);
+
+	UFUNCTION()
+	void HandleDeath(AActor* DyingActor);
+
+	UFUNCTION()
+	void HandleLevelUp(int32 NewLevel);
+
 	void ConfigureInputActions();
 	void RegisterDefaultMappingContext();
+	void ConfigureCharacterVisuals();
+	void UpdateAnimInstanceVariables();
+	void UpdateBattleFacialExpression();
 	void Move(const FInputActionValue& Value);
 	void Attack(const FInputActionValue& Value);
 	void ToggleMenu(const FInputActionValue& Value);
+
+	float LastObservedHp = 0.0f;
+	EBattleState LastObservedBattleState;
 };
