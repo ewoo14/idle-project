@@ -42,6 +42,10 @@ server/.turbo/
 server/.next/
 server/.parcel-cache/
 
+# Balance simulator generated detail reports.
+# Keep the small markdown summary tracked for PR evidence.
+tools/balance-sim/reports/*.json
+
 # ===== Docker / 인프라 =====
 infra/.env
 infra/data/
