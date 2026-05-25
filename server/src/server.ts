@@ -7,6 +7,7 @@ import { authRoutes } from "./modules/auth/auth.routes.js";
 import { characterRoutes } from "./modules/character/character.routes.js";
 import { leaderboardRoutes } from "./modules/leaderboard/leaderboard.routes.js";
 import { offlineRoutes } from "./modules/offline/offline.routes.js";
+import { questRoutes } from "./modules/quest/quest.routes.js";
 import { saveRoutes } from "./modules/save/save.routes.js";
 import { authPlugin } from "./plugins/auth.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.js";
@@ -29,6 +30,7 @@ export async function buildServer(opts: { redis: Redis }) {
   await app.register(characterRoutes, { prefix: "/v1/characters" });
   await app.register(saveRoutes, { prefix: "/v1/save", redis: opts.redis });
   await app.register(offlineRoutes, { prefix: "/v1/offline" });
+  await app.register(questRoutes, { prefix: "/v1/quests" });
   await app.register(leaderboardRoutes, {
     prefix: "/v1/leaderboard",
     redis: opts.redis,

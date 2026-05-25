@@ -1,10 +1,12 @@
 import {
   bigint,
   boolean,
+  date,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uuid,
@@ -89,6 +91,32 @@ export const leaderboardRebirth = pgTable(
     leaderboardRebirthSeasonCount: index("leaderboard_rebirth_season_count").on(
       table.seasonId,
       table.rebirthCount,
+    ),
+  }),
+);
+
+export const questProgress = pgTable(
+  "quest_progress",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questId: varchar("quest_id", { length: 64 }).notNull(),
+    progress: integer("progress").notNull().default(0),
+    completed: boolean("completed").notNull().default(false),
+    claimed: boolean("claimed").notNull().default(false),
+    dailyResetDate: date("daily_reset_date"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    questProgressPk: primaryKey({ columns: [table.userId, table.questId] }),
+    questProgressUserCompleted: index("quest_progress_user_completed_idx").on(
+      table.userId,
+      table.completed,
+      table.claimed,
+    ),
+    questProgressDailyReset: index("quest_progress_daily_reset_idx").on(
+      table.dailyResetDate,
     ),
   }),
 );
