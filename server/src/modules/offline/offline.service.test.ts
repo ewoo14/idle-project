@@ -60,6 +60,51 @@ describe("OfflineService", () => {
     expect(result.rewards.exp).toBe(0);
   });
 
+  it("previews rewards when lastSeenAt is the unix epoch", async () => {
+    const repo = createRepo({
+      ...character,
+      level: 1,
+      rebirthCount: 0,
+      lastSeenAt: new Date(0),
+    });
+    const service = new OfflineService(
+      repo,
+      () => new Date("1970-01-01T00:01:00.000Z"),
+    );
+
+    const result = await service.preview(userId(), character.id);
+
+    expect(result.lastSeenUnixSec).toBe(0);
+    expect(result.rewards).toMatchObject({
+      cappedSeconds: 60,
+      gold: 180,
+      exp: 180,
+    });
+  });
+
+  it("claims rewards when lastSeenAt is the unix epoch", async () => {
+    const repo = createRepo({
+      ...character,
+      level: 1,
+      rebirthCount: 0,
+      lastSeenAt: new Date(0),
+    });
+    const service = new OfflineService(
+      repo,
+      () => new Date("1970-01-01T00:01:00.000Z"),
+    );
+
+    const result = await service.claim(userId(), character.id);
+
+    expect(repo.claim).toHaveBeenCalledWith({
+      characterId: character.id,
+      gold: 180,
+      exp: 180,
+      now: new Date("1970-01-01T00:01:00.000Z"),
+    });
+    expect(result.lastSeenUnixSec).toBe(0);
+  });
+
   it("rejects claims with no elapsed offline time", async () => {
     const repo = createRepo({
       ...character,

@@ -2,12 +2,12 @@
 
 int64 FOfflineRewardFormula::BaseGoldPerSec(int32 Level)
 {
-	return Level * 4;
+	return static_cast<int64>(Level) * 4;
 }
 
 int64 FOfflineRewardFormula::BaseExpPerSec(int32 Level)
 {
-	return Level * 4;
+	return static_cast<int64>(Level) * 4;
 }
 
 double FOfflineRewardFormula::ComputeTimeBonusMultiplier(int64 CappedSeconds, int32 RebirthCount)

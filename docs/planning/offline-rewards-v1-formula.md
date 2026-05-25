@@ -22,10 +22,13 @@ gold = round(baseGoldPerSec(level) * cappedSeconds * 0.75 * timeBonusMultiplier)
 exp = round(baseExpPerSec(level) * cappedSeconds * 0.75 * timeBonusMultiplier)
 ```
 
+`baseGoldPerSec` and `baseExpPerSec` are the shared level-scaling base rates. They are intentionally identical in V1 so gold and EXP stay in parity before later content-specific reward tables. Server code uses JavaScript `number`; the C++ mirror casts level to `int64` before multiplication so high-level rates do not overflow an `int32` intermediate.
+
 The level 1 active baseline mirrors M1's approximate 14,400 gold/EXP per hour before offline efficiency and time/rebirth bonuses.
 
 ## Verification
 
-- Server: `npm test -- offline.test.ts`
-- Client: `IdleProject.GameCore.OfflineRewardFormula.ComputeOfflineRewards`
+- Server formula: `npm test -- offline.test.ts`
+- Server offline module: `npm test -- offline.service.test.ts`
+- Client formula mirror: `IdleProject.GameCore.OfflineRewardFormula.ComputeOfflineRewards`
 - Claim flow: `IdleProject.GameCore.IdleGameInstance.ClaimOfflineRewards`

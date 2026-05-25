@@ -18,6 +18,22 @@ describe("computeOfflineRewards", () => {
     expect(result.cappedSeconds).toBe(OFFLINE_CAP_SECONDS);
   });
 
+  it("keeps one second below cap and clamps one second above cap", () => {
+    const underCap = computeOfflineRewards({
+      level: 10,
+      lastSeenUnixSec: 1_000,
+      nowUnixSec: 1_000 + OFFLINE_CAP_SECONDS - 1,
+    });
+    const overCap = computeOfflineRewards({
+      level: 10,
+      lastSeenUnixSec: 1_000,
+      nowUnixSec: 1_000 + OFFLINE_CAP_SECONDS + 1,
+    });
+
+    expect(underCap.cappedSeconds).toBe(43_199);
+    expect(overCap.cappedSeconds).toBe(43_200);
+  });
+
   it("returns zero rewards when no time elapsed", () => {
     const result = computeOfflineRewards({
       level: 10,
@@ -30,6 +46,29 @@ describe("computeOfflineRewards", () => {
       gold: 0,
       exp: 0,
     });
+  });
+
+  it("accepts unix epoch zero as a valid lastSeen timestamp", () => {
+    const result = computeOfflineRewards({
+      level: 1,
+      lastSeenUnixSec: 0,
+      nowUnixSec: 60,
+    });
+
+    expect(result.cappedSeconds).toBe(60);
+    expect(result.gold).toBe(180);
+    expect(result.exp).toBe(180);
+  });
+
+  it("returns non-zero gold and exp for a positive elapsed second", () => {
+    const result = computeOfflineRewards({
+      level: 1,
+      lastSeenUnixSec: 1_000,
+      nowUnixSec: 1_001,
+    });
+
+    expect(result.gold).toBeGreaterThan(0);
+    expect(result.exp).toBeGreaterThan(0);
   });
 
   it("applies offline efficiency to level-based base rates", () => {
@@ -47,6 +86,13 @@ describe("computeOfflineRewards", () => {
     expect(result.exp).toBe(
       Math.round(baseExpPerSec(level) * seconds * OFFLINE_EFFICIENCY),
     );
+  });
+
+  it("keeps high-level base rates in numeric parity with client int64", () => {
+    const highLevel = 1_000_000_000;
+
+    expect(baseGoldPerSec(highLevel)).toBe(4_000_000_000);
+    expect(baseExpPerSec(highLevel)).toBe(4_000_000_000);
   });
 
   it("increases rewards with rebirth bonus", () => {

@@ -14,6 +14,8 @@ Server source of truth: `server/src/core/formulas/offline.ts`.
 - Time bonus: `1 + cappedHours * 0.005 + rebirthCount * 0.05`
 - Rewards are rounded with `Math.round`.
 
+V1 keeps gold and EXP base rates identical. The server is the source of truth; the C++ mirror uses `int64` arithmetic for base rates to match server `number` results at high levels.
+
 ## GET `/preview`
 
 Returns the currently claimable offline rewards without mutating character state.
