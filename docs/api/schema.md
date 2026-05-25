@@ -25,6 +25,7 @@ erDiagram
     int class_id
     int level
     int rebirth_count
+    int rebirth_bonus_points
     jsonb stats
     jsonb skill_tree
     jsonb inventory
@@ -73,7 +74,7 @@ erDiagram
 | 테이블 | 주요 컬럼 | 제약 / 인덱스 |
 | --- | --- | --- |
 | `users` | `id`, `email`, `password_hash`, `nickname`, `created_at`, `last_login_at` | `email` citext unique, `nickname` unique |
-| `characters` | `id`, `user_id`, `class_id`, `level`, `rebirth_count`, `stats`, `skill_tree`, `inventory`, `gold`, `total_exp`, `last_seen_at`, `last_save_at` | `user_id` cascade FK, `class_id between 1 and 5`, `level between 1 and 200`, `gold >= 0`, `total_exp >= 0` |
+| `characters` | `id`, `user_id`, `class_id`, `level`, `rebirth_count`, `rebirth_bonus_points`, `stats`, `skill_tree`, `inventory`, `gold`, `total_exp`, `last_seen_at`, `last_save_at` | `user_id` cascade FK, `class_id between 1 and 5`, `level between 1 and 200`, `rebirth_bonus_points >= 0`, `gold >= 0`, `total_exp >= 0` |
 | `saves` | `id`, `character_id`, `version`, `payload`, `server_validated`, `created_at` | `character_id` cascade FK, `saves_character_created(character_id, created_at desc)` |
 | `leaderboard_power` | `character_id`, `season_id`, `power_score`, `updated_at` | `leaderboard_power_season_score(season_id, power_score desc)` |
 | `leaderboard_rebirth` | `character_id`, `season_id`, `rebirth_count`, `updated_at` | `leaderboard_rebirth_season_count(season_id, rebirth_count desc)` |

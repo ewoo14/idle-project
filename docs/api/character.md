@@ -65,3 +65,45 @@ curl http://localhost:3000/v1/characters/$CHARACTER_ID -H "authorization: Bearer
 없는 캐릭터 또는 타 사용자 캐릭터는 `404 NOT_FOUND`.
 
 PR #4~#10 단계: 클라이언트 UI 는 ClassDB 의 Mvp=1 (전사) 만 노출. 다직업 활성화는 PR #11.
+## POST `/rebirth`
+
+Runs the server-authoritative rebirth transition for an owned character.
+
+Request:
+
+```json
+{ "characterId": "uuid" }
+```
+
+Rules:
+
+- Requires `level >= 100`.
+- Requires the Chapter 1 boss defeat flag in character `stats`:
+  `stats.progress.bChapter1BossDefeated === true` (legacy
+  `stats.bChapter1BossDefeated === true` is also accepted).
+- On success: `rebirthCount += 1`, `rebirthBonusPoints += 5`, `level = 1`,
+  `totalExp = 0`, `gold = floor(gold * 0.1)`, and the boss flag is cleared.
+- Recomputed derived stats include the permanent rebirth bonus
+  (`HP +10` and `PhysAtk +2` per bonus point).
+
+Response:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "id": "uuid",
+    "level": 1,
+    "rebirthCount": 1,
+    "rebirthBonusPoints": 5,
+    "gold": 100,
+    "totalExp": 0
+  }
+}
+```
+
+Failure codes:
+
+- `CHARACTER_NOT_FOUND`
+- `CHARACTER_REBIRTH_LEVEL_REQUIRED`
+- `CHARACTER_REBIRTH_BOSS_REQUIRED`

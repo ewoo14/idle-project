@@ -18,3 +18,14 @@ export const getCharacterSchema = {
     },
   },
 } as const;
+
+export const rebirthCharacterSchema = {
+  body: {
+    type: "object",
+    required: ["characterId"],
+    additionalProperties: false,
+    properties: {
+      characterId: { type: "string", format: "uuid" },
+    },
+  },
+} as const;
