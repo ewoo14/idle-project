@@ -4,6 +4,38 @@
 
 ---
 
+## 부록: M2 인벤토리 V1 수치
+
+`client/Content/Data/ItemDB.csv`는 PR #9 범위의 8슬롯 × 3등급 기본 장비 24종을 정의한다. Weapon은 ATK 100%, Helmet/Top/Bottom/Shoes/Gloves/Cloak은 DEF 70% + HP 30%, Accessory는 ATK/DEF/HP 균형형으로 둔다.
+
+| 등급 | ATK 평균 | DEF 평균 | HP 평균 | MaxEnhance |
+| --- | ---: | ---: | ---: | ---: |
+| Common | 1.0 | 2.5 | 11.25 | 5 |
+| Uncommon | 2.0 | 5.25 | 26.63 | 8 |
+| Rare | 3.88 | 9.75 | 49.38 | 10 |
+
+PowerScore 공식은 UE5 `FItemPowerScore::Compute`와 서버 `computeItemPowerScore`가 공유한다.
+
+```text
+PowerScore = (ATK + DEF + HP / 10) × (1 + EnhanceLevel × 0.1)
+```
+
+자동 장착 점수 비교 흐름:
+
+1. 드롭 장비가 `None` 슬롯/등급이면 인벤토리에 넣지 않는다.
+2. 장비가 최대 100칸을 넘지 않으면 인벤토리에 추가한다.
+3. 같은 슬롯의 현재 장착 장비와 신규 장비의 PowerScore를 비교한다.
+4. 신규 PowerScore가 더 높을 때만 자동 장착하고 HUD 장비 요약을 갱신한다.
+5. 같은 등급이어도 낮은 PowerScore면 기존 장비를 유지한다.
+
+드롭 밀도 기준:
+
+- 현재 슬라임 환경은 시간당 약 1200마리 처치 가정이다.
+- 1마리 처치 시 장비 드롭 5%면 1시간 기대 드롭은 약 60개다.
+- 이 수치는 M2 인벤토리 자동 흡수/자동 장착 체감 검증용이며, 실제 경제 확정값은 후속 밸런스 시뮬레이션에서 보정한다.
+
+---
+
 ## 1. 큰 원칙
 
 1. **항상 진행감(progress) 이 있어야 한다** — 1분이 지나도 무언가는 변한다 (골드, EXP, 작은 드롭).

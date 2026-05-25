@@ -24,6 +24,11 @@
 - [ ] 골드 드롭 + 자동 흡수
 - [ ] 몬스터 respawn (5초 후)
 - [ ] HUD HP/EXP/Gold 실시간 갱신
+- [ ] 장비 드롭 5% 확률 동작
+- [ ] 자동 흡수 + 자동 장착
+- [ ] HUD 좌하단 장비 표시
+- [ ] ComputeEquipmentBonus 합산 정합
+- [ ] PowerScore 강화 계수 적용
 - [ ] NetworkClient guest register 성공 호출 + 서버 미기동 graceful 진행
 
 ## 2. 서버 (Node.js) — PR #7 이후 채움
@@ -50,6 +55,8 @@
 ## 4. 데이터 / 콘텐츠 — PR #4 이후 채움
 
 - [ ] ItemDB / SkillDB / ClassDB / MonsterDB ID 충돌 없음
+- [ ] ItemDB 8슬롯 × 3등급 24행 구성
+- [ ] 장비 등급별 ATK/DEF/HP 범위 정합
 - [ ] 능력치 공식 결과 = 기대치 (대표 5케이스)
 - [ ] 강화 곡선 / 잠재 풀 정합
 - [ ] 로컬라이즈 키 누락 없음

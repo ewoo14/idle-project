@@ -27,6 +27,26 @@ FText FormatLevel(int32 Level)
 {
 	return FText::FromString(FString::Printf(TEXT("Lv. %d"), Level));
 }
+
+FSlateColor ResolveEquipmentColor(const FText& WeaponName)
+{
+	using namespace IdleProject::UI;
+
+	const FString Text = WeaponName.ToString();
+	if (Text.Contains(TEXT("Rare")))
+	{
+		return Theme::RarityRare;
+	}
+	if (Text.Contains(TEXT("Uncommon")))
+	{
+		return Theme::RarityUncommon;
+	}
+	if (Text.Contains(TEXT("Common")))
+	{
+		return Theme::RarityCommon;
+	}
+	return Theme::TextMuted;
+}
 }
 
 void SIdleHUDWidget::Construct(const FArguments& InArgs)
@@ -92,6 +112,23 @@ void SIdleHUDWidget::Construct(const FArguments& InArgs)
 				.Text(FormatGold(0))
 			]
 		]
+
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Left)
+		.VAlign(VAlign_Bottom)
+		.Padding(FMargin(24.0f, 0.0f, 0.0f, 24.0f))
+		[
+			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SAssignNew(EquipmentText, STextBlock)
+				.Font(LabelFont)
+				.ColorAndOpacity(Theme::TextMuted)
+				.Text(FText::FromString(TEXT("⚔ 무기 없음\n🛡 방어구 0/7 슬롯 (DEF+0, HP+0)")))
+			]
+		]
 	];
 }
 
@@ -124,5 +161,17 @@ void SIdleHUDWidget::UpdateLevel(int32 Level)
 	if (LevelText)
 	{
 		LevelText->SetText(FormatLevel(Level));
+	}
+}
+
+void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary)
+{
+	if (EquipmentText)
+	{
+		EquipmentText->SetText(FText::FromString(FString::Printf(
+			TEXT("%s\n%s"),
+			*WeaponName.ToString(),
+			*ArmorSummary.ToString())));
+		EquipmentText->SetColorAndOpacity(ResolveEquipmentColor(WeaponName));
 	}
 }

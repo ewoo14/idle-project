@@ -14,6 +14,7 @@
 #include "InputCoreTypes.h"
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
+#include "ItemSystem/InventoryComponent.h"
 #include "UObject/ConstructorHelpers.h"
 
 AIdleCharacter::AIdleCharacter()
@@ -47,6 +48,7 @@ AIdleCharacter::AIdleCharacter()
 
 	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("Combat"));
 	BattleAI = CreateDefaultSubobject<UBattleAIComponent>(TEXT("BattleAI"));
+	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	Movement->MaxWalkSpeed = MoveSpeed;
@@ -63,20 +65,11 @@ void AIdleCharacter::BeginPlay()
 
 	RegisterDefaultMappingContext();
 
-	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, 1);
-	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, 1);
-	UE_LOG(
-		LogTemp,
-		Display,
-		TEXT("[StatFormulas] L1 ClassId=%d STR=%.1f HP=%.1f"),
-		static_cast<int32>(DefaultClassId),
-		Primary.Str,
-		Derived.Hp);
-
-	if (Combat)
+	if (Inventory)
 	{
-		Combat->InitializeCombat(Derived.Hp, Derived.PhysAtk, Derived.PhysDef, Derived.AtkSpeed);
+		Inventory->OnEquippedChanged.AddDynamic(this, &AIdleCharacter::HandleEquippedChanged);
 	}
+	RefreshDerivedStats();
 
 	if (BattleAI)
 	{
@@ -100,6 +93,39 @@ void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this, &AIdleCharacter::Move);
 	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &AIdleCharacter::Attack);
 	EnhancedInput->BindAction(MenuToggleAction, ETriggerEvent::Started, this, &AIdleCharacter::ToggleMenu);
+}
+
+void AIdleCharacter::RefreshDerivedStats()
+{
+	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
+	const FDerivedStats EquipBonus = Inventory ? Inventory->ComputeEquipmentBonus() : FDerivedStats();
+	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus);
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("[Inventory] Stats refreshed L%d ClassId=%d HP=%.1f ATK=%.1f DEF=%.1f EquipAtk=%.1f EquipDef=%.1f EquipHp=%.1f"),
+		Level,
+		static_cast<int32>(DefaultClassId),
+		Derived.Hp,
+		Derived.PhysAtk,
+		Derived.PhysDef,
+		EquipBonus.PhysAtk,
+		EquipBonus.PhysDef,
+		EquipBonus.Hp);
+
+	if (Combat)
+	{
+		const float HpRatio = Combat->MaxHp > 0.0f ? Combat->CurrentHp / Combat->MaxHp : 1.0f;
+		Combat->InitializeCombat(Derived.Hp, Derived.PhysAtk, Derived.PhysDef, Derived.AtkSpeed);
+		Combat->CurrentHp = FMath::Clamp(Derived.Hp * HpRatio, 0.0f, Combat->MaxHp);
+		Combat->OnHpChanged.Broadcast(Combat->CurrentHp);
+	}
+}
+
+void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)
+{
+	RefreshDerivedStats();
 }
 
 void AIdleCharacter::ConfigureInputActions()

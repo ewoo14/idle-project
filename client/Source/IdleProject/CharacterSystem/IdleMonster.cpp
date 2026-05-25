@@ -6,6 +6,8 @@
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "ItemSystem/EquipmentDrop.h"
+#include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/GoldDrop.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -81,6 +83,23 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	if (GoldDrop)
 	{
 		GoldDrop->Amount = static_cast<int64>(10 + FMath::RandRange(0, 5));
+	}
+
+	if (FMath::FRand() < 0.05f)
+	{
+		const FItemInstance DropItem = FItemFactory::RandomDropFromMonster(1);
+		if (DropItem.Rarity != EItemRarity::None)
+		{
+			AEquipmentDrop* EquipmentDrop = World->SpawnActor<AEquipmentDrop>(
+				AEquipmentDrop::StaticClass(),
+				GetActorLocation(),
+				FRotator::ZeroRotator,
+				SpawnParameters);
+			if (EquipmentDrop)
+			{
+				EquipmentDrop->Payload = DropItem;
+			}
+		}
 	}
 
 	Destroy();
