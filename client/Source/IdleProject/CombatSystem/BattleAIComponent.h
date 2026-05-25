@@ -40,6 +40,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|BattleAI")
 	AActor* FindClosestEnemy();
 
+	/** 지정 반경 안의 살아있는 적들을 2D 거리 기준으로 수집합니다. 회전베기 같은 AoE 스킬에 사용합니다. */
+	UFUNCTION(BlueprintCallable, Category = "Idle|BattleAI")
+	TArray<AActor*> FindEnemiesInRange(float Radius) const;
+
 	/**
 	 * 컨트롤러 없는(비-캐릭터 경로) 몬스터의 지면 추격 목표 위치를 계산합니다.
 	 * 횡스크롤(X-Z 평면)에서 추격은 화면 가로축 X 로만 이루어지고,

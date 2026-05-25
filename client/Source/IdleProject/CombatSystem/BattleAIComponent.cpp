@@ -77,6 +77,45 @@ AActor* UBattleAIComponent::FindClosestEnemy()
 	return ClosestActor;
 }
 
+TArray<AActor*> UBattleAIComponent::FindEnemiesInRange(float Radius) const
+{
+	TArray<AActor*> Enemies;
+	if (!TargetActorClass)
+	{
+		return Enemies;
+	}
+
+	const AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+	if (!Owner || !World)
+	{
+		return Enemies;
+	}
+
+	const float RadiusSq = FMath::Square(FMath::Max(0.0f, Radius));
+	for (TActorIterator<AActor> It(World, TargetActorClass); It; ++It)
+	{
+		AActor* Candidate = *It;
+		if (!IsValid(Candidate) || Candidate == Owner)
+		{
+			continue;
+		}
+
+		const UCombatComponent* CandidateCombat = Candidate->FindComponentByClass<UCombatComponent>();
+		if (CandidateCombat && CandidateCombat->IsDead())
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared2D(Owner->GetActorLocation(), Candidate->GetActorLocation()) <= RadiusSq)
+		{
+			Enemies.Add(Candidate);
+		}
+	}
+
+	return Enemies;
+}
+
 void UBattleAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopBattle();
@@ -105,8 +144,11 @@ void UBattleAIComponent::UpdateBattle()
 	{
 		if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
 		{
-			TArray<AActor*> AoeTargets;
-			AoeTargets.Add(TargetActor);
+			TArray<AActor*> AoeTargets = FindEnemiesInRange(FMath::Max(OwnerCombat->AttackRange, 400.0f));
+			if (AoeTargets.IsEmpty())
+			{
+				AoeTargets.Add(TargetActor);
+			}
 			Skills->TickSkills(GetWorld()->GetTimeSeconds(), TargetActor, AoeTargets);
 		}
 		Attack(TargetActor);

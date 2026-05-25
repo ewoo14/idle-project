@@ -71,24 +71,31 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
 	TArray<FSkillDefinition> Skills;
 
+	/** 전사 기본 스킬 7종을 정적 정의에서 다시 로드하고 런타임 상태를 초기화합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadDefaultWarriorSkills();
 
+	/** 전투 틱에서 준비된 액티브/궁극기 스킬을 자동 발동합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets);
 
+	/** 지정 스킬이 현재 시간 기준으로 쿨다운 없이 발동 가능한지 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill")
 	bool IsReady(FName SkillId, float Now) const;
 
+	/** HUD 표시용 남은 쿨다운 초를 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill")
 	float GetCooldownRemaining(FName SkillId, float Now) const;
 
+	/** HUD 표시용 남은 쿨다운 비율(0~1)을 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill")
 	float GetCooldownRatio(FName SkillId, float Now) const;
 
+	/** 테스트/스킬 실행에서 마지막 발동 시간을 기록합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	bool MarkSkillCast(FName SkillId, float Now);
 
+	/** 공격/피격 이벤트로 얻은 궁극기 게이지를 0~100 범위에 누적합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void AddGauge(float Amount);
 
@@ -101,6 +108,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	bool TryConsumeUltimateGauge();
 
+	/** 영구 패시브 스킬 효과를 파생 능력치에 합산합니다. */
 	void ApplyPassivesToStats(FDerivedStats& InOutStats) const;
 	float GetGaugeGainOnHit() const;
 	float GetGaugeGainOnTakeDamage() const;

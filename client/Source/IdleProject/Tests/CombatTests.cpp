@@ -4,6 +4,8 @@
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "Components/SceneComponent.h"
+#include "Engine/World.h"
 #include "UI/IdleHUD.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -192,7 +194,7 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	const TArray<FIdleHUDSkillSlotViewModel> Slots = IdleProject::UI::BuildSkillSlotViewModels(*Skills, Now);
 
 	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 4);
-	TestEqual(TEXT("First active skill keeps display name"), Slots[0].DisplayName.ToString(), FString(TEXT("Heavy Strike")));
+	TestEqual(TEXT("First active skill keeps localized display name"), Slots[0].DisplayName.ToString(), FString(TEXT("강타")));
 	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, 0.5f);
 	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, 2.0f);
 	TestFalse(TEXT("Cooling skill is not ready"), Slots[0].bReady);
@@ -201,5 +203,117 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
 	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillAoeTargetsTest,
+	"IdleProject.Combat.Skills.AoeTargets",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillAoeTargetsTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* PrimaryTarget = NewObject<AActor>();
+	UCombatComponent* PrimaryCombat = NewObject<UCombatComponent>(PrimaryTarget);
+	PrimaryTarget->AddInstanceComponent(PrimaryCombat);
+
+	AActor* SecondaryTarget = NewObject<AActor>();
+	UCombatComponent* SecondaryCombat = NewObject<UCombatComponent>(SecondaryTarget);
+	SecondaryTarget->AddInstanceComponent(SecondaryCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 0.0f, 1.0f);
+	PrimaryCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	SecondaryCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	Skills->LoadDefaultWarriorSkills();
+
+	Skills->MarkSkillCast(TEXT("heavy_strike"), 10.0f);
+	Skills->MarkSkillCast(TEXT("shield_up"), 10.0f);
+	Skills->MarkSkillCast(TEXT("charge"), 10.0f);
+
+	TArray<AActor*> AoeTargets;
+	AoeTargets.Add(PrimaryTarget);
+	AoeTargets.Add(SecondaryTarget);
+	Skills->TickSkills(12.0f, PrimaryTarget, AoeTargets);
+
+	TestTrue(TEXT("Whirlwind damages primary target"), PrimaryCombat->CurrentHp < PrimaryCombat->MaxHp);
+	TestTrue(TEXT("Whirlwind damages secondary target"), SecondaryCombat->CurrentHp < SecondaryCombat->MaxHp);
+	TestEqual(TEXT("Whirlwind applies the same damage to every AoE target"), PrimaryCombat->CurrentHp, SecondaryCombat->CurrentHp);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBattleAIAoeTargetGatheringTest,
+	"IdleProject.Combat.BattleAI.AoeTargetGathering",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBattleAIAoeTargetGatheringTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto SpawnPositionedActor = [&World, &SpawnParams](const FVector& Location)
+	{
+		AActor* Actor = World->SpawnActor<AActor>(AActor::StaticClass(), Location, FRotator::ZeroRotator, SpawnParams);
+		USceneComponent* Root = NewObject<USceneComponent>(Actor);
+		Actor->SetRootComponent(Root);
+		Root->RegisterComponent();
+		Actor->SetActorLocation(Location);
+		return Actor;
+	};
+
+	AActor* Owner = SpawnPositionedActor(FVector(0.0, 0.0, 0.0));
+	UBattleAIComponent* BattleAI = NewObject<UBattleAIComponent>(Owner);
+	Owner->AddInstanceComponent(BattleAI);
+	BattleAI->RegisterComponent();
+	BattleAI->TargetActorClass = AActor::StaticClass();
+
+	AActor* NearTarget = SpawnPositionedActor(FVector(150.0, 0.0, 500.0));
+	UCombatComponent* NearCombat = NewObject<UCombatComponent>(NearTarget);
+	NearTarget->AddInstanceComponent(NearCombat);
+	NearCombat->RegisterComponent();
+	NearCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* EdgeTarget = SpawnPositionedActor(FVector(399.0, 0.0, -200.0));
+	UCombatComponent* EdgeCombat = NewObject<UCombatComponent>(EdgeTarget);
+	EdgeTarget->AddInstanceComponent(EdgeCombat);
+	EdgeCombat->RegisterComponent();
+	EdgeCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* FarTarget = SpawnPositionedActor(FVector(450.0, 0.0, 0.0));
+	UCombatComponent* FarCombat = NewObject<UCombatComponent>(FarTarget);
+	FarTarget->AddInstanceComponent(FarCombat);
+	FarCombat->RegisterComponent();
+	FarCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* DeadTarget = SpawnPositionedActor(FVector(100.0, 0.0, 0.0));
+	UCombatComponent* DeadCombat = NewObject<UCombatComponent>(DeadTarget);
+	DeadTarget->AddInstanceComponent(DeadCombat);
+	DeadCombat->RegisterComponent();
+	DeadCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+	DeadCombat->TakeDamage(200.0f, Owner);
+
+	const TArray<AActor*> AoeTargets = BattleAI->FindEnemiesInRange(400.0f);
+
+	TestEqual(TEXT("Far target stays outside 400 units on X"), FarTarget->GetActorLocation().X, 450.0, 0.01);
+	TestTrue(TEXT("AoE gathering includes a near target"), AoeTargets.Contains(NearTarget));
+	TestTrue(TEXT("AoE gathering uses 2D distance and includes edge target"), AoeTargets.Contains(EdgeTarget));
+	TestFalse(TEXT("AoE gathering excludes far target"), AoeTargets.Contains(FarTarget));
+	TestFalse(TEXT("AoE gathering excludes dead target"), AoeTargets.Contains(DeadTarget));
+	TestFalse(TEXT("AoE gathering excludes owner"), AoeTargets.Contains(Owner));
+
+	World->DestroyWorld(false);
 	return true;
 }

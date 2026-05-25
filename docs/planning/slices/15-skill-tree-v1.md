@@ -65,7 +65,7 @@
 - `IdleHUD` 확장: 하단에 액티브 4종 쿨다운(아이콘/바 + 남은 비율) + 궁극기 게이지 바. V1 은 텍스트/단순 바 허용(아이콘 에셋 후속).
 
 ### 2.7 서버 미러 (최소)
-- `SkillDB` 시드(전사 7종 id/type/cooldown/계수)만 server 에 최소 추가(읽기 전용 참조). 실제 스킬 실행은 클라 C++ 결정적 로직.
+- `SkillDB` 시드(전사 7종 id/type/effectType/cooldown/계수/버프/게이지)를 `server/src/core/data/skills.ts` 에 최소 추가(읽기 전용 참조). 실제 스킬 실행은 클라 C++ 결정적 로직.
 
 ### 2.8 테스트
 - 순수 로직 자동화 테스트: 쿨다운 `IsReady/GetCooldownRatio`, 궁극기 게이지 누적/임계/리셋, 패시브 `ApplyPassivesToStats` 합산.
@@ -87,7 +87,7 @@
 | **캐릭터·전투 (메인)** | `USkillComponent` + `FSkillDefinition` + 자동발동/쿨다운/게이지/패시브 + BattleAI 연동 + AIdleCharacter 주입 + 테스트 | ✅ 메인 (`character`) |
 | 밸런스 | 전사 7종 수치(쿨다운/계수/게이지율) 데이터 + 밸런스 문서 갱신 | ✅ 보조 (`balance`) |
 | 디자이너 | HUD 쿨다운/게이지 표시 + 아트 디렉션(스킬 아이콘/이펙트 방향) | ✅ 보조 (`designer`) |
-| 백엔드 | `SkillDB` 최소 시드(읽기 참조) | ◻ 최소 (`backend`) |
+| 백엔드 | `SkillDB` 최소 시드(읽기 참조) | ✅ 최소 (`backend`) |
 | QA | 스킬 자동발동/게이지/패시브 검증 시나리오 + IT | ✅ 보조 (`qa`) |
 | 스토리/퀘스트 | 해당 없음(스킬 플레이버 텍스트만 story 보조 선택) | ◻ |
 

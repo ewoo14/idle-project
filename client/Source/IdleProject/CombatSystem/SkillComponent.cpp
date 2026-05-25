@@ -54,13 +54,13 @@ void USkillComponent::LoadDefaultWarriorSkills()
 	AtkSpeedBuffMagnitude = 0.0f;
 	AtkSpeedBuffEndTime = 0.0f;
 
-	Skills.Add(MakeSkill(TEXT("heavy_strike"), TEXT("Heavy Strike"), ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.5f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("whirlwind"), TEXT("Whirlwind"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("shield_up"), TEXT("Shield Up"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("charge"), TEXT("Charge"), ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("weapon_mastery"), TEXT("Weapon Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("toughness"), TEXT("Toughness"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("berserkers_fury"), TEXT("Berserker's Fury"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f));
+	Skills.Add(MakeSkill(TEXT("heavy_strike"), TEXT("강타"), ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.5f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("whirlwind"), TEXT("회전베기"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("shield_up"), TEXT("방패 올리기"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("charge"), TEXT("돌진"), ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("weapon_mastery"), TEXT("무기 숙련"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("toughness"), TEXT("강인함"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("berserkers_fury"), TEXT("광전사의 분노"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f));
 }
 
 void USkillComponent::TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets)
