@@ -11,7 +11,9 @@
 | `save.md` | 클라우드 세이브 API |
 | `character.md` | 캐릭터 / 환생 API |
 | `offline.md` | 오프라인 보상 preview/claim API |
+| `pets.md` | Pet ownership/equip API |
 | `quest.md` | 퀘스트 목록/진행/보상 API |
+| `season.md` | Season pass progress/token/claim API |
 | `leaderboard.md` | 랭킹 API |
 | `errors.md` | 공통 에러 코드와 1.0 prefix 설계 |
 | `events.md` | WebSocket 이벤트 (1.0) |

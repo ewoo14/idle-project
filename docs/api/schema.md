@@ -6,6 +6,8 @@
 erDiagram
   users ||--o{ characters : owns
   users ||--o{ quest_progress : tracks
+  users ||--|| pet_state : owns_pets
+  users ||--o{ season_state : tracks_season
   characters ||--o{ saves : has
   characters ||--|| leaderboard_power : ranked_by_power
   characters ||--|| leaderboard_rebirth : ranked_by_rebirth
@@ -67,6 +69,21 @@ erDiagram
     date daily_reset_date
     timestamptz updated_at
   }
+
+  pet_state {
+    uuid user_id PK, FK
+    jsonb owned_pet_ids
+    varchar equipped_pet_id
+    timestamptz updated_at
+  }
+
+  season_state {
+    uuid user_id PK, FK
+    int season_id PK
+    int tokens
+    jsonb claimed_tiers
+    timestamptz updated_at
+  }
 ```
 
 ## 테이블
@@ -79,6 +96,8 @@ erDiagram
 | `leaderboard_power` | `character_id`, `season_id`, `power_score`, `updated_at` | `leaderboard_power_season_score(season_id, power_score desc)` |
 | `leaderboard_rebirth` | `character_id`, `season_id`, `rebirth_count`, `updated_at` | `leaderboard_rebirth_season_count(season_id, rebirth_count desc)` |
 | `quest_progress` | `user_id`, `quest_id`, `progress`, `completed`, `claimed`, `daily_reset_date`, `updated_at` | PK(`user_id`, `quest_id`), `user_id` cascade FK, `quest_progress_user_completed_idx`, `quest_progress_daily_reset_idx` |
+| `pet_state` | `user_id`, `owned_pet_ids`, `equipped_pet_id`, `updated_at` | PK(`user_id`), `user_id` cascade FK |
+| `season_state` | `user_id`, `season_id`, `tokens`, `claimed_tiers`, `updated_at` | PK(`user_id`, `season_id`), `user_id` cascade FK, `season_state_tokens_idx` |
 
 마이그레이션 파일은 `server/migrations/0001_init.sql`, 롤백은 `server/migrations/0001_init.down.sql`이다.
 
@@ -98,3 +117,16 @@ PR #15 keeps combat execution authoritative in the Unreal client, but the server
 | `buffDuration` | Buff duration seconds |
 | `gaugeGainOnHit` | Ultimate gauge gained on normal hit |
 | `gaugeGainOnTakeDamage` | Ultimate gauge gained on taking damage |
+
+## PetDB Mirror
+
+PR #22 adds `server/src/core/data/pets.ts` as the server-authoritative V1 pet mirror.
+
+| Pet | Bonus |
+| --- | --- |
+| `dog` | `gold +20%` |
+| `cat` | `drop +15%` |
+
+## Season Pass Mirror
+
+PR #22 adds `server/src/core/data/season.ts` with 10 free-track tiers. Progress is stored in `season_state.tokens`; claimed rewards are tracked in `season_state.claimed_tiers`.
