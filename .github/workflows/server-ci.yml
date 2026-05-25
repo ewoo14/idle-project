@@ -57,4 +57,5 @@ jobs:
 
       - name: Skip notice (server 아직 스캐폴드 전)
         if: steps.detect.outputs.scaffolded == 'false'
-        run: echo "server/ 가 아직 스캐폴드되지 않아 단계를 건너뜁니다. (PR #7 머지 이후 정상 동작)"
+        run: |
+          echo "server/ 가 아직 스캐폴드되지 않아 단계를 건너뜁니다. (PR 7 머지 이후 정상 동작)"
