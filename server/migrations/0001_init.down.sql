@@ -1,0 +1,9 @@
+drop index if exists saves_character_created;
+drop index if exists leaderboard_rebirth_season_count;
+drop index if exists leaderboard_power_season_score;
+drop table if exists leaderboard_rebirth;
+drop table if exists leaderboard_power;
+drop table if exists saves;
+drop table if exists characters;
+drop table if exists users;
+drop extension if exists citext;
