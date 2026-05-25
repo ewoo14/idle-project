@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "CharacterSystem/StatFormulas.h"
 #include "IdleCharacter.generated.h"
 
 class UCameraComponent;
@@ -57,6 +58,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Movement")
 	float MoveSpeed = 450.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Idle")
+	EClassId DefaultClassId = EClassId::Warrior;
 
 private:
 	void ConfigureInputActions();

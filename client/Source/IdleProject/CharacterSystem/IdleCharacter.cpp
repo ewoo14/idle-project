@@ -56,6 +56,16 @@ void AIdleCharacter::BeginPlay()
 	Super::BeginPlay();
 
 	RegisterDefaultMappingContext();
+
+	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, 1);
+	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, 1);
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("[StatFormulas] L1 ClassId=%d STR=%.1f HP=%.1f"),
+		static_cast<int32>(DefaultClassId),
+		Primary.Str,
+		Derived.Hp);
 }
 
 void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
