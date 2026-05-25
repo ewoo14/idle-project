@@ -6,6 +6,10 @@
 
 class UApiClient;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
+
 /**
  * 게임 전역 서비스 컨테이너입니다.
  * PR #4에서는 API 클라이언트 생성과 기본 URL 보관만 담당합니다.
@@ -25,6 +29,36 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
+	void AddGold(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
+	void AddExp(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
+	void LevelUp();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
+	int64 GetGold() const { return Gold; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
+	int32 GetCharacterLevel() const { return CharacterLevel; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
+	int64 GetCurrentExp() const { return CurrentExp; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
+	int64 GetNextExp() const { return NextExp; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
+	FOnGoldChanged OnGoldChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
+	FOnExpChanged OnExpChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
+	FOnLevelUp OnLevelUp;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
@@ -32,4 +66,16 @@ private:
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
+
+	UPROPERTY()
+	int64 Gold = 0;
+
+	UPROPERTY()
+	int32 CharacterLevel = 1;
+
+	UPROPERTY()
+	int64 CurrentExp = 0;
+
+	UPROPERTY()
+	int64 NextExp = 150;
 };

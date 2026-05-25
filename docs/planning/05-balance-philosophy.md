@@ -184,3 +184,19 @@ PR #2 백엔드 V1부터 서버에서 사용하는 공식의 단일 source of tr
 - `client/Content/Data/LevelCurveDB.csv`: UE5 DataTable 임포트용 레벨 경험치 앵커 CSV
 
 기획 문서의 수식 또는 표를 조정할 때는 위 파일의 단위 테스트를 함께 갱신한다. M2 밸런스 시뮬레이터가 도착하면 `level.ts`의 경험치 곡선 보정항과 `stats.ts`의 직업별 성장 보너스를 시뮬레이션 결과에 맞춰 재보정한다.
+
+---
+
+## 부록 — M1 자동 전투 V1 수치 (PR #6)
+
+| 항목 | 기준 수치 | 비고 |
+| --- | --- | --- |
+| Monster 기본 수치 (슬라임) | HP 50 / Atk 8 / Def 5 / Reward Gold 10~15 | `AIdleMonster` placeholder 기본값 |
+| 전사 레벨 1 공격/방어 | PhysAtk 24 / PhysDef 16.0 | `StatFormulas` 결과 |
+| 1마리 처치 시간 추정 | `(50 HP) / (24 - 5 * 0.6 = 21 dmg)` ≈ 3회 공격 → `3 * atkSpeed(1.0s)` = 약 3초 | `CombatFormulas::ComputeDamage` 기준 |
+| 시간당 처치 수 | 약 1200마리 | 5마리 spawn, 무한 respawn 단순 가정 |
+| 시간당 골드 | 약 14400~18000 gold | 1200마리 * 10~15 gold |
+| 시간당 EXP | 약 14400 EXP | monster 1마리 = `level * 12 = 12 EXP` (PR #1 §3.2.2 미러) |
+| 레벨업 시간 | 레벨 1→2 필요치 3506 EXP 기준 약 14분 | M1 단순 환경 기준. 후속 PR 인벤토리/스킬 추가 후 보정 |
+
+M1 자동 전투 V1은 “움직이고 보상이 누적되는 체감” 검증이 목적이다. 위 수치는 실제 경제 밸런스 확정값이 아니라, M2 밸런스 시뮬레이터와 인벤토리/스킬/오프라인 보상 도입 후 재보정할 1차 기준선이다.

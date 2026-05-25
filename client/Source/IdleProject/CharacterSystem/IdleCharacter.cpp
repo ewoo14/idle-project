@@ -1,8 +1,11 @@
 #include "CharacterSystem/IdleCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "CharacterSystem/IdleMonster.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "CombatSystem/BattleAIComponent.h"
+#include "CombatSystem/CombatComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -42,6 +45,9 @@ AIdleCharacter::AIdleCharacter()
 		PlaceholderMesh->SetStaticMesh(CubeMesh.Object);
 	}
 
+	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("Combat"));
+	BattleAI = CreateDefaultSubobject<UBattleAIComponent>(TEXT("BattleAI"));
+
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	Movement->MaxWalkSpeed = MoveSpeed;
 	Movement->bOrientRotationToMovement = false;
@@ -66,6 +72,17 @@ void AIdleCharacter::BeginPlay()
 		static_cast<int32>(DefaultClassId),
 		Primary.Str,
 		Derived.Hp);
+
+	if (Combat)
+	{
+		Combat->InitializeCombat(Derived.Hp, Derived.PhysAtk, Derived.PhysDef, Derived.AtkSpeed);
+	}
+
+	if (BattleAI)
+	{
+		BattleAI->TargetActorClass = AIdleMonster::StaticClass();
+		BattleAI->StartBattle();
+	}
 }
 
 void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

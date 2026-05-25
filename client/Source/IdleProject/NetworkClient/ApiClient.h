@@ -23,8 +23,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Network")
 	bool Post(const FString& Path, const FString& JsonBody);
 
+	void RegisterGuest(TFunction<void(bool, FString)> Callback);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetBaseUrl() const { return BaseUrl; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Network")
+	const FString& GetAuthToken() const { return AuthToken; }
 
 private:
 	FString BuildUrl(const FString& Path) const;
@@ -33,4 +38,7 @@ private:
 
 	UPROPERTY()
 	FString BaseUrl = TEXT("http://localhost:3000");
+
+	UPROPERTY()
+	FString AuthToken;
 };

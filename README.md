@@ -62,20 +62,17 @@ docker compose up -d
 
 ---
 
-## 개발 워크플로우 (요약, v2)
+## 개발 워크플로우 (요약, v3 — 2026-05-25 사용자 명시)
 
-1. **PM(Claude)** 이 기획/작업 명세를 작성하고 PR 을 생성합니다.
-2. **Codex CLI 에이전트** (7파트) 가 PR 브랜치에 구현을 **커밋** 합니다 (개별 코멘트 금지).
-3. 두 라인 **병렬 종합** — 외부 코멘트는 TM 만:
-   - **Claude TM** 이 Claude 7파트 리뷰를 종합 → 1개 코멘트
-   - **Codex TM** 이 Codex 7파트 리뷰를 종합 → 1개 코멘트 (Claude TM 과 비교)
-4. **PM** 이 양 TM 종합을 비교 / 통합하여 fix 지시 코멘트 게시.
-5. **Codex 에이전트** 가 fix 진행.
-6. **Claude TM + Codex TM** 각자 재검토 1개씩.
-7. **PM** 이 통합 판정 — fix 없음이면 [8], 있으면 [5] 로 루프.
-8. **CI 통과 확인 + PM 종합 소견 리뷰** 게시 후 머지.
+1. **PM(Claude)** 기획 → PR 생성.
+2. **Codex 개발** (메인 + 보조 합동 호출) → 커밋 + 푸시. **PM 이 Codex 산출 정리 → PR 코멘트로 게시**.
+3. **Claude 리뷰 + fix** — Claude TM 종합 1개 코멘트 + Claude/PM 직접 처리 가능 항목은 fix commit.
+4. **Codex 리뷰 + fix** — Codex TM 종합 1개 코멘트 (Claude TM 비교 포함) + Codex 자체 fix commit. **PM 이 Codex fix 산출 → PR 코멘트로 게시**.
+5. **Claude 검증 리뷰** — Claude TM 판정. fix 없음 → 단계 [N], fix 있음 → [3] 또는 [4] 로 루프.
+6. (필요 시 라운드 반복)
+N. **CI 통과 + PM 종합 소견 + 머지**.
 
-자세한 단계는 [`docs/workflow/01-pm-codex-claude-loop.md`](docs/workflow/01-pm-codex-claude-loop.md) 참고.
+자세한 단계는 [`docs/workflow/01-pm-codex-claude-loop.md`](docs/workflow/01-pm-codex-claude-loop.md) (v3) 참고.
 
 ---
 

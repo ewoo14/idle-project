@@ -7,6 +7,8 @@
 #include "IdleCharacter.generated.h"
 
 class UCameraComponent;
+class UBattleAIComponent;
+class UCombatComponent;
 class UInputAction;
 class UInputMappingContext;
 class USpringArmComponent;
@@ -39,6 +41,14 @@ protected:
 	/** BP 아트가 붙기 전까지 사용하는 큐브 플레이스홀더 메시입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Character")
 	TObjectPtr<UStaticMeshComponent> PlaceholderMesh;
+
+	/** 자동 전투에 사용하는 전투 능력치 컴포넌트입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	TObjectPtr<UCombatComponent> Combat;
+
+	/** 주변 몬스터를 자동 탐색하고 공격하는 AI 컴포넌트입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	TObjectPtr<UBattleAIComponent> BattleAI;
 
 	/** 좌우 이동 입력 액션입니다. */
 	UPROPERTY(Transient)
