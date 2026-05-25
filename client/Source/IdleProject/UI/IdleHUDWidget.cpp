@@ -1,5 +1,6 @@
 #include "UI/IdleHUDWidget.h"
 
+#include "Internationalization/IdleLocalization.h"
 #include "Styling/CoreStyle.h"
 #include "UI/UIThemeTokens.h"
 #include "Widgets/SOverlay.h"
@@ -10,22 +11,32 @@ namespace
 {
 FText FormatHp(float Current, float Max)
 {
-	return FText::FromString(FString::Printf(TEXT("HP %.0f / %.0f"), Current, Max));
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Current"), FText::AsNumber(FMath::RoundToInt(Current)));
+	Args.Add(TEXT("Max"), FText::AsNumber(FMath::RoundToInt(Max)));
+	return IdleProject::Localization::UI(TEXT("HUD_HP_FORMAT"), Args);
 }
 
 FText FormatExp(int64 Current, int64 Next)
 {
-	return FText::FromString(FString::Printf(TEXT("EXP %lld / %lld"), Current, Next));
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Current"), FText::AsNumber(Current));
+	Args.Add(TEXT("Next"), FText::AsNumber(Next));
+	return IdleProject::Localization::UI(TEXT("HUD_EXP_FORMAT"), Args);
 }
 
 FText FormatGold(int64 Amount)
 {
-	return FText::FromString(FString::Printf(TEXT("골드 %lld"), Amount));
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Amount"), FText::AsNumber(Amount));
+	return IdleProject::Localization::UI(TEXT("HUD_GOLD_FORMAT"), Args);
 }
 
 FText FormatLevel(int32 Level)
 {
-	return FText::FromString(FString::Printf(TEXT("Lv. %d"), Level));
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Level"), FText::AsNumber(Level));
+	return IdleProject::Localization::UI(TEXT("HUD_LEVEL_FORMAT"), Args);
 }
 
 FSlateColor ResolveEquipmentColor(const FText& WeaponName)
@@ -126,7 +137,17 @@ void SIdleHUDWidget::Construct(const FArguments& InArgs)
 				SAssignNew(EquipmentText, STextBlock)
 				.Font(LabelFont)
 				.ColorAndOpacity(Theme::TextMuted)
-				.Text(FText::FromString(TEXT("⚔ 무기 없음\n🛡 방어구 0/7 슬롯 (DEF+0, HP+0)")))
+				.Text(FText::Format(
+					FText::FromString(TEXT("{0}\n{1}")),
+					IdleProject::Localization::UI(TEXT("HUD_NO_WEAPON")),
+					IdleProject::Localization::UI(TEXT("HUD_ARMOR_SUMMARY_FORMAT"), []()
+					{
+						FFormatNamedArguments Args;
+						Args.Add(TEXT("Count"), FText::AsNumber(0));
+						Args.Add(TEXT("Defense"), FText::AsNumber(0));
+						Args.Add(TEXT("Hp"), FText::AsNumber(0));
+						return Args;
+					}())))
 			]
 		]
 	];
@@ -168,10 +189,7 @@ void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& Armor
 {
 	if (EquipmentText)
 	{
-		EquipmentText->SetText(FText::FromString(FString::Printf(
-			TEXT("%s\n%s"),
-			*WeaponName.ToString(),
-			*ArmorSummary.ToString())));
+		EquipmentText->SetText(FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponName, ArmorSummary));
 		EquipmentText->SetColorAndOpacity(ResolveEquipmentColor(WeaponName));
 	}
 }

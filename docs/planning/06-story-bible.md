@@ -14,7 +14,9 @@
 - **참고**: `docs/planning/01-game-design.md §5.2`,
   `docs/planning/01-game-design.md §8`,
   `docs/planning/04-art-direction.md`, `codex/prompts/story.md`
-- **연계 산출물**: `client/Content/Localization/Game/ko/StoryText.csv`
+- **연계 산출물**:
+  `client/Content/Localization/Game/{ko,en}/StoryText.csv`,
+  `client/Content/Localization/Game/{ko,en}/Story.csv`
 
 ---
 
@@ -292,6 +294,10 @@ NPC는 절망을 설명하기보다 "어떻게 수습할지"를 먼저 말한다
 
 CSV는 `Namespace,Key,SourceString,Comment` 컬럼을 사용한다.
 `Namespace`는 V1에서 `Story`로 고정한다.
+`StoryText.csv`는 컷씬/퀘스트 대사 키만 담고,
+`Story.csv`는 챕터, 맵, 보스, 환생 메타처럼 UI나 로그에서 재사용할
+스토리 메타데이터만 담는다. 두 파일은 같은 `Story` 네임스페이스를
+쓰지만, 키는 서로 중복하지 않는다.
 
 ---
 
@@ -322,4 +328,5 @@ CSV는 `Namespace,Key,SourceString,Comment` 컬럼을 사용한다.
 - [x] `docs/planning/04-art-direction.md`의 3D 스타일라이즈드 애니메 톤과 정합
 - [x] 12세 등급 가이드 명시
 - [x] 컷씬 트리거 조건 및 로컬라이즈 키 규칙 명시
-- [x] `client/Content/Localization/Game/ko/StoryText.csv`와 키 샘플 연계
+- [x] `client/Content/Localization/Game/{ko,en}/StoryText.csv` 대사 키와
+      `Story.csv` 메타 키 역할 분리

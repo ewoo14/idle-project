@@ -1,6 +1,7 @@
 #include "GameCore/IdleGameInstance.h"
 
 #include "CharacterSystem/LevelFormulas.h"
+#include "Internationalization/IdleLocalization.h"
 #include "NetworkClient/ApiClient.h"
 
 void UIdleGameInstance::Init()
@@ -28,6 +29,7 @@ void UIdleGameInstance::Init()
 	EnsurePetService();
 	EnsureSeasonService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	LoadLanguage();
 	LoadLastSeenUnixSec();
 
 	ApiClient->RegisterGuest([](bool bSuccess, FString Message)
@@ -43,12 +45,20 @@ void UIdleGameInstance::Init()
 void UIdleGameInstance::Shutdown()
 {
 	LastSeenUnixSec = GetCurrentUnixSeconds();
+	SaveLanguage();
 	SaveLastSeenUnixSec();
 	ApiClient = nullptr;
 	QuestService = nullptr;
 	PetService = nullptr;
 	SeasonService = nullptr;
 	Super::Shutdown();
+}
+
+void UIdleGameInstance::SetLanguage(const FString& InLanguage)
+{
+	Language = IdleProject::Localization::NormalizeLanguage(InLanguage);
+	IdleProject::Localization::SetCurrentLanguage(Language);
+	SaveLanguage();
 }
 
 void UIdleGameInstance::AddGold(int64 Amount)
@@ -363,6 +373,36 @@ void UIdleGameInstance::LoadLastSeenUnixSec()
 			LastSeenUnixSec = FMath::Max<int64>(0, ParsedLastSeen);
 		}
 	}
+}
+
+void UIdleGameInstance::LoadLanguage()
+{
+	Language = TEXT("ko");
+	if (GConfig)
+	{
+		FString SavedLanguage;
+		if (GConfig->GetString(TEXT("/Script/IdleProject.IdleGameInstance"), TEXT("Language"), SavedLanguage, GGameUserSettingsIni))
+		{
+			Language = IdleProject::Localization::NormalizeLanguage(SavedLanguage);
+		}
+	}
+
+	IdleProject::Localization::SetCurrentLanguage(Language);
+}
+
+void UIdleGameInstance::SaveLanguage() const
+{
+	if (!GConfig)
+	{
+		return;
+	}
+
+	GConfig->SetString(
+		TEXT("/Script/IdleProject.IdleGameInstance"),
+		TEXT("Language"),
+		*Language,
+		GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
 }
 
 void UIdleGameInstance::SaveLastSeenUnixSec() const
