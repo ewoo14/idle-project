@@ -14,35 +14,47 @@ jobs:
   lint-build-test:
     name: lint / build / test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect server scaffold
+        id: detect
+        shell: bash
+        run: |
+          if [[ -f "server/package.json" ]]; then
+            echo "scaffolded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "scaffolded=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Node
+        if: steps.detect.outputs.scaffolded == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: server/package-lock.json
 
-      - name: Install (스킵 가능 — server 구현 전)
-        if: ${{ hashFiles('server/package-lock.json') != '' }}
+      - name: Install
+        if: steps.detect.outputs.scaffolded == 'true'
+        working-directory: server
         run: npm ci
 
       - name: Lint
-        if: ${{ hashFiles('server/package-lock.json') != '' }}
+        if: steps.detect.outputs.scaffolded == 'true'
+        working-directory: server
         run: npm run lint --if-present
 
       - name: Build
-        if: ${{ hashFiles('server/package-lock.json') != '' }}
+        if: steps.detect.outputs.scaffolded == 'true'
+        working-directory: server
         run: npm run build --if-present
 
       - name: Test
-        if: ${{ hashFiles('server/package-lock.json') != '' }}
+        if: steps.detect.outputs.scaffolded == 'true'
+        working-directory: server
         run: npm test --if-present
 
-      - name: Skip notice
-        if: ${{ hashFiles('server/package-lock.json') == '' }}
-        run: echo "server/ 가 아직 스캐폴드되지 않아 단계를 건너뜁니다. (PR #1 단계 정상 동작)"
+      - name: Skip notice (server 아직 스캐폴드 전)
+        if: steps.detect.outputs.scaffolded == 'false'
+        run: echo "server/ 가 아직 스캐폴드되지 않아 단계를 건너뜁니다. (PR #7 머지 이후 정상 동작)"
