@@ -4,8 +4,10 @@ param(
     [ValidateSet('designer','story','quest','character','balance','backend','qa')]
     [string]$Role,
 
-    [Parameter(Mandatory=$true)]
-    [string]$Task,
+    [string]$Task = "",
+
+    # 작업 지시를 파일에서 읽는다. -Task 대신 사용하면 호출 명령이 짧아져 권한 규칙 매칭이 깔끔하다.
+    [string]$TaskFile = "",
 
     [string]$WorkingDir = "C:\game\idle game\repo",
 
@@ -34,6 +36,16 @@ if (-not (Test-Path $rolePromptPath)) {
 
 $basePrompt = Get-Content $basePromptPath -Raw -Encoding UTF8
 $rolePrompt = Get-Content $rolePromptPath -Raw -Encoding UTF8
+
+if ($TaskFile -ne "") {
+    if (-not (Test-Path $TaskFile)) {
+        throw "작업 파일이 없습니다: $TaskFile"
+    }
+    $Task = Get-Content $TaskFile -Raw -Encoding UTF8
+}
+if ([string]::IsNullOrWhiteSpace($Task)) {
+    throw "-Task 또는 -TaskFile 중 하나는 반드시 제공해야 합니다."
+}
 
 $fullPrompt = @"
 $basePrompt
@@ -73,10 +85,13 @@ $args = @(
 if ($Model -ne "") {
     $args += @('-m', $Model)
 }
-$args += $fullPrompt
+# 프롬프트는 CLI 인자 대신 stdin 으로 전달한다. Windows codex.cmd(npm 셰임)가 긴 멀티라인
+# 프롬프트를 인자로 받으면 cmd 가 공백/줄바꿈에서 단어 분리해 깨진다('unexpected argument').
+# codex exec 는 '-' 또는 인자 미제공 시 stdin 에서 프롬프트를 읽는다.
+$args += '-'
 
-Write-Host "[invoke.ps1] codex $Role 호출 시작" -ForegroundColor Green
-& codex @args
+Write-Host "[invoke.ps1] codex $Role 호출 시작 (프롬프트 stdin)" -ForegroundColor Green
+$fullPrompt | & codex @args
 $exit = $LASTEXITCODE
 Write-Host "[invoke.ps1] codex 종료 코드: $exit" -ForegroundColor Green
 exit $exit
