@@ -25,6 +25,8 @@ export const putSaveSchema = {
           rebirthCount: { type: "integer", minimum: 0 },
           maxEquipmentGrade: { type: "integer", minimum: 0, maximum: 5 },
           totalExp: { type: "number", minimum: 0 },
+          gold: { type: "integer", minimum: 0 },
+          lastSeenUnixSec: { type: "integer", minimum: 0 },
         },
       },
     },
