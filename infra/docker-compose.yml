@@ -80,9 +80,13 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_PRIVATE_KEY_PATH: /run/secrets/jwt_private.pem
       JWT_PUBLIC_KEY_PATH: /run/secrets/jwt_public.pem
+      JWT_KEY_ID: ${JWT_KEY_ID:-v1}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${SERVER_PORT:-3000}:3000"
+    secrets:
+      - jwt_private
+      - jwt_public
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,3 +128,9 @@ volumes:
   redis-data:
   prometheus-data:
   grafana-data:
+
+secrets:
+  jwt_private:
+    file: ./secrets/jwt_private.pem
+  jwt_public:
+    file: ./secrets/jwt_public.pem
