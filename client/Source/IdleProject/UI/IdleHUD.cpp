@@ -4,6 +4,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "GameCore/IdleGameInstance.h"
+#include "ItemSystem/InventoryComponent.h"
 #include "UI/IdleHUDWidget.h"
 
 void AIdleHUD::PostInitializeComponents()
@@ -31,12 +32,14 @@ void AIdleHUD::PostInitializeComponents()
 	RootWidget->UpdateLevel(IdleGameInstance->GetCharacterLevel());
 
 	BindPlayerCombat();
+	BindPlayerInventory();
 }
 
 void AIdleHUD::BeginPlay()
 {
 	Super::BeginPlay();
 	BindPlayerCombat();
+	BindPlayerInventory();
 }
 
 void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -48,6 +51,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	RootWidget.Reset();
 	PlayerCombat = nullptr;
+	PlayerInventory = nullptr;
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -87,6 +91,11 @@ void AIdleHUD::HandleHpChanged(float NewHp)
 	}
 }
 
+void AIdleHUD::HandleEquippedChanged(EItemSlot Slot)
+{
+	RefreshEquipmentSummary();
+}
+
 void AIdleHUD::BindPlayerCombat()
 {
 	if (PlayerCombat)
@@ -111,4 +120,64 @@ void AIdleHUD::BindPlayerCombat()
 	{
 		RootWidget->UpdateHp(PlayerCombat->CurrentHp, PlayerCombat->MaxHp);
 	}
+}
+
+void AIdleHUD::BindPlayerInventory()
+{
+	if (PlayerInventory)
+	{
+		return;
+	}
+
+	APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
+	if (!Pawn)
+	{
+		return;
+	}
+
+	PlayerInventory = Pawn->FindComponentByClass<UInventoryComponent>();
+	if (!PlayerInventory)
+	{
+		return;
+	}
+
+	PlayerInventory->OnEquippedChanged.AddDynamic(this, &AIdleHUD::HandleEquippedChanged);
+	RefreshEquipmentSummary();
+}
+
+void AIdleHUD::RefreshEquipmentSummary()
+{
+	if (!RootWidget || !PlayerInventory)
+	{
+		return;
+	}
+
+	RootWidget->UpdateEquipmentSummary(PlayerInventory->GetEquippedItem(EItemSlot::Weapon), FindFirstArmorItem());
+}
+
+const FItemInstance* AIdleHUD::FindFirstArmorItem() const
+{
+	if (!PlayerInventory)
+	{
+		return nullptr;
+	}
+
+	const EItemSlot ArmorSlots[] = {
+		EItemSlot::Helmet,
+		EItemSlot::Top,
+		EItemSlot::Bottom,
+		EItemSlot::Shoes,
+		EItemSlot::Gloves,
+		EItemSlot::Cloak,
+		EItemSlot::Accessory
+	};
+
+	for (EItemSlot Slot : ArmorSlots)
+	{
+		if (const FItemInstance* Item = PlayerInventory->GetEquippedItem(Slot))
+		{
+			return Item;
+		}
+	}
+	return nullptr;
 }

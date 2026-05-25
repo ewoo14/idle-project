@@ -4,11 +4,13 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "CharacterSystem/StatFormulas.h"
+#include "ItemSystem/ItemTypes.h"
 #include "IdleCharacter.generated.h"
 
 class UCameraComponent;
 class UBattleAIComponent;
 class UCombatComponent;
+class UInventoryComponent;
 class UInputAction;
 class UInputMappingContext;
 class USpringArmComponent;
@@ -28,6 +30,8 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	void RefreshDerivedStats();
 
 protected:
 	/** 횡스크롤 카메라 거리와 충돌 처리를 담당합니다. */
@@ -49,6 +53,10 @@ protected:
 	/** 주변 몬스터를 자동 탐색하고 공격하는 AI 컴포넌트입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
 	TObjectPtr<UBattleAIComponent> BattleAI;
+
+	/** 장비 획득과 자동 장착을 관리하는 캐릭터 인벤토리입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Inventory")
+	TObjectPtr<UInventoryComponent> Inventory;
 
 	/** 좌우 이동 입력 액션입니다. */
 	UPROPERTY(Transient)
@@ -72,7 +80,13 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Idle")
 	EClassId DefaultClassId = EClassId::Warrior;
 
+	UPROPERTY(EditAnywhere, Category = "Idle")
+	int32 Level = 1;
+
 private:
+	UFUNCTION()
+	void HandleEquippedChanged(EItemSlot Slot);
+
 	void ConfigureInputActions();
 	void RegisterDefaultMappingContext();
 	void Move(const FInputActionValue& Value);

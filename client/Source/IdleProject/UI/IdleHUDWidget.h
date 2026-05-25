@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ItemSystem/ItemTypes.h"
 #include "Widgets/SCompoundWidget.h"
 
 class STextBlock;
@@ -16,10 +17,13 @@ public:
 	void UpdateExp(int64 Current, int64 Next);
 	void UpdateGold(int64 Amount);
 	void UpdateLevel(int32 Level);
+	void UpdateEquipmentSummary(const FItemInstance* Weapon, const FItemInstance* Armor);
 
 private:
 	TSharedPtr<STextBlock> HpText;
 	TSharedPtr<STextBlock> ExpText;
 	TSharedPtr<STextBlock> GoldText;
 	TSharedPtr<STextBlock> LevelText;
+	TSharedPtr<STextBlock> WeaponText;
+	TSharedPtr<STextBlock> ArmorText;
 };

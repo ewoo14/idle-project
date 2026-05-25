@@ -2,10 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "ItemSystem/ItemTypes.h"
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
 class UCombatComponent;
+class UInventoryComponent;
 class SIdleHUDWidget;
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -32,14 +34,23 @@ protected:
 	UFUNCTION()
 	void HandleHpChanged(float NewHp);
 
+	UFUNCTION()
+	void HandleEquippedChanged(EItemSlot Slot);
+
 private:
 	void BindPlayerCombat();
+	void BindPlayerInventory();
+	void RefreshEquipmentSummary();
+	const FItemInstance* FindFirstArmorItem() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UIdleGameInstance> IdleGameInstance;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UCombatComponent> PlayerCombat;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInventoryComponent> PlayerInventory;
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 };

@@ -27,6 +27,39 @@ FText FormatLevel(int32 Level)
 {
 	return FText::FromString(FString::Printf(TEXT("Lv. %d"), Level));
 }
+
+FString RarityToString(EItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EItemRarity::Uncommon:
+		return TEXT("Uncommon");
+	case EItemRarity::Rare:
+		return TEXT("Rare");
+	case EItemRarity::Common:
+		return TEXT("Common");
+	case EItemRarity::None:
+	default:
+		return TEXT("None");
+	}
+}
+
+FText FormatEquipmentLine(const TCHAR* Label, const FItemInstance* Item)
+{
+	if (!Item)
+	{
+		return FText::FromString(FString::Printf(TEXT("%s: -"), Label));
+	}
+
+	return FText::FromString(FString::Printf(
+		TEXT("%s: %s (%s, ATK+%.0f DEF+%.0f HP+%.0f)"),
+		Label,
+		*Item->DisplayName.ToString(),
+		*RarityToString(Item->Rarity),
+		Item->BonusAtk,
+		Item->BonusDef,
+		Item->BonusHp));
+}
 }
 
 void SIdleHUDWidget::Construct(const FArguments& InArgs)
@@ -92,6 +125,33 @@ void SIdleHUDWidget::Construct(const FArguments& InArgs)
 				.Text(FormatGold(0))
 			]
 		]
+
+		+ SOverlay::Slot()
+		.HAlign(HAlign_Left)
+		.VAlign(VAlign_Bottom)
+		.Padding(FMargin(24.0f, 0.0f, 0.0f, 24.0f))
+		[
+			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			.Padding(FMargin(0.0f, 0.0f, 0.0f, 6.0f))
+			[
+				SAssignNew(WeaponText, STextBlock)
+				.Font(LabelFont)
+				.ColorAndOpacity(Theme::TextPrimary)
+				.Text(FormatEquipmentLine(TEXT("무기"), nullptr))
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
+			[
+				SAssignNew(ArmorText, STextBlock)
+				.Font(LabelFont)
+				.ColorAndOpacity(Theme::TextMuted)
+				.Text(FormatEquipmentLine(TEXT("방어구"), nullptr))
+			]
+		]
 	];
 }
 
@@ -124,5 +184,17 @@ void SIdleHUDWidget::UpdateLevel(int32 Level)
 	if (LevelText)
 	{
 		LevelText->SetText(FormatLevel(Level));
+	}
+}
+
+void SIdleHUDWidget::UpdateEquipmentSummary(const FItemInstance* Weapon, const FItemInstance* Armor)
+{
+	if (WeaponText)
+	{
+		WeaponText->SetText(FormatEquipmentLine(TEXT("무기"), Weapon));
+	}
+	if (ArmorText)
+	{
+		ArmorText->SetText(FormatEquipmentLine(TEXT("방어구"), Armor));
 	}
 }
