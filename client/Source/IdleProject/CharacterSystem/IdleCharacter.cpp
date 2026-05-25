@@ -256,10 +256,19 @@ void AIdleCharacter::ConfigureCharacterVisuals()
 		if (USkeletalMesh* LoadedMesh = Cast<USkeletalMesh>(StaticLoadObject(USkeletalMesh::StaticClass(), nullptr, *SkeletalMeshPath)))
 		{
 			CharacterMesh->SetSkeletalMesh(LoadedMesh);
+			// SetSkeletalMesh 는 메시의 Physics Asset(VRM4U PHYS_*)으로 물리 상태를 재생성한다.
+			// 캡슐만 게임플레이 충돌체로 쓰므로, 메시 지오메트리가 몬스터 추격과 충돌하지 않도록
+			// NoCollision 을 재확정한다. (미설정 시 몬스터가 메시에 부딪혀 위로 튕겨 사라짐 — hotfix/13.)
+			CharacterMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			CharacterMesh->SetCollisionProfileName(TEXT("NoCollision"));
+			CharacterMesh->SetSimulatePhysics(false);
 			CharacterMesh->SetVisibility(true);
 			CharacterMesh->SetHiddenInGame(false);
 			PlaceholderMesh->SetVisibility(false);
 			PlaceholderMesh->SetHiddenInGame(true);
+
+			// VRoid/VRM4U 모델에 포함된 액세서리(백팩·로봇팔 등) 머티리얼 슬롯을 숨긴다.
+			HideAccessoryMaterialSlots();
 		}
 		else
 		{
@@ -288,6 +297,49 @@ void AIdleCharacter::ConfigureCharacterVisuals()
 	if (CharacterMesh && AnimInstanceClass)
 	{
 		CharacterMesh->SetAnimInstanceClass(AnimInstanceClass);
+	}
+}
+
+void AIdleCharacter::HideAccessoryMaterialSlots()
+{
+	if (!CharacterMesh)
+	{
+		return;
+	}
+
+	// 숨길 슬롯 키워드는 INI 로 조정 가능 (재컴파일 불필요). 기본값은 보수적으로 backpack,armgear
+	// — 얼굴(robo_face)·몸·실제 팔(arm_mat/arm_plastic) 을 실수로 지우지 않도록 한다.
+	FString HideKeywordsRaw;
+	if (GConfig)
+	{
+		GConfig->GetString(IdleCharacterConfigSection, TEXT("HiddenMaterialSlotKeywords"), HideKeywordsRaw, GEngineIni);
+	}
+	if (HideKeywordsRaw.IsEmpty())
+	{
+		HideKeywordsRaw = TEXT("backpack,armgear");
+	}
+
+	TArray<FString> HideKeywords;
+	HideKeywordsRaw.ParseIntoArray(HideKeywords, TEXT(","), true);
+
+	// PIE 에서 실제 슬롯 구성을 확인해 키워드를 정밀 조정할 수 있도록 전체 슬롯명을 로그로 남긴다.
+	const TArray<FName> SlotNames = CharacterMesh->GetMaterialSlotNames();
+	for (int32 SlotIndex = 0; SlotIndex < SlotNames.Num(); ++SlotIndex)
+	{
+		const FString SlotName = SlotNames[SlotIndex].ToString();
+		UE_LOG(LogTemp, Display, TEXT("[CharacterVisual] 머티리얼 슬롯 %d = %s"), SlotIndex, *SlotName);
+
+		for (const FString& Keyword : HideKeywords)
+		{
+			const FString Trimmed = Keyword.TrimStartAndEnd();
+			if (!Trimmed.IsEmpty() && SlotName.Contains(Trimmed, ESearchCase::IgnoreCase))
+			{
+				// VRoid 메시는 LOD0 에서 섹션:머티리얼 = 1:1 이므로 SectionIndex == SlotIndex 로 숨긴다.
+				CharacterMesh->ShowMaterialSection(SlotIndex, SlotIndex, false, 0);
+				UE_LOG(LogTemp, Display, TEXT("[CharacterVisual] 액세서리 슬롯 숨김 %d (%s) — 키워드 '%s'"), SlotIndex, *SlotName, *Trimmed);
+				break;
+			}
+		}
 	}
 }
 
