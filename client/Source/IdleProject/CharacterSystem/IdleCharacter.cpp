@@ -96,11 +96,7 @@ void AIdleCharacter::BeginPlay()
 	{
 		Inventory->OnEquippedChanged.AddDynamic(this, &AIdleCharacter::HandleEquippedChanged);
 	}
-	if (Skills)
-	{
-		Skills->LoadSkillsForClass(DefaultClassId);
-	}
-	RefreshDerivedStats();
+	SetClassId(DefaultClassId);
 	LastObservedHp = Combat ? Combat->CurrentHp : 0.0f;
 
 	if (BattleAI)
@@ -186,6 +182,26 @@ void AIdleCharacter::RefreshDerivedStats()
 		Combat->CurrentHp = FMath::Clamp(Derived.Hp * HpRatio, 0.0f, Combat->MaxHp);
 		Combat->OnHpChanged.Broadcast(Combat->CurrentHp);
 	}
+}
+
+void AIdleCharacter::SetClassId(EClassId NewClassId)
+{
+	if (NewClassId == EClassId::None)
+	{
+		NewClassId = EClassId::Warrior;
+	}
+
+	DefaultClassId = NewClassId;
+	if (Skills)
+	{
+		Skills->LoadSkillsForClass(DefaultClassId);
+	}
+	RefreshDerivedStats();
+}
+
+EClassId AIdleCharacter::GetClassId() const
+{
+	return DefaultClassId;
 }
 
 void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)

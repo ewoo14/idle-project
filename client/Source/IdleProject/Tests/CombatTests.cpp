@@ -4,6 +4,7 @@
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "CharacterSystem/IdleCharacter.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "CharacterSystem/IdleMonster.h"
@@ -302,6 +303,62 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
 	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FClassSelectionHudDisplayModelTest,
+	"IdleProject.UI.HUD.ClassSelectionDisplayModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FClassSelectionHudDisplayModelTest::RunTest(const FString& Parameters)
+{
+	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = IdleProject::UI::BuildClassSelectionOptions(EClassId::Mage);
+
+	TestEqual(TEXT("Class selector exposes three V1 classes"), Options.Num(), 3);
+	TestEqual(TEXT("First class is warrior"), static_cast<int32>(Options[0].ClassId), static_cast<int32>(EClassId::Warrior));
+	TestEqual(TEXT("Warrior summary highlights STR and CON"), Options[0].StatSummary.ToString(), FString(TEXT("STR/CON")));
+	TestEqual(TEXT("Mage summary highlights INT"), Options[1].StatSummary.ToString(), FString(TEXT("INT")));
+	TestEqual(TEXT("Archer summary highlights DEX"), Options[2].StatSummary.ToString(), FString(TEXT("DEX")));
+	TestTrue(TEXT("Current class is marked selected"), Options[1].bSelected);
+	TestFalse(TEXT("Other classes are not selected"), Options[0].bSelected);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterClassSelectionTest,
+	"IdleProject.Character.ClassSelection.AppliesSkills",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterClassSelectionTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Archer);
+	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+
+	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Archer));
+	TestNotNull(TEXT("Skill component exists"), Skills);
+	TestTrue(TEXT("Archer skill set is loaded"), Skills && HasSkill(*Skills, TEXT("precision_shot")));
+	TestFalse(TEXT("Warrior skill set is replaced"), Skills && HasSkill(*Skills, TEXT("heavy_strike")));
+
+	World->DestroyWorld(false);
 	return true;
 }
 

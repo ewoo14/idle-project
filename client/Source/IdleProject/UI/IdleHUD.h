@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CharacterSystem/StatFormulas.h"
 #include "GameFramework/HUD.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/QuestService.h"
@@ -9,6 +10,7 @@
 
 class UIdleGameInstance;
 class UCombatComponent;
+class AIdleCharacter;
 class UInventoryComponent;
 class USkillComponent;
 class SIdleHUDWidget;
@@ -75,6 +77,15 @@ struct IDLEPROJECT_API FIdleHUDRebirthViewModel
 	bool bLevelReady = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDClassSelectionOptionViewModel
+{
+	EClassId ClassId = EClassId::Warrior;
+	FText DisplayName;
+	FText RoleLabel;
+	FText StatSummary;
+	bool bSelected = false;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -82,6 +93,7 @@ IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillCom
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
+IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -119,7 +131,11 @@ private:
 	void BindPlayerCombat();
 	void BindPlayerInventory();
 	void RefreshEquipmentSummary();
+	AIdleCharacter* ResolvePlayerCharacter() const;
 	USkillComponent* ResolvePlayerSkills() const;
+	void DrawClassSelectionPanel();
+	void DrawClassSelectionOption(const FIdleHUDClassSelectionOptionViewModel& Option, float X, float Y, float Width, float Height);
+	void SelectClassFromHitBox(FName BoxName);
 	void DrawSkillHud(const USkillComponent& SkillComponent, float Now);
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);

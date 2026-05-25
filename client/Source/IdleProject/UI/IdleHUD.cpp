@@ -16,6 +16,7 @@ namespace
 {
 const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
 const FName RebirthHitBoxName(TEXT("RebirthAction"));
+const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
@@ -72,6 +73,11 @@ FText QuestTypeToLabel(EQuestType Type)
 FName MakeQuestClaimHitBoxName(const FString& QuestId)
 {
 	return FName(*(QuestClaimHitBoxPrefix + QuestId));
+}
+
+FName MakeClassSelectionHitBoxName(EClassId ClassId)
+{
+	return FName(*(ClassSelectionHitBoxPrefix + FString::FromInt(static_cast<int32>(ClassId))));
 }
 }
 
@@ -191,6 +197,36 @@ FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth
 	return ViewModel;
 }
 
+TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelectionOptions(EClassId CurrentClassId)
+{
+	struct FClassOptionSeed
+	{
+		EClassId ClassId;
+		const TCHAR* DisplayName;
+		const TCHAR* RoleLabel;
+		const TCHAR* StatSummary;
+	};
+
+	const FClassOptionSeed Seeds[] = {
+		{ EClassId::Warrior, TEXT("전사"), TEXT("근접 방어형"), TEXT("STR/CON") },
+		{ EClassId::Mage, TEXT("마법사"), TEXT("원거리 마법형"), TEXT("INT") },
+		{ EClassId::Archer, TEXT("궁수"), TEXT("치명 원거리형"), TEXT("DEX") }
+	};
+
+	TArray<FIdleHUDClassSelectionOptionViewModel> Options;
+	for (const FClassOptionSeed& Seed : Seeds)
+	{
+		FIdleHUDClassSelectionOptionViewModel Option;
+		Option.ClassId = Seed.ClassId;
+		Option.DisplayName = FText::FromString(Seed.DisplayName);
+		Option.RoleLabel = FText::FromString(Seed.RoleLabel);
+		Option.StatSummary = FText::FromString(Seed.StatSummary);
+		Option.bSelected = Seed.ClassId == CurrentClassId;
+		Options.Add(Option);
+	}
+	return Options;
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -254,6 +290,7 @@ void AIdleHUD::DrawHUD()
 
 	DrawOfflineRewardModal();
 	DrawRebirthPanel();
+	DrawClassSelectionPanel();
 	DrawQuestLog();
 }
 
@@ -272,6 +309,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == RebirthHitBoxName)
 	{
 		TryRebirth();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(ClassSelectionHitBoxPrefix))
+	{
+		SelectClassFromHitBox(BoxName);
 		return;
 	}
 
@@ -428,8 +470,97 @@ void AIdleHUD::RefreshEquipmentSummary()
 
 USkillComponent* AIdleHUD::ResolvePlayerSkills() const
 {
-	const APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
-	return Pawn ? Pawn->FindComponentByClass<USkillComponent>() : nullptr;
+	const AIdleCharacter* Character = ResolvePlayerCharacter();
+	return Character ? Character->FindComponentByClass<USkillComponent>() : nullptr;
+}
+
+AIdleCharacter* AIdleHUD::ResolvePlayerCharacter() const
+{
+	APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
+	return Pawn ? Cast<AIdleCharacter>(Pawn) : nullptr;
+}
+
+void AIdleHUD::DrawClassSelectionPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+
+	AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!IdleCharacter)
+	{
+		return;
+	}
+
+	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = BuildClassSelectionOptions(IdleCharacter->GetClassId());
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 322.0f * Scale;
+	const float HeaderHeight = 42.0f * Scale;
+	const float OptionHeight = 48.0f * Scale;
+	const float OptionGap = 8.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = HeaderHeight + Padding + Options.Num() * OptionHeight + FMath::Max(0, Options.Num() - 1) * OptionGap + Padding;
+	const float X = 28.0f * Scale;
+	const float Y = 92.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(TEXT("시작 직업"), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(TEXT("전사/마법사/궁수"), Theme::TextMuted, X + PanelWidth - 128.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+
+	float OptionY = Y + HeaderHeight + Padding;
+	for (const FIdleHUDClassSelectionOptionViewModel& Option : Options)
+	{
+		DrawClassSelectionOption(Option, X + Padding, OptionY, PanelWidth - Padding * 2.0f, OptionHeight);
+		OptionY += OptionHeight + OptionGap;
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawClassSelectionOption(const FIdleHUDClassSelectionOptionViewModel& Option, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 48.0f;
+	const FLinearColor StateColor = Option.bSelected ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Option.DisplayName.ToString(), Option.bSelected ? Theme::AccentGold : Theme::TextPrimary, X + 14.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.96f * Scale);
+	DrawText(Option.RoleLabel.ToString(), Theme::TextMuted, X + 82.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(Option.StatSummary.ToString(), Theme::AccentBlue, X + 14.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+
+	const FString StateLabel = Option.bSelected ? TEXT("SELECTED") : TEXT("SELECT");
+	DrawText(StateLabel, Option.bSelected ? Theme::AccentGold : Theme::TextMuted, X + Width - 74.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	AddHitBox(FVector2D(X, Y), FVector2D(Width, Height), MakeClassSelectionHitBoxName(Option.ClassId), true, 70);
+}
+
+void AIdleHUD::SelectClassFromHitBox(FName BoxName)
+{
+	FString RawClassId = BoxName.ToString();
+	RawClassId.RightChopInline(ClassSelectionHitBoxPrefix.Len());
+	const int32 ClassIdValue = FCString::Atoi(*RawClassId);
+	if (ClassIdValue < static_cast<int32>(EClassId::Warrior) || ClassIdValue > static_cast<int32>(EClassId::Archer))
+	{
+		return;
+	}
+
+	AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!IdleCharacter)
+	{
+		return;
+	}
+
+	IdleCharacter->SetClassId(static_cast<EClassId>(ClassIdValue));
 }
 
 void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
@@ -775,7 +906,7 @@ void AIdleHUD::RefreshMouseInteraction()
 	}
 
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
-	const bool bNeedsPointer = bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
+	const bool bNeedsPointer = ResolvePlayerCharacter() || bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

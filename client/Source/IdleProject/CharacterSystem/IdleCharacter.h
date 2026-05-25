@@ -39,6 +39,12 @@ public:
 
 	void RefreshDerivedStats();
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Class")
+	void SetClassId(EClassId NewClassId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Class")
+	EClassId GetClassId() const;
+
 protected:
 	/** 횡스크롤 카메라 거리와 충돌 처리를 담당합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Camera")
