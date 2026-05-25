@@ -41,7 +41,6 @@ private:
 	void BindPlayerCombat();
 	void BindPlayerInventory();
 	void RefreshEquipmentSummary();
-	const FItemInstance* FindFirstArmorItem() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UIdleGameInstance> IdleGameInstance;

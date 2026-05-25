@@ -28,37 +28,24 @@ FText FormatLevel(int32 Level)
 	return FText::FromString(FString::Printf(TEXT("Lv. %d"), Level));
 }
 
-FString RarityToString(EItemRarity Rarity)
+FSlateColor ResolveEquipmentColor(const FText& WeaponName)
 {
-	switch (Rarity)
-	{
-	case EItemRarity::Uncommon:
-		return TEXT("Uncommon");
-	case EItemRarity::Rare:
-		return TEXT("Rare");
-	case EItemRarity::Common:
-		return TEXT("Common");
-	case EItemRarity::None:
-	default:
-		return TEXT("None");
-	}
-}
+	using namespace IdleProject::UI;
 
-FText FormatEquipmentLine(const TCHAR* Label, const FItemInstance* Item)
-{
-	if (!Item)
+	const FString Text = WeaponName.ToString();
+	if (Text.Contains(TEXT("Rare")))
 	{
-		return FText::FromString(FString::Printf(TEXT("%s: -"), Label));
+		return Theme::RarityRare;
 	}
-
-	return FText::FromString(FString::Printf(
-		TEXT("%s: %s (%s, ATK+%.0f DEF+%.0f HP+%.0f)"),
-		Label,
-		*Item->DisplayName.ToString(),
-		*RarityToString(Item->Rarity),
-		Item->BonusAtk,
-		Item->BonusDef,
-		Item->BonusHp));
+	if (Text.Contains(TEXT("Uncommon")))
+	{
+		return Theme::RarityUncommon;
+	}
+	if (Text.Contains(TEXT("Common")))
+	{
+		return Theme::RarityCommon;
+	}
+	return Theme::TextMuted;
 }
 }
 
@@ -135,21 +122,11 @@ void SIdleHUDWidget::Construct(const FArguments& InArgs)
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
-			.Padding(FMargin(0.0f, 0.0f, 0.0f, 6.0f))
 			[
-				SAssignNew(WeaponText, STextBlock)
-				.Font(LabelFont)
-				.ColorAndOpacity(Theme::TextPrimary)
-				.Text(FormatEquipmentLine(TEXT("무기"), nullptr))
-			]
-
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SAssignNew(ArmorText, STextBlock)
+				SAssignNew(EquipmentText, STextBlock)
 				.Font(LabelFont)
 				.ColorAndOpacity(Theme::TextMuted)
-				.Text(FormatEquipmentLine(TEXT("방어구"), nullptr))
+				.Text(FText::FromString(TEXT("⚔ 무기 없음\n🛡 방어구 0/7 슬롯 (DEF+0, HP+0)")))
 			]
 		]
 	];
@@ -187,14 +164,14 @@ void SIdleHUDWidget::UpdateLevel(int32 Level)
 	}
 }
 
-void SIdleHUDWidget::UpdateEquipmentSummary(const FItemInstance* Weapon, const FItemInstance* Armor)
+void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary)
 {
-	if (WeaponText)
+	if (EquipmentText)
 	{
-		WeaponText->SetText(FormatEquipmentLine(TEXT("무기"), Weapon));
-	}
-	if (ArmorText)
-	{
-		ArmorText->SetText(FormatEquipmentLine(TEXT("방어구"), Armor));
+		EquipmentText->SetText(FText::FromString(FString::Printf(
+			TEXT("%s\n%s"),
+			*WeaponName.ToString(),
+			*ArmorSummary.ToString())));
+		EquipmentText->SetColorAndOpacity(ResolveEquipmentColor(WeaponName));
 	}
 }

@@ -17,13 +17,12 @@ public:
 	void UpdateExp(int64 Current, int64 Next);
 	void UpdateGold(int64 Amount);
 	void UpdateLevel(int32 Level);
-	void UpdateEquipmentSummary(const FItemInstance* Weapon, const FItemInstance* Armor);
+	void UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary);
 
 private:
 	TSharedPtr<STextBlock> HpText;
 	TSharedPtr<STextBlock> ExpText;
 	TSharedPtr<STextBlock> GoldText;
 	TSharedPtr<STextBlock> LevelText;
-	TSharedPtr<STextBlock> WeaponText;
-	TSharedPtr<STextBlock> ArmorText;
+	TSharedPtr<STextBlock> EquipmentText;
 };

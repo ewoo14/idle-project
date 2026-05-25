@@ -7,6 +7,25 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "UI/IdleHUDWidget.h"
 
+namespace
+{
+FString RarityToString(EItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EItemRarity::Uncommon:
+		return TEXT("Uncommon");
+	case EItemRarity::Rare:
+		return TEXT("Rare");
+	case EItemRarity::Common:
+		return TEXT("Common");
+	case EItemRarity::None:
+	default:
+		return TEXT("None");
+	}
+}
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -152,14 +171,14 @@ void AIdleHUD::RefreshEquipmentSummary()
 		return;
 	}
 
-	RootWidget->UpdateEquipmentSummary(PlayerInventory->GetEquippedItem(EItemSlot::Weapon), FindFirstArmorItem());
-}
-
-const FItemInstance* AIdleHUD::FindFirstArmorItem() const
-{
-	if (!PlayerInventory)
+	FText WeaponLine = FText::FromString(TEXT("⚔ 무기 없음"));
+	if (const FItemInstance* Weapon = PlayerInventory->GetEquippedItem(EItemSlot::Weapon))
 	{
-		return nullptr;
+		WeaponLine = FText::FromString(FString::Printf(
+			TEXT("⚔ %s (%s, ATK+%.0f)"),
+			*Weapon->DisplayName.ToString(),
+			*RarityToString(Weapon->Rarity),
+			Weapon->BonusAtk));
 	}
 
 	const EItemSlot ArmorSlots[] = {
@@ -172,12 +191,25 @@ const FItemInstance* AIdleHUD::FindFirstArmorItem() const
 		EItemSlot::Accessory
 	};
 
+	int32 EquippedArmorCount = 0;
+	float BonusDef = 0.0f;
+	float BonusHp = 0.0f;
+
 	for (EItemSlot Slot : ArmorSlots)
 	{
 		if (const FItemInstance* Item = PlayerInventory->GetEquippedItem(Slot))
 		{
-			return Item;
+			++EquippedArmorCount;
+			BonusDef += Item->BonusDef;
+			BonusHp += Item->BonusHp;
 		}
 	}
-	return nullptr;
+
+	const FText ArmorLine = FText::FromString(FString::Printf(
+		TEXT("🛡 방어구 %d/7 슬롯 (DEF+%.0f, HP+%.0f)"),
+		EquippedArmorCount,
+		BonusDef,
+		BonusHp));
+
+	RootWidget->UpdateEquipment(WeaponLine, ArmorLine);
 }
