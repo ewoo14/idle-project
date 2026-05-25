@@ -27,5 +27,11 @@ public class IdleProject : ModuleRules
 			"Json",
 			"JsonUtilities"
 		});
+
+		// VRM4U 타입을 직접 참조하지 않고 import된 UE 자산을 동적 로드하므로 런타임 모듈만 지연 로드합니다.
+		DynamicallyLoadedModuleNames.AddRange(new string[]
+		{
+			"VRM4U"
+		});
 	}
 }
