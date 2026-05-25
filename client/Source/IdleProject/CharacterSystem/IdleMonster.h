@@ -21,6 +21,15 @@ public:
 
 	UCombatComponent* GetCombat() const { return Combat; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetBoss(bool bInBoss);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
+	bool IsBoss() const { return bIsBoss; }
+
+	float GetConfiguredMaxHp() const;
+	float GetConfiguredAttack() const;
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	TObjectPtr<UStaticMeshComponent> PlaceholderMesh;
@@ -30,6 +39,21 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
 	TObjectPtr<UBattleAIComponent> BattleAI;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	bool bIsBoss = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float NormalMaxHp = 50.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float NormalAttack = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float BossMaxHp = 500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float BossAttack = 24.0f;
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);

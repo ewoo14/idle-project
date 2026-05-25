@@ -29,6 +29,21 @@ describe("stats formulas", () => {
     expect(deriveStats(primary, level)).toMatchObject(expected);
   });
 
+  it.each([
+    [0, { hp: 120, physAtk: 24 }],
+    [5, { hp: 170, physAtk: 34 }],
+    [10, { hp: 220, physAtk: 44 }],
+  ])(
+    "applies rebirth bonus point anchor %i with +10 HP and +2 PhysAtk per point",
+    (rebirthBonusPoints, expected) => {
+      const primary = defaultPrimaryStats(1, 1);
+
+      expect(deriveStats(primary, 1, {}, rebirthBonusPoints)).toMatchObject(
+        expected,
+      );
+    },
+  );
+
   it("마법사 기본 능력치는 INT와 WIS 중심으로 성장한다", () => {
     const primary = defaultPrimaryStats(2, 10);
 

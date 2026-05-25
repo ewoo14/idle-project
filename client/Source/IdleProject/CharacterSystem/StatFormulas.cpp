@@ -80,14 +80,15 @@ FPrimaryStats FStatFormulas::DefaultPrimaryStats(EClassId ClassId, int32 Level)
 	return Result;
 }
 
-FDerivedStats FStatFormulas::DeriveStats(const FPrimaryStats& Primary, int32 Level, const FDerivedStats& EquipmentBonus)
+FDerivedStats FStatFormulas::DeriveStats(const FPrimaryStats& Primary, int32 Level, const FDerivedStats& EquipmentBonus, int32 RebirthBonusPoints)
 {
 	const int32 SafeLevel = FMath::Max(Level, 1);
+	const int32 SafeRebirthBonusPoints = FMath::Max(0, RebirthBonusPoints);
 
 	FDerivedStats Result;
-	Result.Hp = RoundWhole(Primary.Con * 10.0f + static_cast<float>(SafeLevel) * 20.0f + EquipmentBonus.Hp);
+	Result.Hp = RoundWhole(Primary.Con * 10.0f + static_cast<float>(SafeLevel) * 20.0f + EquipmentBonus.Hp + static_cast<float>(SafeRebirthBonusPoints) * 10.0f);
 	Result.Mp = RoundWhole(Primary.Wis * 5.0f + Primary.Int_ * 2.0f + static_cast<float>(SafeLevel) * 4.0f + 5.0f + EquipmentBonus.Mp);
-	Result.PhysAtk = RoundWhole(Primary.Str * 2.0f + EquipmentBonus.PhysAtk);
+	Result.PhysAtk = RoundWhole(Primary.Str * 2.0f + EquipmentBonus.PhysAtk + static_cast<float>(SafeRebirthBonusPoints) * 2.0f);
 	Result.MagicAtk = RoundWhole(Primary.Int_ * 2.0f + Primary.Wis * 0.5f + EquipmentBonus.MagicAtk);
 	Result.PhysDef = RoundWhole(Primary.Con * 1.5f + Primary.Dex * 0.25f + EquipmentBonus.PhysDef);
 	Result.MagicDef = RoundWhole(Primary.Wis * 1.5f + Primary.Int_ * 0.25f + EquipmentBonus.MagicDef);

@@ -86,17 +86,49 @@ void UIdleGameInstance::LevelUp()
 	OnLevelUp.Broadcast(CharacterLevel);
 }
 
-FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
+bool UIdleGameInstance::CanRebirth() const
 {
-	return ClaimOfflineRewardsAt(GetCurrentUnixSeconds(), 0);
+	return bChapter1BossDefeated && CharacterLevel >= 100;
 }
 
-FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCount)
+bool UIdleGameInstance::Rebirth()
 {
-	const FOfflineRewardResult Reward = PreviewOfflineRewards(NowUnixSec, RebirthCount);
+	if (!CanRebirth())
+	{
+		return false;
+	}
+
+	++RebirthCount;
+	RebirthBonusPoints += 5;
+	CharacterLevel = 1;
+	CurrentExp = 0;
+	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	Gold = FMath::FloorToInt64(static_cast<double>(Gold) * 0.1);
+	bChapter1BossDefeated = false;
+
+	OnGoldChanged.Broadcast(Gold);
+	OnExpChanged.Broadcast(CurrentExp, NextExp);
+	OnLevelUp.Broadcast(CharacterLevel);
+	return true;
+}
+
+void UIdleGameInstance::MarkChapter1BossDefeated()
+{
+	bChapter1BossDefeated = true;
+}
+
+FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
+{
+	return ClaimOfflineRewardsAt(GetCurrentUnixSeconds());
+}
+
+FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCountOverride)
+{
+	const int32 EffectiveRebirthCount = RebirthCountOverride >= 0 ? RebirthCountOverride : RebirthCount;
+	const FOfflineRewardResult Reward = PreviewOfflineRewards(NowUnixSec, EffectiveRebirthCount);
 	if (ApiClient)
 	{
-		ApiClient->ClaimOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, RebirthCount);
+		ApiClient->ClaimOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
 	}
 	if (Reward.CappedSeconds <= 0)
 	{
@@ -111,9 +143,10 @@ FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, 
 	return Reward;
 }
 
-FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCount) const
+FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCountOverride) const
 {
-	return FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, RebirthCount);
+	const int32 EffectiveRebirthCount = RebirthCountOverride >= 0 ? RebirthCountOverride : RebirthCount;
+	return FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
 }
 
 void UIdleGameInstance::SetLastSeenUnixSec(int64 UnixSec)

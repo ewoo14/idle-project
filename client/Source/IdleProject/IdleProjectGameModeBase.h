@@ -32,7 +32,7 @@ protected:
 
 private:
 	void SpawnInitialMonsters(AController* NewPlayer);
-	AIdleMonster* SpawnMonsterAt(const FVector& SpawnLocation);
+	AIdleMonster* SpawnMonsterAt(const FVector& SpawnLocation, bool bSpawnBoss = false);
 
 	UFUNCTION()
 	void ScheduleRespawn(AActor* DyingActor);

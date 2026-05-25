@@ -30,6 +30,7 @@ export const characters = pgTable("characters", {
   classId: integer("class_id").notNull(),
   level: integer("level").notNull().default(1),
   rebirthCount: integer("rebirth_count").notNull().default(0),
+  rebirthBonusPoints: integer("rebirth_bonus_points").notNull().default(0),
   stats: jsonb("stats").notNull().default({}),
   skillTree: jsonb("skill_tree").notNull().default({}),
   inventory: jsonb("inventory").notNull().default([]),

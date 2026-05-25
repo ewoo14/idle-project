@@ -2,6 +2,7 @@
 
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/SkillComponent.h"
+#include "CharacterSystem/IdleCharacter.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
@@ -14,7 +15,10 @@
 namespace
 {
 const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
+const FName RebirthHitBoxName(TEXT("RebirthAction"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
+constexpr int32 RebirthRequiredLevel = 100;
+constexpr int32 RebirthBonusPointsPerRun = 5;
 
 FString RarityToString(EItemRarity Rarity)
 {
@@ -164,6 +168,29 @@ FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<F
 	return ViewModel;
 }
 
+FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints)
+{
+	FIdleHUDRebirthViewModel ViewModel;
+	const int32 SafeLevel = FMath::Max(1, CharacterLevel);
+	const int32 SafeRebirthCount = FMath::Max(0, RebirthCount);
+	const int32 SafeBonusPoints = FMath::Max(0, RebirthBonusPoints);
+
+	ViewModel.bCanRebirth = bCanRebirth;
+	ViewModel.bBossDefeated = bBossDefeated;
+	ViewModel.bLevelReady = SafeLevel >= RebirthRequiredLevel;
+	ViewModel.Title = FText::FromString(TEXT("환생"));
+	ViewModel.StatusLabel = FText::FromString(bCanRebirth ? TEXT("환생 가능") : TEXT("환생 조건 미달"));
+	ViewModel.BossLabel = FText::FromString(bBossDefeated ? TEXT("보스 격파 완료") : TEXT("보스 격파 필요"));
+	ViewModel.LevelLabel = ViewModel.bLevelReady
+		? FText::FromString(TEXT("레벨 100 달성"))
+		: FText::FromString(FString::Printf(TEXT("레벨 %d / 100"), SafeLevel));
+	ViewModel.CountLabel = FText::FromString(FString::Printf(TEXT("환생 %d회"), SafeRebirthCount));
+	ViewModel.BonusLabel = FText::FromString(FString::Printf(TEXT("영구 보너스 %d 포인트"), SafeBonusPoints));
+	ViewModel.NextBonusLabel = FText::FromString(FString::Printf(TEXT("환생 진행 시 +%d 포인트"), RebirthBonusPointsPerRun));
+	ViewModel.ButtonLabel = FText::FromString(TEXT("환생 진행"));
+	return ViewModel;
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -226,6 +253,7 @@ void AIdleHUD::DrawHUD()
 	}
 
 	DrawOfflineRewardModal();
+	DrawRebirthPanel();
 	DrawQuestLog();
 }
 
@@ -241,6 +269,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		ClaimQuestFromHitBox(BoxName);
 		return;
 	}
+	if (BoxName == RebirthHitBoxName)
+	{
+		TryRebirth();
+		return;
+	}
 
 	Super::NotifyHitBoxClick(BoxName);
 }
@@ -250,8 +283,7 @@ void AIdleHUD::ToggleQuestLog()
 	bQuestLogVisible = !bQuestLogVisible;
 	if (PlayerOwner)
 	{
-		PlayerOwner->bShowMouseCursor = bQuestLogVisible || OfflineRewardModal.bVisible;
-		PlayerOwner->bEnableClickEvents = bQuestLogVisible || OfflineRewardModal.bVisible;
+		RefreshMouseInteraction();
 	}
 }
 
@@ -499,8 +531,7 @@ void AIdleHUD::PreviewOfflineRewardModal()
 	OfflineRewardModal = IdleProject::UI::BuildOfflineRewardViewModel(IdleGameInstance->PreviewOfflineRewards(NowUnixSec));
 	if (OfflineRewardModal.bVisible && PlayerOwner)
 	{
-		PlayerOwner->bShowMouseCursor = true;
-		PlayerOwner->bEnableClickEvents = true;
+		RefreshMouseInteraction();
 	}
 }
 
@@ -513,6 +544,7 @@ void AIdleHUD::ClaimOfflineRewardModal()
 
 	IdleGameInstance->ClaimOfflineRewards();
 	OfflineRewardModal.bVisible = false;
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::DrawOfflineRewardModal()
@@ -653,4 +685,97 @@ void AIdleHUD::ClaimQuestFromHitBox(FName BoxName)
 	{
 		UE_LOG(LogTemp, Display, TEXT("[QuestLog] ClaimQuest success questId=%s gold=%lld exp=%lld"), *QuestId, Claim.RewardGold, Claim.RewardExp);
 	}
+}
+
+void AIdleHUD::DrawRebirthPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FIdleHUDRebirthViewModel ViewModel = BuildRebirthViewModel(
+		IdleGameInstance->CanRebirth(),
+		IdleGameInstance->HasDefeatedChapter1Boss(),
+		IdleGameInstance->GetCharacterLevel(),
+		IdleGameInstance->GetRebirthCount(),
+		IdleGameInstance->GetRebirthBonusPoints());
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 320.0f * Scale, 440.0f * Scale);
+	const float PanelHeight = 206.0f * Scale;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 304.0f * Scale;
+	const float Padding = 16.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const FLinearColor StateColor = ViewModel.bCanRebirth ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.72f);
+	const FLinearColor BossColor = ViewModel.bBossDefeated ? Theme::AccentGold : Theme::AccentRed;
+	const FLinearColor LevelColor = ViewModel.bLevelReady ? Theme::AccentBlue : Theme::TextMuted;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(StateColor, X, Y, PanelWidth, Border);
+	DrawRect(StateColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(StateColor, X, Y, Border, PanelHeight);
+	DrawRect(StateColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.95f * Scale);
+	DrawText(ViewModel.StatusLabel.ToString(), StateColor, X + PanelWidth - 112.0f * Scale, Y + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(ViewModel.BossLabel.ToString(), BossColor, X + Padding, Y + 52.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.LevelLabel.ToString(), LevelColor, X + 142.0f * Scale, Y + 52.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.CountLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 86.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
+	DrawText(ViewModel.BonusLabel.ToString(), Theme::AccentGold, X + Padding, Y + 116.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
+	DrawText(ViewModel.NextBonusLabel.ToString(), Theme::TextMuted, X + Padding, Y + 144.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+
+	const float ButtonWidth = 112.0f * Scale;
+	const float ButtonHeight = 34.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + PanelHeight - Padding - ButtonHeight;
+	DrawRect(ViewModel.bCanRebirth ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanRebirth ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 18.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+	if (ViewModel.bCanRebirth)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), RebirthHitBoxName, true, 80);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryRebirth()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || !IdleGameInstance->Rebirth())
+	{
+		return;
+	}
+
+	if (AIdleCharacter* IdleCharacter = PlayerOwner ? Cast<AIdleCharacter>(PlayerOwner->GetPawn()) : nullptr)
+	{
+		IdleCharacter->RefreshDerivedStats();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::RefreshMouseInteraction()
+{
+	if (!PlayerOwner)
+	{
+		return;
+	}
+
+	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
+	const bool bNeedsPointer = bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
+	PlayerOwner->bShowMouseCursor = bNeedsPointer;
+	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }
