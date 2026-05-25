@@ -21,6 +21,8 @@ public class IdleProject : ModuleRules
 			"Paper2D",
 			"EnhancedInput",
 			"UMG",
+			"Slate",
+			"SlateCore",
 			"HTTP",
 			"Json",
 			"JsonUtilities"
