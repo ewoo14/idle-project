@@ -125,8 +125,7 @@ void UBattleAIComponent::MoveTowards(AActor* TargetActor, float DeltaSeconds)
 		return;
 	}
 
-	const float MoveSpeed = 220.0f;
-	const FVector NextLocation = FMath::VInterpConstantTo(Owner->GetActorLocation(), TargetActor->GetActorLocation(), DeltaSeconds, MoveSpeed);
+	const FVector NextLocation = FMath::VInterpConstantTo(Owner->GetActorLocation(), TargetActor->GetActorLocation(), DeltaSeconds, NonCharacterMoveSpeed);
 	Owner->SetActorLocation(NextLocation, true);
 }
 

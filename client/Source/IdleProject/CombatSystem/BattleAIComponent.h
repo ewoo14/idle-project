@@ -40,6 +40,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|BattleAI")
 	AActor* FindClosestEnemy();
 
+	/** AI 갱신 주기(초). 기본 0.2s = 5Hz. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|BattleAI", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float BattleInterval = 0.2f;
+
+	/** 비-캐릭터(예: 몬스터) 추격 시 사용하는 보간 이동 속도(units/sec). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|BattleAI", meta = (ClampMin = "10.0"))
+	float NonCharacterMoveSpeed = 220.0f;
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -51,5 +59,4 @@ private:
 
 	FTimerHandle BattleTimerHandle;
 	float LastAttackTime = -1000.0f;
-	static constexpr float BattleInterval = 0.2f;
 };

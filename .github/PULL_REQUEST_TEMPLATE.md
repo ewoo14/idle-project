@@ -25,20 +25,17 @@
 - [ ] 단위 테스트 통과
 - [ ] CI 통과 확인
 
-## 5. 멀티 에이전트 워크플로우 v2 체크리스트
+## 5. 멀티 에이전트 워크플로우 v3 체크리스트
 
-워크플로우 단계를 진행하며 체크해주세요. 자세한 흐름은 [`docs/workflow/01-pm-codex-claude-loop.md`](../docs/workflow/01-pm-codex-claude-loop.md).
+워크플로우 단계를 진행하며 체크해주세요. 자세한 흐름은 [`docs/workflow/01-pm-codex-claude-loop.md`](../docs/workflow/01-pm-codex-claude-loop.md) (v3).
 
-- [ ] **[1] PM 기획** — 기획/명세 첨부 완료
-- [ ] **[2] Codex 1차 구현** — 7개 파트 커밋 완료 (개별 코멘트 금지)
-- [ ] **[3a] Claude TM 종합 리뷰** — 1개 코멘트 게시
-- [ ] **[3b] Codex TM 종합 리뷰** — 1개 코멘트 게시 (Claude TM 비교 포함)
-- [ ] **[4] PM 1차 통합** — fix 지시 코멘트 게시
-- [ ] **[5] Codex 2차 fix** — PM 지시 반영
-- [ ] **[6a] Claude TM 재검토** — 1개 코멘트
-- [ ] **[6b] Codex TM 재검토** — 1개 코멘트
-- [ ] **[7] PM 2차 통합** — fix 없음 판정 (있으면 [5] 로 루프)
-- [ ] **[8] CI 통과 + PM 종합 소견** — 머지 직전 게시
+- [ ] **[1] PM 기획** — 기획서 + PR 본문
+- [ ] **[2] Codex 개발 + PM 산출 게시** — Codex 커밋 + PM 이 산출 PR 코멘트
+- [ ] **[3] Claude 리뷰 + fix** — Claude TM 종합 + Claude/PM 직접 fix
+- [ ] **[4] Codex 리뷰 + fix + PM 산출 게시** — Codex TM 종합 + Codex fix + PM 산출 코멘트
+- [ ] **[5] Claude 검증 리뷰** — fix 없음 판정 (있으면 [3] 또는 [4] 로 루프)
+- [ ] (라운드 반복 시: round/N 라벨 + 코멘트 헤더 갱신)
+- [ ] **[N] CI 통과 + PM 종합 소견** — 머지 직전 게시
 
 ## 6. 리스크 / 영향
 > 회귀 가능성, 의존성, 마이그레이션, 호환성.
