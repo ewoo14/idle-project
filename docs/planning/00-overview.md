@@ -1,14 +1,16 @@
 # 기획 문서 — 한눈에 보기
 
-본 디렉터리는 게임의 **무엇을 / 왜 / 어떻게** 를 정의합니다. 모든 후속 PR (구현, 콘텐츠, 밸런스, 백엔드) 은 여기에 정의된 기획에 정렬되어야 합니다.
+본 디렉터리는 게임의 **무엇을 / 왜 / 어떻게** 를 정의합니다.
+모든 후속 PR은 여기에 정의된 기획에 정렬되어야 합니다.
 
 | 문서 | 내용 |
 | --- | --- |
-| [01-game-design.md](01-game-design.md) | 장르, 코어 루프, 캐릭터/아이템/스킬, 메타 진행, MVP 범위 — **핵심 기획서** |
-| [02-architecture.md](02-architecture.md) | UE5 클라이언트 + Docker 서버 기술 구조, API, DB, 보안 |
+| [01-game-design.md](01-game-design.md) | 장르, 루프, MVP 범위 — **핵심 기획서** |
+| [02-architecture.md](02-architecture.md) | UE5 클라이언트 + Docker 서버 구조 |
 | [03-milestones.md](03-milestones.md) | M0 ~ M6 마일스톤, 각 PR 단위 슬라이스 |
-| [04-art-direction.md](04-art-direction.md) | 픽셀 아트 톤, 컬러 팔레트, UI 가이드 |
-| [05-balance-philosophy.md](05-balance-philosophy.md) | 성장 곡선, 인플레이션 관리, 환생/메타 보상 철학 |
+| [04-art-direction.md](04-art-direction.md) | 3D 애니메 톤, 컬러, UI 가이드 |
+| [05-balance-philosophy.md](05-balance-philosophy.md) | 성장 곡선, 환생/메타 보상 |
+| [06-story-bible.md](06-story-bible.md) | 세계관, 인물, 챕터 1, 대사 기준 |
 
 ---
 
