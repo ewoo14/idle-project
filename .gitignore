@@ -79,3 +79,6 @@ secrets.json
 # 또는 직접 https://github.com/ruyo/VRM4U/releases 에서 VRM4U_5_7_*.zip 다운로드 후
 # client/Plugins/VRM4U/ 에 압축 해제
 client/Plugins/VRM4U/
+
+# VRM 캐릭터 자산 — git LFS 또는 사용자 다운로드. binary 큼.
+client/Content/Characters/*.vrm
