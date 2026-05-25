@@ -4,10 +4,69 @@
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "CharacterSystem/IdleCharacter.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "UI/IdleHUD.h"
+
+namespace
+{
+int32 CountSkillsByType(const USkillComponent& Skills, ESkillType Type)
+{
+	return Skills.Skills.FilterByPredicate([Type](const FSkillDefinition& Skill)
+	{
+		return Skill.Type == Type;
+	}).Num();
+}
+
+bool HasSkill(const USkillComponent& Skills, FName SkillId)
+{
+	return Skills.Skills.ContainsByPredicate([SkillId](const FSkillDefinition& Skill)
+	{
+		return Skill.SkillId == SkillId;
+	});
+}
+
+struct FExpectedSkillDefinition
+{
+	FName SkillId;
+	EClassId ClassId;
+	ESkillType Type;
+	ESkillEffectType EffectType;
+	float Cooldown;
+	float DamageCoeff;
+	float BuffMagnitude;
+	float BuffDuration;
+	float GaugeGainOnHit;
+	float GaugeGainOnTakeDamage;
+};
+
+bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent& Skills, const FExpectedSkillDefinition& Expected)
+{
+	const FSkillDefinition* Actual = Skills.Skills.FindByPredicate([&Expected](const FSkillDefinition& Skill)
+	{
+		return Skill.SkillId == Expected.SkillId;
+	});
+
+	Test.TestNotNull(*FString::Printf(TEXT("%s exists"), *Expected.SkillId.ToString()), Actual);
+	if (!Actual)
+	{
+		return false;
+	}
+
+	Test.TestEqual(*FString::Printf(TEXT("%s ClassId"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->ClassId), static_cast<int32>(Expected.ClassId));
+	Test.TestEqual(*FString::Printf(TEXT("%s Type"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->Type), static_cast<int32>(Expected.Type));
+	Test.TestEqual(*FString::Printf(TEXT("%s EffectType"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->EffectType), static_cast<int32>(Expected.EffectType));
+	Test.TestEqual(*FString::Printf(TEXT("%s Cooldown"), *Expected.SkillId.ToString()), Actual->Cooldown, Expected.Cooldown);
+	Test.TestEqual(*FString::Printf(TEXT("%s DamageCoeff"), *Expected.SkillId.ToString()), Actual->DamageCoeff, Expected.DamageCoeff);
+	Test.TestEqual(*FString::Printf(TEXT("%s BuffMagnitude"), *Expected.SkillId.ToString()), Actual->BuffMagnitude, Expected.BuffMagnitude);
+	Test.TestEqual(*FString::Printf(TEXT("%s BuffDuration"), *Expected.SkillId.ToString()), Actual->BuffDuration, Expected.BuffDuration);
+	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnHit"), *Expected.SkillId.ToString()), Actual->GaugeGainOnHit, Expected.GaugeGainOnHit);
+	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnTakeDamage"), *Expected.SkillId.ToString()), Actual->GaugeGainOnTakeDamage, Expected.GaugeGainOnTakeDamage);
+	return true;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatFormulasTest,
@@ -19,6 +78,34 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Atk 100 Def 20 damage"), FCombatFormulas::ComputeDamage(100.0f, 20.0f), 88.0f);
 	TestEqual(TEXT("Minimum damage guarantee"), FCombatFormulas::ComputeDamage(10.0f, 100.0f), 0.5f);
 	TestEqual(TEXT("Zero defense damage"), FCombatFormulas::ComputeDamage(50.0f, 0.0f), 50.0f);
+	TestEqual(TEXT("Expected crit damage applies after defense"), FCombatFormulas::ComputeDamage(40.0f, 10.0f, 0.25f, 1.8f), 40.8f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatClassDamageTest,
+	"IdleProject.Combat.Formulas.ClassDamage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatClassDamageTest::RunTest(const FString& Parameters)
+{
+	FDerivedStats MageStats;
+	MageStats.PhysAtk = 12.0f;
+	MageStats.MagicAtk = 40.0f;
+	TestEqual(TEXT("Mage damage uses magic attack"), FCombatFormulas::ComputeDamage(MageStats, EClassId::Mage, 10.0f), 34.0f);
+
+	FDerivedStats ArcherStats;
+	ArcherStats.PhysAtk = 40.0f;
+	ArcherStats.MagicAtk = 12.0f;
+	ArcherStats.CritRate = 0.25f;
+	ArcherStats.CritDmg = 1.8f;
+	TestEqual(TEXT("Archer damage includes expected crit value"), FCombatFormulas::ComputeDamage(ArcherStats, EClassId::Archer, 10.0f), 40.8f);
+
+	FDerivedStats WarriorStats;
+	WarriorStats.PhysAtk = 40.0f;
+	WarriorStats.MagicAtk = 80.0f;
+	TestEqual(TEXT("Warrior damage keeps physical attack"), FCombatFormulas::ComputeDamage(WarriorStats, EClassId::Warrior, 10.0f), 34.0f);
 
 	return true;
 }
@@ -93,6 +180,85 @@ bool FSkillCooldownTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillClassDefaultsTest,
+	"IdleProject.Combat.Skills.ClassDefaults",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+
+	Skills->LoadDefaultMageSkills();
+	TestEqual(TEXT("Mage has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Mage has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Mage has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Mage has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Mage loads arcane bolt"), HasSkill(*Skills, TEXT("arcane_bolt")));
+	TestTrue(TEXT("Mage loads meteor"), HasSkill(*Skills, TEXT("meteor")));
+
+	Skills->LoadDefaultArcherSkills();
+	TestEqual(TEXT("Archer has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Archer has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Archer has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Archer has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Archer loads precision shot"), HasSkill(*Skills, TEXT("precision_shot")));
+	TestTrue(TEXT("Archer loads arrow_rain"), HasSkill(*Skills, TEXT("arrow_rain")));
+
+	Skills->LoadSkillsForClass(EClassId::Warrior);
+	TestTrue(TEXT("Class loader selects warrior skills"), HasSkill(*Skills, TEXT("heavy_strike")));
+	Skills->LoadSkillsForClass(EClassId::Mage);
+	TestTrue(TEXT("Class loader selects mage skills"), HasSkill(*Skills, TEXT("arcane_bolt")));
+	Skills->LoadSkillsForClass(EClassId::Archer);
+	TestTrue(TEXT("Class loader selects archer skills"), HasSkill(*Skills, TEXT("precision_shot")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillDefinitionParityTest,
+	"IdleProject.Combat.Skills.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+
+	Skills->LoadDefaultMageSkills();
+	const TArray<FExpectedSkillDefinition> MageSkills = {
+		{TEXT("arcane_bolt"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("chain_lightning"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("mana_shield"), EClassId::Mage, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f, 0.0f, 0.0f},
+		{TEXT("meteor"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("spell_mastery"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("mana_flow"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("arcane_overload"), EClassId::Mage, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : MageSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultArcherSkills();
+	const TArray<FExpectedSkillDefinition> ArcherSkills = {
+		{TEXT("precision_shot"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.2f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("arrow_rain"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("focus"), EClassId::Archer, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
+		{TEXT("piercing_arrow"), EClassId::Archer, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("critical_eye"), EClassId::Archer, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.0f},
+		{TEXT("quick_draw"), EClassId::Archer, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f},
+		{TEXT("eagle_eye"), EClassId::Archer, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : ArcherSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSkillGaugeTest,
 	"IdleProject.Combat.Skills.UltimateGauge",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -138,6 +304,22 @@ bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weapon mastery grants 15 percent physical attack"), Stats.PhysAtk, 230.0f);
 	TestEqual(TEXT("Toughness grants 20 percent max HP"), Stats.Hp, 1200.0f);
 	TestEqual(TEXT("Unrelated stats stay unchanged"), Stats.PhysDef, 50.0f);
+
+	Skills->LoadDefaultMageSkills();
+	Stats = FDerivedStats();
+	Stats.MagicAtk = 200.0f;
+	Stats.Mp = 1000.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Mage spell mastery grants 15 percent magic attack"), Stats.MagicAtk, 230.0f);
+	TestEqual(TEXT("Mage mana flow grants 20 percent max MP"), Stats.Mp, 1200.0f);
+
+	Skills->LoadDefaultArcherSkills();
+	Stats = FDerivedStats();
+	Stats.CritRate = 0.10f;
+	Stats.AtkSpeed = 1.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Archer critical eye grants five percentage points crit"), Stats.CritRate, 0.15f);
+	TestEqual(TEXT("Archer quick draw grants 10 percent attack speed"), Stats.AtkSpeed, 1.1f);
 
 	return true;
 }
@@ -204,6 +386,62 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
 	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FClassSelectionHudDisplayModelTest,
+	"IdleProject.UI.HUD.ClassSelectionDisplayModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FClassSelectionHudDisplayModelTest::RunTest(const FString& Parameters)
+{
+	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = IdleProject::UI::BuildClassSelectionOptions(EClassId::Mage);
+
+	TestEqual(TEXT("Class selector exposes three V1 classes"), Options.Num(), 3);
+	TestEqual(TEXT("First class is warrior"), static_cast<int32>(Options[0].ClassId), static_cast<int32>(EClassId::Warrior));
+	TestEqual(TEXT("Warrior summary highlights STR and CON"), Options[0].StatSummary.ToString(), FString(TEXT("STR/CON")));
+	TestEqual(TEXT("Mage summary highlights INT"), Options[1].StatSummary.ToString(), FString(TEXT("INT")));
+	TestEqual(TEXT("Archer summary highlights DEX"), Options[2].StatSummary.ToString(), FString(TEXT("DEX")));
+	TestTrue(TEXT("Current class is marked selected"), Options[1].bSelected);
+	TestFalse(TEXT("Other classes are not selected"), Options[0].bSelected);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterClassSelectionTest,
+	"IdleProject.Character.ClassSelection.AppliesSkills",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterClassSelectionTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Archer);
+	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+
+	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Archer));
+	TestNotNull(TEXT("Skill component exists"), Skills);
+	TestTrue(TEXT("Archer skill set is loaded"), Skills && HasSkill(*Skills, TEXT("precision_shot")));
+	TestFalse(TEXT("Warrior skill set is replaced"), Skills && HasSkill(*Skills, TEXT("heavy_strike")));
+
+	World->DestroyWorld(false);
 	return true;
 }
 

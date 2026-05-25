@@ -217,7 +217,7 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 
 	LastAttackTime = World->GetTimeSeconds();
 	State = EBattleState::Attack;
-	TargetCombat->TakeDamage(FCombatFormulas::ComputeDamage(OwnerCombat->Atk, TargetCombat->Def), GetOwner());
+	TargetCombat->TakeDamage(FCombatFormulas::ComputeDamage(OwnerCombat->Atk, TargetCombat->Def, OwnerCombat->CritRate, OwnerCombat->CritDmg), GetOwner());
 	if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
 	{
 		Skills->AddGauge(Skills->GetGaugeGainOnHit());

@@ -11,6 +11,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
+#include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -95,11 +96,7 @@ void AIdleCharacter::BeginPlay()
 	{
 		Inventory->OnEquippedChanged.AddDynamic(this, &AIdleCharacter::HandleEquippedChanged);
 	}
-	if (Skills)
-	{
-		Skills->LoadDefaultWarriorSkills();
-	}
-	RefreshDerivedStats();
+	SetClassId(DefaultClassId);
 	LastObservedHp = Combat ? Combat->CurrentHp : 0.0f;
 
 	if (BattleAI)
@@ -175,10 +172,36 @@ void AIdleCharacter::RefreshDerivedStats()
 	if (Combat)
 	{
 		const float HpRatio = Combat->MaxHp > 0.0f ? Combat->CurrentHp / Combat->MaxHp : 1.0f;
-		Combat->InitializeCombat(Derived.Hp, Derived.PhysAtk, Derived.PhysDef, Derived.AtkSpeed);
+		Combat->InitializeCombat(
+			Derived.Hp,
+			FCombatFormulas::ComputeAttackPower(Derived, DefaultClassId),
+			Derived.PhysDef,
+			Derived.AtkSpeed,
+			DefaultClassId == EClassId::Archer ? Derived.CritRate : 0.0f,
+			DefaultClassId == EClassId::Archer ? Derived.CritDmg : 1.5f);
 		Combat->CurrentHp = FMath::Clamp(Derived.Hp * HpRatio, 0.0f, Combat->MaxHp);
 		Combat->OnHpChanged.Broadcast(Combat->CurrentHp);
 	}
+}
+
+void AIdleCharacter::SetClassId(EClassId NewClassId)
+{
+	if (NewClassId == EClassId::None)
+	{
+		NewClassId = EClassId::Warrior;
+	}
+
+	DefaultClassId = NewClassId;
+	if (Skills)
+	{
+		Skills->LoadSkillsForClass(DefaultClassId);
+	}
+	RefreshDerivedStats();
+}
+
+EClassId AIdleCharacter::GetClassId() const
+{
+	return DefaultClassId;
 }
 
 void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)
