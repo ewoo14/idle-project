@@ -75,6 +75,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadDefaultWarriorSkills();
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultMageSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultArcherSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadSkillsForClass(EClassId ClassId);
+
 	/** 전투 틱에서 준비된 액티브/궁극기 스킬을 자동 발동합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets);
@@ -114,6 +123,7 @@ public:
 	float GetGaugeGainOnTakeDamage() const;
 
 private:
+	void ResetSkillState();
 	const FSkillDefinition* FindSkill(FName SkillId) const;
 	void UpdateTimedBuffs(float Now);
 	void ExecuteSkill(const FSkillDefinition& Skill, float Now, AActor* Target, const TArray<AActor*>& AoeTargets);

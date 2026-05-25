@@ -7,13 +7,15 @@ UCombatComponent::UCombatComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UCombatComponent::InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed)
+void UCombatComponent::InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed, float InCritRate, float InCritDmg)
 {
 	MaxHp = FMath::Max(1.0f, InMaxHp);
 	CurrentHp = MaxHp;
 	Atk = FMath::Max(0.0f, InAtk);
 	Def = FMath::Max(0.0f, InDef);
 	AtkSpeed = FMath::Max(0.1f, InAtkSpeed);
+	CritRate = FMath::Clamp(InCritRate, 0.0f, 1.0f);
+	CritDmg = FMath::Max(1.0f, InCritDmg);
 	bDeathBroadcast = false;
 	OnHpChanged.Broadcast(CurrentHp);
 }

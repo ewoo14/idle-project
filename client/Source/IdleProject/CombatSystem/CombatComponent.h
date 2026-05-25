@@ -32,6 +32,12 @@ public:
 	float AtkSpeed = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
+	float CritRate = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
+	float CritDmg = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
 	float AttackRange = 200.0f;
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Combat")
@@ -46,7 +52,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat")
 	bool IsDead() const;
 
-	void InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed);
+	void InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed, float InCritRate = 0.0f, float InCritDmg = 1.5f);
 
 private:
 	bool bDeathBroadcast = false;

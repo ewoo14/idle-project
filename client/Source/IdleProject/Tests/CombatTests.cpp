@@ -9,6 +9,25 @@
 #include "CharacterSystem/IdleMonster.h"
 #include "UI/IdleHUD.h"
 
+namespace
+{
+int32 CountSkillsByType(const USkillComponent& Skills, ESkillType Type)
+{
+	return Skills.Skills.FilterByPredicate([Type](const FSkillDefinition& Skill)
+	{
+		return Skill.Type == Type;
+	}).Num();
+}
+
+bool HasSkill(const USkillComponent& Skills, FName SkillId)
+{
+	return Skills.Skills.ContainsByPredicate([SkillId](const FSkillDefinition& Skill)
+	{
+		return Skill.SkillId == SkillId;
+	});
+}
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatFormulasTest,
 	"IdleProject.Combat.Formulas.ComputeDamage",
@@ -19,6 +38,34 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Atk 100 Def 20 damage"), FCombatFormulas::ComputeDamage(100.0f, 20.0f), 88.0f);
 	TestEqual(TEXT("Minimum damage guarantee"), FCombatFormulas::ComputeDamage(10.0f, 100.0f), 0.5f);
 	TestEqual(TEXT("Zero defense damage"), FCombatFormulas::ComputeDamage(50.0f, 0.0f), 50.0f);
+	TestEqual(TEXT("Expected crit damage applies after defense"), FCombatFormulas::ComputeDamage(40.0f, 10.0f, 0.25f, 1.8f), 40.8f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatClassDamageTest,
+	"IdleProject.Combat.Formulas.ClassDamage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatClassDamageTest::RunTest(const FString& Parameters)
+{
+	FDerivedStats MageStats;
+	MageStats.PhysAtk = 12.0f;
+	MageStats.MagicAtk = 40.0f;
+	TestEqual(TEXT("Mage damage uses magic attack"), FCombatFormulas::ComputeDamage(MageStats, EClassId::Mage, 10.0f), 34.0f);
+
+	FDerivedStats ArcherStats;
+	ArcherStats.PhysAtk = 40.0f;
+	ArcherStats.MagicAtk = 12.0f;
+	ArcherStats.CritRate = 0.25f;
+	ArcherStats.CritDmg = 1.8f;
+	TestEqual(TEXT("Archer damage includes expected crit value"), FCombatFormulas::ComputeDamage(ArcherStats, EClassId::Archer, 10.0f), 40.8f);
+
+	FDerivedStats WarriorStats;
+	WarriorStats.PhysAtk = 40.0f;
+	WarriorStats.MagicAtk = 80.0f;
+	TestEqual(TEXT("Warrior damage keeps physical attack"), FCombatFormulas::ComputeDamage(WarriorStats, EClassId::Warrior, 10.0f), 34.0f);
 
 	return true;
 }
@@ -93,6 +140,41 @@ bool FSkillCooldownTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillClassDefaultsTest,
+	"IdleProject.Combat.Skills.ClassDefaults",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+
+	Skills->LoadDefaultMageSkills();
+	TestEqual(TEXT("Mage has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Mage has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Mage has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Mage has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Mage loads arcane bolt"), HasSkill(*Skills, TEXT("arcane_bolt")));
+	TestTrue(TEXT("Mage loads meteor"), HasSkill(*Skills, TEXT("meteor")));
+
+	Skills->LoadDefaultArcherSkills();
+	TestEqual(TEXT("Archer has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Archer has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Archer has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Archer has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Archer loads precision shot"), HasSkill(*Skills, TEXT("precision_shot")));
+	TestTrue(TEXT("Archer loads arrow_rain"), HasSkill(*Skills, TEXT("arrow_rain")));
+
+	Skills->LoadSkillsForClass(EClassId::Warrior);
+	TestTrue(TEXT("Class loader selects warrior skills"), HasSkill(*Skills, TEXT("heavy_strike")));
+	Skills->LoadSkillsForClass(EClassId::Mage);
+	TestTrue(TEXT("Class loader selects mage skills"), HasSkill(*Skills, TEXT("arcane_bolt")));
+	Skills->LoadSkillsForClass(EClassId::Archer);
+	TestTrue(TEXT("Class loader selects archer skills"), HasSkill(*Skills, TEXT("precision_shot")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSkillGaugeTest,
 	"IdleProject.Combat.Skills.UltimateGauge",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -138,6 +220,22 @@ bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weapon mastery grants 15 percent physical attack"), Stats.PhysAtk, 230.0f);
 	TestEqual(TEXT("Toughness grants 20 percent max HP"), Stats.Hp, 1200.0f);
 	TestEqual(TEXT("Unrelated stats stay unchanged"), Stats.PhysDef, 50.0f);
+
+	Skills->LoadDefaultMageSkills();
+	Stats = FDerivedStats();
+	Stats.MagicAtk = 200.0f;
+	Stats.Mp = 1000.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Mage spell mastery grants 15 percent magic attack"), Stats.MagicAtk, 230.0f);
+	TestEqual(TEXT("Mage mana flow grants 20 percent max MP"), Stats.Mp, 1200.0f);
+
+	Skills->LoadDefaultArcherSkills();
+	Stats = FDerivedStats();
+	Stats.CritRate = 0.10f;
+	Stats.AtkSpeed = 1.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Archer critical eye grants five percentage points crit"), Stats.CritRate, 0.15f);
+	TestEqual(TEXT("Archer quick draw grants 10 percent attack speed"), Stats.AtkSpeed, 1.1f);
 
 	return true;
 }
