@@ -11,8 +11,8 @@
 - **서버**: Node.js 22 + Fastify 5 + Drizzle + PostgreSQL 16 + Redis 7 (Docker Compose)
 - **저장소**: https://github.com/ewoo14/idle-project.git
 
-기획서: [`docs/planning/00-overview.md`](docs/planning/00-overview.md)  
-기술 아키텍처: [`docs/planning/02-architecture.md`](docs/planning/02-architecture.md)  
+기획서: [`docs/planning/00-overview.md`](docs/planning/00-overview.md)
+기술 아키텍처: [`docs/planning/02-architecture.md`](docs/planning/02-architecture.md)
 마일스톤: [`docs/planning/03-milestones.md`](docs/planning/03-milestones.md)
 
 ---

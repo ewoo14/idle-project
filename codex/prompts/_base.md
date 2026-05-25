@@ -19,7 +19,7 @@
 - 코드 식별자, 파일명, 영문 prefix 는 영문 허용
 
 ## 커밋 규칙
-- 커밋 prefix: `codex(<role>): <한글 요약>`  
+- 커밋 prefix: `codex(<role>): <한글 요약>`
   예: `codex(backend): 회원가입 핸들러 구현`
 - 의미 있는 단위로 자주 커밋
 - 시크릿 / `.env` 커밋 절대 금지
