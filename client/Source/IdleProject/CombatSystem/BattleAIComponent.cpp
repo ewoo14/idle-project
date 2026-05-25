@@ -110,6 +110,18 @@ void UBattleAIComponent::UpdateBattle()
 	MoveTowards(TargetActor, BattleInterval);
 }
 
+FVector UBattleAIComponent::ComputeGroundChaseLocation(
+	const FVector& OwnerLocation,
+	const FVector& TargetLocation,
+	float DeltaSeconds,
+	float Speed)
+{
+	// 추격 목표는 타깃의 X(화면 가로) 만 취하고, Z(중력축) 와 Y(깊이) 는 추격 주체 자신의 값을 유지한다.
+	// → 타깃 캡슐 중심(높음)으로 떠오르지 않고 지면을 따라 수평 이동하며, 높이는 중력/지면이 처리한다.
+	const FVector HorizontalTarget(TargetLocation.X, OwnerLocation.Y, OwnerLocation.Z);
+	return FMath::VInterpConstantTo(OwnerLocation, HorizontalTarget, DeltaSeconds, Speed);
+}
+
 void UBattleAIComponent::MoveTowards(AActor* TargetActor, float DeltaSeconds)
 {
 	AActor* Owner = GetOwner();
@@ -118,19 +130,22 @@ void UBattleAIComponent::MoveTowards(AActor* TargetActor, float DeltaSeconds)
 		return;
 	}
 
-	// 횡스크롤 X-Z 평면 (Y축 plane normal) — GetSafeNormal2D() 는 X-Y 평면 정규화로
-	// Z 성분을 잘라버려 캐릭터가 Z 방향 추격을 못 한다. 3D 정규화 후 Y 성분만 0 처리.
-	FVector Direction = (TargetActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal();
-	Direction.Y = 0.0f;
-	Direction = Direction.GetSafeNormal();
-
 	if (AIdleCharacter* IdleCharacter = Cast<AIdleCharacter>(Owner))
 	{
+		// 플레이어(컨트롤러 보유)는 걷기 이동 입력으로 추격한다 (걷기 모드는 Z 입력을 무시 → 지면 유지).
+		// 횡스크롤 X-Z 평면 (Y축 plane normal): 3D 정규화 후 Y 성분만 0 처리.
+		FVector Direction = (TargetActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal();
+		Direction.Y = 0.0f;
+		Direction = Direction.GetSafeNormal();
 		IdleCharacter->AddMovementInput(Direction, 1.0f);
 		return;
 	}
 
-	const FVector NextLocation = FMath::VInterpConstantTo(Owner->GetActorLocation(), TargetActor->GetActorLocation(), DeltaSeconds, NonCharacterMoveSpeed);
+	// 몬스터(컨트롤러 없음 → AddMovementInput 불가)는 위치 보간으로 추격한다.
+	// 타깃 전체 3D 위치로 보간하면 플레이어 캡슐 중심(더 높은 Z)으로 끌려 올라가므로,
+	// 수평(X)만 추격하고 Z·Y 는 몬스터 자신의 지면선 값을 유지한다 (몬스터는 GravityScale=0 으로 낙하 없음).
+	const FVector NextLocation = ComputeGroundChaseLocation(
+		Owner->GetActorLocation(), TargetActor->GetActorLocation(), DeltaSeconds, NonCharacterMoveSpeed);
 	Owner->SetActorLocation(NextLocation, true);
 }
 

@@ -1,6 +1,8 @@
 #include "IdleProjectGameModeBase.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/IdleMonster.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
 #include "CombatSystem/CombatComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/LightComponent.h"
@@ -94,13 +96,26 @@ void AIdleProjectGameModeBase::SpawnInitialMonsters(AController* NewPlayer)
 	}
 
 	bInitialMonstersSpawned = true;
-	const FVector Center = PlayerPawn->GetActorLocation();
-	const float Radius = 800.0f;
+
+	// 횡스크롤 평면 스테이지: 몬스터를 플레이어와 같은 지면선(Z)에 좌우로 번갈아 X 로 퍼뜨린다.
+	// (기존 sin(angle)*120 Z 변동은 일부 몬스터를 공중/바닥 아래에 spawn → 중력으로 월드 밖까지 떨어져 사라짐.)
+	const FVector PlayerLocation = PlayerPawn->GetActorLocation();
+	float PlayerHalfHeight = 88.0f;
+	if (const ACharacter* PlayerCharacter = Cast<ACharacter>(PlayerPawn))
+	{
+		PlayerHalfHeight = PlayerCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	}
+	// 몬스터 캡슐 half-height(44)의 발을 플레이어 발 높이에 맞춘다.
+	constexpr float MonsterHalfHeight = 44.0f;
+	const float GroundAlignedZ = PlayerLocation.Z - (PlayerHalfHeight - MonsterHalfHeight);
+
 	for (int32 Index = 0; Index < InitialMonsterCount; ++Index)
 	{
-		const float Angle = (2.0f * PI * static_cast<float>(Index)) / FMath::Max(1.0f, static_cast<float>(InitialMonsterCount));
-		const FVector Offset(FMath::Cos(Angle) * Radius, 0.0f, FMath::Sin(Angle) * 120.0f);
-		SpawnMonsterAt(Center + Offset);
+		const float Side = (Index % 2 == 0) ? 1.0f : -1.0f;
+		const int32 Rank = Index / 2;
+		const float DistanceX = 350.0f + 300.0f * static_cast<float>(Rank);
+		const FVector SpawnLocation(PlayerLocation.X + Side * DistanceX, PlayerLocation.Y, GroundAlignedZ);
+		SpawnMonsterAt(SpawnLocation);
 	}
 }
 

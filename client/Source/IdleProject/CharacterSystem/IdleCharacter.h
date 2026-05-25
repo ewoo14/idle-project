@@ -116,6 +116,8 @@ private:
 	void ConfigureInputActions();
 	void RegisterDefaultMappingContext();
 	void ConfigureCharacterVisuals();
+	/** VRoid/VRM4U 모델의 액세서리(백팩·로봇팔 등) 머티리얼 슬롯을 INI 키워드 기준으로 숨깁니다. */
+	void HideAccessoryMaterialSlots();
 	void UpdateAnimInstanceVariables();
 	void UpdateBattleFacialExpression();
 	void Move(const FInputActionValue& Value);

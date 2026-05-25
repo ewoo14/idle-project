@@ -19,6 +19,10 @@ AIdleMonster::AIdleMonster()
 	PrimaryActorTick.bCanEverTick = false;
 
 	GetCapsuleComponent()->InitCapsuleSize(34.0f, 44.0f);
+	// 오토배틀에서 전투원끼리는 물리적으로 막을 필요가 없다. Pawn 채널을 무시해 플레이어·다른 몬스터
+	// 캡슐과의 충돌 이탈(depenetration) 임펄스를 제거한다 (이 임펄스가 몬스터를 위로 튕겨 사라지게 함).
+	// 지면(WorldStatic)은 그대로 Block 하여 캐릭터가 바닥에 선다.
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 
 	PlaceholderMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PlaceholderMesh"));
 	PlaceholderMesh->SetupAttachment(RootComponent);
@@ -46,6 +50,9 @@ AIdleMonster::AIdleMonster()
 	Movement->bOrientRotationToMovement = false;
 	Movement->bConstrainToPlane = true;
 	Movement->SetPlaneConstraintNormal(FVector::YAxisVector);
+	// 평면 스테이지의 오토배틀 — 몬스터는 지면선에 고정되어 X 로만 추격한다. 중력을 끄면 지면 충돌
+	// 여부와 무관하게 낙하하지 않는다. (기존 중력 + 공중/바닥아래 spawn 조합이 몬스터를 월드 밖으로 떨어뜨려 사라지게 함.)
+	Movement->GravityScale = 0.0f;
 }
 
 void AIdleMonster::BeginPlay()
