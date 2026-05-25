@@ -63,6 +63,8 @@ void UInventoryComponent::UnequipSlot(EItemSlot Slot)
 
 FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 {
+	// server/src/core/formulas/equipment.ts 의 computeInventoryBonus 와 1:1 미러.
+	// 강화 보정: (1 + EnhanceLevel × 0.1) 을 각 Bonus 에 곱한다 (PR #1 §2.3 강화 곡선).
 	FDerivedStats Bonus;
 	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
 	{
@@ -72,9 +74,10 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		}
 
 		const FItemInstance& Item = Items[Pair.Value];
-		Bonus.PhysAtk += Item.BonusAtk;
-		Bonus.PhysDef += Item.BonusDef;
-		Bonus.Hp += Item.BonusHp;
+		const float EnhanceMultiplier = 1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f;
+		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier;
+		Bonus.PhysDef += Item.BonusDef * EnhanceMultiplier;
+		Bonus.Hp += Item.BonusHp * EnhanceMultiplier;
 	}
 	return Bonus;
 }
