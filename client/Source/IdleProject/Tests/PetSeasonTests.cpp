@@ -3,6 +3,7 @@
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/PetService.h"
 #include "GameCore/SeasonService.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -113,6 +114,67 @@ bool FIdleGameInstancePetSeasonHooksTest::RunTest(const FString& Parameters)
 	FSeasonClaimResult SeasonClaim = GameInstance->ClaimSeasonReward(1);
 	TestTrue(TEXT("Reached season reward can be claimed through GameInstance"), SeasonClaim.bSuccess);
 	TestEqual(TEXT("Tier one gold reward is added"), GameInstance->GetGold(), static_cast<int64>(650));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetSeasonHudViewModelTest,
+	"IdleProject.UI.HUD.PetSeasonViewModels",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
+{
+	UPetService* Pets = NewObject<UPetService>();
+	Pets->InitializeDefaultPets();
+	TestTrue(TEXT("Dog is equipped for the pet HUD seed"), Pets->EquipPet(TEXT("dog")));
+
+	const FIdleHUDPetPanelViewModel PetPanel = IdleProject::UI::BuildPetPanelViewModel(
+		Pets->GetPetDefinitions(),
+		Pets->GetEquippedPetId(),
+		Pets->GetEquippedPetGoldBonusPercent(),
+		Pets->GetEquippedPetDropBonusPercent());
+
+	TestEqual(TEXT("Pet HUD shows both V1 pets"), PetPanel.Rows.Num(), 2);
+	TestTrue(TEXT("Dog row is marked equipped"), PetPanel.Rows[0].bEquipped);
+	TestFalse(TEXT("Bird row is not equipped"), PetPanel.Rows[1].bEquipped);
+	TestTrue(TEXT("Equipped pet summary includes gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("20%")));
+	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
+
+	USeasonService* Season = NewObject<USeasonService>();
+	Season->InitializeDefaultSeason();
+	Season->AddSeasonTokens(10);
+
+	const FIdleHUDSeasonPassViewModel SeasonPanel = IdleProject::UI::BuildSeasonPassViewModel(
+		Season->GetSeasonTiers(),
+		Season->GetSeasonTokens(),
+		Season->GetReachedTier(),
+		[Season](int32 Tier)
+		{
+			return Season->IsTierClaimed(Tier);
+		});
+
+	TestEqual(TEXT("Season HUD mirrors ten V1 tiers"), SeasonPanel.Rows.Num(), 10);
+	TestEqual(TEXT("Season HUD token summary"), SeasonPanel.TokenLabel.ToString(), FString(TEXT("10 / 325")));
+	TestTrue(TEXT("Tier one can be claimed"), SeasonPanel.Rows[0].bCanClaim);
+	TestFalse(TEXT("Tier two is still locked"), SeasonPanel.Rows[1].bReached);
+	TestTrue(TEXT("Tier one action is claim"), SeasonPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("받기")));
+
+	FSeasonClaimResult Claim = Season->ClaimSeasonReward(1);
+	TestTrue(TEXT("Season service claim succeeds"), Claim.bSuccess);
+
+	const FIdleHUDSeasonPassViewModel ClaimedPanel = IdleProject::UI::BuildSeasonPassViewModel(
+		Season->GetSeasonTiers(),
+		Season->GetSeasonTokens(),
+		Season->GetReachedTier(),
+		[Season](int32 Tier)
+		{
+			return Season->IsTierClaimed(Tier);
+		});
+
+	TestTrue(TEXT("Claimed tier is marked claimed"), ClaimedPanel.Rows[0].bClaimed);
+	TestFalse(TEXT("Claimed tier cannot be claimed again"), ClaimedPanel.Rows[0].bCanClaim);
+	TestTrue(TEXT("Claimed action label is final"), ClaimedPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("수령 완료")));
 
 	return true;
 }

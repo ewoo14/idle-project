@@ -4,7 +4,9 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "GameFramework/HUD.h"
 #include "GameCore/OfflineRewardFormula.h"
+#include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/SeasonService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleHUD.generated.h"
 
@@ -86,6 +88,46 @@ struct IDLEPROJECT_API FIdleHUDClassSelectionOptionViewModel
 	bool bSelected = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDPetRowViewModel
+{
+	FString PetId;
+	FText Name;
+	FText BonusLabel;
+	FText ActionLabel;
+	bool bEquipped = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDPetPanelViewModel
+{
+	FText Title;
+	FText EquippedLabel;
+	FText GoldBonusLabel;
+	FText DropBonusLabel;
+	TArray<FIdleHUDPetRowViewModel> Rows;
+};
+
+struct IDLEPROJECT_API FIdleHUDSeasonTierRowViewModel
+{
+	int32 Tier = 0;
+	FText TierLabel;
+	FText RequirementLabel;
+	FText RewardLabel;
+	FText ActionLabel;
+	float ProgressRatio = 0.0f;
+	bool bReached = false;
+	bool bClaimed = false;
+	bool bCanClaim = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDSeasonPassViewModel
+{
+	FText Title;
+	FText TokenLabel;
+	FText ProgressLabel;
+	float ProgressRatio = 0.0f;
+	TArray<FIdleHUDSeasonTierRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -94,6 +136,8 @@ IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
 IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
+IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent);
+IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -146,6 +190,12 @@ private:
 	void ClaimQuestFromHitBox(FName BoxName);
 	void DrawRebirthPanel();
 	void TryRebirth();
+	void DrawPetPanel();
+	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
+	void EquipPetFromHitBox(FName BoxName);
+	void DrawSeasonPassPanel();
+	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
+	void ClaimSeasonTierFromHitBox(FName BoxName);
 	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)

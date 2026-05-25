@@ -18,6 +18,8 @@ const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
 const FName RebirthHitBoxName(TEXT("RebirthAction"));
 const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
+const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
+const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
 
@@ -70,6 +72,35 @@ FText QuestTypeToLabel(EQuestType Type)
 		: FText::FromString(TEXT("일일"));
 }
 
+FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
+{
+	const FString Percent = FString::Printf(TEXT("%.0f%%"), BonusPercent);
+	switch (Type)
+	{
+	case EPetBonusType::Gold:
+		return FText::FromString(FString::Printf(TEXT("골드 +%s"), *Percent));
+	case EPetBonusType::Drop:
+		return FText::FromString(FString::Printf(TEXT("드롭 +%s"), *Percent));
+	case EPetBonusType::None:
+	default:
+		return FText::FromString(TEXT("-"));
+	}
+}
+
+FText SeasonRewardToLabel(ESeasonRewardType Type, int64 Amount)
+{
+	switch (Type)
+	{
+	case ESeasonRewardType::Gold:
+		return FText::FromString(FString::Printf(TEXT("보상 골드 +%s"), *FormatIntegerWithCommas(Amount)));
+	case ESeasonRewardType::Exp:
+		return FText::FromString(FString::Printf(TEXT("보상 EXP +%s"), *FormatIntegerWithCommas(Amount)));
+	case ESeasonRewardType::None:
+	default:
+		return FText::FromString(TEXT("-"));
+	}
+}
+
 FName MakeQuestClaimHitBoxName(const FString& QuestId)
 {
 	return FName(*(QuestClaimHitBoxPrefix + QuestId));
@@ -78,6 +109,16 @@ FName MakeQuestClaimHitBoxName(const FString& QuestId)
 FName MakeClassSelectionHitBoxName(EClassId ClassId)
 {
 	return FName(*(ClassSelectionHitBoxPrefix + FString::FromInt(static_cast<int32>(ClassId))));
+}
+
+FName MakePetEquipHitBoxName(const FString& PetId)
+{
+	return FName(*(PetEquipHitBoxPrefix + PetId));
+}
+
+FName MakeSeasonClaimHitBoxName(int32 Tier)
+{
+	return FName(*(SeasonClaimHitBoxPrefix + FString::FromInt(Tier)));
 }
 }
 
@@ -227,6 +268,67 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	return Options;
 }
 
+FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent)
+{
+	FIdleHUDPetPanelViewModel ViewModel;
+	ViewModel.Title = FText::FromString(TEXT("펫"));
+	ViewModel.EquippedLabel = FText::FromString(EquippedPetId.IsEmpty()
+		? TEXT("장착: 없음")
+		: FString::Printf(TEXT("장착: %s"), *EquippedPetId));
+	ViewModel.GoldBonusLabel = FText::FromString(FString::Printf(TEXT("골드 +%.0f%%"), GoldBonusPercent));
+	ViewModel.DropBonusLabel = FText::FromString(FString::Printf(TEXT("드롭 +%.0f%%"), DropBonusPercent));
+
+	for (const FPetDefinition& Definition : PetDefinitions)
+	{
+		FIdleHUDPetRowViewModel Row;
+		Row.PetId = Definition.PetId;
+		Row.Name = Definition.Name;
+		Row.BonusLabel = PetBonusTypeToLabel(Definition.BonusType, Definition.BonusPercent);
+		Row.bEquipped = Definition.PetId == EquippedPetId;
+		Row.ActionLabel = FText::FromString(Row.bEquipped ? TEXT("장착됨") : TEXT("장착"));
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
+FIdleHUDSeasonPassViewModel IdleProject::UI::BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed)
+{
+	FIdleHUDSeasonPassViewModel ViewModel;
+	ViewModel.Title = FText::FromString(TEXT("시즌 패스"));
+
+	int32 MaxRequiredTokens = 0;
+	for (const FSeasonTierDefinition& Tier : Tiers)
+	{
+		MaxRequiredTokens = FMath::Max(MaxRequiredTokens, Tier.RequiredTokens);
+	}
+
+	ViewModel.TokenLabel = FText::FromString(FString::Printf(TEXT("%d / %d"), SeasonTokens, MaxRequiredTokens));
+	ViewModel.ProgressRatio = MaxRequiredTokens > 0
+		? FMath::Clamp(static_cast<float>(SeasonTokens) / static_cast<float>(MaxRequiredTokens), 0.0f, 1.0f)
+		: 0.0f;
+	ViewModel.ProgressLabel = FText::FromString(FString::Printf(TEXT("티어 %d / %d"), ReachedTier, Tiers.Num()));
+
+	for (const FSeasonTierDefinition& Tier : Tiers)
+	{
+		FIdleHUDSeasonTierRowViewModel Row;
+		Row.Tier = Tier.Tier;
+		Row.TierLabel = FText::FromString(FString::Printf(TEXT("티어 %d"), Tier.Tier));
+		Row.RequirementLabel = FText::FromString(FString::Printf(TEXT("%d 토큰"), Tier.RequiredTokens));
+		Row.RewardLabel = SeasonRewardToLabel(Tier.RewardType, Tier.RewardAmount);
+		Row.ProgressRatio = Tier.RequiredTokens > 0
+			? FMath::Clamp(static_cast<float>(SeasonTokens) / static_cast<float>(Tier.RequiredTokens), 0.0f, 1.0f)
+			: 1.0f;
+		Row.bReached = ReachedTier >= Tier.Tier;
+		Row.bClaimed = IsTierClaimed(Tier.Tier);
+		Row.bCanClaim = Row.bReached && !Row.bClaimed;
+		Row.ActionLabel = FText::FromString(Row.bClaimed ? TEXT("수령 완료") : (Row.bCanClaim ? TEXT("받기") : TEXT("잠김")));
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -288,10 +390,12 @@ void AIdleHUD::DrawHUD()
 		DrawSkillHud(*PlayerSkills, World->GetTimeSeconds());
 	}
 
-	DrawOfflineRewardModal();
 	DrawRebirthPanel();
 	DrawClassSelectionPanel();
+	DrawPetPanel();
+	DrawSeasonPassPanel();
 	DrawQuestLog();
+	DrawOfflineRewardModal();
 }
 
 void AIdleHUD::NotifyHitBoxClick(FName BoxName)
@@ -304,6 +408,16 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(QuestClaimHitBoxPrefix))
 	{
 		ClaimQuestFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PetEquipHitBoxPrefix))
+	{
+		EquipPetFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(SeasonClaimHitBoxPrefix))
+	{
+		ClaimSeasonTierFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName == RebirthHitBoxName)
@@ -894,6 +1008,211 @@ void AIdleHUD::TryRebirth()
 	if (AIdleCharacter* IdleCharacter = PlayerOwner ? Cast<AIdleCharacter>(PlayerOwner->GetPawn()) : nullptr)
 	{
 		IdleCharacter->RefreshDerivedStats();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawPetPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UPetService* PetService = IdleGameInstance ? IdleGameInstance->GetPetService() : nullptr;
+	if (!PetService)
+	{
+		return;
+	}
+
+	const FIdleHUDPetPanelViewModel ViewModel = BuildPetPanelViewModel(
+		PetService->GetPetDefinitions(),
+		PetService->GetEquippedPetId(),
+		IdleGameInstance->GetEquippedPetGoldBonusPercent(),
+		IdleGameInstance->GetEquippedPetDropBonusPercent());
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 322.0f * Scale;
+	const float HeaderHeight = 44.0f * Scale;
+	const float RowHeight = 42.0f * Scale;
+	const float RowGap = 8.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = HeaderHeight + 48.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float X = 28.0f * Scale;
+	const float Y = 332.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.EquippedLabel.ToString(), Theme::TextMuted, X + 72.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(ViewModel.GoldBonusLabel.ToString(), Theme::AccentGold, X + Padding, Y + 46.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+	DrawText(ViewModel.DropBonusLabel.ToString(), Theme::AccentBlue, X + 128.0f * Scale, Y + 46.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+
+	float RowY = Y + HeaderHeight + 42.0f * Scale;
+	for (const FIdleHUDPetRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawPetRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 42.0f;
+	const FLinearColor StateColor = Row.bEquipped ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 92.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+
+	const float ButtonWidth = 78.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 8.0f * Scale;
+	DrawRect(Row.bEquipped ? Theme::BgPanel : Theme::AccentGold, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bEquipped ? Theme::TextMuted : Theme::BgPrimary, ButtonX + 11.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	if (!Row.bEquipped)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetEquipHitBoxName(Row.PetId), true, 82);
+	}
+}
+
+void AIdleHUD::EquipPetFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString PetId = BoxName.ToString();
+	PetId.RightChopInline(PetEquipHitBoxPrefix.Len());
+	if (!PetId.IsEmpty())
+	{
+		IdleGameInstance->EquipPet(PetId);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawSeasonPassPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const USeasonService* SeasonService = IdleGameInstance ? IdleGameInstance->GetSeasonService() : nullptr;
+	if (!SeasonService)
+	{
+		return;
+	}
+
+	const FIdleHUDSeasonPassViewModel ViewModel = BuildSeasonPassViewModel(
+		SeasonService->GetSeasonTiers(),
+		SeasonService->GetSeasonTokens(),
+		SeasonService->GetReachedTier(),
+		[SeasonService](int32 Tier)
+		{
+			return SeasonService->IsTierClaimed(Tier);
+		});
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 420.0f * Scale;
+	const float HeaderHeight = 54.0f * Scale;
+	const float RowHeight = 29.0f * Scale;
+	const float RowGap = 5.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = HeaderHeight + 30.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float X = 28.0f * Scale;
+	const float Y = 520.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.TokenLabel.ToString(), Theme::AccentGold, X + PanelWidth - 92.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), X + Padding, Y + 42.0f * Scale, PanelWidth - Padding * 2.0f, 6.0f * Scale);
+	DrawRect(Theme::AccentBlue, X + Padding, Y + 42.0f * Scale, (PanelWidth - Padding * 2.0f) * ViewModel.ProgressRatio, 6.0f * Scale);
+
+	float RowY = Y + HeaderHeight + 22.0f * Scale;
+	for (const FIdleHUDSeasonTierRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawSeasonTierRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 29.0f;
+	const FLinearColor StateColor = Row.bClaimed ? Theme::TextMuted.CopyWithNewOpacity(0.46f) : (Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.96f), X + 7.0f * Scale, Y + Height - 5.0f * Scale, Width - 14.0f * Scale, 3.0f * Scale);
+	DrawRect(StateColor, X + 7.0f * Scale, Y + Height - 5.0f * Scale, (Width - 14.0f * Scale) * Row.ProgressRatio, 3.0f * Scale);
+
+	DrawText(Row.TierLabel.ToString(), Row.bReached ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.RequirementLabel.ToString(), Theme::TextMuted, X + 72.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextPrimary, X + 150.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+
+	const float ButtonWidth = 68.0f * Scale;
+	const float ButtonHeight = 21.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 7.0f * Scale;
+	const float ButtonY = Y + 4.0f * Scale;
+	DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	if (Row.bCanClaim)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeSeasonClaimHitBoxName(Row.Tier), true, 84);
+	}
+}
+
+void AIdleHUD::ClaimSeasonTierFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawTier = BoxName.ToString();
+	RawTier.RightChopInline(SeasonClaimHitBoxPrefix.Len());
+	const int32 Tier = FCString::Atoi(*RawTier);
+	if (Tier > 0)
+	{
+		IdleGameInstance->ClaimSeasonReward(Tier);
 	}
 	RefreshMouseInteraction();
 }
