@@ -15,7 +15,39 @@ PR #2 범위에서는 `classId=1` 전사만 생성한다.
 응답:
 
 ```json
-{ "ok": true, "data": { "id": "uuid", "classId": 1, "level": 1, "rebirthCount": 0, "stats": { "str": 12, "dex": 6, "int": 3, "luk": 4, "hp": 120, "mp": 30 } } }
+{
+  "ok": true,
+  "data": {
+    "id": "uuid",
+    "classId": 1,
+    "level": 1,
+    "rebirthCount": 0,
+    "stats": {
+      "primary": {
+        "str": 12,
+        "dex": 6,
+        "int": 3,
+        "wis": 3,
+        "con": 10,
+        "luk": 4
+      },
+      "derived": {
+        "hp": 120,
+        "mp": 30,
+        "physAtk": 24,
+        "magicAtk": 8,
+        "physDef": 17,
+        "magicDef": 5,
+        "atkSpeed": 1,
+        "moveSpeed": 1,
+        "critRate": 0.008,
+        "critDmg": 1.504,
+        "dodge": 0.013,
+        "accuracy": 0.762
+      }
+    }
+  }
+}
 ```
 
 ```bash

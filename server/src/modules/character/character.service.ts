@@ -1,11 +1,12 @@
 import { NotFoundError, ValidationError } from "../../core/errors.js";
+import { defaultPrimaryStats, deriveStats } from "../../core/formulas/index.js";
 
 export type CharacterCreateInput = {
   userId: string;
   classId: number;
   level: number;
   rebirthCount: number;
-  stats: Record<string, number>;
+  stats: Record<string, unknown>;
   skillTree: Record<string, unknown>;
   inventory: unknown[];
 };
@@ -28,12 +29,16 @@ export class CharacterService {
         "PR #2 범위에서는 전사(class_id=1)만 생성할 수 있습니다.",
       );
     }
+    const primary = defaultPrimaryStats(1, 1);
     return this.repo.createCharacter({
       userId,
       classId: 1,
       level: 1,
       rebirthCount: 0,
-      stats: { str: 12, dex: 6, int: 3, luk: 4, hp: 120, mp: 30 },
+      stats: {
+        primary,
+        derived: deriveStats(primary, 1),
+      },
       skillTree: {},
       inventory: [],
     });
