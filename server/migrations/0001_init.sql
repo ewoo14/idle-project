@@ -18,6 +18,9 @@ create table if not exists characters (
   stats jsonb not null default '{}'::jsonb,
   skill_tree jsonb not null default '{}'::jsonb,
   inventory jsonb not null default '[]'::jsonb,
+  gold int not null default 0 check (gold >= 0),
+  total_exp int not null default 0 check (total_exp >= 0),
+  last_seen_at timestamptz,
   last_save_at timestamptz
 );
 

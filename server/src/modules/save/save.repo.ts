@@ -8,7 +8,8 @@ export class SaveRepoPg {
   async findCharacterByUser(userId: string, characterId: string) {
     const result = await this.pool.query(
       `select id, user_id as "userId", class_id as "classId", level, rebirth_count as "rebirthCount",
-              stats, skill_tree as "skillTree", inventory, last_save_at as "lastSaveAt"
+              stats, skill_tree as "skillTree", inventory, gold, total_exp as "totalExp",
+              last_seen_at as "lastSeenAt", last_save_at as "lastSaveAt"
        from characters where user_id = $1 and id = $2`,
       [userId, characterId],
     );
@@ -40,9 +41,17 @@ export class SaveRepoPg {
         `update characters
          set level = greatest(level, $2),
              rebirth_count = greatest(rebirth_count, $3),
+             gold = greatest(gold, coalesce(($4::jsonb ->> 'gold')::int, gold)),
+             total_exp = greatest(total_exp, coalesce(($4::jsonb ->> 'totalExp')::int, total_exp)),
+             last_seen_at = coalesce(to_timestamp(($4::jsonb ->> 'lastSeenUnixSec')::double precision), last_seen_at, now()),
              last_save_at = now()
          where id = $1`,
-        [input.characterId, input.payload.level, input.payload.rebirthCount],
+        [
+          input.characterId,
+          input.payload.level,
+          input.payload.rebirthCount,
+          JSON.stringify(input.payload),
+        ],
       );
       await client.query("commit");
       return result.rows[0];

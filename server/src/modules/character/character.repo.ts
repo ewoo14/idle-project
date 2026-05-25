@@ -7,9 +7,11 @@ export class CharacterRepoPg {
 
   async createCharacter(input: CharacterCreateInput) {
     const result = await this.pool.query(
-      `insert into characters (id, user_id, class_id, level, rebirth_count, stats, skill_tree, inventory)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
-       returning id, user_id as "userId", class_id as "classId", level, rebirth_count as "rebirthCount", stats, skill_tree as "skillTree", inventory, last_save_at as "lastSaveAt"`,
+      `insert into characters (id, user_id, class_id, level, rebirth_count, stats, skill_tree, inventory, last_seen_at)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, now())
+       returning id, user_id as "userId", class_id as "classId", level, rebirth_count as "rebirthCount",
+                 stats, skill_tree as "skillTree", inventory, gold, total_exp as "totalExp",
+                 last_seen_at as "lastSeenAt", last_save_at as "lastSaveAt"`,
       [
         randomUUID(),
         input.userId,
@@ -27,7 +29,8 @@ export class CharacterRepoPg {
   async findByIdForUser(userId: string, characterId: string) {
     const result = await this.pool.query(
       `select id, user_id as "userId", class_id as "classId", level, rebirth_count as "rebirthCount",
-              stats, skill_tree as "skillTree", inventory, last_save_at as "lastSaveAt"
+              stats, skill_tree as "skillTree", inventory, gold, total_exp as "totalExp",
+              last_seen_at as "lastSeenAt", last_save_at as "lastSaveAt"
        from characters
        where user_id = $1 and id = $2`,
       [userId, characterId],

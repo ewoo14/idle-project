@@ -11,6 +11,9 @@ export type CharacterRecord = {
   stats: unknown;
   skillTree: unknown;
   inventory: unknown;
+  gold: number;
+  totalExp: number;
+  lastSeenAt: Date | null;
   lastSaveAt: Date | null;
 };
 
@@ -19,6 +22,8 @@ export type SavePayload = {
   rebirthCount: number;
   maxEquipmentGrade: number;
   totalExp?: number;
+  gold?: number;
+  lastSeenUnixSec?: number;
   [key: string]: unknown;
 };
 
@@ -141,6 +146,18 @@ export function validateSavePayload(
     }
   }
   if (
+    payload.gold !== undefined &&
+    (!Number.isInteger(payload.gold) || payload.gold < character.gold)
+  ) {
+    rejectSave(context, payload, "gold regresses server currency");
+  }
+  if (
+    payload.lastSeenUnixSec !== undefined &&
+    (!Number.isInteger(payload.lastSeenUnixSec) || payload.lastSeenUnixSec < 0)
+  ) {
+    rejectSave(context, payload, "lastSeenUnixSec must be a unix timestamp");
+  }
+  if (
     payload.level < character.level ||
     payload.rebirthCount < character.rebirthCount
   ) {
@@ -176,6 +193,8 @@ function rejectSave(
         rebirthCount: payload.rebirthCount,
         maxEquipmentGrade: payload.maxEquipmentGrade,
         totalExp: payload.totalExp,
+        gold: payload.gold,
+        lastSeenUnixSec: payload.lastSeenUnixSec,
       },
     },
     "save payload rejected",

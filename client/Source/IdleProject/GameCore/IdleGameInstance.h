@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "GameCore/OfflineRewardFormula.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
@@ -38,6 +39,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void LevelUp();
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Offline")
+	FOfflineRewardResult ClaimOfflineRewards();
+
+	FOfflineRewardResult ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCount = 0);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
+	FOfflineRewardResult PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCount = 0) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Offline")
+	void SetLastSeenUnixSec(int64 UnixSec);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int64 GetGold() const { return Gold; }
 
@@ -49,6 +61,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int64 GetNextExp() const { return NextExp; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
+	int64 GetLastSeenUnixSec() const { return LastSeenUnixSec; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
 	FOnGoldChanged OnGoldChanged;
@@ -78,4 +93,11 @@ private:
 
 	UPROPERTY()
 	int64 NextExp = 150;
+
+	UPROPERTY()
+	int64 LastSeenUnixSec = 0;
+
+	static int64 GetCurrentUnixSeconds();
+	void LoadLastSeenUnixSec();
+	void SaveLastSeenUnixSec() const;
 };

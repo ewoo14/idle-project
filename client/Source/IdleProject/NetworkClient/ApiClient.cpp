@@ -85,6 +85,32 @@ void UApiClient::RegisterGuest(TFunction<void(bool, FString)> Callback)
 	}
 }
 
+bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
+{
+	const FString Path = FString::Printf(
+		TEXT("/v1/offline/preview?level=%d&lastSeenUnixSec=%lld&nowUnixSec=%lld&rebirthCount=%d"),
+		Level,
+		LastSeenUnixSec,
+		NowUnixSec,
+		RebirthCount);
+	return Get(Path);
+}
+
+bool UApiClient::ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
+{
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetNumberField(TEXT("level"), Level);
+	JsonObject->SetNumberField(TEXT("lastSeenUnixSec"), static_cast<double>(LastSeenUnixSec));
+	JsonObject->SetNumberField(TEXT("nowUnixSec"), static_cast<double>(NowUnixSec));
+	JsonObject->SetNumberField(TEXT("rebirthCount"), RebirthCount);
+
+	FString JsonBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+
+	return Post(TEXT("/v1/offline/claim"), JsonBody);
+}
+
 FString UApiClient::BuildUrl(const FString& Path) const
 {
 	if (Path.StartsWith(TEXT("http://")) || Path.StartsWith(TEXT("https://")))
@@ -107,6 +133,10 @@ bool UApiClient::SendRequest(const FString& Verb, const FString& Path, const FSt
 	Request->SetURL(BuildUrl(Path));
 	Request->SetVerb(Verb);
 	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+	if (!AuthToken.IsEmpty())
+	{
+		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+	}
 
 	if (Verb == TEXT("POST"))
 	{

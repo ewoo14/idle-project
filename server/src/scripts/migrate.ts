@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pool } from "../core/db.js";
@@ -7,9 +7,24 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 
 export async function runMigration(direction: "up" | "down") {
-  const file = direction === "up" ? "0001_init.sql" : "0001_init.down.sql";
-  const sql = await readFile(resolve(root, "migrations", file), "utf8");
-  await pool.query(sql);
+  const migrationsDir = resolve(root, "migrations");
+  const files = await readdir(migrationsDir);
+  const migrationFiles =
+    direction === "up"
+      ? files
+          .filter(
+            (file) => /^\d+_.+\.sql$/.test(file) && !file.endsWith(".down.sql"),
+          )
+          .sort()
+      : files
+          .filter((file) => /^\d+_.+\.down\.sql$/.test(file))
+          .sort()
+          .reverse();
+
+  for (const file of migrationFiles) {
+    const sql = await readFile(resolve(migrationsDir, file), "utf8");
+    await pool.query(sql);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, "/")}`) {
