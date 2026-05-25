@@ -24,6 +24,8 @@ public:
 	bool Post(const FString& Path, const FString& JsonBody);
 
 	void RegisterGuest(TFunction<void(bool, FString)> Callback);
+	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
+	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetBaseUrl() const { return BaseUrl; }

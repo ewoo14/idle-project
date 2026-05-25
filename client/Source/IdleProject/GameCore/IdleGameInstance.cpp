@@ -25,6 +25,7 @@ void UIdleGameInstance::Init()
 	ApiClient = NewObject<UApiClient>(this);
 	ApiClient->Initialize(ApiBaseUrl);
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	LoadLastSeenUnixSec();
 
 	ApiClient->RegisterGuest([](bool bSuccess, FString Message)
 	{
@@ -36,6 +37,8 @@ void UIdleGameInstance::Init()
 
 void UIdleGameInstance::Shutdown()
 {
+	LastSeenUnixSec = GetCurrentUnixSeconds();
+	SaveLastSeenUnixSec();
 	ApiClient = nullptr;
 	Super::Shutdown();
 }
@@ -79,4 +82,77 @@ void UIdleGameInstance::LevelUp()
 	++CharacterLevel;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	OnLevelUp.Broadcast(CharacterLevel);
+}
+
+FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
+{
+	return ClaimOfflineRewardsAt(GetCurrentUnixSeconds(), 0);
+}
+
+FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCount)
+{
+	const FOfflineRewardResult Reward = PreviewOfflineRewards(NowUnixSec, RebirthCount);
+	if (ApiClient)
+	{
+		ApiClient->ClaimOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, RebirthCount);
+	}
+	if (Reward.CappedSeconds <= 0)
+	{
+		LastSeenUnixSec = FMath::Max(LastSeenUnixSec, NowUnixSec);
+		return Reward;
+	}
+
+	AddGold(Reward.Gold);
+	AddExp(Reward.Exp);
+	LastSeenUnixSec = FMath::Max(LastSeenUnixSec, NowUnixSec);
+	return Reward;
+}
+
+FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCount) const
+{
+	return FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, RebirthCount);
+}
+
+void UIdleGameInstance::SetLastSeenUnixSec(int64 UnixSec)
+{
+	LastSeenUnixSec = FMath::Max<int64>(0, UnixSec);
+}
+
+int64 UIdleGameInstance::GetCurrentUnixSeconds()
+{
+	return FDateTime::UtcNow().ToUnixTimestamp();
+}
+
+void UIdleGameInstance::LoadLastSeenUnixSec()
+{
+	LastSeenUnixSec = GetCurrentUnixSeconds();
+	if (!GConfig)
+	{
+		return;
+	}
+
+	FString SavedLastSeen;
+	if (GConfig->GetString(TEXT("/Script/IdleProject.IdleGameInstance"), TEXT("LastSeenUnixSec"), SavedLastSeen, GGameUserSettingsIni))
+	{
+		int64 ParsedLastSeen = 0;
+		if (LexTryParseString(ParsedLastSeen, *SavedLastSeen))
+		{
+			LastSeenUnixSec = FMath::Max<int64>(0, ParsedLastSeen);
+		}
+	}
+}
+
+void UIdleGameInstance::SaveLastSeenUnixSec() const
+{
+	if (!GConfig)
+	{
+		return;
+	}
+
+	GConfig->SetString(
+		TEXT("/Script/IdleProject.IdleGameInstance"),
+		TEXT("LastSeenUnixSec"),
+		*FString::Printf(TEXT("%lld"), LastSeenUnixSec),
+		GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
 }

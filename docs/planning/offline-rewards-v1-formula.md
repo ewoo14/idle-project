@@ -1,6 +1,7 @@
 # Offline Rewards V1 Formula
 
 Server source of truth: `server/src/core/formulas/offline.ts`.
+Client mirror: `client/Source/IdleProject/GameCore/OfflineRewardFormula.h/.cpp`.
 
 ## Constants
 
@@ -22,3 +23,9 @@ exp = round(baseExpPerSec(level) * cappedSeconds * 0.75 * timeBonusMultiplier)
 ```
 
 The level 1 active baseline mirrors M1's approximate 14,400 gold/EXP per hour before offline efficiency and time/rebirth bonuses.
+
+## Verification
+
+- Server: `npm test -- offline.test.ts`
+- Client: `IdleProject.GameCore.OfflineRewardFormula.ComputeOfflineRewards`
+- Claim flow: `IdleProject.GameCore.IdleGameInstance.ClaimOfflineRewards`
