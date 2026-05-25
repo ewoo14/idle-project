@@ -1,7 +1,9 @@
 #include "Misc/AutomationTest.h"
 
 #include "CombatSystem/BattleAIComponent.h"
+#include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "CombatSystem/SkillComponent.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatFormulasTest,
@@ -58,6 +60,115 @@ bool FBattleAIGroundChaseTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("가까운 타깃 X 도달"), Next.X, 10.0, Tolerance);
 		TestEqual(TEXT("도달 시에도 Z 유지"), Next.Z, -56.0, Tolerance);
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillCooldownTest,
+	"IdleProject.Combat.Skills.CooldownReadiness",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillCooldownTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	const FName HeavyStrike(TEXT("heavy_strike"));
+	TestTrue(TEXT("Heavy strike is ready before first cast"), Skills->IsReady(HeavyStrike, 10.0f));
+	TestEqual(TEXT("Ready skill has zero cooldown remaining"), Skills->GetCooldownRemaining(HeavyStrike, 10.0f), 0.0f);
+	TestEqual(TEXT("Ready skill has zero cooldown ratio"), Skills->GetCooldownRatio(HeavyStrike, 10.0f), 0.0f);
+
+	TestTrue(TEXT("Cast starts cooldown"), Skills->MarkSkillCast(HeavyStrike, 10.0f));
+	TestFalse(TEXT("Heavy strike is not ready during cooldown"), Skills->IsReady(HeavyStrike, 12.0f));
+	TestEqual(TEXT("Cooldown remaining is seconds until ready"), Skills->GetCooldownRemaining(HeavyStrike, 12.0f), 2.0f);
+	TestEqual(TEXT("Cooldown ratio reflects elapsed cooldown"), Skills->GetCooldownRatio(HeavyStrike, 12.0f), 0.5f);
+	TestTrue(TEXT("Heavy strike is ready when cooldown expires"), Skills->IsReady(HeavyStrike, 14.0f));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillGaugeTest,
+	"IdleProject.Combat.Skills.UltimateGauge",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillGaugeTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	TestEqual(TEXT("Initial gauge is empty"), Skills->GetCurrentGauge(), 0.0f);
+	Skills->AddGauge(60.0f);
+	Skills->AddGauge(60.0f);
+	TestEqual(TEXT("Gauge is clamped at 100"), Skills->GetCurrentGauge(), 100.0f);
+	TestTrue(TEXT("Ultimate is ready at 100 gauge"), Skills->IsUltimateReady());
+
+	TestTrue(TEXT("Ultimate cast consumes gauge"), Skills->TryConsumeUltimateGauge());
+	TestEqual(TEXT("Gauge resets after ultimate"), Skills->GetCurrentGauge(), 0.0f);
+	TestFalse(TEXT("Ultimate is no longer ready after reset"), Skills->IsUltimateReady());
+
+	Skills->AddGauge(-20.0f);
+	TestEqual(TEXT("Gauge cannot go below zero"), Skills->GetCurrentGauge(), 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillPassiveStatsTest,
+	"IdleProject.Combat.Skills.PassiveStats",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	FDerivedStats Stats;
+	Stats.Hp = 1000.0f;
+	Stats.PhysAtk = 200.0f;
+	Stats.PhysDef = 50.0f;
+
+	Skills->ApplyPassivesToStats(Stats);
+
+	TestEqual(TEXT("Weapon mastery grants 15 percent physical attack"), Stats.PhysAtk, 230.0f);
+	TestEqual(TEXT("Toughness grants 20 percent max HP"), Stats.Hp, 1200.0f);
+	TestEqual(TEXT("Unrelated stats stay unchanged"), Stats.PhysDef, 50.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillUltimateBuffTest,
+	"IdleProject.Combat.Skills.UltimateBuff",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillUltimateBuffTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 20.0f, 1.0f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	Skills->LoadDefaultWarriorSkills();
+	Skills->AddGauge(100.0f);
+
+	TArray<AActor*> AoeTargets;
+	Skills->TickSkills(30.0f, Target, AoeTargets);
+
+	TestEqual(TEXT("Ultimate resets gauge"), Skills->GetCurrentGauge(), 0.0f);
+	TestEqual(TEXT("Ultimate grants 30 percent attack speed buff"), OwnerCombat->AtkSpeed, 1.3f);
+	TestTrue(TEXT("Ultimate deals damage to target"), TargetCombat->CurrentHp < TargetCombat->MaxHp);
+
+	Skills->TickSkills(35.0f, Target, AoeTargets);
+	TestEqual(TEXT("Ultimate attack speed buff expires"), OwnerCombat->AtkSpeed, 1.0f);
 
 	return true;
 }

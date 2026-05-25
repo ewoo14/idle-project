@@ -1,5 +1,7 @@
 #include "CombatSystem/CombatComponent.h"
 
+#include "CombatSystem/SkillComponent.h"
+
 UCombatComponent::UCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -25,6 +27,14 @@ void UCombatComponent::TakeDamage(float Damage, AActor* Instigator)
 
 	CurrentHp = FMath::Clamp(CurrentHp - FMath::Max(0.0f, Damage), 0.0f, MaxHp);
 	OnHpChanged.Broadcast(CurrentHp);
+
+	if (Damage > 0.0f)
+	{
+		if (USkillComponent* Skills = GetOwner() ? GetOwner()->FindComponentByClass<USkillComponent>() : nullptr)
+		{
+			Skills->AddGauge(Skills->GetGaugeGainOnTakeDamage());
+		}
+	}
 
 	if (CurrentHp <= 0.0f && !bDeathBroadcast)
 	{

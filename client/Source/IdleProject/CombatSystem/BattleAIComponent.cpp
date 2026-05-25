@@ -3,6 +3,7 @@
 #include "CharacterSystem/IdleCharacter.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "CombatSystem/SkillComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -102,6 +103,12 @@ void UBattleAIComponent::UpdateBattle()
 	const float Distance = FVector::Dist2D(GetOwner()->GetActorLocation(), TargetActor->GetActorLocation());
 	if (Distance <= OwnerCombat->AttackRange)
 	{
+		if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
+		{
+			TArray<AActor*> AoeTargets;
+			AoeTargets.Add(TargetActor);
+			Skills->TickSkills(GetWorld()->GetTimeSeconds(), TargetActor, AoeTargets);
+		}
 		Attack(TargetActor);
 		return;
 	}
@@ -169,6 +176,10 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 	LastAttackTime = World->GetTimeSeconds();
 	State = EBattleState::Attack;
 	TargetCombat->TakeDamage(FCombatFormulas::ComputeDamage(OwnerCombat->Atk, TargetCombat->Def), GetOwner());
+	if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
+	{
+		Skills->AddGauge(Skills->GetGaugeGainOnHit());
+	}
 }
 
 UCombatComponent* UBattleAIComponent::GetOwnerCombat() const

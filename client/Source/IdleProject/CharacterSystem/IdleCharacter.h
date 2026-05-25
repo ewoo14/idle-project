@@ -15,6 +15,7 @@ class UIdleAnimInstance;
 class UInventoryComponent;
 class UInputAction;
 class UInputMappingContext;
+class USkillComponent;
 class USkeletalMeshComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
@@ -70,6 +71,10 @@ protected:
 	/** 주변 몬스터를 자동 탐색하고 공격하는 AI 컴포넌트입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
 	TObjectPtr<UBattleAIComponent> BattleAI;
+
+	/** 전사 스킬 V1 쿨다운, 패시브, 궁극기 게이지를 관리합니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	TObjectPtr<USkillComponent> Skills;
 
 	/** 장비 획득과 자동 장착을 관리하는 캐릭터 인벤토리입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Inventory")

@@ -11,6 +11,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
+#include "CombatSystem/SkillComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameCore/IdleGameInstance.h"
@@ -69,6 +70,7 @@ AIdleCharacter::AIdleCharacter()
 
 	Combat = CreateDefaultSubobject<UCombatComponent>(TEXT("Combat"));
 	BattleAI = CreateDefaultSubobject<UBattleAIComponent>(TEXT("BattleAI"));
+	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 	Facial = CreateDefaultSubobject<UFacialExpressionComponent>(TEXT("Facial"));
 
@@ -91,6 +93,10 @@ void AIdleCharacter::BeginPlay()
 	if (Inventory)
 	{
 		Inventory->OnEquippedChanged.AddDynamic(this, &AIdleCharacter::HandleEquippedChanged);
+	}
+	if (Skills)
+	{
+		Skills->LoadDefaultWarriorSkills();
 	}
 	RefreshDerivedStats();
 	LastObservedHp = Combat ? Combat->CurrentHp : 0.0f;
@@ -143,7 +149,11 @@ void AIdleCharacter::RefreshDerivedStats()
 {
 	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
 	const FDerivedStats EquipBonus = Inventory ? Inventory->ComputeEquipmentBonus() : FDerivedStats();
-	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus);
+	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus);
+	if (Skills)
+	{
+		Skills->ApplyPassivesToStats(Derived);
+	}
 
 	UE_LOG(
 		LogTemp,
