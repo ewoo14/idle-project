@@ -1,37 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { AuthError } from "../../core/errors.js";
-import { AuthService } from "./auth.service.js";
+import { type AuthDeps, AuthService } from "./auth.service.js";
 
 const user = {
   id: "00000000-0000-0000-0000-000000000001",
   email: "hero@example.com",
-  nickname: "전사",
+  nickname: "hero",
   passwordHash: "hash",
 };
 
 describe("AuthService", () => {
-  it("비밀번호가 맞으면 access/refresh 토큰을 발급한다", async () => {
-    const service = new AuthService({
-      users: {
-        createUser: vi.fn(),
+  it("issues access and refresh tokens when password matches", async () => {
+    const service = new AuthService(
+      createDeps({
         findByEmail: vi.fn().mockResolvedValue(user),
-        touchLastLogin: vi.fn(),
-      },
-      password: {
-        hash: vi.fn(),
         compare: vi.fn().mockResolvedValue(true),
-      },
-      tokens: {
-        signAccess: vi.fn().mockResolvedValue("access"),
-        signRefresh: vi.fn().mockResolvedValue("refresh"),
-        verifyRefresh: vi.fn(),
-      },
-      tokenStore: {
-        rememberRefresh: vi.fn(),
-        isRefreshRevoked: vi.fn(),
-        revokeRefresh: vi.fn(),
-      },
-    });
+      }),
+    );
 
     const result = await service.login({
       email: user.email,
@@ -42,62 +27,107 @@ describe("AuthService", () => {
     expect(result.refreshToken).toBe("refresh");
   });
 
-  it("비밀번호가 틀리면 401을 던진다", async () => {
-    const service = new AuthService({
-      users: {
-        createUser: vi.fn(),
+  it("rejects login when password does not match", async () => {
+    const service = new AuthService(
+      createDeps({
         findByEmail: vi.fn().mockResolvedValue(user),
-        touchLastLogin: vi.fn(),
-      },
-      password: {
-        hash: vi.fn(),
         compare: vi.fn().mockResolvedValue(false),
-      },
-      tokens: {
-        signAccess: vi.fn(),
-        signRefresh: vi.fn(),
-        verifyRefresh: vi.fn(),
-      },
-      tokenStore: {
-        rememberRefresh: vi.fn(),
-        isRefreshRevoked: vi.fn(),
-        revokeRefresh: vi.fn(),
-      },
-    });
+      }),
+    );
 
     await expect(
       service.login({ email: user.email, password: "bad" }),
     ).rejects.toBeInstanceOf(AuthError);
   });
 
-  it("폐기된 refresh 토큰은 갱신하지 않는다", async () => {
-    const service = new AuthService({
-      users: {
-        createUser: vi.fn(),
-        findByEmail: vi.fn(),
-        touchLastLogin: vi.fn(),
-      },
-      password: {
-        hash: vi.fn(),
-        compare: vi.fn(),
-      },
-      tokens: {
-        signAccess: vi.fn(),
-        signRefresh: vi.fn(),
+  it("rejects revoked refresh tokens", async () => {
+    const service = new AuthService(
+      createDeps({
         verifyRefresh: vi.fn().mockResolvedValue({
           sub: user.id,
           jti: "old",
           email: user.email,
           nickname: user.nickname,
+          typ: "refresh",
         }),
-      },
-      tokenStore: {
-        rememberRefresh: vi.fn(),
         isRefreshRevoked: vi.fn().mockResolvedValue(true),
-        revokeRefresh: vi.fn(),
-      },
-    });
+      }),
+    );
+
+    await expect(service.refresh("refresh")).rejects.toBeInstanceOf(AuthError);
+  });
+
+  it("rejects an access token used as a refresh token", async () => {
+    const service = new AuthService(
+      createDeps({
+        verifyRefresh: vi.fn().mockResolvedValue({
+          sub: user.id,
+          jti: "access-jti",
+          email: user.email,
+          nickname: user.nickname,
+          typ: "access",
+        }),
+        isRefreshActive: vi.fn().mockResolvedValue(true),
+      }),
+    );
+
+    await expect(service.refresh("access-token")).rejects.toBeInstanceOf(
+      AuthError,
+    );
+    await expect(service.logout("access-token")).rejects.toBeInstanceOf(
+      AuthError,
+    );
+  });
+
+  it("rejects refresh when the jti is not active", async () => {
+    const service = new AuthService(
+      createDeps({
+        verifyRefresh: vi.fn().mockResolvedValue({
+          sub: user.id,
+          jti: "missing-jti",
+          email: user.email,
+          nickname: user.nickname,
+          typ: "refresh",
+        }),
+        isRefreshActive: vi.fn().mockResolvedValue(false),
+      }),
+    );
 
     await expect(service.refresh("refresh")).rejects.toBeInstanceOf(AuthError);
   });
 });
+
+function createDeps(
+  overrides: {
+    findByEmail?: AuthDeps["users"]["findByEmail"];
+    compare?: AuthDeps["password"]["compare"];
+    verifyRefresh?: AuthDeps["tokens"]["verifyRefresh"];
+    isRefreshRevoked?: AuthDeps["tokenStore"]["isRefreshRevoked"];
+    isRefreshActive?: AuthDeps["tokenStore"]["isRefreshActive"];
+  } = {},
+): AuthDeps {
+  return {
+    users: {
+      createUser: vi.fn(),
+      findByEmail: overrides.findByEmail ?? vi.fn(),
+      touchLastLogin: vi.fn(),
+    },
+    password: {
+      hash: vi.fn(),
+      compare: overrides.compare ?? vi.fn(),
+    },
+    tokens: {
+      signAccess: vi.fn().mockResolvedValue("access"),
+      signRefresh: vi.fn().mockResolvedValue("refresh"),
+      verifyRefresh: overrides.verifyRefresh ?? vi.fn(),
+    },
+    tokenStore: {
+      rememberRefresh: vi.fn(),
+      isRefreshRevoked:
+        overrides.isRefreshRevoked ?? vi.fn().mockResolvedValue(false),
+      isRefreshActive:
+        overrides.isRefreshActive ?? vi.fn().mockResolvedValue(true),
+      revokeRefresh: vi.fn(),
+    },
+  };
+}

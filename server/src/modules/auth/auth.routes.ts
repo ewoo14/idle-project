@@ -60,6 +60,8 @@ export async function authRoutes(app: FastifyInstance, opts: { redis: Redis }) {
       rememberRefresh: async (userId, jti, ttl) => {
         await opts.redis.set(`refresh:active:${jti}`, userId, "EX", ttl);
       },
+      isRefreshActive: async (jti) =>
+        (await opts.redis.exists(`refresh:active:${jti}`)) === 1,
       isRefreshRevoked: async (jti) =>
         (await opts.redis.exists(`refresh:revoked:${jti}`)) === 1,
       revokeRefresh: async (jti, ttl) => {

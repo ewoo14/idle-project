@@ -8,6 +8,14 @@ export type AuthUser = {
   passwordHash: string;
 };
 
+export type RefreshPayload = {
+  sub: string;
+  jti: string;
+  email: string;
+  nickname: string;
+  typ?: string;
+};
+
 export type AuthDeps = {
   users: {
     createUser(input: {
@@ -25,9 +33,7 @@ export type AuthDeps = {
   tokens: {
     signAccess(user: AuthUser): Promise<string>;
     signRefresh(user: AuthUser, jti: string): Promise<string>;
-    verifyRefresh(
-      token: string,
-    ): Promise<{ sub: string; jti: string; email: string; nickname: string }>;
+    verifyRefresh(token: string): Promise<RefreshPayload>;
   };
   tokenStore: {
     rememberRefresh(
@@ -35,6 +41,7 @@ export type AuthDeps = {
       jti: string,
       ttlSeconds: number,
     ): Promise<void>;
+    isRefreshActive(jti: string): Promise<boolean>;
     isRefreshRevoked(jti: string): Promise<boolean>;
     revokeRefresh(jti: string, ttlSeconds: number): Promise<void>;
   };
@@ -46,7 +53,9 @@ export class AuthService {
   async register(input: { email: string; password: string; nickname: string }) {
     const exists = await this.deps.users.findByEmail(input.email.toLowerCase());
     if (exists) {
-      throw new ConflictError("이미 가입된 이메일입니다.");
+      throw new ConflictError("이미 가입된 이메일입니다.", {
+        code: "AUTH_EMAIL_ALREADY_EXISTS",
+      });
     }
     const passwordHash = await this.deps.password.hash(input.password);
     const user = await this.deps.users.createUser({
@@ -60,24 +69,25 @@ export class AuthService {
   async login(input: { email: string; password: string }) {
     const user = await this.deps.users.findByEmail(input.email.toLowerCase());
     if (!user) {
-      throw new AuthError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      throw new AuthError("이메일 또는 비밀번호가 올바르지 않습니다.", {
+        code: "AUTH_INVALID_CREDENTIALS",
+      });
     }
     const ok = await this.deps.password.compare(
       input.password,
       user.passwordHash,
     );
     if (!ok) {
-      throw new AuthError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      throw new AuthError("이메일 또는 비밀번호가 올바르지 않습니다.", {
+        code: "AUTH_INVALID_CREDENTIALS",
+      });
     }
     await this.deps.users.touchLastLogin(user.id);
     return this.issueTokens(user);
   }
 
   async refresh(refreshToken: string) {
-    const payload = await this.deps.tokens.verifyRefresh(refreshToken);
-    if (await this.deps.tokenStore.isRefreshRevoked(payload.jti)) {
-      throw new AuthError("폐기된 refresh 토큰입니다.");
-    }
+    const payload = await this.verifyUsableRefresh(refreshToken);
     await this.deps.tokenStore.revokeRefresh(payload.jti, refreshTtlSeconds);
     const user: AuthUser = {
       id: payload.sub,
@@ -89,9 +99,29 @@ export class AuthService {
   }
 
   async logout(refreshToken: string) {
-    const payload = await this.deps.tokens.verifyRefresh(refreshToken);
+    const payload = await this.verifyUsableRefresh(refreshToken);
     await this.deps.tokenStore.revokeRefresh(payload.jti, refreshTtlSeconds);
     return { loggedOut: true };
+  }
+
+  private async verifyUsableRefresh(refreshToken: string) {
+    const payload = await this.deps.tokens.verifyRefresh(refreshToken);
+    if (payload.typ !== "refresh") {
+      throw new AuthError("refresh 토큰이 아닙니다.", {
+        code: "AUTH_REFRESH_TOKEN_INVALID",
+      });
+    }
+    if (await this.deps.tokenStore.isRefreshRevoked(payload.jti)) {
+      throw new AuthError("폐기된 refresh 토큰입니다.", {
+        code: "AUTH_REFRESH_TOKEN_REVOKED",
+      });
+    }
+    if (!(await this.deps.tokenStore.isRefreshActive(payload.jti))) {
+      throw new AuthError("활성 refresh 토큰이 아닙니다.", {
+        code: "AUTH_REFRESH_TOKEN_INACTIVE",
+      });
+    }
+    return payload;
   }
 
   private async issueTokens(user: AuthUser) {
