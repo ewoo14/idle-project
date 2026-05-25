@@ -287,3 +287,38 @@ PR #2 백엔드 V1부터 서버에서 사용하는 공식의 단일 source of tr
 | 레벨업 시간 | 레벨 1→2 필요치 3506 EXP 기준 약 14분 | M1 단순 환경 기준. 후속 PR 인벤토리/스킬 추가 후 보정 |
 
 M1 자동 전투 V1은 “움직이고 보상이 누적되는 체감” 검증이 목적이다. 위 수치는 실제 경제 밸런스 확정값이 아니라, M2 밸런스 시뮬레이터와 인벤토리/스킬/오프라인 보상 도입 후 재보정할 1차 기준선이다.
+
+---
+
+## PR #23 Balance Simulator V1 Result
+
+`tools/balance-sim/` now runs a deterministic 1000-sample simulation for the
+first rebirth target: Lv100 plus one boss clear. The simulator imports the
+server formula sources directly:
+
+- `server/src/core/formulas/level.ts`
+- `server/src/core/formulas/combat.ts`
+- `server/src/core/formulas/stats.ts`
+- `server/src/core/formulas/offline.ts`
+
+Current seed `23` result:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 6.074 |
+| median | 6.529 |
+| p90 | 6.979 |
+
+The median is inside the 5-10h target and the distribution remains inside the
+3-20h review band. No EXP curve change is applied in this slice. In particular,
+do not raise the `level.ts` exponent toward 1.85-2.0 yet; keep the current curve
+and re-run the simulator after the next equipment, enhancement, or monster-data
+change.
+
+Sensitivity notes:
+
+- EXP curve: current curve is acceptable for the first rebirth target.
+- Gold per hour: keep active gold tuning stable until enhancement spend data is
+  available.
+- Offline efficiency: current sampled 70-80% band keeps idle progress below
+  active play while staying relevant.
