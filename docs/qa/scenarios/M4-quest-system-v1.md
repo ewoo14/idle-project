@@ -12,9 +12,18 @@ Character-side quest logic for PR #18:
 
 ## Automated Coverage
 
+### Given / When / Then
+
+- Given server `questDefinitions` is the canonical quest table, When `QuestService.list()` exposes unlocked quests, Then quest ID, objective, target count, rewards, prerequisite, and chapter map fields match the canonical table.
+- Given local `UQuestService` initializes default quests, When automation reads its definition snapshot, Then every quest definition matches `server/src/core/data/quests.ts` field-for-field for gameplay data.
+- Given kill, offline reward, and gear enhance events occur, When objective progress is recorded, Then only matching active unclaimed quests advance and progress clamps at each target.
+- Given a quest is completed or claimed, When duplicate progress or duplicate claim attempts occur, Then rewards are not granted twice and claimed quests do not gain additional progress.
+- Given daily quests contain progress from a previous UTC date, When quest state is listed or reset, Then progress, completed, and claimed flags reset to zero/false with the new reset date.
+
 Automation target: `IdleProject.GameCore.QuestService`
 
 - `ProgressClaimUnlock`: first main quest starts active with three daily quests, kill progress completes `main_ch1_001`, claiming returns reward values, and `main_ch1_002` unlocks.
+- `DefinitionParity`: local quest definitions match the server quest table for quest ID, type, objective, target count, reward gold, reward EXP, prerequisite, and chapter map.
 - `DailyReset`: daily progress/completed/claimed state resets when the reset date advances.
 
 Automation target: `IdleProject.GameCore.IdleGameInstance.QuestRewardAndHooks`
@@ -22,6 +31,13 @@ Automation target: `IdleProject.GameCore.IdleGameInstance.QuestRewardAndHooks`
 - `RecordQuestProgress(EQuestObjective::KillMonster, 5)` completes the first main quest.
 - `ClaimQuest("main_ch1_001")` applies reward gold and EXP through existing progression methods.
 - `ClaimOfflineRewardsAt(...)` advances the `daily_claim_offline` quest.
+- `RecordGearEnhanced()` advances and completes the `daily_enhance_gear` quest after three hooks.
+
+Vitest target: `server/src/modules/quest/quest.service.test.ts`
+
+- Objective progress covers `kill_monster`, `claim_offline`, and `enhance` events across active quests.
+- Claimed quests are returned unchanged and are not persisted again during duplicate progress.
+- Listed quest metadata is compared against `server/src/core/data/quests.ts` instead of a copied fixture.
 
 ## Manual PIE Smoke
 

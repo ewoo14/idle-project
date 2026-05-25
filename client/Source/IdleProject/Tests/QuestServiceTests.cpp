@@ -42,6 +42,61 @@ bool FQuestServiceProgressClaimTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceDefinitionParityTest,
+	"IdleProject.GameCore.QuestService.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	UQuestService* Quests = NewObject<UQuestService>();
+	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
+
+	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
+	TestEqual(TEXT("Quest definition count matches server quests.ts"), Definitions.Num(), 8);
+
+	struct FExpectedQuestDefinition
+	{
+		const TCHAR* QuestId;
+		EQuestType Type;
+		EQuestObjective Objective;
+		int32 TargetCount;
+		int64 RewardGold;
+		int64 RewardExp;
+		const TCHAR* PrerequisiteQuestId;
+		const TCHAR* ChapterMapId;
+	};
+
+	const FExpectedQuestDefinition Expected[] = {
+		{TEXT("main_ch1_001"), EQuestType::Main, EQuestObjective::KillMonster, 5, 150, 80, TEXT(""), TEXT("1-1")},
+		{TEXT("main_ch1_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 220, 140, TEXT("main_ch1_001"), TEXT("1-1")},
+		{TEXT("main_ch1_003"), EQuestType::Main, EQuestObjective::KillMonster, 12, 420, 300, TEXT("main_ch1_002"), TEXT("1-2")},
+		{TEXT("main_ch1_004"), EQuestType::Main, EQuestObjective::ClearMap, 1, 700, 520, TEXT("main_ch1_003"), TEXT("1-3")},
+		{TEXT("main_ch1_005"), EQuestType::Main, EQuestObjective::KillMonster, 20, 1200, 900, TEXT("main_ch1_004"), TEXT("1-5")},
+		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
+		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
+		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
+	};
+
+	for (int32 Index = 0; Index < Definitions.Num() && Index < UE_ARRAY_COUNT(Expected); ++Index)
+	{
+		const FQuestDefinition& Actual = Definitions[Index];
+		const FExpectedQuestDefinition& ExpectedQuest = Expected[Index];
+		const FString Prefix = FString::Printf(TEXT("Quest definition %d "), Index);
+
+		TestEqual(*(Prefix + TEXT("quest id")), Actual.QuestId, FString(ExpectedQuest.QuestId));
+		TestEqual(*(Prefix + TEXT("type")), Actual.Type, ExpectedQuest.Type);
+		TestEqual(*(Prefix + TEXT("objective")), Actual.Objective, ExpectedQuest.Objective);
+		TestEqual(*(Prefix + TEXT("target count")), Actual.TargetCount, ExpectedQuest.TargetCount);
+		TestEqual(*(Prefix + TEXT("reward gold")), Actual.RewardGold, ExpectedQuest.RewardGold);
+		TestEqual(*(Prefix + TEXT("reward exp")), Actual.RewardExp, ExpectedQuest.RewardExp);
+		TestEqual(*(Prefix + TEXT("prerequisite")), Actual.PrerequisiteQuestId, FString(ExpectedQuest.PrerequisiteQuestId));
+		TestEqual(*(Prefix + TEXT("chapter map")), Actual.ChapterMapId, FString(ExpectedQuest.ChapterMapId));
+	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FQuestServiceDailyResetTest,
 	"IdleProject.GameCore.QuestService.DailyReset",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -95,6 +150,15 @@ bool FIdleGameInstanceQuestRewardTest::RunTest(const FString& Parameters)
 	FQuestState OfflineDaily;
 	TestTrue(TEXT("Offline daily quest exists"), GameInstance->GetQuestState(TEXT("daily_claim_offline"), OfflineDaily));
 	TestTrue(TEXT("Offline reward claim hook completes daily quest"), OfflineDaily.bCompleted);
+
+	GameInstance->RecordGearEnhanced();
+	GameInstance->RecordGearEnhanced();
+	GameInstance->RecordGearEnhanced();
+
+	FQuestState EnhanceDaily;
+	TestTrue(TEXT("Enhance daily quest exists"), GameInstance->GetQuestState(TEXT("daily_enhance_gear"), EnhanceDaily));
+	TestEqual(TEXT("Enhance hook reaches daily quest target"), EnhanceDaily.Progress, 3);
+	TestTrue(TEXT("Enhance hook completes daily quest"), EnhanceDaily.bCompleted);
 
 	return true;
 }

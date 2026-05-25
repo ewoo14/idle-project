@@ -1,5 +1,7 @@
 import {
   dailyQuestIds,
+  type Quest,
+  type QuestObjective,
   questById,
   questDefinitions,
 } from "../../core/data/quests.js";
@@ -72,14 +74,7 @@ export class QuestService {
     characterId: string,
     input: { questId: string; amount: number },
   ) {
-    if (!Number.isInteger(input.amount) || input.amount <= 0) {
-      throw new ValidationError(
-        "Quest progress amount must be a positive integer.",
-        {
-          code: "QUEST_PROGRESS_AMOUNT_INVALID",
-        },
-      );
-    }
+    this.assertProgressAmount(input.amount);
 
     const quest = questById.get(input.questId);
     if (!quest) {
@@ -91,11 +86,53 @@ export class QuestService {
       throw new ValidationError("Quest is locked.", { code: "QUEST_LOCKED" });
     }
 
-    const current = state.progressFor(quest.questId);
-    const progress = Math.min(
-      quest.targetCount,
-      current.progress + input.amount,
+    return this.saveProgress(userId, quest, state, input.amount);
+  }
+
+  async addProgressForObjective(
+    userId: string,
+    characterId: string,
+    input: { objective: QuestObjective; amount: number },
+  ) {
+    this.assertProgressAmount(input.amount);
+
+    const state = await this.buildState(userId, characterId);
+    const activeMatches = questDefinitions.filter(
+      (quest) =>
+        quest.objective === input.objective &&
+        (quest.type === "daily" || state.isUnlocked(quest.questId)),
     );
+
+    const results = [];
+    for (const quest of activeMatches) {
+      results.push(await this.saveProgress(userId, quest, state, input.amount));
+    }
+    return results;
+  }
+
+  private assertProgressAmount(amount: number) {
+    if (!Number.isInteger(amount) || amount <= 0) {
+      throw new ValidationError(
+        "Quest progress amount must be a positive integer.",
+        {
+          code: "QUEST_PROGRESS_AMOUNT_INVALID",
+        },
+      );
+    }
+  }
+
+  private async saveProgress(
+    userId: string,
+    quest: Quest,
+    state: Awaited<ReturnType<QuestService["buildState"]>>,
+    amount: number,
+  ) {
+    const current = state.progressFor(quest.questId);
+    if (current.claimed) {
+      return { ...quest, ...current };
+    }
+
+    const progress = Math.min(quest.targetCount, current.progress + amount);
     const saved = await this.repo.upsertProgress({
       userId,
       questId: quest.questId,

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { questDefinitions } from "../../core/data/quests.js";
 import { NotFoundError, ValidationError } from "../../core/errors.js";
 import type { QuestProgressRecord, QuestRepo } from "./quest.service.js";
 import { QuestService } from "./quest.service.js";
@@ -74,6 +75,129 @@ describe("QuestService", () => {
       completed: true,
       claimed: false,
     });
+  });
+
+  it("advances unlocked active quests by objective without progressing claimed rewards", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "daily_kill_monsters",
+          progress: 29,
+          dailyResetDate: "2026-05-26",
+        }),
+        progressRecord({
+          questId: "daily_claim_offline",
+          progress: 1,
+          completed: true,
+          claimed: true,
+          dailyResetDate: "2026-05-26",
+        }),
+        progressRecord({
+          questId: "daily_enhance_gear",
+          progress: 2,
+          dailyResetDate: "2026-05-26",
+        }),
+      ],
+    });
+    const service = new QuestService(
+      repo,
+      () => new Date("2026-05-26T02:00:00.000Z"),
+    );
+
+    const killResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "kill_monster", amount: 1 },
+    );
+    const claimedOffline = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "claim_offline", amount: 1 },
+    );
+    const enhanceResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "enhance", amount: 1 },
+    );
+
+    expect(killResults.map((quest) => quest.questId)).toEqual([
+      "main_ch1_001",
+      "daily_kill_monsters",
+    ]);
+    expect(killResults).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          questId: "main_ch1_001",
+          progress: 1,
+          completed: false,
+        }),
+        expect.objectContaining({
+          questId: "daily_kill_monsters",
+          progress: 30,
+          completed: true,
+        }),
+      ]),
+    );
+    expect(claimedOffline).toEqual([
+      expect.objectContaining({
+        questId: "daily_claim_offline",
+        progress: 1,
+        completed: true,
+        claimed: true,
+      }),
+    ]);
+    expect(enhanceResults).toEqual([
+      expect.objectContaining({
+        questId: "daily_enhance_gear",
+        progress: 3,
+        completed: true,
+      }),
+    ]);
+    expect(repo.upsertProgress).not.toHaveBeenCalledWith(
+      expect.objectContaining({ questId: "daily_claim_offline" }),
+    );
+  });
+
+  it("keeps listed quest data aligned with the canonical quest definitions", async () => {
+    const repo = createRepo({
+      progress: questDefinitions
+        .filter((quest) => quest.prerequisiteQuestId)
+        .map((quest) =>
+          progressRecord({
+            questId: quest.prerequisiteQuestId,
+            progress: quest.targetCount,
+            completed: true,
+            claimed: true,
+          }),
+        ),
+    });
+    const service = new QuestService(repo);
+
+    const result = await service.list(userId, characterId);
+
+    expect(
+      result.quests.map((quest) => ({
+        questId: quest.questId,
+        targetCount: quest.targetCount,
+        rewardGold: quest.rewardGold,
+        rewardExp: quest.rewardExp,
+        objective: quest.objective,
+        type: quest.type,
+        prerequisiteQuestId: quest.prerequisiteQuestId,
+        chapterMapId: quest.chapterMapId,
+      })),
+    ).toEqual(
+      questDefinitions.map((quest) => ({
+        questId: quest.questId,
+        targetCount: quest.targetCount,
+        rewardGold: quest.rewardGold,
+        rewardExp: quest.rewardExp,
+        objective: quest.objective,
+        type: quest.type,
+        prerequisiteQuestId: quest.prerequisiteQuestId,
+        chapterMapId: quest.chapterMapId,
+      })),
+    );
   });
 
   it("rejects progress for locked main quests", async () => {

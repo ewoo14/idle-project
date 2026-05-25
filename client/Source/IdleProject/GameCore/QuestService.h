@@ -143,6 +143,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Quest")
 	TArray<FQuestState> GetActiveQuestStates() const;
 
+	const TArray<FQuestDefinition>& GetQuestDefinitions() const;
+
 	bool GetQuestState(const FString& QuestId, FQuestState& OutState) const;
 
 	static FString GetCurrentUtcDateString();

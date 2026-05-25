@@ -111,6 +111,11 @@ TArray<FQuestState> UQuestService::GetActiveQuestStates() const
 	return States;
 }
 
+const TArray<FQuestDefinition>& UQuestService::GetQuestDefinitions() const
+{
+	return Definitions;
+}
+
 bool UQuestService::GetQuestState(const FString& QuestId, FQuestState& OutState) const
 {
 	if (const FQuestState* State = ActiveStates.Find(QuestId))
