@@ -17,18 +17,22 @@
 
 ---
 
-## 멀티 에이전트 워크플로우 (모든 PR 적용 — 잊지 말 것)
+## 멀티 에이전트 워크플로우 v2 (모든 PR 적용 — 잊지 말 것)
 
 ```
 [1] PM(Claude) 기획 → PR
-[2] Codex 7파트 1차 구현 (디자이너/스토리/퀘스트/캐릭터·아이템·능력치/밸런스/백엔드·DB/QA)
-[3] Claude 7파트 1차 리뷰
-[4] TM(Claude) 1차 종합 + fix 지시
+[2] Codex 7파트 1차 구현 (커밋 only, 개별 코멘트 금지)
+[3] 두 라인 병렬 종합:
+    [3a] Claude TM → 종합 코멘트 1개
+    [3b] Codex TM  → 종합 코멘트 1개 (Claude TM 과 비교)
+[4] PM 1차 통합 → fix 지시 코멘트 1개
 [5] Codex 2차 fix
-[6] Claude 2차 검토
-[7] TM 2차 종합 → fix 없음 → PM, fix 있음 → [5] 루프
+[6] [6a] Claude TM 재검토 → [6b] Codex TM 재검토 (각 1개)
+[7] PM 2차 통합 → fix 없음 → [8] / fix 있음 → [5]
 [8] CI 통과 + PM 종합 소견 → 머지
 ```
+
+**규칙**: 외부 코멘트는 단계당 TM 종합 2개 + PM 1개 만. 개별 7파트 코멘트 금지.
 
 상세: [`docs/workflow/01-pm-codex-claude-loop.md`](docs/workflow/01-pm-codex-claude-loop.md).
 

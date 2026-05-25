@@ -62,14 +62,18 @@ docker compose up -d
 
 ---
 
-## 개발 워크플로우 (요약)
+## 개발 워크플로우 (요약, v2)
 
 1. **PM(Claude)** 이 기획/작업 명세를 작성하고 PR 을 생성합니다.
-2. **Codex CLI 에이전트** (디자이너 · 스토리 · 퀘스트 · 캐릭터/아이템/능력치 · 밸런스 · 백엔드/DB · QA) 가 PR 브랜치에 구현을 올립니다.
-3. **Claude 리뷰 에이전트** 가 파트별로 한글 리뷰를 답니다.
-4. **TM(Team Manager, Claude)** 가 리뷰를 종합하고 fix 지시를 게시합니다.
-5. **Codex 에이전트** 가 fix 진행 → **Claude** 가 재검토 → **TM** 종합 → fix 없을 때까지 반복.
-6. **PM** 이 CI 통과 확인 후 **종합 소견 리뷰** 를 게시하고 머지합니다.
+2. **Codex CLI 에이전트** (7파트) 가 PR 브랜치에 구현을 **커밋** 합니다 (개별 코멘트 금지).
+3. 두 라인 **병렬 종합** — 외부 코멘트는 TM 만:
+   - **Claude TM** 이 Claude 7파트 리뷰를 종합 → 1개 코멘트
+   - **Codex TM** 이 Codex 7파트 리뷰를 종합 → 1개 코멘트 (Claude TM 과 비교)
+4. **PM** 이 양 TM 종합을 비교 / 통합하여 fix 지시 코멘트 게시.
+5. **Codex 에이전트** 가 fix 진행.
+6. **Claude TM + Codex TM** 각자 재검토 1개씩.
+7. **PM** 이 통합 판정 — fix 없음이면 [8], 있으면 [5] 로 루프.
+8. **CI 통과 확인 + PM 종합 소견 리뷰** 게시 후 머지.
 
 자세한 단계는 [`docs/workflow/01-pm-codex-claude-loop.md`](docs/workflow/01-pm-codex-claude-loop.md) 참고.
 

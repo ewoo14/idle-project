@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/base.json",
+  "$comment": "idle-project UI 토큰. docs/planning/04-art-direction.md §3.2 의 표를 1:1 직렬화. UE5 UMG / 웹 어드민 / 디자이너 작업 모두 본 JSON 을 단일 source of truth 로 한다.",
+  "version": "0.1.0-placeholder",
+  "color": {
+    "bg": {
+      "primary":   "#1A1B2E",
+      "panel":     "#252845"
+    },
+    "text": {
+      "primary":   "#F5F5F0",
+      "muted":     "#A0A4B8"
+    },
+    "accent": {
+      "gold":      "#F4C44A",
+      "blue":      "#6BB7F0",
+      "red":       "#E5556B"
+    },
+    "rarity": {
+      "common":    "#B0B5C0",
+      "uncommon":  "#5BC07A",
+      "rare":      "#5B8BC0",
+      "epic":      "#A05BC0",
+      "legendary": "#F0A040",
+      "mythic": {
+        "$type": "linear-gradient",
+        "angle": 45,
+        "stops": [
+          { "at": 0.0, "color": "#FF7B00" },
+          { "at": 1.0, "color": "#00B4FF" }
+        ],
+        "$comment": "PR #2 디자이너 슬라이스에서 angle/stops 최종 확정 예정."
+      }
+    }
+  },
+  "typography": {
+    "korean": {
+      "family":  "Pretendard",
+      "weights": [400, 500, 700],
+      "selfHost": "client/Content/Fonts/Pretendard/ (PR #2 에서 추가)"
+    },
+    "english": {
+      "family":  "Inter",
+      "weights": [400, 600]
+    },
+    "numeric": {
+      "family": "DungGeunMo",
+      "$comment": "데미지/수치 폰트. 라이선스: SIL OFL 1.1 (재배포 가능)."
+    }
+  },
+  "motion": {
+    "ui-ease-out": { "duration_ms": 200, "curve": "ease-out" },
+    "damage-pop":  { "duration_ms": 350, "curve": "ease-out", "translateY_px": -32, "fadeOut": true },
+    "reward-card": { "duration_ms": 450, "curve": "ease-in-out", "flip": "Y", "particles": true }
+  },
+  "radius": {
+    "sm": 4,
+    "md": 6,
+    "lg": 8
+  },
+  "$todo": [
+    "다크/라이트 분리는 1.0 출시 전 결정 (현재 다크 단일).",
+    "Mythic gradient angle/stops 최종 확정 — PR #2.",
+    "Pretendard 셀프호스팅 경로/라이선스 표기 — PR #2."
+  ]
+}

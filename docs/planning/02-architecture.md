@@ -193,11 +193,41 @@ leaderboard_power
 | 비밀번호 | bcrypt cost 12 |
 | HTTPS | 운영은 nginx + Let's Encrypt 또는 Caddy |
 | CSRF | API 는 토큰 기반이므로 N/A (쿠키 미사용) |
-| Rate Limit | Redis 기반, IP+User 키 — `auth/login` 5회/분 |
+| Rate Limit | Redis 기반, IP+User 키. **§3.5.1 표** 참고 |
 | 입력 검증 | Fastify schema (JSON Schema/AJV) 필수 |
 | SQL Injection | Drizzle 파라미터 바인딩만 |
 | 세이브 위변조 | 서버에서 핵심 진행(레벨/환생/장비 최고치) 재계산 검증, 의심 시 reject + 로그 |
 | 비밀 관리 | `.env` (개발), 운영은 secret manager 또는 호스트 환경변수 |
+| JWT 키 회전 | **§3.5.2** 참고 |
+
+#### 3.5.1 엔드포인트별 Rate Limit 기본 정책
+
+PR #7 (백엔드 V1) 에서 Redis 기반으로 구현. 키는 `IP + User(인증 시)`.
+
+| 분류 | 엔드포인트 예 | 기본 한도 | 비고 |
+| --- | --- | --- | --- |
+| `auth` | `/v1/auth/login`, `/register`, `/refresh` | **5 req / 분 / IP** | 로그인 brute force 차단. 실패 5회 후 1분 lockout |
+| `save` | `/v1/save` GET/PUT | **30 req / 분 / User** | 정상 동기화 (5분 주기) 충분히 여유 |
+| `read` | `/v1/leaderboard/*`, `/v1/character/*` (GET) | **120 req / 분 / User** | 일반 조회 |
+| `mutate` | `/v1/character/rebirth`, `/level-up` | **20 req / 분 / User** | 부정 행위 가속 차단 |
+| `event` (WSS) | `/v1/events` | **연결 5/User, 메시지 60/분/User** | 1.0 |
+| `admin` | `/v1/admin/*` | **별도 IP 화이트리스트 + 1000/시간** | 운영자 전용 |
+
+초과 시 `429 Too Many Requests` + `Retry-After` 헤더. CI 단위 테스트로 한도 검증 (PR #7).
+
+#### 3.5.2 JWT 키 회전 정책
+
+| 항목 | 정책 |
+| --- | --- |
+| 알고리즘 | RS256 (비대칭, 공개키만 검증자에 배포 가능) |
+| 회전 주기 | 운영 기본 **6개월**, 사건 대응 시 즉시 |
+| 키 ID (`kid`) | 모든 JWT 헤더에 `kid` 포함 — 검증 시 키 선택에 사용 |
+| 중첩 신뢰 기간 | **30일** — 신규 키 발급 후 30일간 구 키도 검증 허용 (점진 전환) |
+| Refresh 처리 | 회전 시 모든 refresh 토큰을 30일 이내 자연 만료. 사건 대응 시 즉시 폐기 (Redis blacklist) |
+| 키 저장 | 운영: secret manager (예: AWS Secrets Manager, Vault). 개발: `infra/secrets/jwt_*.pem` (gitignore) |
+| 감사 | 회전 / 폐기 이벤트는 보안 로그 별도 보관 (1년) |
+
+회전 절차 / 자동화 스크립트는 PR #7 (백엔드 V1) 에서 `docs/ops/security.md` 와 함께 추가.
 
 ### 3.6 Docker 운영
 
