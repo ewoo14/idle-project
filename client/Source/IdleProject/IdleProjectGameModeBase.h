@@ -37,5 +37,13 @@ private:
 	UFUNCTION()
 	void ScheduleRespawn(AActor* DyingActor);
 
+	/**
+	 * 빈 default world 에 조명/하늘/바닥을 자동 spawn 한다.
+	 * Game.umap (BP 자산) 미생성 상태에서도 PIE 가 까만 화면이 아닌 정상 시각화를 보이도록.
+	 * PR #7 (hotfix-06-light-sky) 추가. BP 맵 자산 도입 시 본 함수 호출 제거 가능.
+	 */
+	void SpawnDefaultEnvironment();
+
 	bool bInitialMonstersSpawned = false;
+	bool bDefaultEnvironmentSpawned = false;
 };
