@@ -24,7 +24,7 @@
 - [ ] 골드 드롭 + 자동 흡수
 - [ ] 몬스터 respawn (5초 후)
 - [ ] HUD HP/EXP/Gold 실시간 갱신
-- [ ] NetworkClient guest register 호출 + 서버 미기동 graceful
+- [ ] NetworkClient guest register 성공 호출 + 서버 미기동 graceful 진행
 
 ## 2. 서버 (Node.js) — PR #7 이후 채움
 
