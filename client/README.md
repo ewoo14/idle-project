@@ -36,6 +36,10 @@ UE 5.7 기반 클라이언트 코어 부트 프로젝트입니다. 로직은 C++
 - `UMainMenuController`: 추후 `W_MainMenu` Blueprint의 C++ 베이스
 - `UApiClient`: PR #5 인증 연동 전 HTTP GET/POST 골격
 
+## UI 테마 토큰
+
+`docs/planning/ui-tokens.json`이 UI 색상의 source of truth이며, UE5 C++ 미러는 `Source/IdleProject/UI/UIThemeTokens.h`에 둡니다. `UMainMenuController`는 `BackgroundColor`, `PanelColor`, `PrimaryTextColor`, `PrimaryActionColor` 등을 `EditDefaultsOnly`로 노출하므로 `W_MainMenu` Blueprint에서 같은 토큰을 바로 바인딩합니다.
+
 ## 알려진 한계
 
 Blueprint `.uasset`와 맵 에셋은 Codex가 직접 생성하지 않았습니다. PM이 UE 에디터에서 `W_MainMenu`, `MainMenu`, `Game` 맵을 생성해 C++ 베이스에 연결해야 합니다.

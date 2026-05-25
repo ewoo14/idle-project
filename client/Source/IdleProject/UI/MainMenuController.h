@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/UIThemeTokens.h"
 #include "MainMenuController.generated.h"
 
 /**
@@ -14,6 +15,24 @@ class IDLEPROJECT_API UMainMenuController : public UUserWidget
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor BackgroundColor = IdleProject::UI::Theme::BgPrimary;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor PanelColor = IdleProject::UI::Theme::BgPanel;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor PrimaryTextColor = IdleProject::UI::Theme::TextPrimary;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor MutedTextColor = IdleProject::UI::Theme::TextMuted;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor PrimaryActionColor = IdleProject::UI::Theme::AccentGold;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Theme")
+	FLinearColor ErrorColor = IdleProject::UI::Theme::ErrorCritical;
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|MainMenu")
 	void StartGame();
 
