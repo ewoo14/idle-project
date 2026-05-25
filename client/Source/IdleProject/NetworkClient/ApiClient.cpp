@@ -157,6 +157,50 @@ bool UApiClient::ClaimQuestReward(const FString& QuestId, const FString& Charact
 	return Post(FString::Printf(TEXT("/v1/quests/%s/claim"), *QuestId), JsonBody);
 }
 
+bool UApiClient::RequestPetList()
+{
+	return Get(TEXT("/v1/pets"));
+}
+
+bool UApiClient::EquipPet(const FString& PetId)
+{
+	if (PetId.IsEmpty())
+	{
+		return false;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("petId"), PetId);
+
+	FString JsonBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+
+	return Post(FString::Printf(TEXT("/v1/pets/%s/equip"), *PetId), JsonBody);
+}
+
+bool UApiClient::RequestSeasonState()
+{
+	return Get(TEXT("/v1/season"));
+}
+
+bool UApiClient::ClaimSeasonReward(int32 Tier)
+{
+	if (Tier <= 0)
+	{
+		return false;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetNumberField(TEXT("tier"), Tier);
+
+	FString JsonBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+
+	return Post(FString::Printf(TEXT("/v1/season/tiers/%d/claim"), Tier), JsonBody);
+}
+
 FString UApiClient::BuildUrl(const FString& Path) const
 {
 	if (Path.StartsWith(TEXT("http://")) || Path.StartsWith(TEXT("https://")))

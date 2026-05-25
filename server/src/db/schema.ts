@@ -121,3 +121,32 @@ export const questProgress = pgTable(
     ),
   }),
 );
+
+export const petState = pgTable("pet_state", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  ownedPetIds: jsonb("owned_pet_ids").notNull().default(["dog", "bird"]),
+  equippedPetId: varchar("equipped_pet_id", { length: 64 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const seasonState = pgTable(
+  "season_state",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    seasonId: integer("season_id").notNull().default(1),
+    tokens: integer("tokens").notNull().default(0),
+    claimedTiers: jsonb("claimed_tiers").notNull().default([]),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    seasonStatePk: primaryKey({ columns: [table.userId, table.seasonId] }),
+    seasonStateTokens: index("season_state_tokens_idx").on(
+      table.seasonId,
+      table.tokens,
+    ),
+  }),
+);

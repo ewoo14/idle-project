@@ -12,3 +12,4 @@
 | M4 | [M4-quest-system-v1.md](M4-quest-system-v1.md) | 퀘스트 V1 클라이언트 진행, 수령 보상, 일일 리셋, 서버 미기동 graceful 경로 |
 | M5 | [M5-boss-rebirth-v1.md](M5-boss-rebirth-v1.md) | 보스 처치 gate, 환생 reset, 영구 스탯 보너스 parity, 오프라인 보상 carryover |
 | M5 | [M5-mage-archer-classes-v1.md](M5-mage-archer-classes-v1.md) | Mage/Archer class skill parity, class loading, story branch localization, balance guardrails |
+| M5 | [M5-pets-season-pass-v1.md](M5-pets-season-pass-v1.md) | 펫 장착 보너스 parity, 시즌 토큰 진행, 티어 수령, edge/regression 증거 |

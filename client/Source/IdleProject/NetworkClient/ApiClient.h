@@ -29,6 +29,10 @@ public:
 	bool RequestQuestList(const FString& CharacterId);
 	bool ReportQuestProgress(const FString& QuestId, const FString& CharacterId, int32 Amount);
 	bool ClaimQuestReward(const FString& QuestId, const FString& CharacterId);
+	bool RequestPetList();
+	bool EquipPet(const FString& PetId);
+	bool RequestSeasonState();
+	bool ClaimSeasonReward(int32 Tier);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetBaseUrl() const { return BaseUrl; }

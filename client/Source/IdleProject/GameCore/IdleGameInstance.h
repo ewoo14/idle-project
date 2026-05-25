@@ -3,7 +3,9 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "GameCore/OfflineRewardFormula.h"
+#include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/SeasonService.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
@@ -30,6 +32,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UQuestService* GetQuestService() const { return QuestService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UPetService* GetPetService() const { return PetService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	USeasonService* GetSeasonService() const { return SeasonService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -106,6 +114,32 @@ public:
 
 	void InitializeQuestServiceForTests(const FString& CurrentUtcDate);
 
+	void InitializePetSeasonServicesForTests();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool EquipPet(const FString& PetId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	float GetEquippedPetGoldBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	float GetEquippedPetDropBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	int64 ApplyEquippedPetGoldBonus(int64 BaseAmount) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	float ApplyEquippedPetDropBonusChance(float BaseChance) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Season")
+	int32 GetSeasonTokens() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Season")
+	int32 GetReachedSeasonTier() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Season")
+	FSeasonClaimResult ClaimSeasonReward(int32 Tier);
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
 	FOnGoldChanged OnGoldChanged;
 
@@ -121,6 +155,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UQuestService> QuestService;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPetService> PetService;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USeasonService> SeasonService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
@@ -152,6 +192,8 @@ private:
 
 	static int64 GetCurrentUnixSeconds();
 	void EnsureQuestService();
+	void EnsurePetService();
+	void EnsureSeasonService();
 	void LoadLastSeenUnixSec();
 	void SaveLastSeenUnixSec() const;
 };

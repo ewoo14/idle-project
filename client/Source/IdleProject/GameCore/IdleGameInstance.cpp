@@ -25,6 +25,8 @@ void UIdleGameInstance::Init()
 	ApiClient = NewObject<UApiClient>(this);
 	ApiClient->Initialize(ApiBaseUrl);
 	EnsureQuestService();
+	EnsurePetService();
+	EnsureSeasonService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	LoadLastSeenUnixSec();
 
@@ -34,6 +36,8 @@ void UIdleGameInstance::Init()
 			bSuccess ? TEXT("true") : TEXT("false"),
 			*Message);
 	});
+	ApiClient->RequestPetList();
+	ApiClient->RequestSeasonState();
 }
 
 void UIdleGameInstance::Shutdown()
@@ -42,6 +46,8 @@ void UIdleGameInstance::Shutdown()
 	SaveLastSeenUnixSec();
 	ApiClient = nullptr;
 	QuestService = nullptr;
+	PetService = nullptr;
+	SeasonService = nullptr;
 	Super::Shutdown();
 }
 
@@ -195,6 +201,11 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 
 	AddGold(Result.RewardGold);
 	AddExp(Result.RewardExp);
+	EnsureSeasonService();
+	if (SeasonService)
+	{
+		SeasonService->AddSeasonTokens(USeasonService::QuestClaimSeasonTokenReward);
+	}
 	if (ApiClient)
 	{
 		ApiClient->ClaimQuestReward(QuestId, FString());
@@ -218,6 +229,91 @@ void UIdleGameInstance::InitializeQuestServiceForTests(const FString& CurrentUtc
 	QuestService->InitializeDefaultQuests(CurrentUtcDate);
 }
 
+void UIdleGameInstance::InitializePetSeasonServicesForTests()
+{
+	PetService = NewObject<UPetService>(this);
+	PetService->InitializeDefaultPets();
+	SeasonService = NewObject<USeasonService>(this);
+	SeasonService->InitializeDefaultSeason();
+}
+
+bool UIdleGameInstance::EquipPet(const FString& PetId)
+{
+	EnsurePetService();
+	if (!PetService || !PetService->EquipPet(PetId))
+	{
+		return false;
+	}
+
+	if (ApiClient)
+	{
+		ApiClient->EquipPet(PetId);
+	}
+	return true;
+}
+
+float UIdleGameInstance::GetEquippedPetGoldBonusPercent() const
+{
+	return PetService ? PetService->GetEquippedPetGoldBonusPercent() : 0.0f;
+}
+
+float UIdleGameInstance::GetEquippedPetDropBonusPercent() const
+{
+	return PetService ? PetService->GetEquippedPetDropBonusPercent() : 0.0f;
+}
+
+int64 UIdleGameInstance::ApplyEquippedPetGoldBonus(int64 BaseAmount) const
+{
+	return PetService ? PetService->ApplyGoldBonus(BaseAmount) : BaseAmount;
+}
+
+float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
+{
+	return PetService ? PetService->ApplyDropBonusChance(BaseChance) : BaseChance;
+}
+
+int32 UIdleGameInstance::GetSeasonTokens() const
+{
+	return SeasonService ? SeasonService->GetSeasonTokens() : 0;
+}
+
+int32 UIdleGameInstance::GetReachedSeasonTier() const
+{
+	return SeasonService ? SeasonService->GetReachedTier() : 0;
+}
+
+FSeasonClaimResult UIdleGameInstance::ClaimSeasonReward(int32 Tier)
+{
+	EnsureSeasonService();
+	FSeasonClaimResult Result;
+	if (!SeasonService)
+	{
+		Result.Message = TEXT("season_service_unavailable");
+		return Result;
+	}
+
+	Result = SeasonService->ClaimSeasonReward(Tier);
+	if (!Result.bSuccess)
+	{
+		return Result;
+	}
+
+	if (Result.RewardType == ESeasonRewardType::Gold)
+	{
+		AddGold(Result.RewardAmount);
+	}
+	else if (Result.RewardType == ESeasonRewardType::Exp)
+	{
+		AddExp(Result.RewardAmount);
+	}
+
+	if (ApiClient)
+	{
+		ApiClient->ClaimSeasonReward(Tier);
+	}
+	return Result;
+}
+
 int64 UIdleGameInstance::GetCurrentUnixSeconds()
 {
 	return FDateTime::UtcNow().ToUnixTimestamp();
@@ -229,6 +325,24 @@ void UIdleGameInstance::EnsureQuestService()
 	{
 		QuestService = NewObject<UQuestService>(this);
 		QuestService->InitializeDefaultQuests(UQuestService::GetCurrentUtcDateString());
+	}
+}
+
+void UIdleGameInstance::EnsurePetService()
+{
+	if (!PetService)
+	{
+		PetService = NewObject<UPetService>(this);
+		PetService->InitializeDefaultPets();
+	}
+}
+
+void UIdleGameInstance::EnsureSeasonService()
+{
+	if (!SeasonService)
+	{
+		SeasonService = NewObject<USeasonService>(this);
+		SeasonService->InitializeDefaultSeason();
 	}
 }
 
