@@ -92,6 +92,10 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MenuToggleAction;
 
+	/** 퀘스트 로그 토글 입력 액션입니다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> QuestLogToggleAction;
+
 	/** 런타임에서 생성하는 EnhancedInput 기본 매핑입니다. */
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -128,6 +132,7 @@ private:
 	void Move(const FInputActionValue& Value);
 	void Attack(const FInputActionValue& Value);
 	void ToggleMenu(const FInputActionValue& Value);
+	void ToggleQuestLog(const FInputActionValue& Value);
 
 	float LastObservedHp = 0.0f;
 	EBattleState LastObservedBattleState;

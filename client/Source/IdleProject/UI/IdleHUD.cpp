@@ -14,6 +14,7 @@
 namespace
 {
 const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
+const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 
 FString RarityToString(EItemRarity Rarity)
 {
@@ -55,6 +56,18 @@ FString FormatElapsedHoursMinutes(int64 CappedSeconds)
 	const int64 Hours = ClampedSeconds / 3600;
 	const int64 Minutes = (ClampedSeconds % 3600) / 60;
 	return FString::Printf(TEXT("%lld:%02lld"), Hours, Minutes);
+}
+
+FText QuestTypeToLabel(EQuestType Type)
+{
+	return Type == EQuestType::Main
+		? FText::FromString(TEXT("메인"))
+		: FText::FromString(TEXT("일일"));
+}
+
+FName MakeQuestClaimHitBoxName(const FString& QuestId)
+{
+	return FName(*(QuestClaimHitBoxPrefix + QuestId));
 }
 }
 
@@ -104,6 +117,50 @@ FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(cons
 		TEXT("EXP +%s"),
 		*FormatIntegerWithCommas(Reward.Exp)));
 	ViewModel.ClaimLabel = FText::FromString(TEXT("수령"));
+	return ViewModel;
+}
+
+FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates)
+{
+	FIdleHUDQuestLogViewModel ViewModel;
+	ViewModel.Title = FText::FromString(TEXT("퀘스트"));
+	ViewModel.ShortcutLabel = FText::FromString(TEXT("Q 닫기"));
+	ViewModel.EmptyLabel = FText::FromString(TEXT("진행 중인 퀘스트 없음"));
+
+	for (const FQuestState& State : QuestStates)
+	{
+		FIdleHUDQuestLogRowViewModel Row;
+		Row.QuestId = State.QuestId;
+		Row.TypeLabel = QuestTypeToLabel(State.Type);
+		Row.Title = State.Title;
+		Row.ProgressRatio = State.TargetCount > 0
+			? FMath::Clamp(static_cast<float>(State.Progress) / static_cast<float>(State.TargetCount), 0.0f, 1.0f)
+			: 1.0f;
+		Row.ProgressLabel = FText::FromString(FString::Printf(
+			TEXT("진행 %d / %d"),
+			State.Progress,
+			State.TargetCount));
+		Row.RewardLabel = FText::FromString(FString::Printf(
+			TEXT("보상 골드 %lld / EXP %lld"),
+			State.RewardGold,
+			State.RewardExp));
+		Row.bCanClaim = State.bCompleted && !State.bClaimed;
+		Row.bClaimed = State.bClaimed;
+		if (Row.bCanClaim)
+		{
+			Row.ActionLabel = FText::FromString(TEXT("수령"));
+		}
+		else if (Row.bClaimed)
+		{
+			Row.ActionLabel = FText::FromString(TEXT("완료"));
+		}
+		else
+		{
+			Row.ActionLabel = FText::FromString(TEXT("진행"));
+		}
+		ViewModel.Rows.Add(Row);
+	}
+
 	return ViewModel;
 }
 
@@ -169,6 +226,7 @@ void AIdleHUD::DrawHUD()
 	}
 
 	DrawOfflineRewardModal();
+	DrawQuestLog();
 }
 
 void AIdleHUD::NotifyHitBoxClick(FName BoxName)
@@ -178,8 +236,23 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		ClaimOfflineRewardModal();
 		return;
 	}
+	if (BoxName.ToString().StartsWith(QuestClaimHitBoxPrefix))
+	{
+		ClaimQuestFromHitBox(BoxName);
+		return;
+	}
 
 	Super::NotifyHitBoxClick(BoxName);
+}
+
+void AIdleHUD::ToggleQuestLog()
+{
+	bQuestLogVisible = !bQuestLogVisible;
+	if (PlayerOwner)
+	{
+		PlayerOwner->bShowMouseCursor = bQuestLogVisible || OfflineRewardModal.bVisible;
+		PlayerOwner->bEnableClickEvents = bQuestLogVisible || OfflineRewardModal.bVisible;
+	}
 }
 
 void AIdleHUD::HandleGoldChanged(int64 NewGold)
@@ -478,4 +551,106 @@ void AIdleHUD::DrawOfflineRewardModal()
 	DrawRect(Theme::AccentGold, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
 	DrawText(OfflineRewardModal.ClaimLabel.ToString(), Theme::BgPrimary, ButtonX + 52.0f * Scale, ButtonY + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 1.0f * Scale);
 	AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), OfflineRewardClaimHitBoxName, true, 100);
+}
+
+void AIdleHUD::DrawQuestLog()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas || !bQuestLogVisible)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FIdleHUDQuestLogViewModel ViewModel = BuildQuestLogViewModel(IdleGameInstance->GetActiveQuestStates());
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.36f, 420.0f * Scale, 620.0f * Scale);
+	const float RowHeight = 74.0f * Scale;
+	const float HeaderHeight = 54.0f * Scale;
+	const float Padding = 18.0f * Scale;
+	const float PanelHeight = HeaderHeight + Padding + FMath::Max(1, ViewModel.Rows.Num()) * (RowHeight + 10.0f * Scale) + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 92.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.94f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 14.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 1.0f * Scale);
+	DrawText(ViewModel.ShortcutLabel.ToString(), Theme::TextMuted, X + PanelWidth - 72.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	if (ViewModel.Rows.IsEmpty())
+	{
+		DrawText(ViewModel.EmptyLabel.ToString(), Theme::TextMuted, X + Padding, RowY + 20.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.95f * Scale);
+		return;
+	}
+
+	for (const FIdleHUDQuestLogRowViewModel& Row : ViewModel.Rows)
+	{
+		const float RowX = X + Padding;
+		const float InnerWidth = PanelWidth - Padding * 2.0f;
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), RowX, RowY, InnerWidth, RowHeight);
+		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.42f), RowX, RowY, 4.0f * Scale, RowHeight);
+
+		DrawText(Row.TypeLabel.ToString(), Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue, RowX + 12.0f * Scale, RowY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+		DrawText(Row.Title.ToString(), Theme::TextPrimary, RowX + 58.0f * Scale, RowY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.92f * Scale);
+		DrawText(Row.ProgressLabel.ToString(), Theme::TextMuted, RowX + 12.0f * Scale, RowY + 33.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+		DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, RowX + 132.0f * Scale, RowY + 33.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+
+		const float BarX = RowX + 12.0f * Scale;
+		const float BarY = RowY + RowHeight - 12.0f * Scale;
+		const float BarWidth = InnerWidth - 104.0f * Scale;
+		DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.96f), BarX, BarY, BarWidth, 5.0f * Scale);
+		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue, BarX, BarY, BarWidth * Row.ProgressRatio, 5.0f * Scale);
+
+		const float ButtonWidth = 72.0f * Scale;
+		const float ButtonHeight = 30.0f * Scale;
+		const float ButtonX = RowX + InnerWidth - ButtonWidth - 12.0f * Scale;
+		const float ButtonY = RowY + 22.0f * Scale;
+		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+		DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 19.0f * Scale, ButtonY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+		if (Row.bCanClaim)
+		{
+			AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeQuestClaimHitBoxName(Row.QuestId), true, 90);
+		}
+
+		RowY += RowHeight + 10.0f * Scale;
+	}
+}
+
+void AIdleHUD::ClaimQuestFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString QuestId = BoxName.ToString();
+	QuestId.RightChopInline(QuestClaimHitBoxPrefix.Len());
+	if (QuestId.IsEmpty())
+	{
+		return;
+	}
+
+	const FQuestClaimResult Claim = IdleGameInstance->ClaimQuest(QuestId);
+	if (Claim.bSuccess)
+	{
+		UE_LOG(LogTemp, Display, TEXT("[QuestLog] ClaimQuest success questId=%s gold=%lld exp=%lld"), *QuestId, Claim.RewardGold, Claim.RewardExp);
+	}
 }

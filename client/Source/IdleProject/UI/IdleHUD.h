@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "GameCore/OfflineRewardFormula.h"
+#include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleHUD.generated.h"
 
@@ -38,11 +39,33 @@ struct IDLEPROJECT_API FIdleHUDOfflineRewardViewModel
 	FText ClaimLabel;
 };
 
+struct IDLEPROJECT_API FIdleHUDQuestLogRowViewModel
+{
+	FString QuestId;
+	FText TypeLabel;
+	FText Title;
+	FText ProgressLabel;
+	FText RewardLabel;
+	FText ActionLabel;
+	float ProgressRatio = 0.0f;
+	bool bCanClaim = false;
+	bool bClaimed = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDQuestLogViewModel
+{
+	FText Title;
+	FText ShortcutLabel;
+	FText EmptyLabel;
+	TArray<FIdleHUDQuestLogRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
+IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -57,6 +80,8 @@ public:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void DrawHUD() override;
 	virtual void NotifyHitBoxClick(FName BoxName) override;
+
+	void ToggleQuestLog();
 
 protected:
 	UFUNCTION()
@@ -85,6 +110,8 @@ private:
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();
 	void DrawOfflineRewardModal();
+	void DrawQuestLog();
+	void ClaimQuestFromHitBox(FName BoxName);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UIdleGameInstance> IdleGameInstance;
@@ -97,4 +124,5 @@ private:
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
+	bool bQuestLogVisible = false;
 };
