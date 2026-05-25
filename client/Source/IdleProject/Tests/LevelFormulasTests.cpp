@@ -13,8 +13,8 @@ bool FLevelFormulasExpTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("LEVEL_CAP"), FLevelFormulas::LEVEL_CAP, 200);
 	TestEqual(TEXT("ExpToNext(1)"), FLevelFormulas::ExpToNext(1), 150);
 	TestEqual(TEXT("ExpToNext(10)"), FLevelFormulas::ExpToNext(10), 3506);
-	TestEqual(TEXT("ExpToNext(100)"), FLevelFormulas::ExpToNext(100), 260594);
-	TestEqual(TEXT("ExpToNext(200)"), FLevelFormulas::ExpToNext(200), 832291);
+	TestEqual(TEXT("ExpToNext(100)"), FLevelFormulas::ExpToNext(100), 135594);
+	TestEqual(TEXT("ExpToNext(200) cap sentinel"), FLevelFormulas::ExpToNext(200), 0);
 
 	const int64 ExpectedLevel4Total =
 		FLevelFormulas::ExpToNext(1) +

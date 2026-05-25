@@ -11,15 +11,9 @@ int64 RoundToInt64(double Value)
 int64 FLevelFormulas::ExpToNext(int32 Level)
 {
 	const int32 SafeLevel = FMath::Max(Level, 1);
-
-	// PR #4 명시 기대값을 보존하는 클라이언트 레벨 곡선입니다.
-	if (SafeLevel == 100)
-	{
-		return 260594;
-	}
 	if (SafeLevel == LEVEL_CAP)
 	{
-		return 832291;
+		return 0;
 	}
 
 	return RoundToInt64(50.0 * FMath::Pow(static_cast<double>(SafeLevel), 1.7) + 100.0 * static_cast<double>(SafeLevel));
