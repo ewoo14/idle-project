@@ -1,0 +1,47 @@
+name: release
+
+# 릴리스 자동화 V1 — 버전 태그(v*) 푸시 시 서버 Docker 이미지 빌드 검증 + GitHub 릴리스 생성.
+# (UE 클라이언트 패키징은 GitHub 러너에 UE 5.7 부재로 self-hosted 러너 필요 → tools/build/package-client.ps1 로 로컬/self-hosted 수행. 후속에 self-hosted 러너 잡 추가.)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "릴리스 태그 (예: v0.1.0)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  server-image:
+    name: 서버 Docker 이미지 빌드 검증
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 버전 확인
+        run: |
+          echo "VERSION=$(cat VERSION)" >> "$GITHUB_ENV"
+          echo "릴리스 버전: $(cat VERSION)"
+
+      - name: 서버 이미지 빌드 (검증)
+        run: docker build -t idle-project-server:${{ env.VERSION }} ./server
+
+      - name: 이미지 정보
+        run: docker image inspect "idle-project-server:${{ env.VERSION }}" --format 'built {{.Id}} size {{.Size}}'
+
+  github-release:
+    name: GitHub 릴리스 생성
+    needs: server-image
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 릴리스 생성 (자동 노트)
+        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
