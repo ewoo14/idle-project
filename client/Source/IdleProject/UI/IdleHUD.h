@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "GameCore/OfflineRewardFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleHUD.generated.h"
 
@@ -27,10 +28,21 @@ struct IDLEPROJECT_API FIdleHUDUltimateViewModel
 	bool bReady = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDOfflineRewardViewModel
+{
+	bool bVisible = false;
+	FText Title;
+	FText ElapsedLabel;
+	FText GoldLabel;
+	FText ExpLabel;
+	FText ClaimLabel;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
+IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -44,6 +56,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void DrawHUD() override;
+	virtual void NotifyHitBoxClick(FName BoxName) override;
 
 protected:
 	UFUNCTION()
@@ -69,6 +82,9 @@ private:
 	void DrawSkillHud(const USkillComponent& SkillComponent, float Now);
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
+	void PreviewOfflineRewardModal();
+	void ClaimOfflineRewardModal();
+	void DrawOfflineRewardModal();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UIdleGameInstance> IdleGameInstance;
@@ -80,4 +96,5 @@ private:
 	TObjectPtr<UInventoryComponent> PlayerInventory;
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
+	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
 };

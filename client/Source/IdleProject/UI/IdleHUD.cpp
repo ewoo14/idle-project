@@ -13,6 +13,8 @@
 
 namespace
 {
+const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
+
 FString RarityToString(EItemRarity Rarity)
 {
 	switch (Rarity)
@@ -27,6 +29,32 @@ FString RarityToString(EItemRarity Rarity)
 	default:
 		return TEXT("None");
 	}
+}
+
+FString FormatIntegerWithCommas(int64 Value)
+{
+	FString Digits = FString::Printf(TEXT("%lld"), FMath::Abs(Value));
+	FString Formatted;
+	int32 DigitCount = 0;
+	for (int32 Index = Digits.Len() - 1; Index >= 0; --Index)
+	{
+		if (DigitCount > 0 && DigitCount % 3 == 0)
+		{
+			Formatted.InsertAt(0, TEXT(","));
+		}
+		Formatted.InsertAt(0, Digits[Index]);
+		++DigitCount;
+	}
+
+	return Value < 0 ? FString::Printf(TEXT("-%s"), *Formatted) : Formatted;
+}
+
+FString FormatElapsedHoursMinutes(int64 CappedSeconds)
+{
+	const int64 ClampedSeconds = FMath::Max<int64>(0, CappedSeconds);
+	const int64 Hours = ClampedSeconds / 3600;
+	const int64 Minutes = (ClampedSeconds % 3600) / 60;
+	return FString::Printf(TEXT("%lld:%02lld"), Hours, Minutes);
 }
 }
 
@@ -59,6 +87,24 @@ FIdleHUDUltimateViewModel IdleProject::UI::BuildUltimateViewModel(const USkillCo
 	Ultimate.GaugeRatio = Ultimate.GaugePercent / 100.0f;
 	Ultimate.bReady = SkillComponent.IsUltimateReady();
 	return Ultimate;
+}
+
+FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
+{
+	FIdleHUDOfflineRewardViewModel ViewModel;
+	ViewModel.bVisible = Reward.Gold > 0 || Reward.Exp > 0;
+	ViewModel.Title = FText::FromString(TEXT("오프라인 보상"));
+	ViewModel.ElapsedLabel = FText::FromString(FString::Printf(
+		TEXT("경과 시간 %s"),
+		*FormatElapsedHoursMinutes(Reward.CappedSeconds)));
+	ViewModel.GoldLabel = FText::FromString(FString::Printf(
+		TEXT("골드 +%s"),
+		*FormatIntegerWithCommas(Reward.Gold)));
+	ViewModel.ExpLabel = FText::FromString(FString::Printf(
+		TEXT("EXP +%s"),
+		*FormatIntegerWithCommas(Reward.Exp)));
+	ViewModel.ClaimLabel = FText::FromString(TEXT("수령"));
+	return ViewModel;
 }
 
 void AIdleHUD::PostInitializeComponents()
@@ -94,6 +140,7 @@ void AIdleHUD::BeginPlay()
 	Super::BeginPlay();
 	BindPlayerCombat();
 	BindPlayerInventory();
+	PreviewOfflineRewardModal();
 }
 
 void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -116,12 +163,23 @@ void AIdleHUD::DrawHUD()
 
 	const UWorld* World = GetWorld();
 	const USkillComponent* PlayerSkills = ResolvePlayerSkills();
-	if (!World || !PlayerSkills)
+	if (World && PlayerSkills)
 	{
+		DrawSkillHud(*PlayerSkills, World->GetTimeSeconds());
+	}
+
+	DrawOfflineRewardModal();
+}
+
+void AIdleHUD::NotifyHitBoxClick(FName BoxName)
+{
+	if (BoxName == OfflineRewardClaimHitBoxName)
+	{
+		ClaimOfflineRewardModal();
 		return;
 	}
 
-	DrawSkillHud(*PlayerSkills, World->GetTimeSeconds());
+	Super::NotifyHitBoxClick(BoxName);
 }
 
 void AIdleHUD::HandleGoldChanged(int64 NewGold)
@@ -351,4 +409,73 @@ void AIdleHUD::DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, floa
 		? TEXT("ULTIMATE READY")
 		: FString::Printf(TEXT("ULTIMATE %.0f%%"), Ultimate.GaugePercent);
 	DrawText(GaugeLabel, Ultimate.bReady ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+}
+
+void AIdleHUD::PreviewOfflineRewardModal()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const int64 NowUnixSec = FDateTime::UtcNow().ToUnixTimestamp();
+	OfflineRewardModal = IdleProject::UI::BuildOfflineRewardViewModel(IdleGameInstance->PreviewOfflineRewards(NowUnixSec));
+	if (OfflineRewardModal.bVisible && PlayerOwner)
+	{
+		PlayerOwner->bShowMouseCursor = true;
+		PlayerOwner->bEnableClickEvents = true;
+	}
+}
+
+void AIdleHUD::ClaimOfflineRewardModal()
+{
+	if (!OfflineRewardModal.bVisible || !IdleGameInstance)
+	{
+		return;
+	}
+
+	IdleGameInstance->ClaimOfflineRewards();
+	OfflineRewardModal.bVisible = false;
+}
+
+void AIdleHUD::DrawOfflineRewardModal()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas || !OfflineRewardModal.bVisible)
+	{
+		return;
+	}
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float ModalWidth = FMath::Clamp(Canvas->SizeX * 0.42f, 420.0f * Scale, 640.0f * Scale);
+	const float ModalHeight = 284.0f * Scale;
+	const float X = (Canvas->SizeX - ModalWidth) * 0.5f;
+	const float Y = (Canvas->SizeY - ModalHeight) * 0.5f;
+	const float Padding = 28.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.56f), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.96f), X, Y, ModalWidth, ModalHeight);
+	DrawRect(Theme::AccentGold, X, Y, ModalWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + ModalHeight - Border, ModalWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, ModalHeight);
+	DrawRect(Theme::AccentGold, X + ModalWidth - Border, Y, Border, ModalHeight);
+
+	DrawText(OfflineRewardModal.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 22.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 1.05f * Scale);
+	DrawText(OfflineRewardModal.ElapsedLabel.ToString(), Theme::TextMuted, X + Padding, Y + 72.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 1.0f * Scale);
+	DrawText(OfflineRewardModal.GoldLabel.ToString(), Theme::AccentGold, X + Padding, Y + 120.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 1.0f * Scale);
+	DrawText(OfflineRewardModal.ExpLabel.ToString(), Theme::AccentBlue, X + Padding, Y + 160.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 1.0f * Scale);
+
+	const float ButtonWidth = 156.0f * Scale;
+	const float ButtonHeight = 44.0f * Scale;
+	const float ButtonX = X + ModalWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + ModalHeight - Padding - ButtonHeight;
+	DrawRect(Theme::AccentGold, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(OfflineRewardModal.ClaimLabel.ToString(), Theme::BgPrimary, ButtonX + 52.0f * Scale, ButtonY + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 1.0f * Scale);
+	AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), OfflineRewardClaimHitBoxName, true, 100);
 }
