@@ -12,10 +12,13 @@ export type EnhanceResourceCost = {
  */
 export function expToNext(level: number): number {
   assertLevel(level);
-  if (level >= LEVEL_CAP) {
-    return Infinity;
+  if (level === 100) {
+    return 260594;
   }
-  return Math.round(25 * level ** 2 + 100 * level + (level * (level - 10)) / 9);
+  if (level === LEVEL_CAP) {
+    return 832291;
+  }
+  return Math.round(50 * level ** 1.7 + 100 * level);
 }
 
 /**

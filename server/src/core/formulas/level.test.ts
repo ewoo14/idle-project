@@ -20,9 +20,9 @@ describe("level formulas", () => {
     expect(() => expToNext(0)).toThrow("level must be >= 1");
   });
 
-  it("레벨 캡 이상은 다음 레벨 경험치를 Infinity로 반환한다", () => {
+  it("레벨 캡 앵커 경험치를 반환한다", () => {
     expect(LEVEL_CAP).toBe(200);
-    expect(expToNext(200)).toBe(Infinity);
+    expect(expToNext(200)).toBe(832291);
   });
 
   it("누적 경험치는 레벨 1에서 해당 레벨까지 필요한 경험치 합산이다", () => {

@@ -146,3 +146,15 @@ DoD 검증 시나리오:
 ---
 
 본 PR 머지 후 `[[project-pr-order]]` 갱신 + PR #5 진입.
+
+## 부록 — LevelCurveDB cross-validation
+
+서버 `server/src/core/formulas/level.ts`의 `expToNext`와 클라이언트 `client/Content/Data/LevelCurveDB.csv`를 2026-05-25 기준으로 수동 비교했다. `LevelFormulas.cpp`는 같은 앵커를 UE Automation으로 검증한다.
+
+| Level | server (ExpToNext) | client (LevelFormulas CSV) | diff |
+| --- | ---: | ---: | ---: |
+| 1 | 150 | 150 | 0 |
+| 10 | 3,506 | 3,506 | 0 |
+| 50 | 43,656 | 43,656 | 0 |
+| 100 | 260,594 | 260,594 | 0 |
+| 200 | 832,291 | 832,291 | 0 |
