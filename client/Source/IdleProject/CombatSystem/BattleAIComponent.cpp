@@ -142,8 +142,8 @@ void UBattleAIComponent::MoveTowards(AActor* TargetActor, float DeltaSeconds)
 	}
 
 	// 몬스터(컨트롤러 없음 → AddMovementInput 불가)는 위치 보간으로 추격한다.
-	// 타깃 전체 3D 위치로 보간하면 플레이어 캡슐 중심(더 높은 Z)으로 끌려 올라가
-	// 충돌 이탈(depenetration)로 위로 사라지므로, 수평(X)만 추격하고 Z 는 중력/지면에 맡긴다.
+	// 타깃 전체 3D 위치로 보간하면 플레이어 캡슐 중심(더 높은 Z)으로 끌려 올라가므로,
+	// 수평(X)만 추격하고 Z·Y 는 몬스터 자신의 지면선 값을 유지한다 (몬스터는 GravityScale=0 으로 낙하 없음).
 	const FVector NextLocation = ComputeGroundChaseLocation(
 		Owner->GetActorLocation(), TargetActor->GetActorLocation(), DeltaSeconds, NonCharacterMoveSpeed);
 	Owner->SetActorLocation(NextLocation, true);

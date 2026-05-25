@@ -7,6 +7,7 @@
 #include "CharacterSystem/IdleAnimInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
@@ -307,29 +308,58 @@ void AIdleCharacter::HideAccessoryMaterialSlots()
 		return;
 	}
 
-	// 숨길 슬롯 키워드는 INI 로 조정 가능 (재컴파일 불필요). 기본값은 보수적으로 backpack,armgear
-	// — 얼굴(robo_face)·몸·실제 팔(arm_mat/arm_plastic) 을 실수로 지우지 않도록 한다.
-	FString HideKeywordsRaw;
-	if (GConfig)
+	// 숨김 키워드는 INI 로 조정 가능 (재컴파일 불필요).
+	auto ReadKeywords = [](const TCHAR* Key, const TCHAR* DefaultValue)
 	{
-		GConfig->GetString(IdleCharacterConfigSection, TEXT("HiddenMaterialSlotKeywords"), HideKeywordsRaw, GEngineIni);
-	}
-	if (HideKeywordsRaw.IsEmpty())
+		FString Raw;
+		if (GConfig)
+		{
+			GConfig->GetString(IdleCharacterConfigSection, Key, Raw, GEngineIni);
+		}
+		if (Raw.IsEmpty())
+		{
+			Raw = DefaultValue;
+		}
+		TArray<FString> Keywords;
+		Raw.ParseIntoArray(Keywords, TEXT(","), true);
+		return Keywords;
+	};
+
+	// 머티리얼 슬롯 키워드: 백팩 마운트(backpack_*) 와 로봇팔 케이싱(arm_mat/arm_plastic/armgear_plastic) 표면.
+	const TArray<FString> SlotKeywords = ReadKeywords(TEXT("HiddenMaterialSlotKeywords"), TEXT("backpack,arm"));
+	// 본(bone) 키워드: 로봇팔 골격 전체(robo_root_pole/robo_*_L/robo_wire_*/robo_arm). 본 단위로 접으면
+	// 전선·관절·글로우 등 머티리얼이 무엇이든 로봇팔 지오메트리가 완전히 사라진다. 인간 팔(upper_arm_L 등)은 'robo' 미포함이라 안전.
+	const TArray<FString> BoneKeywords = ReadKeywords(TEXT("HiddenBoneKeywords"), TEXT("robo"));
+
+	// 1) 본 단위 숨김 — 로봇팔 골격 전체 제거 (가장 확실).
+	if (USkeletalMesh* SkelMesh = CharacterMesh->GetSkeletalMeshAsset())
 	{
-		HideKeywordsRaw = TEXT("backpack,armgear");
+		const FReferenceSkeleton& RefSkeleton = SkelMesh->GetRefSkeleton();
+		for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); ++BoneIndex)
+		{
+			const FName BoneFName = RefSkeleton.GetBoneName(BoneIndex);
+			const FString BoneName = BoneFName.ToString();
+			for (const FString& Keyword : BoneKeywords)
+			{
+				const FString Trimmed = Keyword.TrimStartAndEnd();
+				if (!Trimmed.IsEmpty() && BoneName.Contains(Trimmed, ESearchCase::IgnoreCase))
+				{
+					CharacterMesh->HideBoneByName(BoneFName, PBO_None);
+					UE_LOG(LogTemp, Display, TEXT("[CharacterVisual] 본 숨김 %d (%s) — 키워드 '%s'"), BoneIndex, *BoneName, *Trimmed);
+					break;
+				}
+			}
+		}
 	}
 
-	TArray<FString> HideKeywords;
-	HideKeywordsRaw.ParseIntoArray(HideKeywords, TEXT(","), true);
-
-	// PIE 에서 실제 슬롯 구성을 확인해 키워드를 정밀 조정할 수 있도록 전체 슬롯명을 로그로 남긴다.
+	// 2) 머티리얼 슬롯 숨김 — 백팩 마운트 등 본 단위로 안 잡히는 표면 처리. 전체 슬롯명은 로그로 남겨 키워드 조정에 활용.
 	const TArray<FName> SlotNames = CharacterMesh->GetMaterialSlotNames();
 	for (int32 SlotIndex = 0; SlotIndex < SlotNames.Num(); ++SlotIndex)
 	{
 		const FString SlotName = SlotNames[SlotIndex].ToString();
 		UE_LOG(LogTemp, Display, TEXT("[CharacterVisual] 머티리얼 슬롯 %d = %s"), SlotIndex, *SlotName);
 
-		for (const FString& Keyword : HideKeywords)
+		for (const FString& Keyword : SlotKeywords)
 		{
 			const FString Trimmed = Keyword.TrimStartAndEnd();
 			if (!Trimmed.IsEmpty() && SlotName.Contains(Trimmed, ESearchCase::IgnoreCase))
