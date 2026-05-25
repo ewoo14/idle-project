@@ -61,12 +61,12 @@ void AIdleMonster::BeginPlay()
 
 	if (UMaterialInstanceDynamic* DynamicMaterial = PlaceholderMesh->CreateAndSetMaterialInstanceDynamic(0))
 	{
-		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.05f, 0.8f, 0.2f));
+		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), bIsBoss ? FLinearColor(0.9f, 0.15f, 0.05f) : FLinearColor(0.05f, 0.8f, 0.2f));
 	}
 
 	if (Combat)
 	{
-		Combat->InitializeCombat(50.0f, 8.0f, 5.0f, 1.0f);
+		Combat->InitializeCombat(GetConfiguredMaxHp(), GetConfiguredAttack(), bIsBoss ? 12.0f : 5.0f, bIsBoss ? 0.8f : 1.0f);
 		Combat->OnDeath.AddDynamic(this, &AIdleMonster::HandleDeath);
 	}
 
@@ -75,6 +75,25 @@ void AIdleMonster::BeginPlay()
 		BattleAI->TargetActorClass = AIdleCharacter::StaticClass();
 		BattleAI->StartBattle();
 	}
+}
+
+void AIdleMonster::SetBoss(bool bInBoss)
+{
+	bIsBoss = bInBoss;
+	if (PlaceholderMesh)
+	{
+		PlaceholderMesh->SetRelativeScale3D(bIsBoss ? FVector(1.35f, 1.35f, 1.35f) : FVector(0.75f, 0.75f, 0.75f));
+	}
+}
+
+float AIdleMonster::GetConfiguredMaxHp() const
+{
+	return bIsBoss ? BossMaxHp : NormalMaxHp;
+}
+
+float AIdleMonster::GetConfiguredAttack() const
+{
+	return bIsBoss ? BossAttack : NormalAttack;
 }
 
 void AIdleMonster::HandleDeath(AActor* DyingActor)
@@ -93,6 +112,10 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 		const int64 ExpReward = 12;
 		GameInstance->AddExp(ExpReward);
 		GameInstance->RecordMonsterKilled();
+		if (bIsBoss)
+		{
+			GameInstance->MarkChapter1BossDefeated();
+		}
 	}
 
 	FActorSpawnParameters SpawnParameters;

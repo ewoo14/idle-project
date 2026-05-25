@@ -134,11 +134,18 @@ export function deriveStats(
   primary: PrimaryStats,
   level: number,
   equipmentBonus: Partial<DerivedStats> = {},
+  rebirthBonusPoints = 0,
 ): DerivedStats {
   assertPositiveLevel(level);
+  assertRebirthBonusPoints(rebirthBonusPoints);
 
   return {
-    hp: roundWhole(primary.con * 10 + level * 20 + bonus(equipmentBonus.hp)),
+    hp: roundWhole(
+      primary.con * 10 +
+        level * 20 +
+        bonus(equipmentBonus.hp) +
+        rebirthBonusPoints * 10,
+    ),
     mp: roundWhole(
       primary.wis * 5 +
         primary.int * 2 +
@@ -146,7 +153,9 @@ export function deriveStats(
         5 +
         bonus(equipmentBonus.mp),
     ),
-    physAtk: roundWhole(primary.str * 2 + bonus(equipmentBonus.physAtk)),
+    physAtk: roundWhole(
+      primary.str * 2 + bonus(equipmentBonus.physAtk) + rebirthBonusPoints * 2,
+    ),
     magicAtk: roundWhole(
       primary.int * 2 + primary.wis * 0.5 + bonus(equipmentBonus.magicAtk),
     ),
@@ -186,6 +195,12 @@ export function deriveStats(
 function assertPositiveLevel(level: number) {
   if (!Number.isInteger(level) || level < 1) {
     throw new Error("level must be >= 1");
+  }
+}
+
+function assertRebirthBonusPoints(rebirthBonusPoints: number) {
+  if (!Number.isInteger(rebirthBonusPoints) || rebirthBonusPoints < 0) {
+    throw new Error("rebirthBonusPoints must be >= 0");
   }
 }
 

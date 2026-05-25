@@ -104,5 +104,5 @@ struct IDLEPROJECT_API FDerivedStats
 struct IDLEPROJECT_API FStatFormulas
 {
 	static FPrimaryStats DefaultPrimaryStats(EClassId ClassId, int32 Level);
-	static FDerivedStats DeriveStats(const FPrimaryStats& Primary, int32 Level, const FDerivedStats& EquipmentBonus = FDerivedStats());
+	static FDerivedStats DeriveStats(const FPrimaryStats& Primary, int32 Level, const FDerivedStats& EquipmentBonus = FDerivedStats(), int32 RebirthBonusPoints = 0);
 };

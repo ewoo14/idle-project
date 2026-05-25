@@ -43,13 +43,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void LevelUp();
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
+	bool CanRebirth() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rebirth")
+	bool Rebirth();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rebirth")
+	void MarkChapter1BossDefeated();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
+	bool HasDefeatedChapter1Boss() const { return bChapter1BossDefeated; }
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Offline")
 	FOfflineRewardResult ClaimOfflineRewards();
 
-	FOfflineRewardResult ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCount = 0);
+	FOfflineRewardResult ClaimOfflineRewardsAt(int64 NowUnixSec, int32 RebirthCountOverride = -1);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
-	FOfflineRewardResult PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCount = 0) const;
+	FOfflineRewardResult PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCountOverride = -1) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Offline")
 	void SetLastSeenUnixSec(int64 UnixSec);
@@ -65,6 +77,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int64 GetNextExp() const { return NextExp; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
+	int32 GetRebirthCount() const { return RebirthCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
+	int32 GetRebirthBonusPoints() const { return RebirthBonusPoints; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
 	int64 GetLastSeenUnixSec() const { return LastSeenUnixSec; }
@@ -119,6 +137,15 @@ private:
 
 	UPROPERTY()
 	int64 NextExp = 150;
+
+	UPROPERTY()
+	int32 RebirthCount = 0;
+
+	UPROPERTY()
+	int32 RebirthBonusPoints = 0;
+
+	UPROPERTY()
+	bool bChapter1BossDefeated = false;
 
 	UPROPERTY()
 	int64 LastSeenUnixSec = 0;

@@ -151,7 +151,9 @@ void AIdleCharacter::RefreshDerivedStats()
 {
 	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
 	const FDerivedStats EquipBonus = Inventory ? Inventory->ComputeEquipmentBonus() : FDerivedStats();
-	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus);
+	const UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	const int32 RebirthBonusPoints = IdleGameInstance ? IdleGameInstance->GetRebirthBonusPoints() : 0;
+	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus, RebirthBonusPoints);
 	if (Skills)
 	{
 		Skills->ApplyPassivesToStats(Derived);

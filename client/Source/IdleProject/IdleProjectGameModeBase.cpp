@@ -115,11 +115,11 @@ void AIdleProjectGameModeBase::SpawnInitialMonsters(AController* NewPlayer)
 		const int32 Rank = Index / 2;
 		const float DistanceX = 350.0f + 300.0f * static_cast<float>(Rank);
 		const FVector SpawnLocation(PlayerLocation.X + Side * DistanceX, PlayerLocation.Y, GroundAlignedZ);
-		SpawnMonsterAt(SpawnLocation);
+		SpawnMonsterAt(SpawnLocation, Index == InitialMonsterCount - 1);
 	}
 }
 
-AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocation)
+AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocation, bool bSpawnBoss)
 {
 	UWorld* World = GetWorld();
 	if (!World || !MonsterClass)
@@ -127,12 +127,20 @@ AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocat
 		return nullptr;
 	}
 
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	AIdleMonster* Monster = World->SpawnActor<AIdleMonster>(MonsterClass, SpawnLocation, FRotator::ZeroRotator, SpawnParameters);
-	if (Monster && Monster->GetCombat())
+	AIdleMonster* Monster = World->SpawnActorDeferred<AIdleMonster>(
+		MonsterClass,
+		FTransform(FRotator::ZeroRotator, SpawnLocation),
+		nullptr,
+		nullptr,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	if (Monster)
 	{
-		Monster->GetCombat()->OnDeath.AddDynamic(this, &AIdleProjectGameModeBase::ScheduleRespawn);
+		Monster->SetBoss(bSpawnBoss);
+		Monster->FinishSpawning(FTransform(FRotator::ZeroRotator, SpawnLocation));
+		if (Monster->GetCombat())
+		{
+			Monster->GetCombat()->OnDeath.AddDynamic(this, &AIdleProjectGameModeBase::ScheduleRespawn);
+		}
 	}
 	return Monster;
 }
@@ -146,9 +154,11 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 	}
 
 	const FVector RespawnLocation = DyingActor->GetActorLocation();
+	const AIdleMonster* DyingMonster = Cast<AIdleMonster>(DyingActor);
+	const bool bRespawnBoss = DyingMonster && DyingMonster->IsBoss();
 	FTimerHandle RespawnTimerHandle;
-	World->GetTimerManager().SetTimer(RespawnTimerHandle, FTimerDelegate::CreateWeakLambda(this, [this, RespawnLocation]()
+	World->GetTimerManager().SetTimer(RespawnTimerHandle, FTimerDelegate::CreateWeakLambda(this, [this, RespawnLocation, bRespawnBoss]()
 	{
-		SpawnMonsterAt(RespawnLocation);
+		SpawnMonsterAt(RespawnLocation, bRespawnBoss);
 	}), MonsterRespawnDelay, false);
 }

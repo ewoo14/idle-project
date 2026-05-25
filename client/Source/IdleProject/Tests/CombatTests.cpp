@@ -6,6 +6,7 @@
 #include "CombatSystem/SkillComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "CharacterSystem/IdleMonster.h"
 #include "UI/IdleHUD.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -315,5 +316,28 @@ bool FBattleAIAoeTargetGatheringTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("AoE gathering excludes owner"), AoeTargets.Contains(Owner));
 
 	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleMonsterBossConfigTest,
+	"IdleProject.Combat.Monster.BossConfig",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleMonsterBossConfigTest::RunTest(const FString& Parameters)
+{
+	AIdleMonster* Monster = NewObject<AIdleMonster>();
+	TestNotNull(TEXT("Monster is created"), Monster);
+	if (!Monster)
+	{
+		return false;
+	}
+
+	TestFalse(TEXT("Default monster is not boss"), Monster->IsBoss());
+	Monster->SetBoss(true);
+	TestTrue(TEXT("Boss flag is stored"), Monster->IsBoss());
+	TestTrue(TEXT("Boss max HP is stronger than normal monster HP"), Monster->GetConfiguredMaxHp() > 50.0f);
+	TestTrue(TEXT("Boss attack is stronger than normal monster attack"), Monster->GetConfiguredAttack() > 8.0f);
+
 	return true;
 }
