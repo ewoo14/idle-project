@@ -118,7 +118,12 @@ void UBattleAIComponent::MoveTowards(AActor* TargetActor, float DeltaSeconds)
 		return;
 	}
 
-	const FVector Direction = (TargetActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal2D();
+	// 횡스크롤 X-Z 평면 (Y축 plane normal) — GetSafeNormal2D() 는 X-Y 평면 정규화로
+	// Z 성분을 잘라버려 캐릭터가 Z 방향 추격을 못 한다. 3D 정규화 후 Y 성분만 0 처리.
+	FVector Direction = (TargetActor->GetActorLocation() - Owner->GetActorLocation()).GetSafeNormal();
+	Direction.Y = 0.0f;
+	Direction = Direction.GetSafeNormal();
+
 	if (AIdleCharacter* IdleCharacter = Cast<AIdleCharacter>(Owner))
 	{
 		IdleCharacter->AddMovementInput(Direction, 1.0f);

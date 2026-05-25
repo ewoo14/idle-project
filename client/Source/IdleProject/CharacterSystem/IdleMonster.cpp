@@ -5,10 +5,12 @@
 #include "Components/StaticMeshComponent.h"
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
+#include "GameCore/IdleGameInstance.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ItemSystem/EquipmentDrop.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/GoldDrop.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -75,6 +77,14 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	{
 		Destroy();
 		return;
+	}
+
+	// EXP 지급 — PR #1 §3.2.2 미러: monster level × 12 EXP (PR #9 단계 슬라임 = level 1).
+	// AIdleGameInstance::AddExp 가 누적 / 레벨업 / 델리게이트 broadcast 처리.
+	if (UIdleGameInstance* GameInstance = Cast<UIdleGameInstance>(UGameplayStatics::GetGameInstance(World)))
+	{
+		const int64 ExpReward = 12;
+		GameInstance->AddExp(ExpReward);
 	}
 
 	FActorSpawnParameters SpawnParameters;
