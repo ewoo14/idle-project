@@ -26,6 +26,9 @@ public:
 	void RegisterGuest(TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
+	bool RequestQuestList(const FString& CharacterId);
+	bool ReportQuestProgress(const FString& QuestId, const FString& CharacterId, int32 Amount);
+	bool ClaimQuestReward(const FString& QuestId, const FString& CharacterId);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetBaseUrl() const { return BaseUrl; }

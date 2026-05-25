@@ -92,6 +92,7 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	{
 		const int64 ExpReward = 12;
 		GameInstance->AddExp(ExpReward);
+		GameInstance->RecordMonsterKilled();
 	}
 
 	FActorSpawnParameters SpawnParameters;

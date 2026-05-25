@@ -111,6 +111,52 @@ bool UApiClient::ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 N
 	return Post(TEXT("/v1/offline/claim"), JsonBody);
 }
 
+bool UApiClient::RequestQuestList(const FString& CharacterId)
+{
+	if (CharacterId.IsEmpty())
+	{
+		return false;
+	}
+
+	const FString Path = FString::Printf(TEXT("/v1/quests?characterId=%s"), *CharacterId);
+	return Get(Path);
+}
+
+bool UApiClient::ReportQuestProgress(const FString& QuestId, const FString& CharacterId, int32 Amount)
+{
+	if (QuestId.IsEmpty() || CharacterId.IsEmpty() || Amount <= 0)
+	{
+		return false;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	JsonObject->SetNumberField(TEXT("amount"), Amount);
+
+	FString JsonBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+
+	return Post(FString::Printf(TEXT("/v1/quests/%s/progress"), *QuestId), JsonBody);
+}
+
+bool UApiClient::ClaimQuestReward(const FString& QuestId, const FString& CharacterId)
+{
+	if (QuestId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		return false;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+
+	FString JsonBody;
+	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+
+	return Post(FString::Printf(TEXT("/v1/quests/%s/claim"), *QuestId), JsonBody);
+}
+
 FString UApiClient::BuildUrl(const FString& Path) const
 {
 	if (Path.StartsWith(TEXT("http://")) || Path.StartsWith(TEXT("https://")))

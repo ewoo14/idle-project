@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "GameCore/OfflineRewardFormula.h"
+#include "GameCore/QuestService.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
@@ -26,6 +27,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UApiClient* GetApiClient() const { return ApiClient; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UQuestService* GetQuestService() const { return QuestService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -65,6 +69,25 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
 	int64 GetLastSeenUnixSec() const { return LastSeenUnixSec; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
+	void RecordQuestProgress(EQuestObjective Objective, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
+	void RecordMonsterKilled();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
+	void RecordGearEnhanced();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
+	FQuestClaimResult ClaimQuest(const FString& QuestId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Quest")
+	TArray<FQuestState> GetActiveQuestStates() const;
+
+	bool GetQuestState(const FString& QuestId, FQuestState& OutState) const;
+
+	void InitializeQuestServiceForTests(const FString& CurrentUtcDate);
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
 	FOnGoldChanged OnGoldChanged;
 
@@ -77,6 +100,9 @@ public:
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UQuestService> QuestService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
@@ -98,6 +124,7 @@ private:
 	int64 LastSeenUnixSec = 0;
 
 	static int64 GetCurrentUnixSeconds();
+	void EnsureQuestService();
 	void LoadLastSeenUnixSec();
 	void SaveLastSeenUnixSec() const;
 };
