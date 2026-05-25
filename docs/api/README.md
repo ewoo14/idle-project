@@ -6,10 +6,12 @@
 
 | 파일 | 내용 |
 | --- | --- |
+| `envelope.md` | 공통 응답 envelope, 시간/ID/필드명 직렬화 표준 |
 | `auth.md` | 인증 API (회원가입, 로그인, 토큰 갱신) |
 | `save.md` | 클라우드 세이브 API |
 | `character.md` | 캐릭터 / 환생 API |
 | `leaderboard.md` | 랭킹 API |
+| `errors.md` | 공통 에러 코드와 1.0 prefix 설계 |
 | `events.md` | WebSocket 이벤트 (1.0) |
 | `schema.md` | DB ERD + 테이블 |
 | `openapi.yaml` | OpenAPI 3.1 스펙 (자동 생성) |

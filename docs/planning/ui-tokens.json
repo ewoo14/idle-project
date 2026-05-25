@@ -16,6 +16,12 @@
       "blue":      "#6BB7F0",
       "red":       "#E5556B"
     },
+    "errors": {
+      "critical":  "#FF4D5E",
+      "warn":      "#F0A43A",
+      "info":      "#5BA7F0",
+      "auth":      "#C071F2"
+    },
     "rarity": {
       "common":    "#B0B5C0",
       "uncommon":  "#5BC07A",

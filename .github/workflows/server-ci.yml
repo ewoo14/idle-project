@@ -14,6 +14,29 @@ jobs:
   lint-build-test:
     name: lint / build / test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: idle
+          POSTGRES_PASSWORD: change_me_local_only
+          POSTGRES_DB: idle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U idle -d idle"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +76,16 @@ jobs:
       - name: Test
         if: steps.detect.outputs.scaffolded == 'true'
         working-directory: server
-        run: npm test --if-present
+        env:
+          DATABASE_URL: postgres://idle:change_me_local_only@localhost:5432/idle
+          REDIS_URL: redis://localhost:6379
+          JWT_PRIVATE_KEY_PATH: /tmp/jwt_private.pem
+          JWT_PUBLIC_KEY_PATH: /tmp/jwt_public.pem
+          JWT_KEY_ID: v1
+        run: |
+          openssl genrsa -out /tmp/jwt_private.pem 2048
+          openssl rsa -in /tmp/jwt_private.pem -pubout -out /tmp/jwt_public.pem
+          npm test --if-present
 
       - name: Skip notice (server 아직 스캐폴드 전)
         if: steps.detect.outputs.scaffolded == 'false'

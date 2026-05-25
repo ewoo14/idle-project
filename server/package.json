@@ -1,0 +1,50 @@
+{
+  "name": "@idle-project/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "db:migrate": "tsx src/scripts/migrate.ts up",
+    "db:rollback": "tsx src/scripts/migrate.ts down"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^13.0.0",
+    "@fastify/jwt": "^9.1.0",
+    "@fastify/rate-limit": "^10.2.2",
+    "bcrypt": "^5.1.1",
+    "drizzle-orm": "^0.44.2",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.6.1",
+    "nanoid": "^5.1.5",
+    "pg": "^8.16.0",
+    "pino": "^9.7.0",
+    "pino-pretty": "^13.0.0",
+    "zod": "^3.25.32"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.6",
+    "@testcontainers/postgresql": "^10.27.0",
+    "@testcontainers/redis": "^10.27.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
+    "@vitest/coverage-v8": "^1.6.1",
+    "drizzle-kit": "^0.31.1",
+    "testcontainers": "^10.27.0",
+    "tsx": "^4.19.4",
+    "typescript": "5.5.4",
+    "vitest": "^1.6.1"
+  }
+}
