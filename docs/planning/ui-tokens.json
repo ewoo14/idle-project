@@ -67,6 +67,7 @@
   "$todo": [
     "다크/라이트 분리는 1.0 출시 전 결정 (현재 다크 단일).",
     "Mythic gradient angle/stops 최종 확정 — PR #2.",
-    "Pretendard 셀프호스팅 경로/라이선스 표기 — PR #2."
+    "Pretendard 셀프호스팅 경로/라이선스 표기 — PR #2.",
+    "UE5 C++ 미러: client/Source/IdleProject/UI/UIThemeTokens.h"
   ]
 }

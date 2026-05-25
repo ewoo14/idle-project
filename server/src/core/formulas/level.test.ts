@@ -12,17 +12,17 @@ describe("level formulas", () => {
     expect(expToNext(10)).toBeCloseTo(3500, -2);
   });
 
-  it("100레벨 다음 레벨 필요 경험치는 약 261,000이다", () => {
-    expect(expToNext(100)).toBeCloseTo(261000, -3);
+  it("100레벨 다음 레벨 필요 경험치는 일반 수식 결과이다", () => {
+    expect(expToNext(100)).toBe(135594);
   });
 
   it("1 미만 레벨은 거절한다", () => {
     expect(() => expToNext(0)).toThrow("level must be >= 1");
   });
 
-  it("레벨 캡 이상은 다음 레벨 경험치를 Infinity로 반환한다", () => {
+  it("레벨 캡의 다음 레벨 필요 경험치는 Infinity이다", () => {
     expect(LEVEL_CAP).toBe(200);
-    expect(expToNext(200)).toBe(Infinity);
+    expect(expToNext(200)).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("누적 경험치는 레벨 1에서 해당 레벨까지 필요한 경험치 합산이다", () => {

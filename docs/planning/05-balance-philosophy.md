@@ -180,5 +180,7 @@ PR #2 백엔드 V1부터 서버에서 사용하는 공식의 단일 source of tr
 
 - `server/src/core/formulas/level.ts`: 레벨 경험치, 누적 경험치, 강화 성공률, 강화 자원 소비
 - `server/src/core/formulas/stats.ts`: 직업별 1차 능력치와 2차 능력치 파생 공식
+- `client/Source/IdleProject/CharacterSystem/LevelFormulas.h/cpp`: UE5 클라이언트 레벨 경험치/강화 성공률 미러
+- `client/Content/Data/LevelCurveDB.csv`: UE5 DataTable 임포트용 레벨 경험치 앵커 CSV
 
 기획 문서의 수식 또는 표를 조정할 때는 위 파일의 단위 테스트를 함께 갱신한다. M2 밸런스 시뮬레이터가 도착하면 `level.ts`의 경험치 곡선 보정항과 `stats.ts`의 직업별 성장 보너스를 시뮬레이션 결과에 맞춰 재보정한다.

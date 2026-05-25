@@ -63,3 +63,5 @@ curl http://localhost:3000/v1/characters/$CHARACTER_ID -H "authorization: Bearer
 ```
 
 없는 캐릭터 또는 타 사용자 캐릭터는 `404 NOT_FOUND`.
+
+PR #4~#10 단계: 클라이언트 UI 는 ClassDB 의 Mvp=1 (전사) 만 노출. 다직업 활성화는 PR #11.
