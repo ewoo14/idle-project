@@ -23,6 +23,7 @@
 #include "InputModifiers.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "Misc/ConfigCacheIni.h"
+#include "UI/IdleHUD.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -143,6 +144,7 @@ void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this, &AIdleCharacter::Move);
 	EnhancedInput->BindAction(AttackAction, ETriggerEvent::Started, this, &AIdleCharacter::Attack);
 	EnhancedInput->BindAction(MenuToggleAction, ETriggerEvent::Started, this, &AIdleCharacter::ToggleMenu);
+	EnhancedInput->BindAction(QuestLogToggleAction, ETriggerEvent::Started, this, &AIdleCharacter::ToggleQuestLog);
 }
 
 void AIdleCharacter::RefreshDerivedStats()
@@ -219,6 +221,9 @@ void AIdleCharacter::ConfigureInputActions()
 	MenuToggleAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_MenuToggle"));
 	MenuToggleAction->ValueType = EInputActionValueType::Boolean;
 
+	QuestLogToggleAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_QuestLogToggle"));
+	QuestLogToggleAction->ValueType = EInputActionValueType::Boolean;
+
 	DefaultMappingContext = CreateDefaultSubobject<UInputMappingContext>(TEXT("IMC_IdleDefault"));
 	DefaultMappingContext->MapKey(MoveAction, EKeys::D);
 	DefaultMappingContext->MapKey(MoveAction, EKeys::Right);
@@ -231,6 +236,7 @@ void AIdleCharacter::ConfigureInputActions()
 
 	DefaultMappingContext->MapKey(AttackAction, EKeys::SpaceBar);
 	DefaultMappingContext->MapKey(MenuToggleAction, EKeys::Escape);
+	DefaultMappingContext->MapKey(QuestLogToggleAction, EKeys::Q);
 }
 
 void AIdleCharacter::RegisterDefaultMappingContext()
@@ -441,5 +447,20 @@ void AIdleCharacter::ToggleMenu(const FInputActionValue& Value)
 	if (Value.Get<bool>())
 	{
 		UE_LOG(LogTemp, Display, TEXT("IdleCharacter MenuToggle input received."));
+	}
+}
+
+void AIdleCharacter::ToggleQuestLog(const FInputActionValue& Value)
+{
+	if (!Value.Get<bool>())
+	{
+		return;
+	}
+
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	AIdleHUD* IdleHUD = PlayerController ? Cast<AIdleHUD>(PlayerController->GetHUD()) : nullptr;
+	if (IdleHUD)
+	{
+		IdleHUD->ToggleQuestLog();
 	}
 }

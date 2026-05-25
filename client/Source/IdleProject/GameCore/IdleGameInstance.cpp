@@ -24,6 +24,7 @@ void UIdleGameInstance::Init()
 
 	ApiClient = NewObject<UApiClient>(this);
 	ApiClient->Initialize(ApiBaseUrl);
+	EnsureQuestService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	LoadLastSeenUnixSec();
 
@@ -40,6 +41,7 @@ void UIdleGameInstance::Shutdown()
 	LastSeenUnixSec = GetCurrentUnixSeconds();
 	SaveLastSeenUnixSec();
 	ApiClient = nullptr;
+	QuestService = nullptr;
 	Super::Shutdown();
 }
 
@@ -104,6 +106,7 @@ FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, 
 
 	AddGold(Reward.Gold);
 	AddExp(Reward.Exp);
+	RecordQuestProgress(EQuestObjective::ClaimOffline, 1);
 	LastSeenUnixSec = FMath::Max(LastSeenUnixSec, NowUnixSec);
 	return Reward;
 }
@@ -118,9 +121,82 @@ void UIdleGameInstance::SetLastSeenUnixSec(int64 UnixSec)
 	LastSeenUnixSec = FMath::Max<int64>(0, UnixSec);
 }
 
+void UIdleGameInstance::RecordQuestProgress(EQuestObjective Objective, int32 Amount)
+{
+	EnsureQuestService();
+	if (!QuestService)
+	{
+		return;
+	}
+
+	QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+	QuestService->RecordProgress(Objective, Amount);
+}
+
+void UIdleGameInstance::RecordMonsterKilled()
+{
+	RecordQuestProgress(EQuestObjective::KillMonster, 1);
+}
+
+void UIdleGameInstance::RecordGearEnhanced()
+{
+	RecordQuestProgress(EQuestObjective::Enhance, 1);
+}
+
+FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
+{
+	EnsureQuestService();
+	FQuestClaimResult Result;
+	if (!QuestService)
+	{
+		Result.Message = TEXT("quest_service_unavailable");
+		return Result;
+	}
+
+	QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+	Result = QuestService->ClaimQuest(QuestId);
+	if (!Result.bSuccess)
+	{
+		return Result;
+	}
+
+	AddGold(Result.RewardGold);
+	AddExp(Result.RewardExp);
+	if (ApiClient)
+	{
+		ApiClient->ClaimQuestReward(QuestId, FString());
+	}
+	return Result;
+}
+
+TArray<FQuestState> UIdleGameInstance::GetActiveQuestStates() const
+{
+	return QuestService ? QuestService->GetActiveQuestStates() : TArray<FQuestState>();
+}
+
+bool UIdleGameInstance::GetQuestState(const FString& QuestId, FQuestState& OutState) const
+{
+	return QuestService ? QuestService->GetQuestState(QuestId, OutState) : false;
+}
+
+void UIdleGameInstance::InitializeQuestServiceForTests(const FString& CurrentUtcDate)
+{
+	QuestService = NewObject<UQuestService>(this);
+	QuestService->InitializeDefaultQuests(CurrentUtcDate);
+}
+
 int64 UIdleGameInstance::GetCurrentUnixSeconds()
 {
 	return FDateTime::UtcNow().ToUnixTimestamp();
+}
+
+void UIdleGameInstance::EnsureQuestService()
+{
+	if (!QuestService)
+	{
+		QuestService = NewObject<UQuestService>(this);
+		QuestService->InitializeDefaultQuests(UQuestService::GetCurrentUtcDateString());
+	}
 }
 
 void UIdleGameInstance::LoadLastSeenUnixSec()

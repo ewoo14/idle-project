@@ -5,6 +5,7 @@
 ```mermaid
 erDiagram
   users ||--o{ characters : owns
+  users ||--o{ quest_progress : tracks
   characters ||--o{ saves : has
   characters ||--|| leaderboard_power : ranked_by_power
   characters ||--|| leaderboard_rebirth : ranked_by_rebirth
@@ -55,6 +56,16 @@ erDiagram
     int rebirth_count
     timestamptz updated_at
   }
+
+  quest_progress {
+    uuid user_id PK, FK
+    varchar quest_id PK
+    int progress
+    boolean completed
+    boolean claimed
+    date daily_reset_date
+    timestamptz updated_at
+  }
 ```
 
 ## 테이블
@@ -66,6 +77,7 @@ erDiagram
 | `saves` | `id`, `character_id`, `version`, `payload`, `server_validated`, `created_at` | `character_id` cascade FK, `saves_character_created(character_id, created_at desc)` |
 | `leaderboard_power` | `character_id`, `season_id`, `power_score`, `updated_at` | `leaderboard_power_season_score(season_id, power_score desc)` |
 | `leaderboard_rebirth` | `character_id`, `season_id`, `rebirth_count`, `updated_at` | `leaderboard_rebirth_season_count(season_id, rebirth_count desc)` |
+| `quest_progress` | `user_id`, `quest_id`, `progress`, `completed`, `claimed`, `daily_reset_date`, `updated_at` | PK(`user_id`, `quest_id`), `user_id` cascade FK, `quest_progress_user_completed_idx`, `quest_progress_daily_reset_idx` |
 
 마이그레이션 파일은 `server/migrations/0001_init.sql`, 롤백은 `server/migrations/0001_init.down.sql`이다.
 
