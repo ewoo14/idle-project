@@ -53,6 +53,18 @@ bool FStatFormulasDerivedTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("전사 레벨 1 PhysAtk"), DerivedLevel1.PhysAtk, 24.0f);
 	TestEqual(TEXT("Accuracy base includes 0.75"), DerivedLevel1.Accuracy, 0.762f);
 
+	const FDerivedStats Rebirth0 = FStatFormulas::DeriveStats(WarriorLevel1, 1, FDerivedStats(), 0);
+	TestEqual(TEXT("Rebirth 0 points keeps base HP"), Rebirth0.Hp, 120.0f);
+	TestEqual(TEXT("Rebirth 0 points keeps base PhysAtk"), Rebirth0.PhysAtk, 24.0f);
+
+	const FDerivedStats Rebirth5 = FStatFormulas::DeriveStats(WarriorLevel1, 1, FDerivedStats(), 5);
+	TestEqual(TEXT("Rebirth 5 points adds 50 HP"), Rebirth5.Hp, 170.0f);
+	TestEqual(TEXT("Rebirth 5 points adds 10 PhysAtk"), Rebirth5.PhysAtk, 34.0f);
+
+	const FDerivedStats Rebirth10 = FStatFormulas::DeriveStats(WarriorLevel1, 1, FDerivedStats(), 10);
+	TestEqual(TEXT("Rebirth 10 points adds 100 HP"), Rebirth10.Hp, 220.0f);
+	TestEqual(TEXT("Rebirth 10 points adds 20 PhysAtk"), Rebirth10.PhysAtk, 44.0f);
+
 	const FPrimaryStats WarriorLevel50 = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 50);
 	const FDerivedStats DerivedLevel50 = FStatFormulas::DeriveStats(WarriorLevel50, 50);
 	TestEqual(TEXT("전사 레벨 50 HP"), DerivedLevel50.Hp, 1884.0f);
