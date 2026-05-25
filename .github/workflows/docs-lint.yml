@@ -1,0 +1,30 @@
+name: docs-lint
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+      - ".github/workflows/docs-lint.yml"
+  push:
+    branches: [main]
+    paths:
+      - "**/*.md"
+
+jobs:
+  markdownlint:
+    name: markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install markdownlint-cli2
+        run: npm install -g markdownlint-cli2@0.13.0
+
+      - name: Run markdownlint
+        run: markdownlint-cli2 "**/*.md" "#node_modules" "#client" "#server/node_modules"
+        continue-on-error: true  # 초기 단계는 경고만; 마일스톤 M1 이후 strict 전환

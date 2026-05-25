@@ -1,0 +1,12 @@
+# 기본 오너 — 모든 경로
+*       @ewoo14
+
+# 파트별 명목 오너 (Codex/Claude 에이전트의 1차 책임 영역; 최종 승인은 PM)
+/client/                       @ewoo14
+/server/                       @ewoo14
+/infra/                        @ewoo14
+/docs/planning/                @ewoo14
+/docs/workflow/                @ewoo14
+/docs/api/                     @ewoo14
+/.github/                      @ewoo14
+/codex/                        @ewoo14

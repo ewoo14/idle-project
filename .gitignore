@@ -1,0 +1,73 @@
+# ===== Unreal Engine 5 =====
+client/Binaries/
+client/Build/
+client/DerivedDataCache/
+client/Intermediate/
+client/Saved/
+client/Plugins/*/Binaries/
+client/Plugins/*/Intermediate/
+client/*.VC.db
+client/*.opensdf
+client/*.opendb
+client/*.sdf
+client/*.suo
+client/.vs/
+client/*.xcodeproj/
+client/*.xcworkspace/
+
+# UE5 자동 생성 파일
+client/.idea/
+client/*.sln
+client/*.vcxproj*
+client/Makefile
+client/CMakeLists.txt
+client/*.code-workspace
+
+# 컴파일 결과
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.lib
+
+# ===== Node.js / TypeScript =====
+server/node_modules/
+server/dist/
+server/.env
+server/.env.local
+server/coverage/
+server/*.log
+server/.turbo/
+server/.next/
+server/.parcel-cache/
+
+# ===== Docker / 인프라 =====
+infra/.env
+infra/data/
+infra/volumes/
+infra/*.log
+
+# ===== IDE =====
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.idea/
+*.swp
+*~
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 시크릿 =====
+*.pem
+*.key
+*.p12
+.secrets/
+secrets.json
+
+# ===== Codex / Claude 로컬 =====
+.codex/sessions/
+.claude/local-cache/
