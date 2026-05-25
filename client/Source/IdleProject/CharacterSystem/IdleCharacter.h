@@ -1,0 +1,67 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Character.h"
+#include "InputActionValue.h"
+#include "IdleCharacter.generated.h"
+
+class UCameraComponent;
+class UInputAction;
+class UInputMappingContext;
+class USpringArmComponent;
+class UStaticMeshComponent;
+
+/**
+ * M1 클라이언트 코어 부트용 임시 플레이어 캐릭터입니다.
+ * 전사 1종을 기준으로 횡스크롤 이동, 공격 입력 로그, 메뉴 토글 입력만 제공합니다.
+ */
+UCLASS()
+class IDLEPROJECT_API AIdleCharacter : public ACharacter
+{
+	GENERATED_BODY()
+
+public:
+	AIdleCharacter();
+
+	virtual void BeginPlay() override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+protected:
+	/** 횡스크롤 카메라 거리와 충돌 처리를 담당합니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Camera")
+	TObjectPtr<USpringArmComponent> SpringArm;
+
+	/** 캐릭터를 바라보는 사이드뷰 카메라입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Camera")
+	TObjectPtr<UCameraComponent> SideViewCamera;
+
+	/** BP 아트가 붙기 전까지 사용하는 큐브 플레이스홀더 메시입니다. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Character")
+	TObjectPtr<UStaticMeshComponent> PlaceholderMesh;
+
+	/** 좌우 이동 입력 액션입니다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> MoveAction;
+
+	/** 기본 공격 입력 액션입니다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> AttackAction;
+
+	/** 메뉴 토글 입력 액션입니다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> MenuToggleAction;
+
+	/** 런타임에서 생성하는 EnhancedInput 기본 매핑입니다. */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputMappingContext> DefaultMappingContext;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Movement")
+	float MoveSpeed = 450.0f;
+
+private:
+	void ConfigureInputActions();
+	void RegisterDefaultMappingContext();
+	void Move(const FInputActionValue& Value);
+	void Attack(const FInputActionValue& Value);
+	void ToggleMenu(const FInputActionValue& Value);
+};
