@@ -5,23 +5,31 @@ float FCombatFormulas::ComputeDamage(float Atk, float Def)
 	return FMath::Max(Atk * 0.05f, Atk - Def * 0.6f);
 }
 
-float FCombatFormulas::ComputeDamage(float Atk, float Def, float CritRate, float CritDmg)
+float FCombatFormulas::ComputeMagicDamage(float MagicAtk, float MagicDef)
 {
-	const float BaseDamage = ComputeDamage(Atk, Def);
-	const float SafeCritRate = FMath::Clamp(CritRate, 0.0f, 1.0f);
-	const float SafeCritDmg = FMath::Max(1.0f, CritDmg);
-	return BaseDamage * (1.0f + SafeCritRate * (SafeCritDmg - 1.0f));
+	return ComputeDamage(MagicAtk, MagicDef);
+}
+
+bool FCombatFormulas::RollCrit(float CritRate, FRandomStream& RandomStream)
+{
+	return RandomStream.GetFraction() < FMath::Clamp(CritRate, 0.0f, 1.0f);
+}
+
+float FCombatFormulas::ApplyCrit(float BaseDamage, bool bIsCrit, float CritDmg)
+{
+	return bIsCrit ? BaseDamage * FMath::Max(1.0f, CritDmg) : BaseDamage;
 }
 
 float FCombatFormulas::ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float Def)
 {
-	const float AttackPower = ClassId == EClassId::Mage ? AttackerStats.MagicAtk : AttackerStats.PhysAtk;
-	if (ClassId != EClassId::Archer)
-	{
-		return ComputeDamage(AttackPower, Def);
-	}
+	return ComputeDamage(AttackerStats, ClassId, Def, Def);
+}
 
-	return ComputeDamage(AttackPower, Def, AttackerStats.CritRate, AttackerStats.CritDmg);
+float FCombatFormulas::ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float PhysDef, float MagicDef)
+{
+	return ClassId == EClassId::Mage
+		? ComputeMagicDamage(AttackerStats.MagicAtk, MagicDef)
+		: ComputeDamage(AttackerStats.PhysAtk, PhysDef);
 }
 
 float FCombatFormulas::ComputeAttackPower(const FDerivedStats& AttackerStats, EClassId ClassId)

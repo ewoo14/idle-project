@@ -5,3 +5,26 @@
 export function computeDamage(atk: number, def: number): number {
   return Math.max(atk * 0.05, atk - def * 0.6);
 }
+
+export function computeMagicDamage(magicAtk: number, magicDef: number): number {
+  return computeDamage(magicAtk, magicDef);
+}
+
+export function rollCrit(
+  critRate: number,
+  rng: () => number = Math.random,
+): boolean {
+  return rng() < clamp(critRate, 0, 1);
+}
+
+export function applyCrit(
+  baseDamage: number,
+  isCrit: boolean,
+  critDmg: number,
+): number {
+  return isCrit ? baseDamage * Math.max(1, critDmg) : baseDamage;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}

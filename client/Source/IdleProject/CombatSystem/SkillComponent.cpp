@@ -348,7 +348,15 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 		return;
 	}
 
-	TargetCombat->TakeDamage(FCombatFormulas::ComputeDamage(OwnerCombat->Atk * Skill.DamageCoeff, TargetCombat->Def, OwnerCombat->CritRate, OwnerCombat->CritDmg), GetOwner());
+	const bool bMagicDamage = Skill.ClassId == EClassId::Mage;
+	const float AttackPower = bMagicDamage ? OwnerCombat->MagicAtk : OwnerCombat->Atk;
+	const float Defense = bMagicDamage ? TargetCombat->MagicDef : TargetCombat->Def;
+	const float BaseDamage = bMagicDamage
+		? FCombatFormulas::ComputeMagicDamage(AttackPower * Skill.DamageCoeff, Defense)
+		: FCombatFormulas::ComputeDamage(AttackPower * Skill.DamageCoeff, Defense);
+	const float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, OwnerCombat->RollCrit(), OwnerCombat->CritDmg);
+
+	TargetCombat->TakeDamage(FinalDamage, GetOwner());
 	if (Skill.Type != ESkillType::Ultimate)
 	{
 		AddGauge(Skill.GaugeGainOnHit);

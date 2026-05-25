@@ -11,7 +11,6 @@
 #include "Components/StaticMeshComponent.h"
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
-#include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -174,11 +173,13 @@ void AIdleCharacter::RefreshDerivedStats()
 		const float HpRatio = Combat->MaxHp > 0.0f ? Combat->CurrentHp / Combat->MaxHp : 1.0f;
 		Combat->InitializeCombat(
 			Derived.Hp,
-			FCombatFormulas::ComputeAttackPower(Derived, DefaultClassId),
+			Derived.PhysAtk,
 			Derived.PhysDef,
 			Derived.AtkSpeed,
-			DefaultClassId == EClassId::Archer ? Derived.CritRate : 0.0f,
-			DefaultClassId == EClassId::Archer ? Derived.CritDmg : 1.5f);
+			Derived.MagicAtk,
+			Derived.MagicDef,
+			Derived.CritRate,
+			Derived.CritDmg);
 		Combat->CurrentHp = FMath::Clamp(Derived.Hp * HpRatio, 0.0f, Combat->MaxHp);
 		Combat->OnHpChanged.Broadcast(Combat->CurrentHp);
 	}

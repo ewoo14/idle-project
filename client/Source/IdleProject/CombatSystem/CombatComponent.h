@@ -29,6 +29,12 @@ public:
 	float Def = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
+	float MagicAtk = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
+	float MagicDef = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
 	float AtkSpeed = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Combat")
@@ -53,7 +59,10 @@ public:
 	bool IsDead() const;
 
 	void InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed, float InCritRate = 0.0f, float InCritDmg = 1.5f);
+	void InitializeCombat(float InMaxHp, float InAtk, float InDef, float InAtkSpeed, float InMagicAtk, float InMagicDef, float InCritRate, float InCritDmg);
+	bool RollCrit();
 
 private:
 	bool bDeathBroadcast = false;
+	FRandomStream CritRandomStream;
 };

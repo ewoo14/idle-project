@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeDamage } from "./combat.js";
+import {
+  applyCrit,
+  computeDamage,
+  computeMagicDamage,
+  rollCrit,
+} from "./combat.js";
 
 const clientServerDamageAnchors = [
   { atk: 100, def: 20, clientResult: 88 },
@@ -31,5 +36,21 @@ describe("combat formulas", () => {
     clientResult,
   }) => {
     expect(computeDamage(atk, def) - clientResult).toBe(0);
+  });
+
+  it("applies critical multiplier only when the roll crits", () => {
+    expect(applyCrit(34, false, 1.8)).toBe(34);
+    expect(applyCrit(34, true, 1.8)).toBe(61.2);
+  });
+
+  it("rolls deterministic critical boundaries", () => {
+    const rng = () => 0.5;
+
+    expect(rollCrit(0, rng)).toBe(false);
+    expect(rollCrit(1, rng)).toBe(true);
+  });
+
+  it("computes magic damage with the same curve using MagicAtk vs MagicDef", () => {
+    expect(computeMagicDamage(80, 20)).toBe(68);
   });
 });

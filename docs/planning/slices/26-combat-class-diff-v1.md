@@ -50,3 +50,10 @@
 
 ## 7. 후속
 - 속성 상성/상태이상, 방어 관통/회피·명중, 데미지 플로팅 텍스트, 직업별 콤보.
+
+## Codex character implementation note
+- Client formulas now use explicit `ComputeDamage(atk, def)`, `ComputeMagicDamage(magicAtk, magicDef)`, `RollCrit(critRate, FRandomStream&)`, and `ApplyCrit(baseDamage, isCrit, critDmg)`.
+- `UCombatComponent` stores `MagicAtk` and `MagicDef` while preserving the old 6-argument `InitializeCombat` overload for existing physical-only callers. The new 8-argument overload injects magic and crit stats together.
+- `AIdleCharacter` initializes combat from derived `PhysAtk`, `PhysDef`, `MagicAtk`, `MagicDef`, `CritRate`, and `CritDmg`; monsters mirror physical defense into `MagicDef` for V1.
+- Basic attacks remain physical and roll crit. Mage skills use `MagicAtk` vs target `MagicDef`; non-mage damage skills use `Atk` vs `Def`; both apply rolled crit.
+- Server `combat.ts` mirrors the same helpers and has Vitest anchors for crit and magic damage parity.

@@ -7,7 +7,10 @@
 struct IDLEPROJECT_API FCombatFormulas
 {
 	static float ComputeDamage(float Atk, float Def);
-	static float ComputeDamage(float Atk, float Def, float CritRate, float CritDmg);
+	static float ComputeMagicDamage(float MagicAtk, float MagicDef);
+	static bool RollCrit(float CritRate, FRandomStream& RandomStream);
+	static float ApplyCrit(float BaseDamage, bool bIsCrit, float CritDmg);
 	static float ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float Def);
+	static float ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float PhysDef, float MagicDef);
 	static float ComputeAttackPower(const FDerivedStats& AttackerStats, EClassId ClassId);
 };
