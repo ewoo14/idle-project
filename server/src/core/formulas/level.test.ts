@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  LEVEL_CAP,
   cumulativeExp,
   enhanceResourceCost,
   enhanceSuccessRate,
   expToNext,
+  LEVEL_CAP,
 } from "./level.js";
 
 describe("level formulas", () => {

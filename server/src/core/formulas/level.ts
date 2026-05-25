@@ -15,9 +15,7 @@ export function expToNext(level: number): number {
   if (level >= LEVEL_CAP) {
     return Infinity;
   }
-  return Math.round(
-    25 * Math.pow(level, 2) + 100 * level + (level * (level - 10)) / 9,
-  );
+  return Math.round(25 * level ** 2 + 100 * level + (level * (level - 10)) / 9);
 }
 
 /**
@@ -26,7 +24,11 @@ export function expToNext(level: number): number {
 export function cumulativeExp(level: number): number {
   assertLevel(level);
   let total = 0;
-  for (let currentLevel = 1; currentLevel < Math.min(level, LEVEL_CAP); currentLevel += 1) {
+  for (
+    let currentLevel = 1;
+    currentLevel < Math.min(level, LEVEL_CAP);
+    currentLevel += 1
+  ) {
     total += expToNext(currentLevel);
   }
   return total;
@@ -51,9 +53,7 @@ export function enhanceSuccessRate(currentStage: number): number {
 /**
  * 강화 시도당 자원 소비. docs/planning/05-balance-philosophy.md §2.3 표와 1:1로 맞춘다.
  */
-export function enhanceResourceCost(
-  currentStage: number,
-): EnhanceResourceCost {
+export function enhanceResourceCost(currentStage: number): EnhanceResourceCost {
   assertEnhanceStage(currentStage);
   if (currentStage <= 5) {
     return {

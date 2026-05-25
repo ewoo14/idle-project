@@ -50,12 +50,13 @@ describe("stats formulas", () => {
   it("장비 보너스를 2차 능력치에 더한다", () => {
     const primary = defaultPrimaryStats(1, 1);
 
-    expect(deriveStats(primary, 1, { hp: 50, physAtk: 10, critRate: 0.1 }))
-      .toMatchObject({
-        hp: 170,
-        physAtk: 34,
-        critRate: 0.108,
-      });
+    expect(
+      deriveStats(primary, 1, { hp: 50, physAtk: 10, critRate: 0.1 }),
+    ).toMatchObject({
+      hp: 170,
+      physAtk: 34,
+      critRate: 0.108,
+    });
   });
 
   it("확률형 2차 능력치는 상한 1.0을 넘지 않는다", () => {
@@ -68,12 +69,13 @@ describe("stats formulas", () => {
       luk: 1000,
     };
 
-    expect(deriveStats(primary, 1, { critRate: 1, dodge: 1, accuracy: 1 }))
-      .toMatchObject({
-        critRate: 1,
-        dodge: 1,
-        accuracy: 1,
-      });
+    expect(
+      deriveStats(primary, 1, { critRate: 1, dodge: 1, accuracy: 1 }),
+    ).toMatchObject({
+      critRate: 1,
+      dodge: 1,
+      accuracy: 1,
+    });
   });
 
   it("같은 입력은 항상 같은 결과를 반환한다", () => {
