@@ -10,17 +10,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FLevelFormulasExpTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("LEVEL_CAP"), FLevelFormulas::LEVEL_CAP, 200);
-	TestEqual(TEXT("ExpToNext(1)"), FLevelFormulas::ExpToNext(1), 150);
-	TestEqual(TEXT("ExpToNext(10)"), FLevelFormulas::ExpToNext(10), 3506);
-	TestEqual(TEXT("ExpToNext(100)"), FLevelFormulas::ExpToNext(100), 135594);
-	TestEqual(TEXT("ExpToNext(200) cap sentinel"), FLevelFormulas::ExpToNext(200), 0);
+	TestEqual(TEXT("LEVEL_CAP"), FLevelFormulas::LEVEL_CAP, static_cast<int32>(200));
+	TestEqual(TEXT("ExpToNext(1)"), FLevelFormulas::ExpToNext(1), static_cast<int64>(150));
+	TestEqual(TEXT("ExpToNext(10)"), FLevelFormulas::ExpToNext(10), static_cast<int64>(3506));
+	TestEqual(TEXT("ExpToNext(100)"), FLevelFormulas::ExpToNext(100), static_cast<int64>(135594));
+	TestEqual(TEXT("ExpToNext(200) cap sentinel"), FLevelFormulas::ExpToNext(200), static_cast<int64>(0));
 
 	const int64 ExpectedLevel4Total =
 		FLevelFormulas::ExpToNext(1) +
 		FLevelFormulas::ExpToNext(2) +
 		FLevelFormulas::ExpToNext(3);
-	TestEqual(TEXT("CumulativeExp(1)"), FLevelFormulas::CumulativeExp(1), 0);
+	TestEqual(TEXT("CumulativeExp(1)"), FLevelFormulas::CumulativeExp(1), static_cast<int64>(0));
 	TestEqual(TEXT("CumulativeExp(4)"), FLevelFormulas::CumulativeExp(4), ExpectedLevel4Total);
 
 	return true;

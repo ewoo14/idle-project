@@ -11,22 +11,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FStatFormulasDefaultPrimaryTest::RunTest(const FString& Parameters)
 {
 	const FPrimaryStats WarriorLevel1 = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1);
-	TestEqual(TEXT("전사 레벨 1 STR"), WarriorLevel1.Str, 12);
-	TestEqual(TEXT("전사 레벨 1 DEX"), WarriorLevel1.Dex, 6);
-	TestEqual(TEXT("전사 레벨 1 INT"), WarriorLevel1.Int_, 3);
-	TestEqual(TEXT("전사 레벨 1 WIS"), WarriorLevel1.Wis, 3);
-	TestEqual(TEXT("전사 레벨 1 CON"), WarriorLevel1.Con, 10);
-	TestEqual(TEXT("전사 레벨 1 LUK"), WarriorLevel1.Luk, 4);
+	TestEqual(TEXT("전사 레벨 1 STR"), WarriorLevel1.Str, 12.0f);
+	TestEqual(TEXT("전사 레벨 1 DEX"), WarriorLevel1.Dex, 6.0f);
+	TestEqual(TEXT("전사 레벨 1 INT"), WarriorLevel1.Int_, 3.0f);
+	TestEqual(TEXT("전사 레벨 1 WIS"), WarriorLevel1.Wis, 3.0f);
+	TestEqual(TEXT("전사 레벨 1 CON"), WarriorLevel1.Con, 10.0f);
+	TestEqual(TEXT("전사 레벨 1 LUK"), WarriorLevel1.Luk, 4.0f);
 
 	const FPrimaryStats MageLevel1 = FStatFormulas::DefaultPrimaryStats(EClassId::Mage, 1);
-	TestEqual(TEXT("마법사 레벨 1 INT"), MageLevel1.Int_, 12);
-	TestEqual(TEXT("마법사 레벨 1 WIS"), MageLevel1.Wis, 10);
-	TestEqual(TEXT("마법사 레벨 1 STR"), MageLevel1.Str, 3);
+	TestEqual(TEXT("마법사 레벨 1 INT"), MageLevel1.Int_, 12.0f);
+	TestEqual(TEXT("마법사 레벨 1 WIS"), MageLevel1.Wis, 10.0f);
+	TestEqual(TEXT("마법사 레벨 1 STR"), MageLevel1.Str, 3.0f);
 
 	const FPrimaryStats ArcherLevel1 = FStatFormulas::DefaultPrimaryStats(EClassId::Archer, 1);
-	TestEqual(TEXT("궁수 레벨 1 DEX"), ArcherLevel1.Dex, 12);
-	TestEqual(TEXT("궁수 레벨 1 LUK"), ArcherLevel1.Luk, 10);
-	TestEqual(TEXT("궁수 레벨 1 CON"), ArcherLevel1.Con, 6);
+	TestEqual(TEXT("궁수 레벨 1 DEX"), ArcherLevel1.Dex, 12.0f);
+	TestEqual(TEXT("궁수 레벨 1 LUK"), ArcherLevel1.Luk, 10.0f);
+	TestEqual(TEXT("궁수 레벨 1 CON"), ArcherLevel1.Con, 6.0f);
 
 	const FPrimaryStats WarriorLevel50 = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 50);
 	TestEqual(TEXT("전사 레벨 50 STR"), WarriorLevel50.Str, 105.1f);
