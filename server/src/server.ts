@@ -26,7 +26,7 @@ export async function buildServer(opts: { redis: Redis }) {
 
   await app.register(authRoutes, { prefix: "/v1/auth", redis: opts.redis });
   await app.register(characterRoutes, { prefix: "/v1/characters" });
-  await app.register(saveRoutes, { prefix: "/v1/save" });
+  await app.register(saveRoutes, { prefix: "/v1/save", redis: opts.redis });
   await app.register(leaderboardRoutes, {
     prefix: "/v1/leaderboard",
     redis: opts.redis,

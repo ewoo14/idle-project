@@ -23,7 +23,8 @@ export const putSaveSchema = {
         properties: {
           level: { type: "integer", minimum: 1, maximum: 200 },
           rebirthCount: { type: "integer", minimum: 0 },
-          maxEquipmentGrade: { type: "integer", minimum: 0, maximum: 10 },
+          maxEquipmentGrade: { type: "integer", minimum: 0, maximum: 5 },
+          totalExp: { type: "number", minimum: 0 },
         },
       },
     },

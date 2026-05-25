@@ -1,12 +1,23 @@
 import type { FastifyInstance } from "fastify";
+import type { Redis } from "ioredis";
 import { pool } from "../../core/db.js";
+import { logger } from "../../core/logger.js";
 import { rateLimitPolicies } from "../../plugins/rate-limit.js";
+import {
+  LeaderboardCacheRedis,
+  LeaderboardRepoPg,
+} from "../leaderboard/leaderboard.repo.js";
+import { LeaderboardService } from "../leaderboard/leaderboard.service.js";
 import { SaveRepoPg } from "./save.repo.js";
 import { getSaveSchema, historySchema, putSaveSchema } from "./save.schema.js";
 import { type SavePayload, SaveService } from "./save.service.js";
 
-export async function saveRoutes(app: FastifyInstance) {
-  const service = new SaveService(new SaveRepoPg(pool));
+export async function saveRoutes(app: FastifyInstance, opts: { redis: Redis }) {
+  const leaderboard = new LeaderboardService(
+    new LeaderboardRepoPg(pool),
+    new LeaderboardCacheRedis(opts.redis),
+  );
+  const service = new SaveService(new SaveRepoPg(pool), leaderboard, logger);
 
   app.get(
     "/",
