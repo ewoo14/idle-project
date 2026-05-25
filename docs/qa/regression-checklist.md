@@ -20,6 +20,11 @@
 - [ ] 캐릭터 등장 + 입력 처리 (좌/우/공격/메뉴)
 - [ ] StatFormulas / LevelFormulas 결과 출력
 - [ ] UE Automation 모든 테스트 통과
+- [ ] 자동 전투 — 캐릭터가 몬스터 자동 추격/공격
+- [ ] 골드 드롭 + 자동 흡수
+- [ ] 몬스터 respawn (5초 후)
+- [ ] HUD HP/EXP/Gold 실시간 갱신
+- [ ] NetworkClient guest register 호출 + 서버 미기동 graceful
 
 ## 2. 서버 (Node.js) — PR #7 이후 채움
 
