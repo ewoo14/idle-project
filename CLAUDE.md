@@ -7,7 +7,7 @@
 ## 프로젝트
 
 - **이름**: idle-project (메이플스토리 키우기 풍 방치형 RPG)
-- **엔진**: Unreal Engine 5.4
+- **엔진**: Unreal Engine 5.7.4
 - **서버**: Node.js 22 + Fastify 5 + Drizzle + PostgreSQL 16 + Redis 7 (Docker Compose)
 - **저장소**: https://github.com/ewoo14/idle-project.git
 

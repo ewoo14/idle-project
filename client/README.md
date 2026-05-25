@@ -1,6 +1,6 @@
 # client/ — Unreal Engine 5 클라이언트
 
-> 본 디렉터리는 **PR #2 (M1 클라이언트 코어 부트)** 시점에 UE5 5.4 프로젝트로 스캐폴드됩니다. 현재는 자리만 잡고 있습니다.
+> 본 디렉터리는 **PR #2 (M1 클라이언트 코어 부트)** 시점에 UE5 5.7.4 프로젝트로 스캐폴드됩니다. 현재는 자리만 잡고 있습니다.
 
 ## 예정 구조
 
@@ -32,11 +32,11 @@ client/
 
 ```powershell
 # Editor
-"C:\Program Files\Epic Games\UE_5.4\Engine\Binaries\Win64\UnrealEditor.exe" `
+"C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor.exe" `
   "C:\game\idle game\repo\client\IdleProject.uproject"
 
 # 패키지
-"C:\Program Files\Epic Games\UE_5.4\Engine\Build\BatchFiles\RunUAT.bat" `
+"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\RunUAT.bat" `
   BuildCookRun -project="C:\game\idle game\repo\client\IdleProject.uproject" `
   -platform=Win64 -clientconfig=Development -build -cook -stage -package
 ```

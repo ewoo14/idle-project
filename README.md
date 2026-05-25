@@ -9,7 +9,7 @@
 | 항목 | 내용 |
 | --- | --- |
 | 장르 | 횡스크롤 방치형 RPG (자동 전투 + 캐릭터 육성 + 오프라인 보상) |
-| 엔진 | Unreal Engine 5.4 (Paper2D + Niagara) |
+| 엔진 | Unreal Engine **5.7.4** (Paper2D + Niagara) |
 | 클라이언트 타깃 | 1차 Windows (Steam 출시 목표), 추후 macOS / 모바일 |
 | 서버 | Node.js 22 (TypeScript) + Fastify · PostgreSQL 16 · Redis 7 |
 | 인프라 | Docker Compose (개발) → Docker 호스트 또는 클라우드 (운영) |
@@ -58,7 +58,7 @@ docker compose up -d
 ```
 
 ### 3. UE5 클라이언트 (클라이언트 PR 머지 후)
-- `client/IdleProject.uproject` 더블 클릭 → UE5 5.4 에디터로 열림.
+- `client/IdleProject.uproject` 더블 클릭 → UE5 5.7.4 에디터로 열림.
 
 ---
 
