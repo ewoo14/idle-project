@@ -4,6 +4,7 @@
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "UI/IdleHUD.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatFormulasTest,
@@ -169,6 +170,36 @@ bool FSkillUltimateBuffTest::RunTest(const FString& Parameters)
 
 	Skills->TickSkills(35.0f, Target, AoeTargets);
 	TestEqual(TEXT("Ultimate attack speed buff expires"), OwnerCombat->AtkSpeed, 1.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillHudDisplayModelTest,
+	"IdleProject.UI.HUD.SkillDisplayModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	constexpr float CastTime = 10.0f;
+	constexpr float Now = 12.0f;
+	Skills->MarkSkillCast(TEXT("heavy_strike"), CastTime);
+	Skills->AddGauge(100.0f);
+
+	const TArray<FIdleHUDSkillSlotViewModel> Slots = IdleProject::UI::BuildSkillSlotViewModels(*Skills, Now);
+
+	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 4);
+	TestEqual(TEXT("First active skill keeps display name"), Slots[0].DisplayName.ToString(), FString(TEXT("Heavy Strike")));
+	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, 0.5f);
+	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, 2.0f);
+	TestFalse(TEXT("Cooling skill is not ready"), Slots[0].bReady);
+
+	const FIdleHUDUltimateViewModel Ultimate = IdleProject::UI::BuildUltimateViewModel(*Skills);
+	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
+	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
 
 	return true;
 }

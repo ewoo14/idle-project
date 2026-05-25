@@ -79,6 +79,8 @@
 | `--rarity-legendary` | `#F0A040` |  |
 | `--rarity-mythic` | gradient(`#FF7B00 → #00B4FF`) |  |
 
+Skill HUD V1은 `--bg-panel` 위에 `--accent-blue`로 쿨다운 진행도를, `--accent-gold`로 READY 상태와 궁극기 준비 상태를 표시한다. 하단 중앙 4슬롯 + 상단 궁극기 게이지 구조로 배치하고 1080p/1440p/4K에서 캔버스 높이 기준으로 크기를 스케일해 기존 HP/EXP/Gold/장비 HUD와 겹치지 않게 유지한다.
+
 ### 3.3 타이포
 
 | 용도 | 폰트 | 비고 |
