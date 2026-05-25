@@ -60,12 +60,28 @@ struct IDLEPROJECT_API FIdleHUDQuestLogViewModel
 	TArray<FIdleHUDQuestLogRowViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDRebirthViewModel
+{
+	FText Title;
+	FText StatusLabel;
+	FText BossLabel;
+	FText LevelLabel;
+	FText CountLabel;
+	FText BonusLabel;
+	FText NextBonusLabel;
+	FText ButtonLabel;
+	bool bCanRebirth = false;
+	bool bBossDefeated = false;
+	bool bLevelReady = false;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
+IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -112,6 +128,9 @@ private:
 	void DrawOfflineRewardModal();
 	void DrawQuestLog();
 	void ClaimQuestFromHitBox(FName BoxName);
+	void DrawRebirthPanel();
+	void TryRebirth();
+	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UIdleGameInstance> IdleGameInstance;
