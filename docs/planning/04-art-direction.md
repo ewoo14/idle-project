@@ -6,34 +6,51 @@
 
 ## 1. 비주얼 컨셉
 
-### 1.1 한 줄
-> *"메이플 스타일의 친근한 도트 풍 + UE5 다이내믹 라이팅이 더해진 환상적인 횡스크롤"*
+### 1.1 한 줄 (2026-05-25 갱신, PR #11)
+> *"3D 스타일라이즈드 애니메 풍 사이드뷰 — 셀쉐이딩 + 표정 풍부한 미소년/미소녀 + 게임감 있는 카메라"*
+
+> **변경 이력**: PR #1 의 도트 풍 원안 → 사용자 명시 (2026-05-25) 로 3D 애니메 풍 전환 (PR #11). 도트 사이즈 / 8-12 프레임 / 트위닝 금지 등 도트 표준은 **모두 폐기**. 셀쉐이딩 3D + Mixamo 풍부한 애니메이션 + ARKit blend shape 표정 채택.
 
 ### 1.2 키워드
-- **친근함** — 둥글둥글한 캐릭터, 따뜻한 라인
-- **명료함** — 작은 사이즈에서도 실루엣이 식별
-- **환상적** — Niagara 파티클, 빛/먼지/마법 잔상으로 매 사냥이 화려
-- **장인 정신** — 손으로 찍은 듯한 도트 + 미세한 애님
+- **친근함** — 일본 애니메 풍 둥근 얼굴 + 큰 눈
+- **표정** — Idle / Battle / Smile / Hit / Death / LevelUp 등 상황별 자연 표정
+- **환상적** — Niagara 파티클, 동적 라이팅으로 매 사냥이 화려
+- **셀쉐이딩** — 외곽선 강조 + 평면 그림자 (Toon shading)
 
 ### 1.3 참고
-- 메이플스토리, 옥토패스 트래블러, Eastward, Sea of Stars, AFK Arena (UI 정돈)
+- VRoid Studio 의 표준 미소년/미소녀, 원신 (Genshin Impact), 블루 아카이브, AFK Arena (UI 정돈), Octopath Traveler (사이드뷰 카메라)
 
 ---
 
 ## 2. 캐릭터 / 몬스터
 
-### 2.1 비율
-- 헤드 : 바디 = **1 : 1.3 ~ 1 : 1.5** (살짝 SD 풍)
-- 픽셀 사이즈: 캐릭터 약 **64 × 96 px** (스케일 4x 렌더)
+### 2.1 비율 (3D 갱신)
+- **8헤드 (1:7~8)** — VRoid 표준
+- 사이즈: SK Mesh 약 **180 cm (UE unit 180)** — 표준 키
+- (구) 픽셀 64×96 px 폐기
 
 ### 2.2 컬러
-- 메인 캐릭터는 **3색 팔레트** 로 인식성 확보 (예: 전사 = 빨강/회색/금)
+- 메인 캐릭터는 **3색 팔레트** 로 인식성 확보 (헤어 / 의상 / 액세서리)
+- 셀쉐이딩 외곽선 — 어두운 색 (#1A1B2E 또는 #000)
 - 몬스터는 직업 컬러와 보색 우선
 
-### 2.3 애니메이션
-- 8 프레임 기본, 강조 동작은 12 프레임
-- 액션: Idle, Walk, Attack(1~3), Skill(1~3), Hit, Dead, Levelup
-- 트위닝 금지 — 도트 원칙 유지
+### 2.3 애니메이션 (3D 갱신)
+- **Skeletal Mesh + AnimBlueprint State Machine**
+- 자산 출처: **Mixamo 무료** (Idle / Walking / Sword Slash / Hit React / Death) + 추후 자체 제작
+- 트랜지션: blend 시간 0.15~0.3s (자연 보간)
+- (구) 8-12 프레임 도트 표준 폐기
+
+### 2.4 표정 시스템 (3D 신규)
+- **Blend Shapes (Morph Targets)** — VRoid 의 ARKit 호환 표정 (`Joy`, `Angry`, `Sorrow`, `Fun`, `Surprised`, `Neutral`)
+- `EFacialExpression` enum: None / Idle / Battle / Smile / Hit / Death / LevelUp
+- `UFacialExpressionComponent::SetExpression(EFacialExpression, Duration)` API
+- 자동 트리거:
+  - 전투 시작 → Battle (Angry)
+  - 슬라임 사망 → Smile (Joy, 1초)
+  - 피격 → Hit (Sorrow, 0.5초)
+  - 사망 → Death (Sorrow + 영구)
+  - 레벨업 → LevelUp (Surprised + Joy, 1.5초)
+  - 평상시 → Idle (Neutral)
 
 ---
 

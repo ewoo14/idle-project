@@ -71,3 +71,11 @@ secrets.json
 # ===== Codex / Claude 로컬 =====
 .codex/sessions/
 .claude/local-cache/
+
+# VRM4U plugin — 사용자 환경 전용 (binary, ~68MB).
+# 설치: git clone 후 다음 실행
+#   curl -fLsS -o /tmp/vrm.zip https://github.com/ruyo/VRM4U/releases/download/20260513/VRM4U_5_7_20260513.zip
+#   unzip -q /tmp/vrm.zip -d client/  # 안에 Plugins/VRM4U/ 구조
+# 또는 직접 https://github.com/ruyo/VRM4U/releases 에서 VRM4U_5_7_*.zip 다운로드 후
+# client/Plugins/VRM4U/ 에 압축 해제
+client/Plugins/VRM4U/
