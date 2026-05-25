@@ -91,6 +91,56 @@ bool FSeasonServiceTierClaimTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSeasonServiceDefinitionParityTest,
+	"IdleProject.GameCore.SeasonService.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSeasonServiceDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	USeasonService* Season = NewObject<USeasonService>();
+	Season->InitializeDefaultSeason();
+
+	const TArray<FSeasonTierDefinition>& Tiers = Season->GetSeasonTiers();
+	TestEqual(TEXT("Season id mirrors server currentSeasonId"), Season->GetSeasonId(), 1);
+	TestEqual(TEXT("Season free track has 10 tiers"), Tiers.Num(), 10);
+
+	struct FExpectedTier
+	{
+		int32 Tier;
+		int32 RequiredTokens;
+		ESeasonRewardType RewardType;
+		int64 RewardAmount;
+	};
+
+	const FExpectedTier ExpectedTiers[] = {
+		{1, 10, ESeasonRewardType::Gold, 500},
+		{2, 25, ESeasonRewardType::Gold, 1000},
+		{3, 45, ESeasonRewardType::Exp, 300},
+		{4, 70, ESeasonRewardType::Gold, 1800},
+		{5, 100, ESeasonRewardType::Exp, 650},
+		{6, 135, ESeasonRewardType::Gold, 3000},
+		{7, 175, ESeasonRewardType::Exp, 1100},
+		{8, 220, ESeasonRewardType::Gold, 4800},
+		{9, 270, ESeasonRewardType::Exp, 1750},
+		{10, 325, ESeasonRewardType::Gold, 7500},
+	};
+
+	const int32 ExpectedTierCount = UE_ARRAY_COUNT(ExpectedTiers);
+	for (int32 Index = 0; Index < Tiers.Num() && Index < ExpectedTierCount; ++Index)
+	{
+		const FString Prefix = FString::Printf(TEXT("Tier %d mirrors server season.ts"), Index + 1);
+		TestEqual(*(Prefix + TEXT(" tier")), Tiers[Index].Tier, ExpectedTiers[Index].Tier);
+		TestEqual(*(Prefix + TEXT(" required tokens")), Tiers[Index].RequiredTokens, ExpectedTiers[Index].RequiredTokens);
+		TestEqual(*(Prefix + TEXT(" reward type")), Tiers[Index].RewardType, ExpectedTiers[Index].RewardType);
+		TestEqual(*(Prefix + TEXT(" reward amount")), Tiers[Index].RewardAmount, ExpectedTiers[Index].RewardAmount);
+	}
+
+	TestEqual(TEXT("Quest claim token reward mirrors V1 contract"), USeasonService::QuestClaimSeasonTokenReward, 10);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleGameInstancePetSeasonHooksTest,
 	"IdleProject.GameCore.IdleGameInstance.PetSeasonHooks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

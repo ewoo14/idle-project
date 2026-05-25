@@ -125,7 +125,7 @@ PR #22 adds `server/src/core/data/pets.ts` as the server-authoritative V1 pet mi
 | Pet | Bonus |
 | --- | --- |
 | `dog` | `gold +20%` |
-| `cat` | `drop +15%` |
+| `bird` | `drop +15%` |
 
 ## Season Pass Mirror
 
