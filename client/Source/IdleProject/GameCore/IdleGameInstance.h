@@ -42,6 +42,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Settings")
+	void SetLanguage(const FString& Language);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Settings")
+	const FString& GetLanguage() const { return Language; }
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddGold(int64 Amount);
 
@@ -167,6 +173,9 @@ private:
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
 
 	UPROPERTY()
+	FString Language = TEXT("ko");
+
+	UPROPERTY()
 	int64 Gold = 0;
 
 	UPROPERTY()
@@ -194,6 +203,8 @@ private:
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();
+	void LoadLanguage();
+	void SaveLanguage() const;
 	void LoadLastSeenUnixSec();
 	void SaveLastSeenUnixSec() const;
 };

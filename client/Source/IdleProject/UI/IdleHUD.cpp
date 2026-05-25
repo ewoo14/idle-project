@@ -8,6 +8,7 @@
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "GameCore/IdleGameInstance.h"
+#include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
@@ -65,11 +66,18 @@ FString FormatElapsedHoursMinutes(int64 CappedSeconds)
 	return FString::Printf(TEXT("%lld:%02lld"), Hours, Minutes);
 }
 
+FText FormatLocalizedUI(const TCHAR* Key, TFunctionRef<void(FFormatNamedArguments&)> BuildArgs)
+{
+	FFormatNamedArguments Args;
+	BuildArgs(Args);
+	return IdleProject::Localization::UI(Key, Args);
+}
+
 FText QuestTypeToLabel(EQuestType Type)
 {
 	return Type == EQuestType::Main
-		? FText::FromString(TEXT("메인"))
-		: FText::FromString(TEXT("일일"));
+		? IdleProject::Localization::UI(TEXT("QUEST_TYPE_MAIN"))
+		: IdleProject::Localization::UI(TEXT("QUEST_TYPE_DAILY"));
 }
 
 FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
@@ -78,12 +86,18 @@ FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
 	switch (Type)
 	{
 	case EPetBonusType::Gold:
-		return FText::FromString(FString::Printf(TEXT("골드 +%s"), *Percent));
+		return FormatLocalizedUI(TEXT("PET_BONUS_GOLD_FORMAT"), [&Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::FromString(Percent));
+		});
 	case EPetBonusType::Drop:
-		return FText::FromString(FString::Printf(TEXT("드롭 +%s"), *Percent));
+		return FormatLocalizedUI(TEXT("PET_BONUS_DROP_FORMAT"), [&Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::FromString(Percent));
+		});
 	case EPetBonusType::None:
 	default:
-		return FText::FromString(TEXT("-"));
+		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
 	}
 }
 
@@ -92,12 +106,18 @@ FText SeasonRewardToLabel(ESeasonRewardType Type, int64 Amount)
 	switch (Type)
 	{
 	case ESeasonRewardType::Gold:
-		return FText::FromString(FString::Printf(TEXT("보상 골드 +%s"), *FormatIntegerWithCommas(Amount)));
+		return FormatLocalizedUI(TEXT("SEASON_REWARD_GOLD_FORMAT"), [Amount](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(Amount)));
+		});
 	case ESeasonRewardType::Exp:
-		return FText::FromString(FString::Printf(TEXT("보상 EXP +%s"), *FormatIntegerWithCommas(Amount)));
+		return FormatLocalizedUI(TEXT("SEASON_REWARD_EXP_FORMAT"), [Amount](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(Amount)));
+		});
 	case ESeasonRewardType::None:
 	default:
-		return FText::FromString(TEXT("-"));
+		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
 	}
 }
 
@@ -157,26 +177,29 @@ FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(cons
 {
 	FIdleHUDOfflineRewardViewModel ViewModel;
 	ViewModel.bVisible = Reward.Gold > 0 || Reward.Exp > 0;
-	ViewModel.Title = FText::FromString(TEXT("오프라인 보상"));
-	ViewModel.ElapsedLabel = FText::FromString(FString::Printf(
-		TEXT("경과 시간 %s"),
-		*FormatElapsedHoursMinutes(Reward.CappedSeconds)));
-	ViewModel.GoldLabel = FText::FromString(FString::Printf(
-		TEXT("골드 +%s"),
-		*FormatIntegerWithCommas(Reward.Gold)));
-	ViewModel.ExpLabel = FText::FromString(FString::Printf(
-		TEXT("EXP +%s"),
-		*FormatIntegerWithCommas(Reward.Exp)));
-	ViewModel.ClaimLabel = FText::FromString(TEXT("수령"));
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("OFFLINE_REWARD_TITLE"));
+	ViewModel.ElapsedLabel = FormatLocalizedUI(TEXT("OFFLINE_REWARD_ELAPSED_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Elapsed"), FText::FromString(FormatElapsedHoursMinutes(Reward.CappedSeconds)));
+	});
+	ViewModel.GoldLabel = FormatLocalizedUI(TEXT("REWARD_GOLD_PLUS_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(Reward.Gold)));
+	});
+	ViewModel.ExpLabel = FormatLocalizedUI(TEXT("REWARD_EXP_PLUS_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(Reward.Exp)));
+	});
+	ViewModel.ClaimLabel = IdleProject::Localization::UI(TEXT("ACTION_CLAIM"));
 	return ViewModel;
 }
 
 FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates)
 {
 	FIdleHUDQuestLogViewModel ViewModel;
-	ViewModel.Title = FText::FromString(TEXT("퀘스트"));
-	ViewModel.ShortcutLabel = FText::FromString(TEXT("Q 닫기"));
-	ViewModel.EmptyLabel = FText::FromString(TEXT("진행 중인 퀘스트 없음"));
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("QUEST_LOG_TITLE"));
+	ViewModel.ShortcutLabel = IdleProject::Localization::UI(TEXT("QUEST_LOG_SHORTCUT_CLOSE"));
+	ViewModel.EmptyLabel = IdleProject::Localization::UI(TEXT("QUEST_LOG_EMPTY"));
 
 	for (const FQuestState& State : QuestStates)
 	{
@@ -187,27 +210,29 @@ FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<F
 		Row.ProgressRatio = State.TargetCount > 0
 			? FMath::Clamp(static_cast<float>(State.Progress) / static_cast<float>(State.TargetCount), 0.0f, 1.0f)
 			: 1.0f;
-		Row.ProgressLabel = FText::FromString(FString::Printf(
-			TEXT("진행 %d / %d"),
-			State.Progress,
-			State.TargetCount));
-		Row.RewardLabel = FText::FromString(FString::Printf(
-			TEXT("보상 골드 %lld / EXP %lld"),
-			State.RewardGold,
-			State.RewardExp));
+		Row.ProgressLabel = FormatLocalizedUI(TEXT("QUEST_PROGRESS_FORMAT"), [&State](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Current"), FText::AsNumber(State.Progress));
+			Args.Add(TEXT("Target"), FText::AsNumber(State.TargetCount));
+		});
+		Row.RewardLabel = FormatLocalizedUI(TEXT("QUEST_REWARD_FORMAT"), [&State](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Gold"), FText::AsNumber(State.RewardGold));
+			Args.Add(TEXT("Exp"), FText::AsNumber(State.RewardExp));
+		});
 		Row.bCanClaim = State.bCompleted && !State.bClaimed;
 		Row.bClaimed = State.bClaimed;
 		if (Row.bCanClaim)
 		{
-			Row.ActionLabel = FText::FromString(TEXT("수령"));
+			Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_CLAIM"));
 		}
 		else if (Row.bClaimed)
 		{
-			Row.ActionLabel = FText::FromString(TEXT("완료"));
+			Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_CLAIMED"));
 		}
 		else
 		{
-			Row.ActionLabel = FText::FromString(TEXT("진행"));
+			Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_IN_PROGRESS"));
 		}
 		ViewModel.Rows.Add(Row);
 	}
@@ -225,16 +250,28 @@ FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth
 	ViewModel.bCanRebirth = bCanRebirth;
 	ViewModel.bBossDefeated = bBossDefeated;
 	ViewModel.bLevelReady = SafeLevel >= RebirthRequiredLevel;
-	ViewModel.Title = FText::FromString(TEXT("환생"));
-	ViewModel.StatusLabel = FText::FromString(bCanRebirth ? TEXT("환생 가능") : TEXT("환생 조건 미달"));
-	ViewModel.BossLabel = FText::FromString(bBossDefeated ? TEXT("보스 격파 완료") : TEXT("보스 격파 필요"));
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("REBIRTH_TITLE"));
+	ViewModel.StatusLabel = IdleProject::Localization::UI(bCanRebirth ? TEXT("REBIRTH_STATUS_READY") : TEXT("REBIRTH_STATUS_LOCKED"));
+	ViewModel.BossLabel = IdleProject::Localization::UI(bBossDefeated ? TEXT("REBIRTH_BOSS_DONE") : TEXT("REBIRTH_BOSS_REQUIRED"));
 	ViewModel.LevelLabel = ViewModel.bLevelReady
-		? FText::FromString(TEXT("레벨 100 달성"))
-		: FText::FromString(FString::Printf(TEXT("레벨 %d / 100"), SafeLevel));
-	ViewModel.CountLabel = FText::FromString(FString::Printf(TEXT("환생 %d회"), SafeRebirthCount));
-	ViewModel.BonusLabel = FText::FromString(FString::Printf(TEXT("영구 보너스 %d 포인트"), SafeBonusPoints));
-	ViewModel.NextBonusLabel = FText::FromString(FString::Printf(TEXT("환생 진행 시 +%d 포인트"), RebirthBonusPointsPerRun));
-	ViewModel.ButtonLabel = FText::FromString(TEXT("환생 진행"));
+		? IdleProject::Localization::UI(TEXT("REBIRTH_LEVEL_DONE"))
+		: FormatLocalizedUI(TEXT("REBIRTH_LEVEL_FORMAT"), [SafeLevel](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(SafeLevel));
+		});
+	ViewModel.CountLabel = FormatLocalizedUI(TEXT("REBIRTH_COUNT_FORMAT"), [SafeRebirthCount](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Count"), FText::AsNumber(SafeRebirthCount));
+	});
+	ViewModel.BonusLabel = FormatLocalizedUI(TEXT("REBIRTH_BONUS_FORMAT"), [SafeBonusPoints](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Points"), FText::AsNumber(SafeBonusPoints));
+	});
+	ViewModel.NextBonusLabel = FormatLocalizedUI(TEXT("REBIRTH_NEXT_BONUS_FORMAT"), [](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Points"), FText::AsNumber(RebirthBonusPointsPerRun));
+	});
+	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("REBIRTH_BUTTON"));
 	return ViewModel;
 }
 
@@ -243,15 +280,15 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	struct FClassOptionSeed
 	{
 		EClassId ClassId;
-		const TCHAR* DisplayName;
-		const TCHAR* RoleLabel;
+		const TCHAR* DisplayNameKey;
+		const TCHAR* RoleLabelKey;
 		const TCHAR* StatSummary;
 	};
 
 	const FClassOptionSeed Seeds[] = {
-		{ EClassId::Warrior, TEXT("전사"), TEXT("근접 방어형"), TEXT("STR/CON") },
-		{ EClassId::Mage, TEXT("마법사"), TEXT("원거리 마법형"), TEXT("INT") },
-		{ EClassId::Archer, TEXT("궁수"), TEXT("치명 원거리형"), TEXT("DEX") }
+		{ EClassId::Warrior, TEXT("CLASS_WARRIOR_NAME"), TEXT("CLASS_WARRIOR_ROLE"), TEXT("STR/CON") },
+		{ EClassId::Mage, TEXT("CLASS_MAGE_NAME"), TEXT("CLASS_MAGE_ROLE"), TEXT("INT") },
+		{ EClassId::Archer, TEXT("CLASS_ARCHER_NAME"), TEXT("CLASS_ARCHER_ROLE"), TEXT("DEX") }
 	};
 
 	TArray<FIdleHUDClassSelectionOptionViewModel> Options;
@@ -259,8 +296,8 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	{
 		FIdleHUDClassSelectionOptionViewModel Option;
 		Option.ClassId = Seed.ClassId;
-		Option.DisplayName = FText::FromString(Seed.DisplayName);
-		Option.RoleLabel = FText::FromString(Seed.RoleLabel);
+		Option.DisplayName = IdleProject::Localization::UI(Seed.DisplayNameKey);
+		Option.RoleLabel = IdleProject::Localization::UI(Seed.RoleLabelKey);
 		Option.StatSummary = FText::FromString(Seed.StatSummary);
 		Option.bSelected = Seed.ClassId == CurrentClassId;
 		Options.Add(Option);
@@ -271,12 +308,21 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent)
 {
 	FIdleHUDPetPanelViewModel ViewModel;
-	ViewModel.Title = FText::FromString(TEXT("펫"));
-	ViewModel.EquippedLabel = FText::FromString(EquippedPetId.IsEmpty()
-		? TEXT("장착: 없음")
-		: FString::Printf(TEXT("장착: %s"), *EquippedPetId));
-	ViewModel.GoldBonusLabel = FText::FromString(FString::Printf(TEXT("골드 +%.0f%%"), GoldBonusPercent));
-	ViewModel.DropBonusLabel = FText::FromString(FString::Printf(TEXT("드롭 +%.0f%%"), DropBonusPercent));
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("PET_PANEL_TITLE"));
+	ViewModel.EquippedLabel = EquippedPetId.IsEmpty()
+		? IdleProject::Localization::UI(TEXT("PET_EQUIPPED_NONE"))
+		: FormatLocalizedUI(TEXT("PET_EQUIPPED_FORMAT"), [&EquippedPetId](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("PetId"), FText::FromString(EquippedPetId));
+		});
+	ViewModel.GoldBonusLabel = FormatLocalizedUI(TEXT("PET_BONUS_GOLD_FORMAT"), [GoldBonusPercent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::FromString(FString::Printf(TEXT("%.0f%%"), GoldBonusPercent)));
+	});
+	ViewModel.DropBonusLabel = FormatLocalizedUI(TEXT("PET_BONUS_DROP_FORMAT"), [DropBonusPercent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::FromString(FString::Printf(TEXT("%.0f%%"), DropBonusPercent)));
+	});
 
 	for (const FPetDefinition& Definition : PetDefinitions)
 	{
@@ -285,7 +331,7 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 		Row.Name = Definition.Name;
 		Row.BonusLabel = PetBonusTypeToLabel(Definition.BonusType, Definition.BonusPercent);
 		Row.bEquipped = Definition.PetId == EquippedPetId;
-		Row.ActionLabel = FText::FromString(Row.bEquipped ? TEXT("장착됨") : TEXT("장착"));
+		Row.ActionLabel = IdleProject::Localization::UI(Row.bEquipped ? TEXT("ACTION_EQUIPPED") : TEXT("ACTION_EQUIP"));
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -295,7 +341,7 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 FIdleHUDSeasonPassViewModel IdleProject::UI::BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed)
 {
 	FIdleHUDSeasonPassViewModel ViewModel;
-	ViewModel.Title = FText::FromString(TEXT("시즌 패스"));
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("SEASON_PASS_TITLE"));
 
 	int32 MaxRequiredTokens = 0;
 	for (const FSeasonTierDefinition& Tier : Tiers)
@@ -307,14 +353,24 @@ FIdleHUDSeasonPassViewModel IdleProject::UI::BuildSeasonPassViewModel(const TArr
 	ViewModel.ProgressRatio = MaxRequiredTokens > 0
 		? FMath::Clamp(static_cast<float>(SeasonTokens) / static_cast<float>(MaxRequiredTokens), 0.0f, 1.0f)
 		: 0.0f;
-	ViewModel.ProgressLabel = FText::FromString(FString::Printf(TEXT("티어 %d / %d"), ReachedTier, Tiers.Num()));
+	ViewModel.ProgressLabel = FormatLocalizedUI(TEXT("SEASON_PROGRESS_FORMAT"), [ReachedTier, &Tiers](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Reached"), FText::AsNumber(ReachedTier));
+		Args.Add(TEXT("Total"), FText::AsNumber(Tiers.Num()));
+	});
 
 	for (const FSeasonTierDefinition& Tier : Tiers)
 	{
 		FIdleHUDSeasonTierRowViewModel Row;
 		Row.Tier = Tier.Tier;
-		Row.TierLabel = FText::FromString(FString::Printf(TEXT("티어 %d"), Tier.Tier));
-		Row.RequirementLabel = FText::FromString(FString::Printf(TEXT("%d 토큰"), Tier.RequiredTokens));
+		Row.TierLabel = FormatLocalizedUI(TEXT("SEASON_TIER_FORMAT"), [&Tier](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Tier"), FText::AsNumber(Tier.Tier));
+		});
+		Row.RequirementLabel = FormatLocalizedUI(TEXT("SEASON_REQUIREMENT_FORMAT"), [&Tier](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Tokens"), FText::AsNumber(Tier.RequiredTokens));
+		});
 		Row.RewardLabel = SeasonRewardToLabel(Tier.RewardType, Tier.RewardAmount);
 		Row.ProgressRatio = Tier.RequiredTokens > 0
 			? FMath::Clamp(static_cast<float>(SeasonTokens) / static_cast<float>(Tier.RequiredTokens), 0.0f, 1.0f)
@@ -322,7 +378,7 @@ FIdleHUDSeasonPassViewModel IdleProject::UI::BuildSeasonPassViewModel(const TArr
 		Row.bReached = ReachedTier >= Tier.Tier;
 		Row.bClaimed = IsTierClaimed(Tier.Tier);
 		Row.bCanClaim = Row.bReached && !Row.bClaimed;
-		Row.ActionLabel = FText::FromString(Row.bClaimed ? TEXT("수령 완료") : (Row.bCanClaim ? TEXT("받기") : TEXT("잠김")));
+		Row.ActionLabel = IdleProject::Localization::UI(Row.bClaimed ? TEXT("SEASON_CLAIMED") : (Row.bCanClaim ? TEXT("ACTION_RECEIVE") : TEXT("ACTION_LOCKED")));
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -539,14 +595,15 @@ void AIdleHUD::RefreshEquipmentSummary()
 		return;
 	}
 
-	FText WeaponLine = FText::FromString(TEXT("⚔ 무기 없음"));
+	FText WeaponLine = IdleProject::Localization::UI(TEXT("HUD_NO_WEAPON"));
 	if (const FItemInstance* Weapon = PlayerInventory->GetEquippedItem(EItemSlot::Weapon))
 	{
-		WeaponLine = FText::FromString(FString::Printf(
-			TEXT("⚔ %s (%s, ATK+%.0f)"),
-			*Weapon->DisplayName.ToString(),
-			*RarityToString(Weapon->Rarity),
-			Weapon->BonusAtk));
+		WeaponLine = FormatLocalizedUI(TEXT("HUD_WEAPON_FORMAT"), [Weapon](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Name"), Weapon->DisplayName);
+			Args.Add(TEXT("Rarity"), FText::FromString(RarityToString(Weapon->Rarity)));
+			Args.Add(TEXT("Attack"), FText::AsNumber(FMath::RoundToInt(Weapon->BonusAtk)));
+		});
 	}
 
 	const EItemSlot ArmorSlots[] = {
@@ -573,11 +630,12 @@ void AIdleHUD::RefreshEquipmentSummary()
 		}
 	}
 
-	const FText ArmorLine = FText::FromString(FString::Printf(
-		TEXT("🛡 방어구 %d/7 슬롯 (DEF+%.0f, HP+%.0f)"),
-		EquippedArmorCount,
-		BonusDef,
-		BonusHp));
+	const FText ArmorLine = FormatLocalizedUI(TEXT("HUD_ARMOR_SUMMARY_FORMAT"), [EquippedArmorCount, BonusDef, BonusHp](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Count"), FText::AsNumber(EquippedArmorCount));
+		Args.Add(TEXT("Defense"), FText::AsNumber(FMath::RoundToInt(BonusDef)));
+		Args.Add(TEXT("Hp"), FText::AsNumber(FMath::RoundToInt(BonusHp)));
+	});
 
 	RootWidget->UpdateEquipment(WeaponLine, ArmorLine);
 }
@@ -627,8 +685,8 @@ void AIdleHUD::DrawClassSelectionPanel()
 	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
 	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
 
-	DrawText(TEXT("시작 직업"), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
-	DrawText(TEXT("전사/마법사/궁수"), Theme::TextMuted, X + PanelWidth - 128.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_TITLE")).ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_SUBTITLE")).ToString(), Theme::TextMuted, X + PanelWidth - 128.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 
 	float OptionY = Y + HeaderHeight + Padding;
 	for (const FIdleHUDClassSelectionOptionViewModel& Option : Options)
@@ -653,7 +711,7 @@ void AIdleHUD::DrawClassSelectionOption(const FIdleHUDClassSelectionOptionViewMo
 	DrawText(Option.RoleLabel.ToString(), Theme::TextMuted, X + 82.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 	DrawText(Option.StatSummary.ToString(), Theme::AccentBlue, X + 14.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 
-	const FString StateLabel = Option.bSelected ? TEXT("SELECTED") : TEXT("SELECT");
+	const FString StateLabel = IdleProject::Localization::UI(Option.bSelected ? TEXT("CLASS_SELECTED") : TEXT("CLASS_SELECT")).ToString();
 	DrawText(StateLabel, Option.bSelected ? Theme::AccentGold : Theme::TextMuted, X + Width - 74.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 	AddHitBox(FVector2D(X, Y), FVector2D(Width, Height), MakeClassSelectionHitBoxName(Option.ClassId), true, 70);
 }
@@ -741,8 +799,11 @@ void AIdleHUD::DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotI
 	DrawText(Slot.DisplayName.ToString(), Theme::TextPrimary, X + 28.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
 
 	const FString StatusLabel = Slot.bReady
-		? TEXT("READY")
-		: FString::Printf(TEXT("%.1fs"), Slot.CooldownRemaining);
+		? IdleProject::Localization::UI(TEXT("SKILL_READY")).ToString()
+		: FormatLocalizedUI(TEXT("SKILL_COOLDOWN_FORMAT"), [&Slot](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Seconds"), FText::AsNumber(Slot.CooldownRemaining));
+		}).ToString();
 	DrawText(StatusLabel, Slot.bReady ? Theme::AccentGold : Theme::TextMuted, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
 }
 
@@ -756,8 +817,11 @@ void AIdleHUD::DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, floa
 	DrawRect(Theme::Auth, X + 4.0f * Scale, Y + 4.0f * Scale, (Width - 8.0f * Scale) * Ultimate.GaugeRatio, Height - 8.0f * Scale);
 
 	const FString GaugeLabel = Ultimate.bReady
-		? TEXT("ULTIMATE READY")
-		: FString::Printf(TEXT("ULTIMATE %.0f%%"), Ultimate.GaugePercent);
+		? IdleProject::Localization::UI(TEXT("ULTIMATE_READY")).ToString()
+		: FormatLocalizedUI(TEXT("ULTIMATE_CHARGE_FORMAT"), [&Ultimate](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(Ultimate.GaugePercent)));
+		}).ToString();
 	DrawText(GaugeLabel, Ultimate.bReady ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
 }
 

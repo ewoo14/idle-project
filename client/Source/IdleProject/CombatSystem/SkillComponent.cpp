@@ -2,6 +2,7 @@
 
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "Internationalization/IdleLocalization.h"
 
 namespace
 {
@@ -34,7 +35,7 @@ FSkillDefinition MakeSkill(
 	FSkillDefinition Skill;
 	Skill.SkillId = FName(SkillId);
 	Skill.ClassId = ClassId;
-	Skill.DisplayName = FText::FromString(DisplayName);
+	Skill.DisplayName = IdleProject::Localization::Text(TEXT("Skill"), SkillId);
 	Skill.Type = Type;
 	Skill.EffectType = EffectType;
 	Skill.Cooldown = Cooldown;

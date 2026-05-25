@@ -1,5 +1,7 @@
 #include "GameCore/QuestService.h"
 
+#include "Internationalization/IdleLocalization.h"
+
 void UQuestService::InitializeDefaultQuests(const FString& CurrentUtcDate)
 {
 	BuildDefaultDefinitions();
@@ -152,7 +154,7 @@ void UQuestService::BuildDefaultDefinitions()
 		FQuestDefinition Definition;
 		Definition.QuestId = QuestId;
 		Definition.Type = Type;
-		Definition.Title = FText::FromString(Title);
+		Definition.Title = IdleProject::Localization::Text(TEXT("Quest"), QuestId);
 		Definition.Objective = Objective;
 		Definition.TargetCount = TargetCount;
 		Definition.RewardGold = RewardGold;

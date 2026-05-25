@@ -8,6 +8,7 @@
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
 #include "CharacterSystem/IdleMonster.h"
+#include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
 
 namespace
@@ -366,6 +367,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 {
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+
 	USkillComponent* Skills = NewObject<USkillComponent>();
 	Skills->LoadDefaultWarriorSkills();
 

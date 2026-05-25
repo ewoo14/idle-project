@@ -1,0 +1,9 @@
+Namespace,Key,SourceString,Comment
+Quest,main_ch1_001,"Find the Broken Lantern","Main quest"
+Quest,main_ch1_002,"Secure the Village Field","Main quest"
+Quest,main_ch1_003,"Repeating Echoes","Main quest"
+Quest,main_ch1_004,"Trace of the Guardian","Main quest"
+Quest,main_ch1_005,"Gate of the Winged Legion","Main quest"
+Quest,daily_kill_monsters,"Daily Hunt","Daily quest"
+Quest,daily_claim_offline,"Claim Rest Rewards","Daily quest"
+Quest,daily_enhance_gear,"Temper Equipment","Daily quest"
