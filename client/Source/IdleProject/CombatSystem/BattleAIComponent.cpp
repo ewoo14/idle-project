@@ -3,6 +3,7 @@
 #include "CharacterSystem/IdleCharacter.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "CombatSystem/SkillComponent.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -76,6 +77,45 @@ AActor* UBattleAIComponent::FindClosestEnemy()
 	return ClosestActor;
 }
 
+TArray<AActor*> UBattleAIComponent::FindEnemiesInRange(float Radius) const
+{
+	TArray<AActor*> Enemies;
+	if (!TargetActorClass)
+	{
+		return Enemies;
+	}
+
+	const AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+	if (!Owner || !World)
+	{
+		return Enemies;
+	}
+
+	const float RadiusSq = FMath::Square(FMath::Max(0.0f, Radius));
+	for (TActorIterator<AActor> It(World, TargetActorClass); It; ++It)
+	{
+		AActor* Candidate = *It;
+		if (!IsValid(Candidate) || Candidate == Owner)
+		{
+			continue;
+		}
+
+		const UCombatComponent* CandidateCombat = Candidate->FindComponentByClass<UCombatComponent>();
+		if (CandidateCombat && CandidateCombat->IsDead())
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared2D(Owner->GetActorLocation(), Candidate->GetActorLocation()) <= RadiusSq)
+		{
+			Enemies.Add(Candidate);
+		}
+	}
+
+	return Enemies;
+}
+
 void UBattleAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopBattle();
@@ -102,6 +142,15 @@ void UBattleAIComponent::UpdateBattle()
 	const float Distance = FVector::Dist2D(GetOwner()->GetActorLocation(), TargetActor->GetActorLocation());
 	if (Distance <= OwnerCombat->AttackRange)
 	{
+		if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
+		{
+			TArray<AActor*> AoeTargets = FindEnemiesInRange(FMath::Max(OwnerCombat->AttackRange, 400.0f));
+			if (AoeTargets.IsEmpty())
+			{
+				AoeTargets.Add(TargetActor);
+			}
+			Skills->TickSkills(GetWorld()->GetTimeSeconds(), TargetActor, AoeTargets);
+		}
 		Attack(TargetActor);
 		return;
 	}
@@ -169,6 +218,10 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 	LastAttackTime = World->GetTimeSeconds();
 	State = EBattleState::Attack;
 	TargetCombat->TakeDamage(FCombatFormulas::ComputeDamage(OwnerCombat->Atk, TargetCombat->Def), GetOwner());
+	if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
+	{
+		Skills->AddGauge(Skills->GetGaugeGainOnHit());
+	}
 }
 
 UCombatComponent* UBattleAIComponent::GetOwnerCombat() const

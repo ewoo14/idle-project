@@ -1,7 +1,12 @@
 #include "Misc/AutomationTest.h"
 
 #include "CombatSystem/BattleAIComponent.h"
+#include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "CombatSystem/SkillComponent.h"
+#include "Components/SceneComponent.h"
+#include "Engine/World.h"
+#include "UI/IdleHUD.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatFormulasTest,
@@ -59,5 +64,256 @@ bool FBattleAIGroundChaseTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("도달 시에도 Z 유지"), Next.Z, -56.0, Tolerance);
 	}
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillCooldownTest,
+	"IdleProject.Combat.Skills.CooldownReadiness",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillCooldownTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	const FName HeavyStrike(TEXT("heavy_strike"));
+	TestTrue(TEXT("Heavy strike is ready before first cast"), Skills->IsReady(HeavyStrike, 10.0f));
+	TestEqual(TEXT("Ready skill has zero cooldown remaining"), Skills->GetCooldownRemaining(HeavyStrike, 10.0f), 0.0f);
+	TestEqual(TEXT("Ready skill has zero cooldown ratio"), Skills->GetCooldownRatio(HeavyStrike, 10.0f), 0.0f);
+
+	TestTrue(TEXT("Cast starts cooldown"), Skills->MarkSkillCast(HeavyStrike, 10.0f));
+	TestFalse(TEXT("Heavy strike is not ready during cooldown"), Skills->IsReady(HeavyStrike, 12.0f));
+	TestEqual(TEXT("Cooldown remaining is seconds until ready"), Skills->GetCooldownRemaining(HeavyStrike, 12.0f), 2.0f);
+	TestEqual(TEXT("Cooldown ratio reflects elapsed cooldown"), Skills->GetCooldownRatio(HeavyStrike, 12.0f), 0.5f);
+	TestTrue(TEXT("Heavy strike is ready when cooldown expires"), Skills->IsReady(HeavyStrike, 14.0f));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillGaugeTest,
+	"IdleProject.Combat.Skills.UltimateGauge",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillGaugeTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	TestEqual(TEXT("Initial gauge is empty"), Skills->GetCurrentGauge(), 0.0f);
+	Skills->AddGauge(60.0f);
+	Skills->AddGauge(60.0f);
+	TestEqual(TEXT("Gauge is clamped at 100"), Skills->GetCurrentGauge(), 100.0f);
+	TestTrue(TEXT("Ultimate is ready at 100 gauge"), Skills->IsUltimateReady());
+
+	TestTrue(TEXT("Ultimate cast consumes gauge"), Skills->TryConsumeUltimateGauge());
+	TestEqual(TEXT("Gauge resets after ultimate"), Skills->GetCurrentGauge(), 0.0f);
+	TestFalse(TEXT("Ultimate is no longer ready after reset"), Skills->IsUltimateReady());
+
+	Skills->AddGauge(-20.0f);
+	TestEqual(TEXT("Gauge cannot go below zero"), Skills->GetCurrentGauge(), 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillPassiveStatsTest,
+	"IdleProject.Combat.Skills.PassiveStats",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	FDerivedStats Stats;
+	Stats.Hp = 1000.0f;
+	Stats.PhysAtk = 200.0f;
+	Stats.PhysDef = 50.0f;
+
+	Skills->ApplyPassivesToStats(Stats);
+
+	TestEqual(TEXT("Weapon mastery grants 15 percent physical attack"), Stats.PhysAtk, 230.0f);
+	TestEqual(TEXT("Toughness grants 20 percent max HP"), Stats.Hp, 1200.0f);
+	TestEqual(TEXT("Unrelated stats stay unchanged"), Stats.PhysDef, 50.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillUltimateBuffTest,
+	"IdleProject.Combat.Skills.UltimateBuff",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillUltimateBuffTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 20.0f, 1.0f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	Skills->LoadDefaultWarriorSkills();
+	Skills->AddGauge(100.0f);
+
+	TArray<AActor*> AoeTargets;
+	Skills->TickSkills(30.0f, Target, AoeTargets);
+
+	TestEqual(TEXT("Ultimate resets gauge"), Skills->GetCurrentGauge(), 0.0f);
+	TestEqual(TEXT("Ultimate grants 30 percent attack speed buff"), OwnerCombat->AtkSpeed, 1.3f);
+	TestTrue(TEXT("Ultimate deals damage to target"), TargetCombat->CurrentHp < TargetCombat->MaxHp);
+
+	Skills->TickSkills(35.0f, Target, AoeTargets);
+	TestEqual(TEXT("Ultimate attack speed buff expires"), OwnerCombat->AtkSpeed, 1.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillHudDisplayModelTest,
+	"IdleProject.UI.HUD.SkillDisplayModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	constexpr float CastTime = 10.0f;
+	constexpr float Now = 12.0f;
+	Skills->MarkSkillCast(TEXT("heavy_strike"), CastTime);
+	Skills->AddGauge(100.0f);
+
+	const TArray<FIdleHUDSkillSlotViewModel> Slots = IdleProject::UI::BuildSkillSlotViewModels(*Skills, Now);
+
+	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 4);
+	TestEqual(TEXT("First active skill keeps localized display name"), Slots[0].DisplayName.ToString(), FString(TEXT("강타")));
+	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, 0.5f);
+	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, 2.0f);
+	TestFalse(TEXT("Cooling skill is not ready"), Slots[0].bReady);
+
+	const FIdleHUDUltimateViewModel Ultimate = IdleProject::UI::BuildUltimateViewModel(*Skills);
+	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
+	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillAoeTargetsTest,
+	"IdleProject.Combat.Skills.AoeTargets",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillAoeTargetsTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* PrimaryTarget = NewObject<AActor>();
+	UCombatComponent* PrimaryCombat = NewObject<UCombatComponent>(PrimaryTarget);
+	PrimaryTarget->AddInstanceComponent(PrimaryCombat);
+
+	AActor* SecondaryTarget = NewObject<AActor>();
+	UCombatComponent* SecondaryCombat = NewObject<UCombatComponent>(SecondaryTarget);
+	SecondaryTarget->AddInstanceComponent(SecondaryCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 0.0f, 1.0f);
+	PrimaryCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	SecondaryCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	Skills->LoadDefaultWarriorSkills();
+
+	Skills->MarkSkillCast(TEXT("heavy_strike"), 10.0f);
+	Skills->MarkSkillCast(TEXT("shield_up"), 10.0f);
+	Skills->MarkSkillCast(TEXT("charge"), 10.0f);
+
+	TArray<AActor*> AoeTargets;
+	AoeTargets.Add(PrimaryTarget);
+	AoeTargets.Add(SecondaryTarget);
+	Skills->TickSkills(12.0f, PrimaryTarget, AoeTargets);
+
+	TestTrue(TEXT("Whirlwind damages primary target"), PrimaryCombat->CurrentHp < PrimaryCombat->MaxHp);
+	TestTrue(TEXT("Whirlwind damages secondary target"), SecondaryCombat->CurrentHp < SecondaryCombat->MaxHp);
+	TestEqual(TEXT("Whirlwind applies the same damage to every AoE target"), PrimaryCombat->CurrentHp, SecondaryCombat->CurrentHp);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBattleAIAoeTargetGatheringTest,
+	"IdleProject.Combat.BattleAI.AoeTargetGathering",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBattleAIAoeTargetGatheringTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto SpawnPositionedActor = [&World, &SpawnParams](const FVector& Location)
+	{
+		AActor* Actor = World->SpawnActor<AActor>(AActor::StaticClass(), Location, FRotator::ZeroRotator, SpawnParams);
+		USceneComponent* Root = NewObject<USceneComponent>(Actor);
+		Actor->SetRootComponent(Root);
+		Root->RegisterComponent();
+		Actor->SetActorLocation(Location);
+		return Actor;
+	};
+
+	AActor* Owner = SpawnPositionedActor(FVector(0.0, 0.0, 0.0));
+	UBattleAIComponent* BattleAI = NewObject<UBattleAIComponent>(Owner);
+	Owner->AddInstanceComponent(BattleAI);
+	BattleAI->RegisterComponent();
+	BattleAI->TargetActorClass = AActor::StaticClass();
+
+	AActor* NearTarget = SpawnPositionedActor(FVector(150.0, 0.0, 500.0));
+	UCombatComponent* NearCombat = NewObject<UCombatComponent>(NearTarget);
+	NearTarget->AddInstanceComponent(NearCombat);
+	NearCombat->RegisterComponent();
+	NearCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* EdgeTarget = SpawnPositionedActor(FVector(399.0, 0.0, -200.0));
+	UCombatComponent* EdgeCombat = NewObject<UCombatComponent>(EdgeTarget);
+	EdgeTarget->AddInstanceComponent(EdgeCombat);
+	EdgeCombat->RegisterComponent();
+	EdgeCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* FarTarget = SpawnPositionedActor(FVector(450.0, 0.0, 0.0));
+	UCombatComponent* FarCombat = NewObject<UCombatComponent>(FarTarget);
+	FarTarget->AddInstanceComponent(FarCombat);
+	FarCombat->RegisterComponent();
+	FarCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* DeadTarget = SpawnPositionedActor(FVector(100.0, 0.0, 0.0));
+	UCombatComponent* DeadCombat = NewObject<UCombatComponent>(DeadTarget);
+	DeadTarget->AddInstanceComponent(DeadCombat);
+	DeadCombat->RegisterComponent();
+	DeadCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+	DeadCombat->TakeDamage(200.0f, Owner);
+
+	const TArray<AActor*> AoeTargets = BattleAI->FindEnemiesInRange(400.0f);
+
+	TestEqual(TEXT("Far target stays outside 400 units on X"), FarTarget->GetActorLocation().X, 450.0, 0.01);
+	TestTrue(TEXT("AoE gathering includes a near target"), AoeTargets.Contains(NearTarget));
+	TestTrue(TEXT("AoE gathering uses 2D distance and includes edge target"), AoeTargets.Contains(EdgeTarget));
+	TestFalse(TEXT("AoE gathering excludes far target"), AoeTargets.Contains(FarTarget));
+	TestFalse(TEXT("AoE gathering excludes dead target"), AoeTargets.Contains(DeadTarget));
+	TestFalse(TEXT("AoE gathering excludes owner"), AoeTargets.Contains(Owner));
+
+	World->DestroyWorld(false);
 	return true;
 }

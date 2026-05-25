@@ -65,3 +65,20 @@ erDiagram
 | `leaderboard_rebirth` | `character_id`, `season_id`, `rebirth_count`, `updated_at` | `leaderboard_rebirth_season_count(season_id, rebirth_count desc)` |
 
 마이그레이션 파일은 `server/migrations/0001_init.sql`, 롤백은 `server/migrations/0001_init.down.sql`이다.
+
+## SkillDB Mirror
+PR #15 keeps combat execution authoritative in the Unreal client, but the server now has a read-only warrior SkillDB mirror at `server/src/core/data/skills.ts` for stable cross-reference.
+
+| Field | Meaning |
+| --- | --- |
+| `skillId` | Stable client/server skill identifier |
+| `classId` | Class owner; warrior is `1` |
+| `displayName` | Localized display name |
+| `type` | `active`, `passive`, or `ultimate` |
+| `effectType` | `damage_single`, `damage_aoe`, `self_buff`, or `dash_damage` |
+| `cooldown` | Cooldown seconds |
+| `damageCoeff` | ATK multiplier |
+| `buffMagnitude` | Buff amount as ratio |
+| `buffDuration` | Buff duration seconds |
+| `gaugeGainOnHit` | Ultimate gauge gained on normal hit |
+| `gaugeGainOnTakeDamage` | Ultimate gauge gained on taking damage |
