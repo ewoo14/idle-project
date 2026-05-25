@@ -135,7 +135,7 @@ DoD 검증 시나리오:
 | Codex 가 UE5 프로젝트 파일 (.uproject, .uasset) 생성 시 형식 오류 | 높음 | 텍스트 (.uproject = JSON, .Build.cs = C#) 위주만 Codex 가 작성, .uasset 은 빈 placeholder 또는 PR 머지 후 PM 이 에디터에서 생성 |
 | UE5 5.7 자체가 너무 신버전이라 Codex 가 5.4 기준으로 코드 작성 | 중 | 프롬프트에 "UE 5.7" 명시 + UPROPERTY / 모듈 패턴은 5.4~5.7 호환 |
 | client-ci 가 self-hosted runner 부재로 빌드 검증 불가 | 중 | PM 로컬 빌드 + 스크린샷 필수, CI 는 코드만 검증 (clang-format 등) |
-| StatFormulas 가 서버 TS 와 결과 어긋남 | 중 | UE Automation 테스트에서 server 의 expToNext(100) 결과 ≈ 261,000 등 5~10건 cross-validation |
+| StatFormulas 가 서버 TS 와 결과 어긋남 | 중 | UE Automation 테스트에서 server 의 expToNext(100) 결과 135,594 등 5~10건 cross-validation |
 
 ## 9. 후속 PR 예고
 
@@ -156,5 +156,7 @@ DoD 검증 시나리오:
 | 1 | 150 | 150 | 0 |
 | 10 | 3,506 | 3,506 | 0 |
 | 50 | 43,656 | 43,656 | 0 |
-| 100 | 260,594 | 260,594 | 0 |
-| 200 | 832,291 | 832,291 | 0 |
+| 100 | 135,594 | 135,594 | 0 |
+| 200 | Infinity | 0 (cap sentinel) | N/A |
+
+근사값 — M2 시뮬레이터로 정밀화 예정.
