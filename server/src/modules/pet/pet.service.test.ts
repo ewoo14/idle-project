@@ -11,7 +11,7 @@ describe("PetService", () => {
     const repo = createRepo({
       state: {
         userId,
-        ownedPetIds: ["dog", "cat"],
+        ownedPetIds: ["dog", "bird"],
         equippedPetId: "dog",
         updatedAt: new Date("2026-05-26T00:00:00.000Z"),
       },
@@ -38,10 +38,10 @@ describe("PetService", () => {
     const repo = createRepo();
     const service = new PetService(repo);
 
-    const result = await service.equip(userId, "cat");
+    const result = await service.equip(userId, "bird");
 
-    expect(repo.equipPet).toHaveBeenCalledWith(userId, "cat");
-    expect(result.equippedPetId).toBe("cat");
+    expect(repo.equipPet).toHaveBeenCalledWith(userId, "bird");
+    expect(result.equippedPetId).toBe("bird");
     expect(result.activeBonus).toEqual({
       bonusType: "drop",
       bonusPercent: 15,
@@ -65,7 +65,7 @@ describe("PetService", () => {
         },
       }),
     );
-    await expect(unowned.equip(userId, "cat")).rejects.toBeInstanceOf(
+    await expect(unowned.equip(userId, "bird")).rejects.toBeInstanceOf(
       ValidationError,
     );
   });
@@ -76,7 +76,7 @@ function createRepo(options: { state?: PetStateRecord } = {}) {
     options.state ??
     ({
       userId,
-      ownedPetIds: ["dog", "cat"],
+      ownedPetIds: ["dog", "bird"],
       equippedPetId: "dog",
       updatedAt: new Date("2026-05-26T00:00:00.000Z"),
     } satisfies PetStateRecord);

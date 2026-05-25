@@ -7,7 +7,7 @@ All endpoints require `Authorization: Bearer <accessToken>`.
 ## Rules
 
 - Pet definitions live in `server/src/core/data/pets.ts`.
-- V1 grants both pets by default: `dog` gives `gold +20%`, `cat` gives `drop +15%`.
+- V1 grants both pets by default: `dog` gives `gold +20%`, `bird` gives `drop +15%`.
 - Only one pet can be equipped at a time.
 
 ## GET `/`

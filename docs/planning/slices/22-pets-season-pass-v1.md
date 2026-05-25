@@ -25,6 +25,13 @@
 - 펫/시즌 UI(IdleHUD/위젯): 펫 장착, 시즌 패스 티어/진행/수령. 단축키.
 - Automation: 펫 보너스 계산, 시즌 진행/수령 순수 로직.
 
+#### Character C++ mirror
+- `UPetService`: V1 기본 보유 펫은 `dog`(gold +20%) / `bird`(drop +15%)이며 1마리만 장착한다.
+- `USeasonService`: 시즌 1 무료 트랙 10티어를 `server/src/core/data/season.ts`와 동일 수치로 미러한다.
+- `UIdleGameInstance::ClaimQuest()` 성공 시 클라이언트 V1 시즌 토큰 `+10`을 적립한다.
+- `AIdleMonster::HandleDeath()`는 골드 드롭 수량과 장비 드롭 확률에 장착 펫 보너스를 곱한다.
+- 네트워크는 `/v1/pets`, `/v1/season` 조회와 장착/수령 요청을 best-effort로 호출하며 실패해도 로컬 진행을 막지 않는다.
+
 ### 2.3 데이터/밸런스
 - 펫 보너스 % (강아지 골드 +20%, 새 드롭 +15% 1차), 시즌 티어 요구 토큰/보상 1차값. 문서.
 

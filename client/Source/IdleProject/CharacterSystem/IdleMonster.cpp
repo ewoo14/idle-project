@@ -107,7 +107,8 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 
 	// EXP 지급 — PR #1 §3.2.2 미러: monster level × 12 EXP (PR #9 단계 슬라임 = level 1).
 	// AIdleGameInstance::AddExp 가 누적 / 레벨업 / 델리게이트 broadcast 처리.
-	if (UIdleGameInstance* GameInstance = Cast<UIdleGameInstance>(UGameplayStatics::GetGameInstance(World)))
+	UIdleGameInstance* GameInstance = Cast<UIdleGameInstance>(UGameplayStatics::GetGameInstance(World));
+	if (GameInstance)
 	{
 		const int64 ExpReward = 12;
 		GameInstance->AddExp(ExpReward);
@@ -123,10 +124,12 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	AGoldDrop* GoldDrop = World->SpawnActor<AGoldDrop>(AGoldDrop::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
 	if (GoldDrop)
 	{
-		GoldDrop->Amount = static_cast<int64>(10 + FMath::RandRange(0, 5));
+		const int64 BaseGoldAmount = static_cast<int64>(10 + FMath::RandRange(0, 5));
+		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(BaseGoldAmount) : BaseGoldAmount;
 	}
 
-	if (FMath::FRand() < 0.05f)
+	const float DropChance = GameInstance ? GameInstance->ApplyEquippedPetDropBonusChance(0.05f) : 0.05f;
+	if (FMath::FRand() < DropChance)
 	{
 		const FItemInstance DropItem = FItemFactory::RandomDropFromMonster(1);
 		if (DropItem.Rarity != EItemRarity::None)

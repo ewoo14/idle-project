@@ -126,7 +126,7 @@ export const petState = pgTable("pet_state", {
   userId: uuid("user_id")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
-  ownedPetIds: jsonb("owned_pet_ids").notNull().default(["dog", "cat"]),
+  ownedPetIds: jsonb("owned_pet_ids").notNull().default(["dog", "bird"]),
   equippedPetId: varchar("equipped_pet_id", { length: 64 }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

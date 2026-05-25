@@ -15,8 +15,8 @@ export const petDefinitions: PetDefinition[] = [
     bonusPercent: 20,
   },
   {
-    petId: "cat",
-    name: "고양이",
+    petId: "bird",
+    name: "새",
     bonusType: "drop",
     bonusPercent: 15,
   },

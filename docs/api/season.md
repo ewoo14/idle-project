@@ -9,6 +9,7 @@ All endpoints require `Authorization: Bearer <accessToken>`.
 - Season tier definitions live in `server/src/core/data/season.ts`.
 - V1 has one free track with 10 tiers.
 - Quest completion can report season tokens through `POST /tokens`.
+- UE C++ V1 mirrors the same 10 tier values and grants +10 local season tokens after a successful quest claim; server reconciliation remains best-effort in this slice.
 - Tier rewards are claimed once and update `characters.gold` or `characters.total_exp`.
 
 ## GET `/`
