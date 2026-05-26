@@ -1,6 +1,7 @@
 #include "ItemSystem/InventoryComponent.h"
 
 #include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/SetBonusFormula.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -81,6 +82,7 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 	// server/src/core/formulas/equipment.ts 의 computeInventoryBonus 와 1:1 미러.
 	// 강화 보정: (1 + EnhanceLevel × 0.1) 을 각 Bonus 에 곱한다 (PR #1 §2.3 강화 곡선).
 	FDerivedStats Bonus;
+	TArray<FItemInstance> EquippedItems;
 	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
 	{
 		if (!Items.IsValidIndex(Pair.Value))
@@ -89,6 +91,7 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		}
 
 		const FItemInstance& Item = Items[Pair.Value];
+		EquippedItems.Add(Item);
 		const float EnhanceMultiplier = 1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f;
 		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier;
 		Bonus.PhysDef += Item.BonusDef * EnhanceMultiplier;
@@ -97,6 +100,17 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		Bonus.AtkSpeed += Item.BonusAtkSpeed * EnhanceMultiplier;
 		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier;
 	}
+
+	const FDerivedStats SetBonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
+	Bonus.Hp += SetBonus.Hp;
+	Bonus.PhysAtk += SetBonus.PhysAtk;
+	Bonus.MagicAtk += SetBonus.MagicAtk;
+	Bonus.PhysDef += SetBonus.PhysDef;
+	Bonus.MagicDef += SetBonus.MagicDef;
+	Bonus.AtkSpeed += SetBonus.AtkSpeed;
+	Bonus.CritRate += SetBonus.CritRate;
+	Bonus.CritDmg += SetBonus.CritDmg;
+
 	return Bonus;
 }
 

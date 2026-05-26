@@ -101,6 +101,8 @@ FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem)
 	const EItemSlot Slot = RollSlot();
 
 	FItemInstance Item = FDropFormula::ComputeItemBonus(Slot, SafeLevel, Rarity, FMath::FRandRange(1.0f, 2.0f));
+	FRandomStream SetRng(FMath::Rand());
+	Item.ItemSet = FDropFormula::RollItemSet(Rarity, SetRng);
 	FRandomStream AffixRng(FMath::Rand());
 	FDropFormula::RollAffixes(Rarity, SafeLevel, AffixRng, Item);
 	Item.DisplayName = FText::FromString(FString::Printf(TEXT("%s %s"), *GetRarityAdjective(Rarity), *GetSlotNoun(Slot)));

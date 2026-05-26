@@ -5,6 +5,7 @@
 #include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
@@ -13,12 +14,13 @@
 
 namespace
 {
-FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0, float CritRate = 0.0f, float AtkSpeed = 0.0f, float MagicAtk = 0.0f)
+FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0, float CritRate = 0.0f, float AtkSpeed = 0.0f, float MagicAtk = 0.0f, EItemSet ItemSet = EItemSet::None)
 {
 	FItemInstance Item;
 	Item.ItemId = ItemId;
 	Item.Slot = Slot;
 	Item.Rarity = Rarity;
+	Item.ItemSet = ItemSet;
 	Item.DisplayName = FText::FromName(ItemId);
 	Item.BonusAtk = Atk;
 	Item.BonusDef = Def;
@@ -217,6 +219,136 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaRollItemSetTest,
+	"IdleProject.Inventory.DropFormula.RollItemSet",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaRollItemSetTest::RunTest(const FString& Parameters)
+{
+	FRandomStream CommonRngA(4301);
+	FRandomStream CommonRngB(4301);
+	TestEqual(TEXT("Common items do not roll an item set"), FDropFormula::RollItemSet(EItemRarity::Common, CommonRngA), EItemSet::None);
+	TestEqual(TEXT("Common item set roll is deterministic"), FDropFormula::RollItemSet(EItemRarity::Common, CommonRngB), EItemSet::None);
+
+	bool bFoundWarrior = false;
+	bool bFoundGuardian = false;
+	bool bFoundArcane = false;
+	FRandomStream RareRng(4302);
+	for (int32 Index = 0; Index < 120; ++Index)
+	{
+		const EItemSet ItemSet = FDropFormula::RollItemSet(EItemRarity::Rare, RareRng);
+		TestTrue(TEXT("Rare+ set roll stays in enum range"), ItemSet >= EItemSet::Warrior && ItemSet <= EItemSet::Arcane);
+		bFoundWarrior = bFoundWarrior || ItemSet == EItemSet::Warrior;
+		bFoundGuardian = bFoundGuardian || ItemSet == EItemSet::Guardian;
+		bFoundArcane = bFoundArcane || ItemSet == EItemSet::Arcane;
+	}
+
+	TestTrue(TEXT("Rare+ rolls can produce Warrior"), bFoundWarrior);
+	TestTrue(TEXT("Rare+ rolls can produce Guardian"), bFoundGuardian);
+	TestTrue(TEXT("Rare+ rolls can produce Arcane"), bFoundArcane);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSetBonusFormulaDefinitionParityTest,
+	"IdleProject.Inventory.SetBonusFormula.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSetBonusFormulaDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	const FDerivedStats WarriorTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Warrior);
+	TestEqual(TEXT("Warrior 2-piece attack matches server"), WarriorTwoPiece.PhysAtk, 20.0f);
+	TestEqual(TEXT("Warrior 2-piece crit remains zero"), WarriorTwoPiece.CritRate, 0.0f);
+
+	const FDerivedStats WarriorFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Warrior);
+	TestEqual(TEXT("Warrior 4-piece adds attack"), WarriorFourPiece.PhysAtk, 50.0f);
+	TestEqual(TEXT("Warrior 4-piece adds crit"), WarriorFourPiece.CritRate, 0.05f);
+
+	const FDerivedStats GuardianTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Guardian);
+	TestEqual(TEXT("Guardian 2-piece defense matches server"), GuardianTwoPiece.PhysDef, 15.0f);
+	TestEqual(TEXT("Guardian 2-piece HP matches server"), GuardianTwoPiece.Hp, 100.0f);
+
+	const FDerivedStats GuardianFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Guardian);
+	TestEqual(TEXT("Guardian 4-piece defense matches server"), GuardianFourPiece.PhysDef, 35.0f);
+	TestEqual(TEXT("Guardian 4-piece HP matches server"), GuardianFourPiece.Hp, 250.0f);
+
+	const FDerivedStats ArcaneTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Arcane);
+	TestEqual(TEXT("Arcane 2-piece magic attack matches server"), ArcaneTwoPiece.MagicAtk, 20.0f);
+
+	const FDerivedStats ArcaneFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Arcane);
+	TestEqual(TEXT("Arcane 4-piece magic attack matches server"), ArcaneFourPiece.MagicAtk, 50.0f);
+	TestEqual(TEXT("Arcane 4-piece crit damage matches server"), ArcaneFourPiece.CritDmg, 0.10f);
+
+	const FDerivedStats NoneBonus = FSetBonusFormula::GetTwoPieceBonus(EItemSet::None);
+	TestEqual(TEXT("None set has no two-piece attack"), NoneBonus.PhysAtk, 0.0f);
+	TestEqual(TEXT("None set has no two-piece HP"), NoneBonus.Hp, 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSetBonusFormulaThresholdsTest,
+	"IdleProject.Inventory.SetBonusFormula.Thresholds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSetBonusFormulaThresholdsTest::RunTest(const FString& Parameters)
+{
+	TArray<FItemInstance> EquippedItems;
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 3.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	FDerivedStats Bonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
+	TestEqual(TEXT("Warrior 2-piece grants physical attack"), Bonus.PhysAtk, 20.0f);
+	TestEqual(TEXT("Warrior 2-piece does not grant crit"), Bonus.CritRate, 0.0f);
+
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	Bonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
+	TestEqual(TEXT("Warrior 4-piece includes 2-piece and 4-piece attack"), Bonus.PhysAtk, 70.0f);
+	TestEqual(TEXT("Warrior 4-piece grants crit rate"), Bonus.CritRate, 0.05f);
+
+	TArray<FItemInstance> MixedItems;
+	MixedItems.Add(MakeTestItem(TEXT("none_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 3.0f, 0.0f, 0.0f));
+	MixedItems.Add(MakeTestItem(TEXT("guardian_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Guardian));
+	Bonus = FSetBonusFormula::ComputeSetBonus(MixedItems);
+	TestEqual(TEXT("None and under-threshold sets grant no attack"), Bonus.PhysAtk, 0.0f);
+	TestEqual(TEXT("None and under-threshold sets grant no defense"), Bonus.PhysDef, 0.0f);
+	TestEqual(TEXT("None and under-threshold sets grant no HP"), Bonus.Hp, 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEquipmentBonusSetBonusTest,
+	"IdleProject.Inventory.Bonus.SetBonus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEquipmentBonusSetBonusTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	const FItemInstance WarriorWeapon = MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior);
+	Inventory->AddItem(WarriorWeapon);
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Equipment bonus includes per-item attack and Warrior set attack"), Bonus.PhysAtk, 80.0f);
+	TestEqual(TEXT("Equipment bonus includes per-item defense only for defense"), Bonus.PhysDef, 15.0f);
+	TestEqual(TEXT("Equipment bonus includes Warrior set crit"), Bonus.CritRate, 0.05f);
+
+	const FPrimaryStats Primary(10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f);
+	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, 1, Bonus);
+	TestEqual(TEXT("Derived stats include set physical attack"), Derived.PhysAtk, 100.0f);
+	TestEqual(TEXT("Derived stats include set crit rate"), Derived.CritRate, 0.07f);
+	TestEqual(TEXT("PowerScore ignores item set membership"), FItemPowerScore::Compute(WarriorWeapon), 10);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEnhanceFormulaCurveTest,
 	"IdleProject.Inventory.EnhanceFormula.Curve",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -395,6 +527,51 @@ bool FEquipmentAffixHudSummaryTest::RunTest(const FString& Parameters)
 		TEXT("Affix summary uses stable crit speed magic order"),
 		IdleProject::UI::BuildAffixSummary(FullAffixItem).ToString(),
 		FString(TEXT("Crit +3% / ASPD +0.10 / MATK +12")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEquipmentSetHudSummaryTest,
+	"IdleProject.UI.HUD.EquipmentSetSummary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEquipmentSetHudSummaryTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	TArray<FItemInstance> EquippedItems;
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("common_shoes"), EItemSlot::Shoes, EItemRarity::Common, 0.0f, 2.0f, 5.0f));
+
+	const FIdleHUDSetSummaryViewModel ViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
+	TestEqual(TEXT("Only non-empty item sets are summarized"), ViewModel.Rows.Num(), 1);
+	TestEqual(TEXT("Warrior row counts three pieces toward four-piece cap"), ViewModel.Rows[0].PieceCount, 3);
+	TestEqual(TEXT("Warrior row exposes current tier label"), ViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("2-piece active")));
+	TestEqual(TEXT("Warrior row exposes next tier label"), ViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Next 4-piece: 1 more")));
+	TestEqual(TEXT("Warrior row summarizes active set bonus"), ViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: PATK +20")));
+	TestEqual(TEXT("Warrior row summary is compact for equipment HUD"), ViewModel.Rows[0].SummaryLabel.ToString(), FString(TEXT("Warrior Set 3/4 (2-piece active)")));
+
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	const FIdleHUDSetSummaryViewModel FourPieceViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
+	TestEqual(TEXT("Four-piece row exposes four-piece tier label"), FourPieceViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("4-piece active")));
+	TestEqual(TEXT("Four-piece row reports complete state"), FourPieceViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Set complete")));
+	TestEqual(TEXT("Four-piece row summarizes cumulative set bonus"), FourPieceViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: PATK +70 / Crit +5%")));
+
+	TArray<FItemInstance> UnderThresholdItems;
+	UnderThresholdItems.Add(MakeTestItem(TEXT("guardian_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Guardian));
+	const FIdleHUDSetSummaryViewModel UnderThresholdViewModel = IdleProject::UI::BuildSetSummaryViewModel(UnderThresholdItems);
+	TestEqual(TEXT("Under-threshold row exposes inactive tier"), UnderThresholdViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("No set bonus")));
+	TestEqual(TEXT("Under-threshold row points to two-piece"), UnderThresholdViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Next 2-piece: 1 more")));
+	TestEqual(TEXT("Under-threshold row has no active bonus"), UnderThresholdViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: -")));
+
+	TArray<FItemInstance> NoSetItems;
+	NoSetItems.Add(MakeTestItem(TEXT("plain_sword"), EItemSlot::Weapon, EItemRarity::Common, 10.0f, 0.0f, 0.0f));
+	const FIdleHUDSetSummaryViewModel NoSetViewModel = IdleProject::UI::BuildSetSummaryViewModel(NoSetItems);
+	TestEqual(TEXT("No-set equipment does not create a set row"), NoSetViewModel.Rows.Num(), 0);
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
