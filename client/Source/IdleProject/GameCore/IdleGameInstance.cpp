@@ -4,6 +4,7 @@
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
+#include "GameCore/TranscendFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Internationalization/IdleLocalization.h"
@@ -313,6 +314,51 @@ bool UIdleGameInstance::Rebirth()
 int32 UIdleGameInstance::PreviewRebirthReward() const
 {
 	return FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
+}
+
+bool UIdleGameInstance::CanTranscend() const
+{
+	return FTranscendFormula::CanTranscend(RebirthCount);
+}
+
+bool UIdleGameInstance::Transcend()
+{
+	if (!CanTranscend())
+	{
+		return false;
+	}
+
+	++TranscendCount;
+	RebirthCount = 0;
+	RebirthBonusPoints = 0;
+	CharacterLevel = 1;
+	CurrentExp = 0;
+	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	AvailableStatPoints = 0;
+	AllocatedStats = FPrimaryStats();
+	Gold = 0;
+	bChapter1BossDefeated = false;
+	if (StageService)
+	{
+		StageService->InitializeDefaultStages();
+	}
+
+	OnTranscend.Broadcast();
+	OnGoldChanged.Broadcast(Gold);
+	OnExpChanged.Broadcast(CurrentExp, NextExp);
+	OnStatPointsChanged.Broadcast();
+	OnLevelUp.Broadcast(CharacterLevel);
+	return true;
+}
+
+float UIdleGameInstance::GetTranscendStatMultiplier() const
+{
+	return FTranscendFormula::GetTranscendStatMultiplier(TranscendCount);
+}
+
+float UIdleGameInstance::PreviewTranscendMultiplier() const
+{
+	return FTranscendFormula::GetTranscendStatMultiplier(TranscendCount + 1);
 }
 
 void UIdleGameInstance::MarkChapter1BossDefeated()

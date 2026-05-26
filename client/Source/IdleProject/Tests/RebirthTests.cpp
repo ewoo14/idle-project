@@ -5,8 +5,26 @@
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/RebirthFormula.h"
+#include "GameCore/TranscendFormula.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+bool PerformRebirths(UIdleGameInstance& GameInstance, int32 Count)
+{
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		GameInstance.AddExp(FLevelFormulas::CumulativeExp(100));
+		GameInstance.MarkChapter1BossDefeated();
+		if (!GameInstance.Rebirth())
+		{
+			return false;
+		}
+	}
+	return true;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FRebirthFormulaRewardTest,
@@ -22,6 +40,25 @@ bool FRebirthFormulaRewardTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Level 109 keeps the level 100 reward floor"), FRebirthFormula::GetRebirthPointsReward(0, 109), static_cast<int32>(5));
 	TestEqual(TEXT("Level 110 adds the first level bonus point"), FRebirthFormula::GetRebirthPointsReward(0, 110), static_cast<int32>(6));
 	TestEqual(TEXT("Negative inputs clamp to first level 100 reward"), FRebirthFormula::GetRebirthPointsReward(-1, 1), static_cast<int32>(5));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FTranscendFormulaTest,
+	"IdleProject.GameCore.Transcend.Formula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTranscendFormulaTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Transcend requires five rebirths"), FTranscendFormula::TranscendRebirthThreshold, static_cast<int32>(5));
+	TestEqual(TEXT("Zero transcend count keeps neutral multiplier"), FTranscendFormula::GetTranscendStatMultiplier(0), 1.0f);
+	TestEqual(TEXT("One transcend adds twenty five percent"), FTranscendFormula::GetTranscendStatMultiplier(1), 1.25f);
+	TestEqual(TEXT("Four transcends double combat stats"), FTranscendFormula::GetTranscendStatMultiplier(4), 2.0f);
+	TestEqual(TEXT("Negative transcend count clamps to neutral multiplier"), FTranscendFormula::GetTranscendStatMultiplier(-1), 1.0f);
+	TestFalse(TEXT("Four rebirths cannot transcend"), FTranscendFormula::CanTranscend(4));
+	TestTrue(TEXT("Five rebirths can transcend"), FTranscendFormula::CanTranscend(5));
+	TestTrue(TEXT("Higher rebirth counts can transcend"), FTranscendFormula::CanTranscend(9));
 
 	return true;
 }
@@ -77,6 +114,80 @@ bool FIdleGameInstanceLevelUpGrantsStatPointsTest::RunTest(const FString& Parame
 
 	TestEqual(TEXT("Level 2 grants formula stat points"), GameInstance->GetAvailableStatPoints(), FStatPointFormula::GetStatPointsForLevelUp(2));
 	TestEqual(TEXT("Level 2 total stat points matches formula"), GameInstance->GetAvailableStatPoints(), FStatPointFormula::GetTotalStatPointsForLevel(GameInstance->GetCharacterLevel()));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceTranscendGateAndPreviewTest,
+	"IdleProject.GameCore.Transcend.GateAndPreview",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceTranscendGateAndPreviewTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		return false;
+	}
+
+	TestFalse(TEXT("Fresh game cannot transcend"), GameInstance->CanTranscend());
+	TestEqual(TEXT("Fresh game has zero transcend count"), GameInstance->GetTranscendCount(), static_cast<int32>(0));
+	TestEqual(TEXT("Fresh game has neutral transcend multiplier"), GameInstance->GetTranscendStatMultiplier(), 1.0f);
+	TestEqual(TEXT("Preview shows the next transcend multiplier"), GameInstance->PreviewTranscendMultiplier(), 1.25f);
+	TestFalse(TEXT("Transcend returns false before threshold"), GameInstance->Transcend());
+
+	TestTrue(TEXT("Test setup performs four rebirths"), PerformRebirths(*GameInstance, 4));
+	TestFalse(TEXT("Four rebirths still cannot transcend"), GameInstance->CanTranscend());
+
+	GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+	GameInstance->MarkChapter1BossDefeated();
+	TestTrue(TEXT("Fifth rebirth succeeds"), GameInstance->Rebirth());
+	TestTrue(TEXT("Five rebirths can transcend"), GameInstance->CanTranscend());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceTranscendResetTest,
+	"IdleProject.GameCore.Transcend.ResetAndCount",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceTranscendResetTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		return false;
+	}
+
+	TestTrue(TEXT("Test setup reaches transcend threshold"), PerformRebirths(*GameInstance, FTranscendFormula::TranscendRebirthThreshold));
+	GameInstance->AddGold(1234);
+	GameInstance->GrantStatPoints(2);
+	TestTrue(TEXT("Allocated STR setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Str));
+	TestTrue(TEXT("Chapter boss setup is marked"), [&GameInstance]()
+	{
+		GameInstance->MarkChapter1BossDefeated();
+		return GameInstance->HasDefeatedChapter1Boss();
+	}());
+
+	const int64 ExpectedNextExp = FLevelFormulas::ExpToNext(1);
+	TestTrue(TEXT("Transcend succeeds at threshold"), GameInstance->Transcend());
+	TestEqual(TEXT("Transcend count increments"), GameInstance->GetTranscendCount(), static_cast<int32>(1));
+	TestEqual(TEXT("Rebirth count resets to zero"), GameInstance->GetRebirthCount(), static_cast<int32>(0));
+	TestEqual(TEXT("Rebirth bonus points reset to zero"), GameInstance->GetRebirthBonusPoints(), static_cast<int32>(0));
+	TestEqual(TEXT("Level resets to one"), GameInstance->GetCharacterLevel(), static_cast<int32>(1));
+	TestEqual(TEXT("Exp resets to zero"), GameInstance->GetCurrentExp(), static_cast<int64>(0));
+	TestEqual(TEXT("Next exp resets to level one curve"), GameInstance->GetNextExp(), ExpectedNextExp);
+	TestEqual(TEXT("Available stat points reset to zero"), GameInstance->GetAvailableStatPoints(), static_cast<int32>(0));
+	TestEqual(TEXT("Allocated STR resets to zero"), GameInstance->GetAllocatedPrimaryStats().Str, 0.0f);
+	TestEqual(TEXT("Transcend V1 resets gold to zero"), GameInstance->GetGold(), static_cast<int64>(0));
+	TestFalse(TEXT("Chapter boss gate resets after transcend"), GameInstance->HasDefeatedChapter1Boss());
+	TestEqual(TEXT("Current multiplier reflects new transcend count"), GameInstance->GetTranscendStatMultiplier(), 1.25f);
+	TestEqual(TEXT("Preview advances from current count"), GameInstance->PreviewTranscendMultiplier(), 1.5f);
+	TestFalse(TEXT("Cannot transcend again after rebirth count reset"), GameInstance->Transcend());
 
 	return true;
 }
