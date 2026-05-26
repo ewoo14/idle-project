@@ -41,6 +41,8 @@ describe("pet level formulas", () => {
   });
 
   it.each([
+    { basePercent: 20, level: 1, expectedPercent: 22 },
+    { basePercent: 15, level: 1, expectedPercent: 16.5 },
     { basePercent: 20, level: 10, expectedPercent: 40 },
     { basePercent: 15, level: 10, expectedPercent: 30 },
   ])("computes effective pet bonus percent", ({

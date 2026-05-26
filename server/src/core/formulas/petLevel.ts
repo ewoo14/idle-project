@@ -22,5 +22,5 @@ export function getEffectiveBonusPercent(
   basePercent: number,
   level: number,
 ): number {
-  return basePercent * getBonusMultiplier(level);
+  return Math.fround(Math.fround(basePercent) * getBonusMultiplier(level));
 }

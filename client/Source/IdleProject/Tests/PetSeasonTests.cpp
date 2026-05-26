@@ -99,6 +99,7 @@ bool FPetServiceGrowthTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Bird can be fed"), Pets->FeedPet(TEXT("bird")));
 	TestEqual(TEXT("Level one bird scales 15 percent drop bonus to 16.5 percent"), Pets->GetEquippedPetDropBonusPercent(), 16.5f);
 	TestEqual(TEXT("Level one bird drop bonus applies scaled percent"), Pets->ApplyDropBonusChance(0.1f), 0.1165f);
+	TestEqual(TEXT("Level one bird drop chance stays clamped at one"), Pets->ApplyDropBonusChance(1.0f), 1.0f);
 
 	TestFalse(TEXT("Unknown pet cannot be fed"), Pets->FeedPet(TEXT("slime")));
 	for (int32 FeedCount = Pets->GetPetLevel(TEXT("dog")); FeedCount < FPetLevelFormula::MaxPetLevel; ++FeedCount)
@@ -139,6 +140,32 @@ bool FIdleGameInstancePetFeedTest::RunTest(const FString& Parameters)
 	FPetFeedResult UnknownResult = GameInstance->TryFeedPet(TEXT("slime"));
 	TestFalse(TEXT("Unknown pet cannot be fed"), UnknownResult.bFed);
 	TestEqual(TEXT("Unknown pet reports zero level"), UnknownResult.NewLevel, 0);
+	TestEqual(TEXT("Unknown pet spends nothing"), UnknownResult.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Unknown pet leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	int64 TotalCostToMax = 0;
+	for (int32 Level = 1; Level < FPetLevelFormula::MaxPetLevel; ++Level)
+	{
+		TotalCostToMax += FPetLevelFormula::GetFeedCost(Level);
+	}
+	GameInstance->AddGold(TotalCostToMax + 5000);
+	for (int32 Level = 1; Level < FPetLevelFormula::MaxPetLevel; ++Level)
+	{
+		TestTrue(TEXT("Dog can be fed through max level"), GameInstance->TryFeedPet(TEXT("dog")).bFed);
+	}
+	const int64 GoldAtMax = GameInstance->GetGold();
+	FPetFeedResult MaxResult = GameInstance->TryFeedPet(TEXT("dog"));
+	TestFalse(TEXT("Max-level pet cannot be fed"), MaxResult.bFed);
+	TestEqual(TEXT("Max-level pet reports current level"), MaxResult.NewLevel, FPetLevelFormula::MaxPetLevel);
+	TestEqual(TEXT("Max-level pet spends nothing"), MaxResult.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Max-level pet leaves gold unchanged"), GameInstance->GetGold(), GoldAtMax);
+
+	TestTrue(TEXT("GameInstance equips bird"), GameInstance->EquipPet(TEXT("bird")));
+	GameInstance->AddGold(FPetLevelFormula::GetFeedCost(0));
+	FPetFeedResult BirdFedResult = GameInstance->TryFeedPet(TEXT("bird"));
+	TestTrue(TEXT("Bird feed succeeds through GameInstance"), BirdFedResult.bFed);
+	TestEqual(TEXT("GameInstance exposes scaled pet drop bonus after feed"), GameInstance->GetEquippedPetDropBonusPercent(), 16.5f);
+	TestEqual(TEXT("GameInstance applies scaled pet drop bonus"), GameInstance->ApplyEquippedPetDropBonusChance(0.1f), 0.1165f);
 
 	return true;
 }
