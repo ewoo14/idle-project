@@ -2,9 +2,30 @@
 
 #include "GameCore/QuestService.h"
 #include "GameCore/OfflineRewardFormula.h"
+#include "Internationalization/IdleLocalization.h"
+#include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+FItemInstance MakeHudTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel)
+{
+	FItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Slot = Slot;
+	Item.Rarity = Rarity;
+	Item.DisplayName = FText::FromName(ItemId);
+	Item.BonusAtk = Atk;
+	Item.BonusDef = Def;
+	Item.BonusHp = Hp;
+	Item.EnhanceLevel = EnhanceLevel;
+	return Item;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FOfflineRewardHudViewModelTest,
@@ -106,6 +127,63 @@ bool FRebirthHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Button uses approved Korean copy"), ReadyViewModel.ButtonLabel.ToString(), FString(TEXT("환생 진행")));
 	TestTrue(TEXT("Ready state enables rebirth button"), ReadyViewModel.bCanRebirth);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhanceHudViewModelTest,
+	"IdleProject.UI.HUD.EnhancePanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeHudTestItem(TEXT("iron_sword"), EItemSlot::Weapon, EItemRarity::Rare, 12.0f, 0.0f, 0.0f, 2));
+	Inventory->AddItem(MakeHudTestItem(TEXT("training_helmet"), EItemSlot::Helmet, EItemRarity::Common, 0.0f, 3.0f, 15.0f, FEnhanceFormula::MaxEnhanceLevel));
+
+	const FIdleHUDEnhancePanelViewModel ViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
+	TestEqual(TEXT("Enhance panel title uses localized copy"), ViewModel.Title.ToString(), FString(TEXT("Enhancement")));
+	TestEqual(TEXT("Enhance panel shows all equipment slots"), ViewModel.Rows.Num(), 8);
+	TestEqual(TEXT("Panel gold label exposes current gold"), ViewModel.GoldLabel.ToString(), FString(TEXT("Gold 1,000")));
+
+	const FIdleHUDEnhanceSlotViewModel& WeaponRow = ViewModel.Rows[0];
+	TestEqual(TEXT("Weapon row targets weapon slot"), WeaponRow.Slot, EItemSlot::Weapon);
+	TestTrue(TEXT("Equipped weapon row is visible as equipped"), WeaponRow.bEquipped);
+	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / +5")));
+	TestEqual(TEXT("Weapon next cost follows formula"), WeaponRow.Cost, static_cast<int64>(900));
+	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 900")));
+	TestEqual(TEXT("Weapon success rate follows formula"), WeaponRow.SuccessRate, 0.70f);
+	TestEqual(TEXT("Weapon success label is localized"), WeaponRow.SuccessRateLabel.ToString(), FString(TEXT("Success 70%")));
+	TestTrue(TEXT("Enough gold and below max enables enhance"), WeaponRow.bCanEnhance);
+	TestEqual(TEXT("Enabled button uses enhance copy"), WeaponRow.ButtonLabel.ToString(), FString(TEXT("Enhance")));
+
+	const FIdleHUDEnhanceSlotViewModel& HelmetRow = ViewModel.Rows[1];
+	TestTrue(TEXT("Max level row is equipped"), HelmetRow.bEquipped);
+	TestFalse(TEXT("Max level row disables enhance"), HelmetRow.bCanEnhance);
+	TestTrue(TEXT("Max level row is marked max"), HelmetRow.bMaxLevel);
+	TestEqual(TEXT("Max level row status is localized"), HelmetRow.StatusLabel.ToString(), FString(TEXT("Max")));
+
+	const FIdleHUDEnhanceSlotViewModel& TopRow = ViewModel.Rows[2];
+	TestFalse(TEXT("Empty slot row is not equipped"), TopRow.bEquipped);
+	TestFalse(TEXT("Empty slot cannot enhance"), TopRow.bCanEnhance);
+	TestEqual(TEXT("Empty slot row status is localized"), TopRow.StatusLabel.ToString(), FString(TEXT("Empty")));
+
+	const FIdleHUDEnhancePanelViewModel PoorViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 100, FText::GetEmpty(), false);
+	TestFalse(TEXT("Gold shortage disables weapon enhance"), PoorViewModel.Rows[0].bCanEnhance);
+	TestFalse(TEXT("Gold shortage is exposed"), PoorViewModel.Rows[0].bGoldEnough);
+	TestEqual(TEXT("Gold shortage row status is localized"), PoorViewModel.Rows[0].StatusLabel.ToString(), FString(TEXT("Need Gold")));
+
+	const FIdleHUDEnhancePanelViewModel SuccessViewModel = IdleProject::UI::BuildEnhancePanelViewModel(
+		*Inventory,
+		1000,
+		FText::FromString(TEXT("Success +3")),
+		true);
+	TestEqual(TEXT("Feedback label is carried into view model"), SuccessViewModel.FeedbackLabel.ToString(), FString(TEXT("Success +3")));
+	TestTrue(TEXT("Feedback success flag is carried into view model"), SuccessViewModel.bFeedbackSuccess);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
