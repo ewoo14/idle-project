@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getEnhanceCost,
   getEnhanceSuccessRate,
+  getRarityCostMultiplier,
   MAX_ENHANCE_LEVEL,
   rollEnhanceSuccess,
 } from "./enhance.js";
@@ -25,6 +26,24 @@ describe("enhance formulas", () => {
 
   it("clamps negative levels to the level zero cost", () => {
     expect(getEnhanceCost(-1)).toBe(100);
+  });
+
+  it.each([
+    ["None", 0],
+    ["Common", 1],
+    ["Uncommon", 2],
+    ["Rare", 4],
+    ["Epic", 8],
+    ["Legendary", 16],
+  ] as const)("computes %s enhance cost multiplier", (rarity, expected) => {
+    expect(getRarityCostMultiplier(rarity)).toBe(expected);
+  });
+
+  it("applies rarity multiplier while keeping Common cost compatible", () => {
+    expect(getEnhanceCost(1, "Common")).toBe(400);
+    expect(getEnhanceCost(1, "Rare")).toBe(1600);
+    expect(getEnhanceCost(0, "Legendary")).toBe(1600);
+    expect(getEnhanceCost(MAX_ENHANCE_LEVEL, "Legendary")).toBe(0);
   });
 
   it.each([

@@ -104,7 +104,9 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 		return Result;
 	}
 
-	const int64 Cost = FEnhanceFormula::GetEnhanceCost(CurrentLevel);
+	const FItemInstance* EquippedItem = Inventory->GetEquippedItem(Slot);
+	const EItemRarity Rarity = EquippedItem ? EquippedItem->Rarity : EItemRarity::None;
+	const int64 Cost = FEnhanceFormula::GetEnhanceCost(CurrentLevel, Rarity);
 	if (Cost <= 0 || Gold < Cost)
 	{
 		OnEnhanceResult.Broadcast(Result);

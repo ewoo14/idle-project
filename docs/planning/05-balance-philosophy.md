@@ -768,6 +768,39 @@ Pressure check against PR #33:
   raise `BaseCost` in both `FShopFormula` and the server `shop.ts` mirror, then
   update parity tests in the same change.
 
+## PR #39 Rarity-Scaled Enhancement Cost V1
+
+Enhancement cost keeps the PR #33 level curve and multiplies it by equipped item
+rarity:
+
+```text
+EnhanceCost = 100 * (CurrentLevel + 1)^2 * RarityCostMultiplier
+```
+
+| Rarity | Cost multiplier |
+| --- | ---: |
+| None | 0 |
+| Common | 1 |
+| Uncommon | 2 |
+| Rare | 4 |
+| Epic | 8 |
+| Legendary | 16 |
+
+The single-argument client/server helper remains Common-compatible so existing
+Common anchors keep their PR #33 values. Equipped-item enhancement and the HUD
+panel must pass the actual equipped rarity. A Rare +0 attempt costs 400 gold,
+and a Legendary +0 attempt costs 1,600 gold; max-level items still cost 0.
+Success rates, failure behavior, and the `1 + EnhanceLevel * 0.1` stat payoff do
+not change in this slice.
+
+Pressure check using the PR #33 expected Common +0 to +5 cost of 11,020.66 gold:
+a single Legendary item costs 176,330.56 expected gold, and eight Legendary
+slots cost 1,410,644.48 expected gold. Against the sampled PR #33 median Lv50
+blended income of 654,689 gold/hour, that full Legendary pass is about 2.154h
+of income. Common early enhancement remains unchanged while high-rarity
+enhancement becomes a visible midgame/endgame sink alongside the repeatable
+shop roll outlet from PR #38.
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:

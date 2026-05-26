@@ -14,6 +14,11 @@ constexpr float EnhanceSuccessRates[FEnhanceFormula::MaxEnhanceLevel] = {
 
 int64 FEnhanceFormula::GetEnhanceCost(int32 CurrentLevel)
 {
+	return GetEnhanceCost(CurrentLevel, EItemRarity::Common);
+}
+
+int64 FEnhanceFormula::GetEnhanceCost(int32 CurrentLevel, EItemRarity Rarity)
+{
 	if (CurrentLevel >= MaxEnhanceLevel)
 	{
 		return 0;
@@ -21,7 +26,27 @@ int64 FEnhanceFormula::GetEnhanceCost(int32 CurrentLevel)
 
 	const int32 ClampedLevel = FMath::Max(CurrentLevel, 0);
 	const int64 NextLevel = static_cast<int64>(ClampedLevel) + 1;
-	return BaseEnhanceCost * NextLevel * NextLevel;
+	return BaseEnhanceCost * NextLevel * NextLevel * GetRarityCostMultiplier(Rarity);
+}
+
+int64 FEnhanceFormula::GetRarityCostMultiplier(EItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EItemRarity::Common:
+		return 1;
+	case EItemRarity::Uncommon:
+		return 2;
+	case EItemRarity::Rare:
+		return 4;
+	case EItemRarity::Epic:
+		return 8;
+	case EItemRarity::Legendary:
+		return 16;
+	case EItemRarity::None:
+	default:
+		return 0;
+	}
 }
 
 float FEnhanceFormula::GetEnhanceSuccessRate(int32 CurrentLevel)

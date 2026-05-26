@@ -106,3 +106,13 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   destruction on failure, and the `1 + EnhanceLevel * 0.1` stat payoff.
 - [ ] Reward-vs-HP parity remains documented for Stage 1-1 through 1-5, with
   the 8x boss reward bonus reviewed separately from normal farming.
+
+## PR #39 Balance Checklist Addendum (Section 4)
+
+- [ ] `FEnhanceFormula::GetRarityCostMultiplier` and the server mirror keep
+  None/Common/Uncommon/Rare/Epic/Legendary multipliers at 0/1/2/4/8/16.
+- [ ] `TryEnhanceEquipped` spends the equipped item's rarity-scaled cost exactly
+  once and preserves invalid-slot, empty-slot, max-level, and insufficient-gold
+  guards.
+- [ ] The HUD enhancement panel displays rarity-scaled cost for each equipped
+  slot while Common remains compatible with the PR #33 cost curve.
