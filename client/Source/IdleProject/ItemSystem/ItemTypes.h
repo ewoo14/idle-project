@@ -28,6 +28,15 @@ enum class EItemRarity : uint8
 	Legendary = 5 UMETA(DisplayName = "Legendary")
 };
 
+UENUM(BlueprintType)
+enum class EItemSet : uint8
+{
+	None = 0 UMETA(Hidden),
+	Warrior = 1 UMETA(DisplayName = "Warrior"),
+	Guardian = 2 UMETA(DisplayName = "Guardian"),
+	Arcane = 3 UMETA(DisplayName = "Arcane")
+};
+
 /** 장비 1개의 런타임 인스턴스입니다. */
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FItemInstance
@@ -42,6 +51,9 @@ struct IDLEPROJECT_API FItemInstance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	EItemRarity Rarity = EItemRarity::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	EItemSet ItemSet = EItemSet::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	FText DisplayName;

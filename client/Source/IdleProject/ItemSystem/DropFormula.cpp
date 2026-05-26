@@ -93,11 +93,32 @@ EItemRarity FDropFormula::RollRarityForLevel(int32 Level, FRandomStream& Rng)
 	return EItemRarity::Legendary;
 }
 
+EItemSet FDropFormula::RollItemSet(EItemRarity Rarity, FRandomStream& Rng)
+{
+	if (Rarity == EItemRarity::None || Rarity == EItemRarity::Common)
+	{
+		return EItemSet::None;
+	}
+
+	const int32 Roll = Rng.RandRange(0, 2);
+	switch (Roll)
+	{
+	case 0:
+		return EItemSet::Warrior;
+	case 1:
+		return EItemSet::Guardian;
+	case 2:
+	default:
+		return EItemSet::Arcane;
+	}
+}
+
 FItemInstance FDropFormula::ComputeItemBonus(EItemSlot Slot, int32 Level, EItemRarity Rarity, float Variance)
 {
 	FItemInstance Item;
 	Item.Slot = Slot;
 	Item.Rarity = Rarity;
+	Item.ItemSet = EItemSet::None;
 	Item.EnhanceLevel = 0;
 
 	const int32 SafeLevel = FMath::Max(Level, 1);

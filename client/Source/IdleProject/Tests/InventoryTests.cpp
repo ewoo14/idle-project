@@ -5,6 +5,7 @@
 #include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
@@ -13,12 +14,13 @@
 
 namespace
 {
-FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0, float CritRate = 0.0f, float AtkSpeed = 0.0f, float MagicAtk = 0.0f)
+FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0, float CritRate = 0.0f, float AtkSpeed = 0.0f, float MagicAtk = 0.0f, EItemSet ItemSet = EItemSet::None)
 {
 	FItemInstance Item;
 	Item.ItemId = ItemId;
 	Item.Slot = Slot;
 	Item.Rarity = Rarity;
+	Item.ItemSet = ItemSet;
 	Item.DisplayName = FText::FromName(ItemId);
 	Item.BonusAtk = Atk;
 	Item.BonusDef = Def;
@@ -212,6 +214,99 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Legendary roll is deterministic for crit"), LegendaryA.BonusCritRate, LegendaryB.BonusCritRate);
 	TestEqual(TEXT("Legendary roll is deterministic for speed"), LegendaryA.BonusAtkSpeed, LegendaryB.BonusAtkSpeed);
 	TestEqual(TEXT("Legendary roll is deterministic for magic"), LegendaryA.BonusMagicAtk, LegendaryB.BonusMagicAtk);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaRollItemSetTest,
+	"IdleProject.Inventory.DropFormula.RollItemSet",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaRollItemSetTest::RunTest(const FString& Parameters)
+{
+	FRandomStream CommonRngA(4301);
+	FRandomStream CommonRngB(4301);
+	TestEqual(TEXT("Common items do not roll an item set"), FDropFormula::RollItemSet(EItemRarity::Common, CommonRngA), EItemSet::None);
+	TestEqual(TEXT("Common item set roll is deterministic"), FDropFormula::RollItemSet(EItemRarity::Common, CommonRngB), EItemSet::None);
+
+	bool bFoundWarrior = false;
+	bool bFoundGuardian = false;
+	bool bFoundArcane = false;
+	FRandomStream RareRng(4302);
+	for (int32 Index = 0; Index < 120; ++Index)
+	{
+		const EItemSet ItemSet = FDropFormula::RollItemSet(EItemRarity::Rare, RareRng);
+		TestTrue(TEXT("Rare+ set roll stays in enum range"), ItemSet >= EItemSet::Warrior && ItemSet <= EItemSet::Arcane);
+		bFoundWarrior = bFoundWarrior || ItemSet == EItemSet::Warrior;
+		bFoundGuardian = bFoundGuardian || ItemSet == EItemSet::Guardian;
+		bFoundArcane = bFoundArcane || ItemSet == EItemSet::Arcane;
+	}
+
+	TestTrue(TEXT("Rare+ rolls can produce Warrior"), bFoundWarrior);
+	TestTrue(TEXT("Rare+ rolls can produce Guardian"), bFoundGuardian);
+	TestTrue(TEXT("Rare+ rolls can produce Arcane"), bFoundArcane);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSetBonusFormulaThresholdsTest,
+	"IdleProject.Inventory.SetBonusFormula.Thresholds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSetBonusFormulaThresholdsTest::RunTest(const FString& Parameters)
+{
+	TArray<FItemInstance> EquippedItems;
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 3.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	FDerivedStats Bonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
+	TestEqual(TEXT("Warrior 2-piece grants physical attack"), Bonus.PhysAtk, 20.0f);
+	TestEqual(TEXT("Warrior 2-piece does not grant crit"), Bonus.CritRate, 0.0f);
+
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	Bonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
+	TestEqual(TEXT("Warrior 4-piece includes 2-piece and 4-piece attack"), Bonus.PhysAtk, 70.0f);
+	TestEqual(TEXT("Warrior 4-piece grants crit rate"), Bonus.CritRate, 0.05f);
+
+	TArray<FItemInstance> MixedItems;
+	MixedItems.Add(MakeTestItem(TEXT("none_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 3.0f, 0.0f, 0.0f));
+	MixedItems.Add(MakeTestItem(TEXT("guardian_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Guardian));
+	Bonus = FSetBonusFormula::ComputeSetBonus(MixedItems);
+	TestEqual(TEXT("None and under-threshold sets grant no attack"), Bonus.PhysAtk, 0.0f);
+	TestEqual(TEXT("None and under-threshold sets grant no defense"), Bonus.PhysDef, 0.0f);
+	TestEqual(TEXT("None and under-threshold sets grant no HP"), Bonus.Hp, 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEquipmentBonusSetBonusTest,
+	"IdleProject.Inventory.Bonus.SetBonus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEquipmentBonusSetBonusTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	const FItemInstance WarriorWeapon = MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior);
+	Inventory->AddItem(WarriorWeapon);
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	Inventory->AddItem(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+
+	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Equipment bonus includes per-item attack and Warrior set attack"), Bonus.PhysAtk, 80.0f);
+	TestEqual(TEXT("Equipment bonus includes per-item defense only for defense"), Bonus.PhysDef, 15.0f);
+	TestEqual(TEXT("Equipment bonus includes Warrior set crit"), Bonus.CritRate, 0.05f);
+
+	const FPrimaryStats Primary(10.0f, 10.0f, 10.0f, 10.0f, 10.0f, 10.0f);
+	const FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, 1, Bonus);
+	TestEqual(TEXT("Derived stats include set physical attack"), Derived.PhysAtk, 100.0f);
+	TestEqual(TEXT("Derived stats include set crit rate"), Derived.CritRate, 0.07f);
+	TestEqual(TEXT("PowerScore ignores item set membership"), FItemPowerScore::Compute(WarriorWeapon), 10);
 
 	return true;
 }

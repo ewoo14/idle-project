@@ -161,3 +161,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   bonus points, and skill passive effects.
 - [ ] UE Automation covers getter values after refresh and combat stat
   initialization parity.
+
+## PR #43 Character Checklist Addendum (Section 4)
+
+- [ ] `FItemInstance` defaults `ItemSet` to `EItemSet::None`, and set membership
+  does not change `FItemPowerScore::Compute`.
+- [ ] `FDropFormula::RollItemSet` is deterministic with injected
+  `FRandomStream`, keeps Common/None as no-set, and assigns Rare+ items to
+  Warrior, Guardian, or Arcane.
+- [ ] `FSetBonusFormula::ComputeSetBonus` applies tiered 2-piece and 4-piece
+  flat `FDerivedStats` bonuses, with 4-piece including the 2-piece bonus.
+- [ ] `UInventoryComponent::ComputeEquipmentBonus` adds set bonuses after
+  per-item enhanced bonuses, with under-threshold and None-set equipment
+  preserving legacy totals.
+- [ ] UE Automation covers set roll behavior, 2-piece/4-piece thresholds,
+  equipment bonus propagation, derived stat propagation, under-threshold
+  regression, and PowerScore regression.
