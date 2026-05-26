@@ -44,16 +44,24 @@ bool UCombatComponent::RollCrit()
 
 void UCombatComponent::TakeDamage(float Damage, AActor* Instigator)
 {
+	TakeDamageTyped(Damage, Instigator, false, EDamageKind::Physical);
+}
+
+void UCombatComponent::TakeDamageTyped(float Damage, AActor* Instigator, bool bWasCrit, EDamageKind Kind)
+{
 	if (IsDead())
 	{
 		return;
 	}
 
-	CurrentHp = FMath::Clamp(CurrentHp - FMath::Max(0.0f, Damage), 0.0f, MaxHp);
+	const float AppliedDamage = FMath::Max(0.0f, Damage);
+	CurrentHp = FMath::Clamp(CurrentHp - AppliedDamage, 0.0f, MaxHp);
 	OnHpChanged.Broadcast(CurrentHp);
 
-	if (Damage > 0.0f)
+	if (AppliedDamage > 0.0f)
 	{
+		OnDamageReceived.Broadcast(AppliedDamage, bWasCrit, Kind);
+
 		if (USkillComponent* Skills = GetOwner() ? GetOwner()->FindComponentByClass<USkillComponent>() : nullptr)
 		{
 			Skills->AddGauge(Skills->GetGaugeGainOnTakeDamage());
