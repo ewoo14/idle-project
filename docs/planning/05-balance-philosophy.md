@@ -609,7 +609,7 @@ Rules:
 - `AIdleCharacter::HandleLevelUp` grants `USkillComponent` exactly 1 skill
   point per level-up event.
 - Each skill has an independent rank stored by `SkillId`.
-- `MaxRank` is 5.
+- `MaxRank` is 50.
 - `RankUpSkill(SkillId)` spends 1 skill point and increases that skill by 1
   rank when the skill is loaded, points are available, and rank is below max.
 - Damage skills use
@@ -628,29 +628,37 @@ Worked examples:
 | 3 | 1.30x | 0.85x |
 | 4 | 1.40x | 0.80x |
 | 5 | 1.50x | 0.75x |
+| 20 | 3.00x | floor 0.1s |
+| 50 | 6.00x | floor 0.1s |
 
 For `heavy_strike` (`baseDamageCoeff=2.5`, `baseCooldown=4.0s`), rank 5
 therefore resolves to `effectiveDamageCoeff=3.75` and
-`effectiveCooldown=3.0s`. This is the V1 cap: +50% damage coefficient and -25%
-cooldown from five level-up skill points spent into one skill.
+`effectiveCooldown=3.0s`, preserving the original low-rank behavior. Rank 20
+reaches the cooldown floor (`0.1s`), and rank 50 resolves to
+`effectiveDamageCoeff=15.0` with the same cooldown floor. This extends the
+skill sink to 50 points while keeping the rank 0 through 5 curve unchanged.
 
 V1 policy:
 
 - Class switching keeps the global point/rank state in memory. A rank only
   applies when its matching `SkillId` exists in the currently loaded skill set.
 - Rebirth-specific reset or preservation rules are deferred to a later slice.
-- No server persistence or formula mirror is shipped in this C++-only step.
+- Server persistence is still deferred, but `server/src/core/formulas/skillRank.ts`
+  mirrors the client damage/cooldown rank formulas for balance and parity tests.
 
 Automation coverage:
 
 - `IdleProject.Combat.Skills.RankPoints` verifies point grants, rank-up spend,
   missing-skill rejection, no-point rejection, and max-rank clamp.
-- `IdleProject.Combat.Skills.RankEffectiveValues` verifies rank 2 damage and
-  cooldown effective values plus cooldown remaining/ratio routing.
+- `IdleProject.Combat.Skills.RankEffectiveValues` verifies rank 2, rank 5,
+  rank 20 cooldown floor, and rank 50 damage/cooldown values plus cooldown
+  remaining/ratio routing.
 - `IdleProject.Combat.Skills.RankDamageApplication` verifies ranked damage uses
   the effective damage coefficient in `TickSkills`/damage application.
 - `IdleProject.Character.LevelUp.GrantsSkillPoint` verifies the character
   level-up handler grants one skill point.
+- `server/src/core/formulas/skillRank.test.ts` verifies the TypeScript mirror
+  for MaxRank, rank 0/5/50 damage, cooldown floor, and zero-cooldown skills.
 
 ---
 

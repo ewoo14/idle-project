@@ -17,16 +17,28 @@ Automation: `IdleProject.Character.LevelUp.GrantsSkillPoint`
 
 Given `heavy_strike` is loaded at rank 0 and the character has skill points
 When the player ranks up `heavy_strike`
-Then each rank spends 1 point and the rank cannot exceed `MaxRank=5`.
+Then each rank spends 1 point and the rank cannot exceed `MaxRank=50`.
 
 Automation: `IdleProject.Combat.Skills.RankPoints`
 
 ## Scenario 3: Rank Affects Damage And Cooldown
 
 Given `heavy_strike` has `baseDamageCoeff=2.5` and `baseCooldown=4.0s`
+When it is rank 0
+Then the effective damage coefficient is 2.5 and the effective cooldown is
+4.0s.
+
 When it reaches rank 5
 Then the effective damage coefficient is 3.75 and the effective cooldown is
 3.0s, matching +50% damage coefficient and -25% cooldown.
+
+When it reaches rank 20
+Then the effective damage coefficient is 7.5 and the effective cooldown is
+floored at 0.1s.
+
+When it reaches rank 50
+Then the effective damage coefficient is 15.0, matching a 6.0x multiplier,
+and the effective cooldown remains floored at 0.1s.
 
 Automation: `IdleProject.Combat.Skills.RankEffectiveValues`
 
@@ -67,4 +79,5 @@ Automation: `IdleProject.UI.HUD.SkillDisplayModel`
   `IdleProject.Combat.Skills.RankDamageApplication`,
   `IdleProject.Character.LevelUp.GrantsSkillPoint`, and
   `IdleProject.UI.HUD.SkillDisplayModel`.
+- Server Vitest stdout for `server/src/core/formulas/skillRank.test.ts`.
 - Build stdout for the UE editor target before PR handoff.

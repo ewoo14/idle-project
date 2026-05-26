@@ -89,7 +89,7 @@ public:
 	TArray<FSkillDefinition> Skills;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Idle|Skill|Rank", meta = (ClampMin = "1"))
-	int32 MaxRank = 5;
+	int32 MaxRank = 50;
 
 	/** 전사 기본 스킬 7종을 정적 정의에서 다시 로드하고 런타임 상태를 초기화합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
