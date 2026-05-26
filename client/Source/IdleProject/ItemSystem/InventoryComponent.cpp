@@ -93,6 +93,9 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier;
 		Bonus.PhysDef += Item.BonusDef * EnhanceMultiplier;
 		Bonus.Hp += Item.BonusHp * EnhanceMultiplier;
+		Bonus.CritRate += Item.BonusCritRate * EnhanceMultiplier;
+		Bonus.AtkSpeed += Item.BonusAtkSpeed * EnhanceMultiplier;
+		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier;
 	}
 	return Bonus;
 }

@@ -55,6 +55,15 @@ struct IDLEPROJECT_API FItemInstance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	float BonusHp = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusCritRate = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusAtkSpeed = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusMagicAtk = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item", meta = (ClampMin = "0", ClampMax = "5"))
 	int32 EnhanceLevel = 0;
 };
@@ -63,7 +72,13 @@ struct IDLEPROJECT_API FItemPowerScore
 {
 	static int32 Compute(const FItemInstance& Item)
 	{
-		const float RawScore = (Item.BonusAtk + Item.BonusDef + Item.BonusHp / 10.0f)
+		const float BaseScore = Item.BonusAtk
+			+ Item.BonusDef
+			+ Item.BonusHp / 10.0f
+			+ Item.BonusCritRate * 1000.0f
+			+ Item.BonusAtkSpeed * 100.0f
+			+ Item.BonusMagicAtk;
+		const float RawScore = BaseScore
 			* (1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f);
 		return FMath::RoundToInt(RawScore);
 	}

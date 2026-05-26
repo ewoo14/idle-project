@@ -822,6 +822,52 @@ The balance simulator reports these rarity scenarios:
 | Epic | 8 | 44,000 | 88,165.25 |
 | Legendary | 16 | 88,000 | 176,330.51 |
 
+## PR #40 Item Affix V1
+
+Affixes add build variety without changing the drop rate, gold reward, or
+enhancement cost curves. Base item stats stay on the PR #36 rarity multiplier
+path; affixes are extra item fields with zero defaults, so legacy items keep
+their existing PowerScore and equipment bonuses.
+
+Affix count by rarity:
+
+| Rarity | Affix count |
+| --- | ---: |
+| None | 0 |
+| Common | 0 |
+| Uncommon | 1 |
+| Rare | 1 |
+| Epic | 2 |
+| Legendary | 2-3 |
+
+V1 affix types:
+
+| Affix | Roll range |
+| --- | ---: |
+| CritRate | +0.01 to +0.05 |
+| AtkSpeed | +0.05 to +0.15 |
+| MagicAtk | round(Level * 0.5 to Level * 1.5) |
+
+`FDropFormula::RollAffixes` uses an injected `FRandomStream` and picks unique
+affix types per item. `UInventoryComponent::ComputeEquipmentBonus` applies the
+same `1 + EnhanceLevel * 0.1` multiplier to affix bonuses as to ATK/DEF/HP,
+then `FStatFormulas::DeriveStats` keeps the existing final clamps: AtkSpeed
+0.5-3.0 and CritRate 0-1.
+
+PowerScore now values affixes before enhancement:
+
+```text
+PowerScore = round((ATK + DEF + HP / 10 + CritRate * 1000 + AtkSpeed * 100 + MagicAtk)
+  * (1 + EnhanceLevel * 0.1))
+```
+
+Automation coverage:
+
+- `IdleProject.Inventory.DropFormula.RollAffixes`
+- `IdleProject.Inventory.Bonus.Affixes`
+- `IdleProject.Inventory.ItemPowerScore.Deterministic`
+- `IdleProject.Character.StatFormulas.DeriveStats`
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:

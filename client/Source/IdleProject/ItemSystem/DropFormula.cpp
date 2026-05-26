@@ -1,5 +1,42 @@
 #include "ItemSystem/DropFormula.h"
 
+namespace
+{
+enum class EAffixKind : uint8
+{
+	CritRate,
+	AtkSpeed,
+	MagicAtk
+};
+
+int32 GetAffixCount(EItemRarity Rarity, FRandomStream& Rng)
+{
+	switch (Rarity)
+	{
+	case EItemRarity::Uncommon:
+	case EItemRarity::Rare:
+		return 1;
+	case EItemRarity::Epic:
+		return 2;
+	case EItemRarity::Legendary:
+		return Rng.GetFraction() < 0.5f ? 2 : 3;
+	case EItemRarity::None:
+	case EItemRarity::Common:
+	default:
+		return 0;
+	}
+}
+
+void ShuffleAffixKinds(TArray<EAffixKind>& Kinds, FRandomStream& Rng)
+{
+	for (int32 Index = Kinds.Num() - 1; Index > 0; --Index)
+	{
+		const int32 SwapIndex = Rng.RandRange(0, Index);
+		Kinds.Swap(Index, SwapIndex);
+	}
+}
+}
+
 float FDropFormula::GetRarityStatMultiplier(EItemRarity Rarity)
 {
 	switch (Rarity)
@@ -92,4 +129,40 @@ FItemInstance FDropFormula::ComputeItemBonus(EItemSlot Slot, int32 Level, EItemR
 	}
 
 	return Item;
+}
+
+void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& Rng, FItemInstance& OutItem)
+{
+	const int32 AffixCount = GetAffixCount(Rarity, Rng);
+	if (AffixCount <= 0)
+	{
+		return;
+	}
+
+	TArray<EAffixKind> AffixKinds{
+		EAffixKind::CritRate,
+		EAffixKind::AtkSpeed,
+		EAffixKind::MagicAtk
+	};
+	ShuffleAffixKinds(AffixKinds, Rng);
+
+	const int32 SafeLevel = FMath::Max(Level, 1);
+	const int32 ClampedCount = FMath::Min(AffixCount, AffixKinds.Num());
+	for (int32 Index = 0; Index < ClampedCount; ++Index)
+	{
+		switch (AffixKinds[Index])
+		{
+		case EAffixKind::CritRate:
+			OutItem.BonusCritRate = FMath::RoundToFloat(Rng.FRandRange(0.01f, 0.05f) * 1000.0f) / 1000.0f;
+			break;
+		case EAffixKind::AtkSpeed:
+			OutItem.BonusAtkSpeed = FMath::RoundToFloat(Rng.FRandRange(0.05f, 0.15f) * 1000.0f) / 1000.0f;
+			break;
+		case EAffixKind::MagicAtk:
+			OutItem.BonusMagicAtk = static_cast<float>(FMath::RoundToInt(static_cast<float>(SafeLevel) * Rng.FRandRange(0.5f, 1.5f)));
+			break;
+		default:
+			break;
+		}
+	}
 }

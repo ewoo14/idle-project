@@ -12,7 +12,7 @@
 
 namespace
 {
-FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0)
+FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, float Atk, float Def, float Hp, int32 EnhanceLevel = 0, float CritRate = 0.0f, float AtkSpeed = 0.0f, float MagicAtk = 0.0f)
 {
 	FItemInstance Item;
 	Item.ItemId = ItemId;
@@ -23,6 +23,9 @@ FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, flo
 	Item.BonusDef = Def;
 	Item.BonusHp = Hp;
 	Item.EnhanceLevel = EnhanceLevel;
+	Item.BonusCritRate = CritRate;
+	Item.BonusAtkSpeed = AtkSpeed;
+	Item.BonusMagicAtk = MagicAtk;
 	return Item;
 }
 }
@@ -109,6 +112,9 @@ bool FDropFormulaComputeItemBonusTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Legendary weapon attack scales by level variance and rarity"), LegendaryWeapon.BonusAtk, 48.0f);
 	TestEqual(TEXT("Legendary weapon has no defense bonus"), LegendaryWeapon.BonusDef, 0.0f);
 	TestEqual(TEXT("Legendary weapon has no HP bonus"), LegendaryWeapon.BonusHp, 0.0f);
+	TestEqual(TEXT("Computed base item has no crit affix"), LegendaryWeapon.BonusCritRate, 0.0f);
+	TestEqual(TEXT("Computed base item has no attack speed affix"), LegendaryWeapon.BonusAtkSpeed, 0.0f);
+	TestEqual(TEXT("Computed base item has no magic attack affix"), LegendaryWeapon.BonusMagicAtk, 0.0f);
 
 	const FItemInstance EpicAccessory = FDropFormula::ComputeItemBonus(EItemSlot::Accessory, 10, EItemRarity::Epic, 1.0f);
 	TestEqual(TEXT("Epic accessory attack split"), EpicAccessory.BonusAtk, 11.5f);
@@ -123,6 +129,59 @@ bool FDropFormulaComputeItemBonusTest::RunTest(const FString& Parameters)
 	const FItemInstance RareArmor = FDropFormula::ComputeItemBonus(EItemSlot::Helmet, 10, EItemRarity::Rare, 2.0f);
 	TestEqual(TEXT("Rare armor defense uses float slot split"), RareArmor.BonusDef, 23.8f);
 	TestEqual(TEXT("Rare armor HP uses float slot split"), RareArmor.BonusHp, 102.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaRollAffixesTest,
+	"IdleProject.Inventory.DropFormula.RollAffixes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
+{
+	FItemInstance Common = MakeTestItem(TEXT("common_sword"), EItemSlot::Weapon, EItemRarity::Common, 1.0f, 0.0f, 0.0f);
+	FRandomStream CommonRng(4001);
+	FDropFormula::RollAffixes(Common.Rarity, 20, CommonRng, Common);
+	TestEqual(TEXT("Common items roll no crit affix"), Common.BonusCritRate, 0.0f);
+	TestEqual(TEXT("Common items roll no speed affix"), Common.BonusAtkSpeed, 0.0f);
+	TestEqual(TEXT("Common items roll no magic affix"), Common.BonusMagicAtk, 0.0f);
+
+	FItemInstance Uncommon = MakeTestItem(TEXT("uncommon_sword"), EItemSlot::Weapon, EItemRarity::Uncommon, 1.0f, 0.0f, 0.0f);
+	FRandomStream UncommonRng(4001);
+	FDropFormula::RollAffixes(Uncommon.Rarity, 20, UncommonRng, Uncommon);
+	const int32 UncommonAffixCount =
+		(Uncommon.BonusCritRate > 0.0f ? 1 : 0) +
+		(Uncommon.BonusAtkSpeed > 0.0f ? 1 : 0) +
+		(Uncommon.BonusMagicAtk > 0.0f ? 1 : 0);
+	TestEqual(TEXT("Uncommon rolls one affix"), UncommonAffixCount, 1);
+
+	FItemInstance Epic = MakeTestItem(TEXT("epic_sword"), EItemSlot::Weapon, EItemRarity::Epic, 1.0f, 0.0f, 0.0f);
+	FRandomStream EpicRng(4002);
+	FDropFormula::RollAffixes(Epic.Rarity, 20, EpicRng, Epic);
+	const int32 EpicAffixCount =
+		(Epic.BonusCritRate > 0.0f ? 1 : 0) +
+		(Epic.BonusAtkSpeed > 0.0f ? 1 : 0) +
+		(Epic.BonusMagicAtk > 0.0f ? 1 : 0);
+	TestEqual(TEXT("Epic rolls two unique affixes"), EpicAffixCount, 2);
+	TestTrue(TEXT("Crit affix stays in range when present"), Epic.BonusCritRate == 0.0f || (Epic.BonusCritRate >= 0.01f && Epic.BonusCritRate <= 0.05f));
+	TestTrue(TEXT("Attack speed affix stays in range when present"), Epic.BonusAtkSpeed == 0.0f || (Epic.BonusAtkSpeed >= 0.05f && Epic.BonusAtkSpeed <= 0.15f));
+	TestTrue(TEXT("Magic attack affix scales by level when present"), Epic.BonusMagicAtk == 0.0f || (Epic.BonusMagicAtk >= 10.0f && Epic.BonusMagicAtk <= 30.0f));
+
+	FItemInstance LegendaryA = MakeTestItem(TEXT("legendary_a"), EItemSlot::Weapon, EItemRarity::Legendary, 1.0f, 0.0f, 0.0f);
+	FItemInstance LegendaryB = MakeTestItem(TEXT("legendary_b"), EItemSlot::Weapon, EItemRarity::Legendary, 1.0f, 0.0f, 0.0f);
+	FRandomStream LegendaryRngA(4003);
+	FRandomStream LegendaryRngB(4003);
+	FDropFormula::RollAffixes(LegendaryA.Rarity, 20, LegendaryRngA, LegendaryA);
+	FDropFormula::RollAffixes(LegendaryB.Rarity, 20, LegendaryRngB, LegendaryB);
+	const int32 LegendaryAffixCount =
+		(LegendaryA.BonusCritRate > 0.0f ? 1 : 0) +
+		(LegendaryA.BonusAtkSpeed > 0.0f ? 1 : 0) +
+		(LegendaryA.BonusMagicAtk > 0.0f ? 1 : 0);
+	TestTrue(TEXT("Legendary rolls two or three affixes"), LegendaryAffixCount >= 2 && LegendaryAffixCount <= 3);
+	TestEqual(TEXT("Legendary roll is deterministic for crit"), LegendaryA.BonusCritRate, LegendaryB.BonusCritRate);
+	TestEqual(TEXT("Legendary roll is deterministic for speed"), LegendaryA.BonusAtkSpeed, LegendaryB.BonusAtkSpeed);
+	TestEqual(TEXT("Legendary roll is deterministic for magic"), LegendaryA.BonusMagicAtk, LegendaryB.BonusMagicAtk);
 
 	return true;
 }
@@ -178,6 +237,9 @@ bool FItemPowerScoreDeterministicTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("같은 아이템 점수 1"), FItemPowerScore::Compute(Sword), 12);
 	TestEqual(TEXT("같은 아이템 점수 2"), FItemPowerScore::Compute(Sword), 12);
+
+	const FItemInstance AffixSword = MakeTestItem(TEXT("affix_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 2, 0.02f, 0.10f, 5.0f);
+	TestEqual(TEXT("Affixes contribute weighted power before enhance multiplier"), FItemPowerScore::Compute(AffixSword), 54);
 
 	return true;
 }
@@ -331,6 +393,25 @@ bool FInventoryEquipmentBonusTwoSlotsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("무기 공격력 보너스"), Bonus.PhysAtk, 12.0f);
 	TestEqual(TEXT("투구 방어력 보너스"), Bonus.PhysDef, 4.0f);
 	TestEqual(TEXT("투구 체력 보너스"), Bonus.Hp, 20.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEquipmentBonusAffixTest,
+	"IdleProject.Inventory.Bonus.Affixes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEquipmentBonusAffixTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 2, 0.02f, 0.10f, 5.0f));
+
+	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Enhanced item increases physical attack"), Bonus.PhysAtk, 12.0f);
+	TestEqual(TEXT("Enhanced item increases crit affix"), Bonus.CritRate, 0.024f);
+	TestEqual(TEXT("Enhanced item increases attack speed affix"), Bonus.AtkSpeed, 0.12f);
+	TestEqual(TEXT("Enhanced item increases magic attack affix"), Bonus.MagicAtk, 6.0f);
 
 	return true;
 }
