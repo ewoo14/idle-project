@@ -87,6 +87,19 @@ struct IDLEPROJECT_API FIdleHUDRebirthViewModel
 	bool bLevelReady = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDTranscendViewModel
+{
+	FText Title;
+	FText StatusLabel;
+	FText RequirementLabel;
+	FText CurrentMultiplierLabel;
+	FText PreviewMultiplierLabel;
+	FText CountLabel;
+	FText ButtonLabel;
+	bool bCanTranscend = false;
+	bool bThresholdReady = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDClassSelectionOptionViewModel
 {
 	EClassId ClassId = EClassId::Warrior;
@@ -313,6 +326,7 @@ IDLEPROJECT_API FText BuildChapterClearFeedbackLabel(int32 Chapter);
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints, int32 PreviewRebirthReward);
+IDLEPROJECT_API FIdleHUDTranscendViewModel BuildTranscendViewModel(bool bCanTranscend, int32 RebirthCount, int32 Threshold, int32 TranscendCount, float CurrentMultiplier, float PreviewMultiplier);
 IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
 IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel);
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
@@ -371,6 +385,9 @@ protected:
 	void HandleStatPointsChanged();
 
 	UFUNCTION()
+	void HandleTranscend();
+
+	UFUNCTION()
 	void HandleBossSpecialAttack(AActor* Boss);
 
 	UFUNCTION()
@@ -421,6 +438,8 @@ private:
 	void ClaimQuestFromHitBox(FName BoxName);
 	void DrawRebirthPanel();
 	void TryRebirth();
+	void DrawTranscendPanel();
+	void TryTranscend();
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipPetFromHitBox(FName BoxName);
@@ -448,9 +467,11 @@ private:
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
 	FText EnhanceFeedbackLabel;
 	FText PetFeedbackLabel;
+	FText TranscendFeedbackLabel;
 	bool bEnhanceFeedbackSuccess = false;
 	bool bPetFeedbackSuccess = false;
 	float PetFeedbackStartTime = -1000.0f;
+	float TranscendFeedbackStartTime = -1000.0f;
 	FShopPurchaseResult LastShopPurchaseResult;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
 	FDelegateHandle AnyDamageReceivedHandle;

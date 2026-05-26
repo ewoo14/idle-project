@@ -1029,3 +1029,40 @@ Balance guardrails:
 - Re-run `npm run balance:sim` after changing `petLevel.ts`,
   `FPetLevelFormula`, kill gold, shop cost, or enhancement cost. The report must
   include `Pet Feed Gold Pressure` with the 1000-run Lv50 gold/hour reference.
+
+## PR #47 Transcendence V1
+
+Transcendence is the second prestige layer above rebirth. V1 unlocks
+`Transcend()` at `RebirthCount >= 5`. A successful transcend increments
+`TranscendCount`, resets rebirth progress and short-cycle progression to zero or
+level 1, and grants a permanent global combat-stat multiplier:
+
+```text
+TranscendStatMultiplier = 1 + max(0, TranscendCount) * 0.25
+```
+
+The multiplier is intentionally linear and uncapped in V1. The first transcend
+therefore gives 1.25x, four transcends give 2.00x, and ten transcends give
+3.50x. It applies only to HP, physical attack, magic attack, physical defense,
+and magic defense. Rate-style stats such as attack speed, crit rate, crit
+damage, dodge, and accuracy stay on their existing clamps and item/class
+systems.
+
+The threshold of five rebirths is a pacing trade-off: it asks the player to
+complete a meaningful rebirth loop before the deeper reset, but it is still
+short enough that the 25% permanent multiplier can be felt on the next climb.
+Because transcend resets `RebirthCount` and `RebirthBonusPoints`, the PR #46
+rebirth reward formula restarts from count 0 after each transcend. This prevents
+the rebirth count scaler and transcend multiplier from compounding in the same
+loop without a reset cost.
+
+V1 guardrails:
+
+- Count 0 must be a neutral 1.00x multiplier and preserve existing combat stats.
+- Server `transcend.ts` must use `Math.fround` at the same formula boundary as
+  the client float formula.
+- HUD copy must show locked/ready state, current rebirths versus threshold,
+  current multiplier, next multiplier, count, and a disabled action below the
+  threshold.
+- Re-run UE automation and server Vitest when changing the threshold,
+  multiplier step, reset policy, or affected stat list.

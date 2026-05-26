@@ -24,3 +24,4 @@ export * from "./shop.js";
 export * from "./stage.js";
 export * from "./statPoints.js";
 export * from "./stats.js";
+export * from "./transcend.js";

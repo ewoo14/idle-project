@@ -13,6 +13,7 @@
 #include "EngineUtils.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/PetLevelFormula.h"
+#include "GameCore/TranscendFormula.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -25,6 +26,7 @@ namespace
 {
 const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
 const FName RebirthHitBoxName(TEXT("RebirthAction"));
+const FName TranscendHitBoxName(TEXT("TranscendAction"));
 const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
@@ -44,6 +46,7 @@ constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
 constexpr float BossSpecialWarningDurationSeconds = 1.6f;
 constexpr float StageFeedbackDurationSeconds = 2.2f;
 constexpr float PetFeedbackDurationSeconds = 2.2f;
+constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -1099,6 +1102,40 @@ FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth
 	return ViewModel;
 }
 
+FIdleHUDTranscendViewModel IdleProject::UI::BuildTranscendViewModel(bool bCanTranscend, int32 RebirthCount, int32 Threshold, int32 TranscendCount, float CurrentMultiplier, float PreviewMultiplier)
+{
+	FIdleHUDTranscendViewModel ViewModel;
+	const int32 SafeThreshold = FMath::Max(1, Threshold);
+	const int32 SafeRebirthCount = FMath::Max(0, RebirthCount);
+	const int32 SafeTranscendCount = FMath::Max(0, TranscendCount);
+	const FString CurrentMultiplierText = FString::Printf(TEXT("x%.2f"), FMath::Max(0.0f, CurrentMultiplier));
+	const FString PreviewMultiplierText = FString::Printf(TEXT("x%.2f"), FMath::Max(0.0f, PreviewMultiplier));
+
+	ViewModel.bCanTranscend = bCanTranscend;
+	ViewModel.bThresholdReady = SafeRebirthCount >= SafeThreshold;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("TRANSCEND_TITLE"));
+	ViewModel.StatusLabel = IdleProject::Localization::UI(bCanTranscend ? TEXT("TRANSCEND_STATUS_READY") : TEXT("TRANSCEND_STATUS_LOCKED"));
+	ViewModel.RequirementLabel = FormatLocalizedUI(TEXT("TRANSCEND_REQUIREMENT_FORMAT"), [SafeRebirthCount, SafeThreshold](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Rebirth"), FText::AsNumber(SafeRebirthCount));
+		Args.Add(TEXT("Threshold"), FText::AsNumber(SafeThreshold));
+	});
+	ViewModel.CurrentMultiplierLabel = FormatLocalizedUI(TEXT("TRANSCEND_CURRENT_MULTIPLIER_FORMAT"), [&CurrentMultiplierText](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Multiplier"), FText::FromString(CurrentMultiplierText));
+	});
+	ViewModel.PreviewMultiplierLabel = FormatLocalizedUI(TEXT("TRANSCEND_PREVIEW_MULTIPLIER_FORMAT"), [&PreviewMultiplierText](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Multiplier"), FText::FromString(PreviewMultiplierText));
+	});
+	ViewModel.CountLabel = FormatLocalizedUI(TEXT("TRANSCEND_COUNT_FORMAT"), [SafeTranscendCount](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Count"), FText::AsNumber(SafeTranscendCount));
+	});
+	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("TRANSCEND_BUTTON"));
+	return ViewModel;
+}
+
 TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelectionOptions(EClassId CurrentClassId)
 {
 	struct FClassOptionSeed
@@ -1312,6 +1349,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnShopPurchase.AddDynamic(this, &AIdleHUD::HandleShopPurchase);
 	IdleGameInstance->OnPetFed.AddDynamic(this, &AIdleHUD::HandlePetFed);
 	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
+	IdleGameInstance->OnTranscend.AddDynamic(this, &AIdleHUD::HandleTranscend);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
@@ -1357,6 +1395,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		IdleGameInstance->OnShopPurchase.RemoveDynamic(this, &AIdleHUD::HandleShopPurchase);
 		IdleGameInstance->OnPetFed.RemoveDynamic(this, &AIdleHUD::HandlePetFed);
 		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
+		IdleGameInstance->OnTranscend.RemoveDynamic(this, &AIdleHUD::HandleTranscend);
 	}
 
 	if (GEngine && GEngine->GameViewport && RootWidget)
@@ -1387,6 +1426,7 @@ void AIdleHUD::DrawHUD()
 	DrawStageIndicator();
 	DrawBossBar();
 	DrawRebirthPanel();
+	DrawTranscendPanel();
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
@@ -1459,6 +1499,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == RebirthHitBoxName)
 	{
 		TryRebirth();
+		return;
+	}
+	if (BoxName == TranscendHitBoxName)
+	{
+		TryTranscend();
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -1606,6 +1651,23 @@ void AIdleHUD::HandlePetFed(const FPetFeedResult& Result)
 
 void AIdleHUD::HandleStatPointsChanged()
 {
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::HandleTranscend()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const float CurrentMultiplier = IdleGameInstance ? IdleGameInstance->GetTranscendStatMultiplier() : 1.0f;
+	const FString MultiplierText = FString::Printf(TEXT("x%.2f"), FMath::Max(0.0f, CurrentMultiplier));
+	TranscendFeedbackLabel = FormatLocalizedUI(TEXT("TRANSCEND_FEEDBACK_FORMAT"), [&MultiplierText](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Multiplier"), FText::FromString(MultiplierText));
+	});
+	const UWorld* World = GetWorld();
+	TranscendFeedbackStartTime = World ? World->GetTimeSeconds() : 0.0f;
 	RefreshMouseInteraction();
 }
 
@@ -2930,6 +2992,95 @@ void AIdleHUD::TryRebirth()
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::DrawTranscendPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FIdleHUDTranscendViewModel ViewModel = BuildTranscendViewModel(
+		IdleGameInstance->CanTranscend(),
+		IdleGameInstance->GetRebirthCount(),
+		FTranscendFormula::TranscendRebirthThreshold,
+		IdleGameInstance->GetTranscendCount(),
+		IdleGameInstance->GetTranscendStatMultiplier(),
+		IdleGameInstance->PreviewTranscendMultiplier());
+
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - TranscendFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !TranscendFeedbackLabel.IsEmpty() && FeedbackElapsed <= TranscendFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 320.0f * Scale, 440.0f * Scale);
+	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
+	const float PanelHeight = (178.0f * Scale) + FeedbackHeight;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 522.0f * Scale;
+	const float Padding = 16.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const FLinearColor StateColor = ViewModel.bCanTranscend ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.72f);
+	const FLinearColor RequirementColor = ViewModel.bThresholdReady ? Theme::AccentBlue : Theme::TextMuted;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(StateColor, X, Y, PanelWidth, Border);
+	DrawRect(StateColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(StateColor, X, Y, Border, PanelHeight);
+	DrawRect(StateColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.95f * Scale);
+	DrawText(ViewModel.StatusLabel.ToString(), StateColor, X + PanelWidth - 122.0f * Scale, Y + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(ViewModel.RequirementLabel.ToString(), RequirementColor, X + Padding, Y + 52.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.CountLabel.ToString(), Theme::TextPrimary, X + 154.0f * Scale, Y + 52.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.CurrentMultiplierLabel.ToString(), Theme::AccentGold, X + Padding, Y + 84.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
+	DrawText(ViewModel.PreviewMultiplierLabel.ToString(), Theme::TextMuted, X + Padding, Y + 112.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+
+	const float ButtonWidth = 112.0f * Scale;
+	const float ButtonHeight = 34.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + 128.0f * Scale;
+	DrawRect(ViewModel.bCanTranscend ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanTranscend ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 22.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+	if (ViewModel.bCanTranscend)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), TranscendHitBoxName, true, 81);
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(TranscendFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, Y + 164.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryTranscend()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || !IdleGameInstance->Transcend())
+	{
+		return;
+	}
+
+	if (AIdleCharacter* IdleCharacter = PlayerOwner ? Cast<AIdleCharacter>(PlayerOwner->GetPawn()) : nullptr)
+	{
+		IdleCharacter->RefreshDerivedStats();
+	}
+	RefreshMouseInteraction();
+}
+
 void AIdleHUD::DrawPetPanel()
 {
 	using namespace IdleProject::UI;
@@ -3291,7 +3442,8 @@ void AIdleHUD::RefreshMouseInteraction()
 	}
 
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady;
+	const bool bTranscendReady = IdleGameInstance && IdleGameInstance->CanTranscend();
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

@@ -169,6 +169,12 @@ void AIdleCharacter::RefreshDerivedStats()
 	{
 		Skills->ApplyPassivesToStats(Derived);
 	}
+	const float TranscendMultiplier = IdleGameInstance ? IdleGameInstance->GetTranscendStatMultiplier() : 1.0f;
+	Derived.Hp *= TranscendMultiplier;
+	Derived.PhysAtk *= TranscendMultiplier;
+	Derived.MagicAtk *= TranscendMultiplier;
+	Derived.PhysDef *= TranscendMultiplier;
+	Derived.MagicDef *= TranscendMultiplier;
 
 	CachedPrimaryStats = Primary;
 	CachedDerivedStats = Derived;

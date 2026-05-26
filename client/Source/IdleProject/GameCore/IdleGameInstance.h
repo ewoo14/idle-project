@@ -19,6 +19,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatPointsChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTranscend);
 
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FEnhanceAttemptResult
@@ -195,6 +196,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
 	int32 GetRebirthBonusPoints() const { return RebirthBonusPoints; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
+	bool CanTranscend() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Transcend")
+	bool Transcend();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
+	int32 GetTranscendCount() const { return TranscendCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
+	float GetTranscendStatMultiplier() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
+	float PreviewTranscendMultiplier() const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Offline")
 	int64 GetLastSeenUnixSec() const { return LastSeenUnixSec; }
 
@@ -260,6 +276,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Stats")
 	FOnStatPointsChanged OnStatPointsChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Transcend")
+	FOnTranscend OnTranscend;
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Enhance")
 	FOnEnhanceResult OnEnhanceResult;
 
@@ -309,6 +328,9 @@ private:
 
 	UPROPERTY()
 	int32 RebirthBonusPoints = 0;
+
+	UPROPERTY()
+	int32 TranscendCount = 0;
 
 	UPROPERTY()
 	int32 AvailableStatPoints = 0;
