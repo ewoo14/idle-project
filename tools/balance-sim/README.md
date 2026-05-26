@@ -53,6 +53,10 @@ Rare, Epic, and Legendary. The report keeps the Common +0 to +5 detail table
 for PR #33 compatibility, then adds a rarity summary and an eight-slot
 Legendary estimate for high-rarity sink pressure.
 
+PR #42 adds pet feed pressure. The simulator imports `petLevel.ts`, reports the
+Lv0 to Lv10 feed-cost path, and compares the dog gold-bonus payback against the
+sampled median Lv50 gold/hour.
+
 ## V1 Interpretation
 
 The V1 pass is a distribution check, not a curve rewrite. It validates the
@@ -94,3 +98,14 @@ Enhancement V1 pressure, using the current +0 to +5 formula:
 
 This keeps Common enhancement a light early gold sink in the current model
 while making high-rarity enhancement visible as midgame/endgame pressure.
+
+Pet growth V1 pressure:
+
+- total Lv0 to Lv10 feed cost: 192,500 gold
+- dog gold bonus: 20% to 40% (+20 percentage points)
+- bird drop bonus: 15% to 30% (+15 percentage points)
+- dog payback at median sampled Lv50 gold/hour: 1.47h
+
+This makes dog feeding a recoupable gold investment rather than a first-rebirth
+progression wall. Bird feeding should be reviewed through loot-quality
+telemetry because its drop bonus does not directly convert to gold/hour.

@@ -901,3 +901,52 @@ phase and special-attack constants do not change EXP or reward formulas by
 themselves. Re-run `npm run balance:sim` after boss HP, boss ATK, reward
 scaling, or equipment/enhancement pressure changes, and compare the result to
 the 5-10h first-rebirth target.
+
+## PR #42 Pet Growth Gold Sink V1
+
+Pet growth adds a gold-only sink to the existing PR #22 pet bonuses. The shared
+client/server formula is:
+
+```text
+MaxPetLevel = 10
+FeedCost(currentLevel) = 500 * (currentLevel + 1)^2, for Lv0 through Lv9
+FeedCost(currentLevel >= 10) = 0
+BonusMultiplier(level) = 1 + level * 0.1, clamped to Lv0 through Lv10
+```
+
+The full Lv0 to Lv10 feed path costs 192,500 gold:
+
+| Current | Next | Feed cost | Cumulative cost | Dog gold bonus | Bird drop bonus |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| Lv0 | Lv1 | 500 | 500 | 22% | 16.5% |
+| Lv1 | Lv2 | 2,000 | 2,500 | 24% | 18% |
+| Lv2 | Lv3 | 4,500 | 7,000 | 26% | 19.5% |
+| Lv3 | Lv4 | 8,000 | 15,000 | 28% | 21% |
+| Lv4 | Lv5 | 12,500 | 27,500 | 30% | 22.5% |
+| Lv5 | Lv6 | 18,000 | 45,500 | 32% | 24% |
+| Lv6 | Lv7 | 24,500 | 70,000 | 34% | 25.5% |
+| Lv7 | Lv8 | 32,000 | 102,000 | 36% | 27% |
+| Lv8 | Lv9 | 40,500 | 142,500 | 38% | 28.5% |
+| Lv9 | Lv10 | 50,000 | 192,500 | 40% | 30% |
+
+Against the PR #32 sampled median Lv50 blended gold income of 654,689 gold/hour,
+maxing the dog increases the gold bonus from 20% to 40%. The incremental
+20 percentage points are worth about 130,938 gold/hour at that reference rate,
+so the 192,500 gold investment pays back in about 1.47h. This is intentionally
+shorter than the first-rebirth 5-10h median target: the pet sink is an early
+recoupable investment, not a hard progression wall.
+
+Balance guardrails:
+
+- Dog growth compounds future gold income, so avoid making the Lv0 to Lv10
+  curve steeper unless telemetry shows gold hoarding after shop and enhancement
+  spend.
+- Bird growth doubles the drop bonus from 15% to 30%, but it does not directly
+  generate gold. Treat it as loot-depth pressure and compare against equipment
+  quality metrics, not only gold/hour.
+- Pet feeding competes with enhancement and shop gold. Since it does not add
+  direct combat power or EXP, it should not shorten the first-rebirth EXP curve
+  by itself.
+- Re-run `npm run balance:sim` after changing `petLevel.ts`,
+  `FPetLevelFormula`, kill gold, shop cost, or enhancement cost. The report must
+  include `Pet Feed Gold Pressure` with the 1000-run Lv50 gold/hour reference.
