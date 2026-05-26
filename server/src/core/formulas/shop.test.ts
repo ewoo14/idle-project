@@ -5,8 +5,11 @@ import { getGearRollCost as getGearRollCostDirect } from "./shop.js";
 describe("shop formulas", () => {
   it.each([
     { globalStageIndex: 0, expectedCost: 300 },
+    { globalStageIndex: 1, expectedCost: 345 },
     { globalStageIndex: 4, expectedCost: 480 },
+    { globalStageIndex: 5, expectedCost: 525 },
     { globalStageIndex: 9, expectedCost: 705 },
+    { globalStageIndex: 10, expectedCost: 750 },
   ])("mirrors client gear roll cost for global stage index $globalStageIndex", ({
     globalStageIndex,
     expectedCost,

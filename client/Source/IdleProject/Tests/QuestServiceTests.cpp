@@ -66,6 +66,21 @@ bool FIdleGameInstanceGearRollPurchaseTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Result name matches inventory item"), Equipped->DisplayName.ToString(), Success.ItemName.ToString());
 	}
 
+	UIdleGameInstance* FullInventoryGameInstance = NewObject<UIdleGameInstance>();
+	UInventoryComponent* FullInventory = NewObject<UInventoryComponent>();
+	for (int32 Index = 0; Index < 100; ++Index)
+	{
+		const FName ItemId(*FString::Printf(TEXT("full_inventory_sword_%d"), Index));
+		TestTrue(TEXT("Full inventory setup accepts item"), FullInventory->AddItem(MakeEnhanceTestItem(ItemId, EItemSlot::Weapon)));
+	}
+
+	FullInventoryGameInstance->AddGold(Cost);
+	const FShopPurchaseResult FullInventoryResult = FullInventoryGameInstance->TryBuyGearRoll(FullInventory);
+	TestFalse(TEXT("Full inventory does not purchase"), FullInventoryResult.bPurchased);
+	TestEqual(TEXT("Full inventory spends nothing"), FullInventoryResult.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Full inventory keeps gold balance"), FullInventoryGameInstance->GetGold(), Cost);
+	TestEqual(TEXT("Full inventory does not add item"), FullInventory->GetItemCount(), 100);
+
 	return true;
 }
 
