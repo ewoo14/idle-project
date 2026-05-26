@@ -70,6 +70,46 @@ bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossHudViewModelTest,
+	"IdleProject.UI.HUD.BossViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossHudViewModelTest::RunTest(const FString& Parameters)
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FIdleHUDBossViewModel PhaseTwoView = BuildBossViewModel(250.0f, 500.0f);
+	TestTrue(TEXT("Boss HUD is visible for a valid boss health pool"), PhaseTwoView.bVisible);
+	TestEqual(TEXT("Boss HP ratio is normalized"), PhaseTwoView.HpRatio, 0.5f);
+	TestEqual(TEXT("Boss HP percent is exposed"), PhaseTwoView.HpPercent, 50.0f);
+	TestEqual(TEXT("Boss phase mirrors formula"), PhaseTwoView.Phase, 2);
+	TestEqual(TEXT("Boss title is localized"), PhaseTwoView.TitleLabel.ToString(), FString(TEXT("Boss")));
+	TestEqual(TEXT("Boss HP label is localized"), PhaseTwoView.HpLabel.ToString(), FString(TEXT("HP 250 / 500")));
+	TestEqual(TEXT("Boss phase label is localized"), PhaseTwoView.PhaseLabel.ToString(), FString(TEXT("Phase 2")));
+	TestEqual(TEXT("Phase 2 uses warning color"), PhaseTwoView.PhaseColor.G, Warn.G);
+
+	const FIdleHUDBossViewModel PhaseTwoBoundaryView = BuildBossViewModel(330.0f, 500.0f);
+	TestEqual(TEXT("Boss HUD mirrors 0.66 boundary as phase 2"), PhaseTwoBoundaryView.Phase, 2);
+
+	const FIdleHUDBossViewModel PhaseThreeBoundaryView = BuildBossViewModel(165.0f, 500.0f);
+	TestEqual(TEXT("Boss HUD mirrors 0.33 boundary as phase 3"), PhaseThreeBoundaryView.Phase, 3);
+
+	const FIdleHUDBossViewModel PhaseThreeView = BuildBossViewModel(0.0f, 500.0f);
+	TestEqual(TEXT("Zero HP remains phase 3"), PhaseThreeView.Phase, 3);
+	TestEqual(TEXT("Empty HP bar is allowed for a defeated boss frame"), PhaseThreeView.HpRatio, 0.0f);
+	TestEqual(TEXT("Phase 3 uses danger color"), PhaseThreeView.PhaseColor.R, AccentRed.R);
+
+	const FIdleHUDBossViewModel InvalidView = BuildBossViewModel(10.0f, 0.0f);
+	TestFalse(TEXT("Boss HUD is hidden for invalid max HP"), InvalidView.bVisible);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDamageFloatingTextHudViewModelTest,
 	"IdleProject.UI.HUD.DamageFloatingTextViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -1,11 +1,13 @@
 #include "Misc/AutomationTest.h"
 
 #include "CombatSystem/BattleAIComponent.h"
+#include "CombatSystem/BossPhaseFormula.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 #include "CombatSystem/StatusElementTypes.h"
 #include "CharacterSystem/IdleCharacter.h"
+#include "BossSpecialAttackTestReceiver.h"
 #include "Components/SceneComponent.h"
 #include "DamageReceivedTestReceiver.h"
 #include "Engine/World.h"
@@ -77,6 +79,39 @@ bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent&
 	Test.TestEqual(*FString::Printf(TEXT("%s Element"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->Element), static_cast<int32>(Expected.Element));
 	return true;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBossPhaseFormulaTest,
+	"IdleProject.Combat.BossPhase.Formula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBossPhaseFormulaTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("HP ratio 0.70 is phase 1"), FBossPhaseFormula::GetBossPhase(0.70f), 1);
+	TestEqual(TEXT("HP ratio 0.66 is phase 2"), FBossPhaseFormula::GetBossPhase(0.66f), 2);
+	TestEqual(TEXT("HP ratio 0.50 is phase 2"), FBossPhaseFormula::GetBossPhase(0.50f), 2);
+	TestEqual(TEXT("HP ratio 0.33 is phase 3"), FBossPhaseFormula::GetBossPhase(0.33f), 3);
+	TestEqual(TEXT("HP ratio 0.20 is phase 3"), FBossPhaseFormula::GetBossPhase(0.20f), 3);
+	TestEqual(TEXT("HP ratio 1.00 is phase 1"), FBossPhaseFormula::GetBossPhase(1.00f), 1);
+	TestEqual(TEXT("HP ratio 0.00 is phase 3"), FBossPhaseFormula::GetBossPhase(0.00f), 3);
+	TestEqual(TEXT("HP ratio above one clamps to phase 1"), FBossPhaseFormula::GetBossPhase(2.00f), 1);
+	TestEqual(TEXT("HP ratio below zero clamps to phase 3"), FBossPhaseFormula::GetBossPhase(-1.00f), 3);
+
+	TestEqual(TEXT("Phase 1 attack multiplier"), FBossPhaseFormula::GetPhaseAtkMultiplier(1), 1.0f);
+	TestEqual(TEXT("Phase 2 attack multiplier"), FBossPhaseFormula::GetPhaseAtkMultiplier(2), 1.25f);
+	TestEqual(TEXT("Phase 3 attack multiplier"), FBossPhaseFormula::GetPhaseAtkMultiplier(3), 1.6f);
+	TestEqual(TEXT("Unknown phase attack multiplier defaults neutral"), FBossPhaseFormula::GetPhaseAtkMultiplier(99), 1.0f);
+
+	TestEqual(TEXT("Phase 1 attack speed multiplier"), FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(1), 1.0f);
+	TestEqual(TEXT("Phase 2 attack speed multiplier"), FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(2), 1.15f);
+	TestEqual(TEXT("Phase 3 attack speed multiplier"), FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(3), 1.3f);
+	TestEqual(TEXT("Unknown phase attack speed multiplier defaults neutral"), FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(99), 1.0f);
+
+	TestEqual(TEXT("Special attack interval"), FBossPhaseFormula::SpecialAttackIntervalSeconds, 6.0f);
+	TestEqual(TEXT("Special attack damage multiplier"), FBossPhaseFormula::GetSpecialAttackDamageMultiplier(), 2.5f);
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -1183,6 +1218,194 @@ bool FBattleAIAoeTargetGatheringTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("AoE gathering excludes far target"), AoeTargets.Contains(FarTarget));
 	TestFalse(TEXT("AoE gathering excludes dead target"), AoeTargets.Contains(DeadTarget));
 	TestFalse(TEXT("AoE gathering excludes owner"), AoeTargets.Contains(Owner));
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBattleAIBossAttackPhaseScalingTest,
+	"IdleProject.Combat.BattleAI.BossAttackPhaseScaling",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBattleAIBossAttackPhaseScalingTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleMonster* Boss = World->SpawnActor<AIdleMonster>(AIdleMonster::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	AActor* Target = World->SpawnActor<AActor>(AActor::StaticClass(), FVector(100.0, 0.0, 0.0), FRotator::ZeroRotator, SpawnParams);
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+	TargetCombat->RegisterComponent();
+
+	TestNotNull(TEXT("Boss is spawned"), Boss);
+	TestNotNull(TEXT("Target is spawned"), Target);
+	TestNotNull(TEXT("Target combat is created"), TargetCombat);
+	if (!Boss || !Target || !TargetCombat)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Boss->SetBoss(true);
+	UCombatComponent* BossCombat = Boss->GetCombat();
+	UBattleAIComponent* BattleAI = Boss->FindComponentByClass<UBattleAIComponent>();
+	TestNotNull(TEXT("Boss combat exists"), BossCombat);
+	TestNotNull(TEXT("Boss battle AI exists"), BattleAI);
+	if (!BossCombat || !BattleAI)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	BossCombat->InitializeCombat(100.0f, 100.0f, 0.0f, 1.0f, 0.0f, 1.5f);
+	BossCombat->CurrentHp = 20.0f;
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 20.0f, 1.0f, 0.0f, 1.5f);
+
+	UBossSpecialAttackTestReceiver* SpecialReceiver = NewObject<UBossSpecialAttackTestReceiver>();
+	BattleAI->OnBossSpecialAttack.AddDynamic(SpecialReceiver, &UBossSpecialAttackTestReceiver::Capture);
+
+	BattleAI->Attack(Target);
+
+	TestEqual(TEXT("Boss opening attack uses phase scaling without special multiplier"), TargetCombat->CurrentHp, 1000.0f - 148.0f);
+	TestEqual(TEXT("Boss opening attack does not broadcast special"), SpecialReceiver->Count, 0);
+
+	World->TimeSeconds += FBossPhaseFormula::SpecialAttackIntervalSeconds + 0.1f;
+	BattleAI->Attack(Target);
+
+	BattleAI->OnBossSpecialAttack.RemoveDynamic(SpecialReceiver, &UBossSpecialAttackTestReceiver::Capture);
+
+	TestEqual(TEXT("Boss periodic special multiplier affects damage after interval"), TargetCombat->CurrentHp, 1000.0f - 148.0f - 370.0f);
+	TestEqual(TEXT("Boss base attack remains unchanged"), BossCombat->Atk, 100.0f);
+	TestEqual(TEXT("Boss base attack speed remains unchanged"), BossCombat->AtkSpeed, 1.0f);
+	TestEqual(TEXT("Boss special attack broadcasts once"), SpecialReceiver->Count, 1);
+	TestTrue(TEXT("Boss special attack broadcasts owner"), SpecialReceiver->LastBoss.Get() == Boss);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBattleAIBossPhaseAttackSpeedCooldownTest,
+	"IdleProject.Combat.BattleAI.BossPhaseAttackSpeedCooldown",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBattleAIBossPhaseAttackSpeedCooldownTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleMonster* Boss = World->SpawnActor<AIdleMonster>(AIdleMonster::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	AActor* Target = World->SpawnActor<AActor>(AActor::StaticClass(), FVector(100.0, 0.0, 0.0), FRotator::ZeroRotator, SpawnParams);
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+	TargetCombat->RegisterComponent();
+
+	TestNotNull(TEXT("Boss is spawned"), Boss);
+	TestNotNull(TEXT("Target is spawned"), Target);
+	TestNotNull(TEXT("Target combat is created"), TargetCombat);
+	if (!Boss || !Target || !TargetCombat)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Boss->SetBoss(true);
+	UCombatComponent* BossCombat = Boss->GetCombat();
+	UBattleAIComponent* BattleAI = Boss->FindComponentByClass<UBattleAIComponent>();
+	TestNotNull(TEXT("Boss combat exists"), BossCombat);
+	TestNotNull(TEXT("Boss battle AI exists"), BattleAI);
+	if (!BossCombat || !BattleAI)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	BossCombat->InitializeCombat(100.0f, 100.0f, 0.0f, 1.0f, 0.0f, 1.5f);
+	BossCombat->CurrentHp = 20.0f;
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 20.0f, 1.0f, 0.0f, 1.5f);
+
+	BattleAI->Attack(Target);
+	World->TimeSeconds += 0.8f;
+	BattleAI->Attack(Target);
+
+	TestEqual(TEXT("Phase 3 attack speed multiplier shortens cooldown for boss only"), TargetCombat->CurrentHp, 1000.0f - 148.0f - 148.0f);
+	TestEqual(TEXT("Boss base attack speed remains unchanged after cooldown scaling"), BossCombat->AtkSpeed, 1.0f);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBattleAINormalAttackUnchangedByBossPhaseTest,
+	"IdleProject.Combat.BattleAI.NormalAttackUnchangedByBossPhase",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FBattleAINormalAttackUnchangedByBossPhaseTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleMonster* Monster = World->SpawnActor<AIdleMonster>(AIdleMonster::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	AActor* Target = World->SpawnActor<AActor>(AActor::StaticClass(), FVector(100.0, 0.0, 0.0), FRotator::ZeroRotator, SpawnParams);
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+	TargetCombat->RegisterComponent();
+
+	TestNotNull(TEXT("Monster is spawned"), Monster);
+	TestNotNull(TEXT("Target is spawned"), Target);
+	TestNotNull(TEXT("Target combat is created"), TargetCombat);
+	if (!Monster || !Target || !TargetCombat)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Monster->SetBoss(false);
+	UCombatComponent* MonsterCombat = Monster->GetCombat();
+	UBattleAIComponent* BattleAI = Monster->FindComponentByClass<UBattleAIComponent>();
+	TestNotNull(TEXT("Monster combat exists"), MonsterCombat);
+	TestNotNull(TEXT("Monster battle AI exists"), BattleAI);
+	if (!MonsterCombat || !BattleAI)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	MonsterCombat->InitializeCombat(100.0f, 100.0f, 0.0f, 1.0f, 0.0f, 1.5f);
+	MonsterCombat->CurrentHp = 20.0f;
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 20.0f, 1.0f, 0.0f, 1.5f);
+
+	UBossSpecialAttackTestReceiver* SpecialReceiver = NewObject<UBossSpecialAttackTestReceiver>();
+	BattleAI->OnBossSpecialAttack.AddDynamic(SpecialReceiver, &UBossSpecialAttackTestReceiver::Capture);
+
+	BattleAI->Attack(Target);
+	World->TimeSeconds += 0.8f;
+	BattleAI->Attack(Target);
+
+	BattleAI->OnBossSpecialAttack.RemoveDynamic(SpecialReceiver, &UBossSpecialAttackTestReceiver::Capture);
+
+	TestEqual(TEXT("Normal monster keeps original damage and cooldown path"), TargetCombat->CurrentHp, 1000.0f - 88.0f);
+	TestEqual(TEXT("Normal monster does not broadcast boss special"), SpecialReceiver->Count, 0);
 
 	World->DestroyWorld(false);
 	return true;

@@ -1,8 +1,11 @@
 #include "UI/IdleHUD.h"
 
+#include "CombatSystem/BattleAIComponent.h"
+#include "CombatSystem/BossPhaseFormula.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/SkillComponent.h"
 #include "CharacterSystem/IdleCharacter.h"
+#include "CharacterSystem/IdleMonster.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
@@ -33,6 +36,7 @@ constexpr float FloatingDamageLifetimeSeconds = 1.0f;
 constexpr float FloatingDamageRisePixels = 32.0f;
 constexpr float FloatingDamageHeadOffsetZ = 120.0f;
 constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
+constexpr float BossSpecialWarningDurationSeconds = 1.6f;
 
 FString RarityToString(EItemRarity Rarity)
 {
@@ -97,6 +101,14 @@ FText FormatPercentLabel(const TCHAR* Key, float Rate)
 	return FormatLocalizedUI(Key, [Percent](FFormatNamedArguments& Args)
 	{
 		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
+}
+
+FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 Value)
+{
+	return FormatLocalizedUI(Key, [ArgName, Value](FFormatNamedArguments& Args)
+	{
+		Args.Add(ArgName, FText::AsNumber(Value));
 	});
 }
 
@@ -180,6 +192,21 @@ FLinearColor StageWeakElementToColor(ESkillElement Element)
 	default:
 		return TextMuted;
 	}
+}
+
+FLinearColor BossPhaseToColor(int32 Phase)
+{
+	using namespace IdleProject::UI::Theme;
+
+	if (Phase >= 3)
+	{
+		return AccentRed;
+	}
+	if (Phase == 2)
+	{
+		return Warn;
+	}
+	return AccentGold;
 }
 
 FName MakeQuestClaimHitBoxName(const FString& QuestId)
@@ -403,6 +430,30 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 	ViewModel.BossBadgeLabel = StageInfo.bBossStage ? IdleProject::Localization::UI(TEXT("STAGE_BOSS_BADGE")) : FText::GetEmpty();
 	ViewModel.BorderColor = StageInfo.bBossStage ? Theme::AccentGold : Theme::AccentBlue;
 	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
+	return ViewModel;
+}
+
+FIdleHUDBossViewModel IdleProject::UI::BuildBossViewModel(float CurrentHp, float MaxHp)
+{
+	FIdleHUDBossViewModel ViewModel;
+	if (MaxHp <= 0.0f)
+	{
+		return ViewModel;
+	}
+
+	const float SafeCurrentHp = FMath::Clamp(CurrentHp, 0.0f, MaxHp);
+	ViewModel.bVisible = true;
+	ViewModel.HpRatio = FMath::Clamp(SafeCurrentHp / MaxHp, 0.0f, 1.0f);
+	ViewModel.HpPercent = ViewModel.HpRatio * 100.0f;
+	ViewModel.Phase = FBossPhaseFormula::GetBossPhase(ViewModel.HpRatio);
+	ViewModel.PhaseColor = BossPhaseToColor(ViewModel.Phase);
+	ViewModel.TitleLabel = IdleProject::Localization::UI(TEXT("BOSS_HUD_TITLE"));
+	ViewModel.HpLabel = FormatLocalizedUI(TEXT("BOSS_HP_FORMAT"), [SafeCurrentHp, MaxHp](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Current"), FText::AsNumber(FMath::RoundToInt(SafeCurrentHp)));
+		Args.Add(TEXT("Max"), FText::AsNumber(FMath::RoundToInt(MaxHp)));
+	});
+	ViewModel.PhaseLabel = FormatLocalizedUIWithNumber(TEXT("BOSS_PHASE_FORMAT"), TEXT("Phase"), ViewModel.Phase);
 	return ViewModel;
 }
 
@@ -847,6 +898,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 
 	UnbindPlayerCombat();
+	UnbindBossSpecialAttack();
 
 	if (IdleGameInstance)
 	{
@@ -878,6 +930,7 @@ void AIdleHUD::DrawHUD()
 	}
 
 	DrawStageIndicator();
+	DrawBossBar();
 	DrawRebirthPanel();
 	DrawStatAllocationPanel();
 	DrawEnhancePanel();
@@ -888,6 +941,7 @@ void AIdleHUD::DrawHUD()
 	DrawOfflineRewardModal();
 	if (World)
 	{
+		DrawBossSpecialWarning(World->GetTimeSeconds());
 		DrawFloatingDamageTexts(World->GetTimeSeconds());
 		DrawStatusIndicators(World->GetTimeSeconds());
 	}
@@ -1048,6 +1102,18 @@ void AIdleHUD::HandleStatPointsChanged()
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::HandleBossSpecialAttack(AActor* Boss)
+{
+	const UWorld* World = GetWorld();
+	if (!World || !Boss)
+	{
+		return;
+	}
+
+	BossSpecialAttackActor = Boss;
+	BossSpecialAttackStartTime = World->GetTimeSeconds();
+}
+
 void AIdleHUD::BindPlayerCombat()
 {
 	APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
@@ -1086,6 +1152,34 @@ void AIdleHUD::UnbindPlayerCombat()
 
 	PlayerCombat = nullptr;
 	PlayerCombatPawn = nullptr;
+}
+
+void AIdleHUD::BindBossSpecialAttack(AIdleMonster* Boss)
+{
+	UBattleAIComponent* BattleAI = Boss ? Boss->FindComponentByClass<UBattleAIComponent>() : nullptr;
+	if (!BattleAI)
+	{
+		UnbindBossSpecialAttack();
+		return;
+	}
+
+	if (BoundBossBattleAI.Get() == BattleAI)
+	{
+		return;
+	}
+
+	UnbindBossSpecialAttack();
+	BattleAI->OnBossSpecialAttack.AddDynamic(this, &AIdleHUD::HandleBossSpecialAttack);
+	BoundBossBattleAI = BattleAI;
+}
+
+void AIdleHUD::UnbindBossSpecialAttack()
+{
+	if (UBattleAIComponent* BattleAI = BoundBossBattleAI.Get())
+	{
+		BattleAI->OnBossSpecialAttack.RemoveDynamic(this, &AIdleHUD::HandleBossSpecialAttack);
+	}
+	BoundBossBattleAI.Reset();
 }
 
 void AIdleHUD::BindPlayerInventory()
@@ -1173,6 +1267,34 @@ AIdleCharacter* AIdleHUD::ResolvePlayerCharacter() const
 {
 	APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
 	return Pawn ? Cast<AIdleCharacter>(Pawn) : nullptr;
+}
+
+AIdleMonster* AIdleHUD::ResolveVisibleBoss() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	for (TActorIterator<AIdleMonster> ActorIt(World); ActorIt; ++ActorIt)
+	{
+		AIdleMonster* Monster = *ActorIt;
+		if (!IsValid(Monster) || !Monster->IsBoss())
+		{
+			continue;
+		}
+
+		const UCombatComponent* Combat = Monster->GetCombat();
+		if (!Combat || Combat->MaxHp <= 0.0f || Combat->IsDead())
+		{
+			continue;
+		}
+
+		return Monster;
+	}
+
+	return nullptr;
 }
 
 void AIdleHUD::DrawClassSelectionPanel()
@@ -1312,6 +1434,89 @@ void AIdleHUD::DrawStageIndicator()
 	const float BarWidth = PanelWidth - Padding * 2.0f;
 	DrawRect(BgPrimary.CopyWithNewOpacity(0.94f), BarX, BarY, BarWidth, BarHeight);
 	DrawRect(ViewModel.BorderColor, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
+}
+
+void AIdleHUD::DrawBossBar()
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	if (!Canvas)
+	{
+		return;
+	}
+
+	AIdleMonster* Boss = ResolveVisibleBoss();
+	BindBossSpecialAttack(Boss);
+	if (!Boss)
+	{
+		return;
+	}
+
+	const UCombatComponent* BossCombat = Boss->GetCombat();
+	if (!BossCombat)
+	{
+		return;
+	}
+
+	const FIdleHUDBossViewModel ViewModel = BuildBossViewModel(BossCombat->CurrentHp, BossCombat->MaxHp);
+	if (!ViewModel.bVisible)
+	{
+		return;
+	}
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.42f, 520.0f * Scale, 900.0f * Scale);
+	const float PanelHeight = 58.0f * Scale;
+	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
+	const float Y = 108.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const float BarHeight = 10.0f * Scale;
+
+	DrawRect(BgPanel.CopyWithNewOpacity(0.93f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(ViewModel.PhaseColor, X, Y, PanelWidth, Border);
+	DrawRect(ViewModel.PhaseColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(ViewModel.PhaseColor, X, Y, Border, PanelHeight);
+	DrawRect(ViewModel.PhaseColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.TitleLabel.ToString(), ViewModel.PhaseColor, X + Padding, Y + 9.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.HpLabel.ToString(), TextPrimary, X + 86.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.PhaseLabel.ToString(), ViewModel.PhaseColor, X + PanelWidth - 100.0f * Scale, Y + 9.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+
+	const float BarX = X + Padding;
+	const float BarY = Y + PanelHeight - Padding - BarHeight;
+	const float BarWidth = PanelWidth - Padding * 2.0f;
+	DrawRect(BgPrimary.CopyWithNewOpacity(0.95f), BarX, BarY, BarWidth, BarHeight);
+	DrawRect(ViewModel.PhaseColor, BarX, BarY, BarWidth * ViewModel.HpRatio, BarHeight);
+}
+
+void AIdleHUD::DrawBossSpecialWarning(float Now)
+{
+	using namespace IdleProject::UI::Theme;
+
+	if (!Canvas)
+	{
+		return;
+	}
+
+	const float Elapsed = Now - BossSpecialAttackStartTime;
+	if (Elapsed < 0.0f || Elapsed > BossSpecialWarningDurationSeconds || !BossSpecialAttackActor.IsValid())
+	{
+		return;
+	}
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float Alpha = 1.0f - FMath::Clamp(Elapsed / BossSpecialWarningDurationSeconds, 0.0f, 1.0f);
+	const FString Warning = IdleProject::Localization::UI(TEXT("BOSS_SPECIAL_WARNING")).ToString();
+	const float Width = 210.0f * Scale;
+	const float Height = 34.0f * Scale;
+	const float X = (Canvas->SizeX - Width) * 0.5f;
+	const float Y = 174.0f * Scale;
+
+	DrawRect(BgPrimary.CopyWithNewOpacity(0.82f * Alpha), X, Y, Width, Height);
+	DrawRect(AccentRed.CopyWithNewOpacity(0.96f * Alpha), X, Y, 5.0f * Scale, Height);
+	DrawText(Warning, AccentRed.CopyWithNewOpacity(Alpha), X + 18.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.82f * Scale);
 }
 
 void AIdleHUD::DrawEnhancePanel()
