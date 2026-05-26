@@ -327,6 +327,15 @@ bool FSkillRankEffectiveValuesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Cooldown remaining uses effective cooldown"), Skills->GetCooldownRemaining(HeavyStrike, 12.0f), 1.6f);
 	TestEqual(TEXT("Cooldown ratio uses effective cooldown"), Skills->GetCooldownRatio(HeavyStrike, 12.0f), 1.6f / 3.6f);
 
+	Skills->GrantSkillPoint(3);
+	Skills->RankUpSkill(HeavyStrike);
+	Skills->RankUpSkill(HeavyStrike);
+	Skills->RankUpSkill(HeavyStrike);
+
+	TestEqual(TEXT("Max rank damage coeff adds fifty percent"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 3.75f);
+	TestEqual(TEXT("Max rank cooldown reduces twenty five percent"), Skills->GetEffectiveCooldown(HeavyStrike), 3.0f);
+	TestEqual(TEXT("Zero-cooldown ultimate remains zero"), Skills->GetEffectiveCooldown(TEXT("berserkers_fury")), 0.0f);
+
 	return true;
 }
 
