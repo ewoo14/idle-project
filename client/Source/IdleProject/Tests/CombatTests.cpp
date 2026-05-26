@@ -79,7 +79,15 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Atk 100 Def 20 damage"), FCombatFormulas::ComputeDamage(100.0f, 20.0f), 88.0f);
 	TestEqual(TEXT("Minimum damage guarantee"), FCombatFormulas::ComputeDamage(10.0f, 100.0f), 0.5f);
 	TestEqual(TEXT("Zero defense damage"), FCombatFormulas::ComputeDamage(50.0f, 0.0f), 50.0f);
-	TestEqual(TEXT("Expected crit damage applies after defense"), FCombatFormulas::ComputeDamage(40.0f, 10.0f, 0.25f, 1.8f), 40.8f);
+	TestEqual(TEXT("Magic damage uses the same curve"), FCombatFormulas::ComputeMagicDamage(80.0f, 20.0f), 68.0f);
+
+	FRandomStream NeverCritStream(12345);
+	FRandomStream AlwaysCritStream(12345);
+	TestFalse(TEXT("Zero crit rate never crits"), FCombatFormulas::RollCrit(0.0f, NeverCritStream));
+	TestTrue(TEXT("Full crit rate always crits"), FCombatFormulas::RollCrit(1.0f, AlwaysCritStream));
+	TestEqual(TEXT("Non crit leaves base damage unchanged"), FCombatFormulas::ApplyCrit(34.0f, false, 1.8f), 34.0f);
+	TestEqual(TEXT("Crit multiplies base damage"), FCombatFormulas::ApplyCrit(34.0f, true, 1.8f), 61.2f);
+	TestEqual(TEXT("Crit damage below one cannot reduce damage"), FCombatFormulas::ApplyCrit(34.0f, true, 0.5f), 34.0f);
 
 	return true;
 }
@@ -94,19 +102,99 @@ bool FCombatClassDamageTest::RunTest(const FString& Parameters)
 	FDerivedStats MageStats;
 	MageStats.PhysAtk = 12.0f;
 	MageStats.MagicAtk = 40.0f;
-	TestEqual(TEXT("Mage damage uses magic attack"), FCombatFormulas::ComputeDamage(MageStats, EClassId::Mage, 10.0f), 34.0f);
+	TestEqual(TEXT("Mage damage uses magic attack and magic defense"), FCombatFormulas::ComputeDamage(MageStats, EClassId::Mage, 20.0f, 10.0f), 34.0f);
 
 	FDerivedStats ArcherStats;
 	ArcherStats.PhysAtk = 40.0f;
 	ArcherStats.MagicAtk = 12.0f;
 	ArcherStats.CritRate = 0.25f;
 	ArcherStats.CritDmg = 1.8f;
-	TestEqual(TEXT("Archer damage includes expected crit value"), FCombatFormulas::ComputeDamage(ArcherStats, EClassId::Archer, 10.0f), 40.8f);
+	TestEqual(TEXT("Archer damage uses physical attack and physical defense"), FCombatFormulas::ComputeDamage(ArcherStats, EClassId::Archer, 10.0f, 80.0f), 34.0f);
 
 	FDerivedStats WarriorStats;
 	WarriorStats.PhysAtk = 40.0f;
 	WarriorStats.MagicAtk = 80.0f;
-	TestEqual(TEXT("Warrior damage keeps physical attack"), FCombatFormulas::ComputeDamage(WarriorStats, EClassId::Warrior, 10.0f), 34.0f);
+	TestEqual(TEXT("Warrior damage keeps physical attack and physical defense"), FCombatFormulas::ComputeDamage(WarriorStats, EClassId::Warrior, 10.0f, 80.0f), 34.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatComponentExtendedStatsTest,
+	"IdleProject.Combat.Component.ExtendedStats",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatComponentExtendedStatsTest::RunTest(const FString& Parameters)
+{
+	UCombatComponent* Combat = NewObject<UCombatComponent>();
+	Combat->InitializeCombat(1000.0f, 50.0f, 20.0f, 1.0f, 80.0f, 30.0f, 0.25f, 1.8f);
+
+	TestEqual(TEXT("Magic attack is initialized"), Combat->MagicAtk, 80.0f);
+	TestEqual(TEXT("Magic defense is initialized"), Combat->MagicDef, 30.0f);
+	TestEqual(TEXT("Crit rate is initialized"), Combat->CritRate, 0.25f);
+	TestEqual(TEXT("Crit damage is initialized"), Combat->CritDmg, 1.8f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillMagicDamageTest,
+	"IdleProject.Combat.Skills.MagicDamage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillMagicDamageTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f, 80.0f, 0.0f, 0.0f, 1.5f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 10.0f, 1.0f, 0.0f, 30.0f, 0.0f, 1.5f);
+	Skills->LoadDefaultMageSkills();
+
+	Skills->MarkSkillCast(TEXT("chain_lightning"), 10.0f);
+	Skills->MarkSkillCast(TEXT("mana_shield"), 10.0f);
+	Skills->MarkSkillCast(TEXT("meteor"), 10.0f);
+	Skills->TickSkills(12.0f, Target, TArray<AActor*>());
+
+	TestEqual(TEXT("Arcane bolt uses MagicAtk vs MagicDef"), TargetCombat->CurrentHp, 1000.0f - 174.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillCritDamageTest,
+	"IdleProject.Combat.Skills.CritDamage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillCritDamageTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 40.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 2.0f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 10.0f, 1.0f);
+	Skills->LoadDefaultArcherSkills();
+
+	Skills->MarkSkillCast(TEXT("arrow_rain"), 10.0f);
+	Skills->MarkSkillCast(TEXT("focus"), 10.0f);
+	Skills->MarkSkillCast(TEXT("piercing_arrow"), 10.0f);
+	Skills->TickSkills(12.0f, Target, TArray<AActor*>());
+
+	TestEqual(TEXT("Precision shot applies guaranteed crit after physical mitigation"), TargetCombat->CurrentHp, 1000.0f - 164.0f);
 
 	return true;
 }

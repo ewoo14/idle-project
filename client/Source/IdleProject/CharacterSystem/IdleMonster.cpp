@@ -66,7 +66,8 @@ void AIdleMonster::BeginPlay()
 
 	if (Combat)
 	{
-		Combat->InitializeCombat(GetConfiguredMaxHp(), GetConfiguredAttack(), bIsBoss ? 12.0f : 5.0f, bIsBoss ? 0.8f : 1.0f);
+		const float Defense = bIsBoss ? 12.0f : 5.0f;
+		Combat->InitializeCombat(GetConfiguredMaxHp(), GetConfiguredAttack(), Defense, bIsBoss ? 0.8f : 1.0f, 0.0f, Defense, 0.0f, 1.5f);
 		Combat->OnDeath.AddDynamic(this, &AIdleMonster::HandleDeath);
 	}
 
