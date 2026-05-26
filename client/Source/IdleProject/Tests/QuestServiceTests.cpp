@@ -2,8 +2,98 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/QuestService.h"
+#include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ItemTypes.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+FItemInstance MakeEnhanceTestItem(FName ItemId, EItemSlot Slot, int32 EnhanceLevel = 0)
+{
+	FItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Slot = Slot;
+	Item.Rarity = EItemRarity::Rare;
+	Item.DisplayName = FText::FromName(ItemId);
+	Item.BonusAtk = 10.0f;
+	Item.EnhanceLevel = EnhanceLevel;
+	return Item;
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceEnhanceAttemptTest,
+	"IdleProject.GameCore.IdleGameInstance.EnhanceAttempt",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeQuestServiceForTests(TEXT("2026-05-26"));
+	GameInstance->SetEnhanceRandomSeed(1);
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeEnhanceTestItem(TEXT("rare_sword"), EItemSlot::Weapon));
+
+	const FEnhanceAttemptResult NoGold = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
+	TestFalse(TEXT("Insufficient gold does not attempt enhance"), NoGold.bAttempted);
+	TestEqual(TEXT("Insufficient gold spends nothing"), NoGold.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Insufficient gold keeps level"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 0);
+
+	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(0));
+	const FEnhanceAttemptResult Success = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
+	TestTrue(TEXT("Enough gold attempts enhance"), Success.bAttempted);
+	TestTrue(TEXT("Seeded first enhance succeeds"), Success.bSuccess);
+	TestEqual(TEXT("Attempt spends level 0 cost once"), Success.GoldSpent, static_cast<int64>(100));
+	TestEqual(TEXT("Successful enhance returns new level"), Success.NewLevel, 1);
+	TestEqual(TEXT("Successful enhance mutates equipped item"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 1);
+	TestEqual(TEXT("Gold is deducted"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	FQuestState EnhanceDaily;
+	TestTrue(TEXT("Enhance daily exists"), GameInstance->GetQuestState(TEXT("daily_enhance_gear"), EnhanceDaily));
+	TestEqual(TEXT("Enhance attempt records quest progress"), EnhanceDaily.Progress, 1);
+
+	UInventoryComponent* FailInventory = NewObject<UInventoryComponent>();
+	FailInventory->AddItem(MakeEnhanceTestItem(TEXT("rare_axe"), EItemSlot::Weapon, FEnhanceFormula::MaxEnhanceLevel - 1));
+
+	int32 FailingSeed = INDEX_NONE;
+	for (int32 Seed = 1; Seed < 1000; ++Seed)
+	{
+		FRandomStream Probe(Seed);
+		if (!FEnhanceFormula::RollEnhanceSuccess(FEnhanceFormula::GetEnhanceSuccessRate(FEnhanceFormula::MaxEnhanceLevel - 1), Probe))
+		{
+			FailingSeed = Seed;
+			break;
+		}
+	}
+	TestTrue(TEXT("A deterministic failure seed is available"), FailingSeed != INDEX_NONE);
+
+	GameInstance->SetEnhanceRandomSeed(FailingSeed);
+	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1));
+	const FEnhanceAttemptResult Failure = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, FailInventory);
+	TestTrue(TEXT("Failed roll still attempts enhance"), Failure.bAttempted);
+	TestFalse(TEXT("Failed roll reports failure"), Failure.bSuccess);
+	TestEqual(TEXT("Failed roll keeps current level"), Failure.NewLevel, FEnhanceFormula::MaxEnhanceLevel - 1);
+	TestEqual(TEXT("Failed roll does not mutate item level"), FailInventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel - 1);
+
+	TestTrue(TEXT("Enhance daily still exists after failed roll"), GameInstance->GetQuestState(TEXT("daily_enhance_gear"), EnhanceDaily));
+	TestEqual(TEXT("Failed roll also records quest progress"), EnhanceDaily.Progress, 2);
+
+	for (int32 Level = 1; Level < FEnhanceFormula::MaxEnhanceLevel; ++Level)
+	{
+		Inventory->EnhanceEquippedItem(EItemSlot::Weapon);
+	}
+
+	GameInstance->AddGold(10000);
+	const int64 GoldBeforeMaxAttempt = GameInstance->GetGold();
+	const FEnhanceAttemptResult AtMax = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
+	TestFalse(TEXT("Max level does not attempt enhance"), AtMax.bAttempted);
+	TestEqual(TEXT("Max level spends no gold"), GameInstance->GetGold(), GoldBeforeMaxAttempt);
+
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FQuestServiceProgressClaimTest,

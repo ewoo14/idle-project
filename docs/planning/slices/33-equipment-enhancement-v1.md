@@ -58,3 +58,14 @@
 
 ## 7. 후속
 - 강화 실패 파괴/하락/보호권, 강화 재료, 잠재능력/추가옵션, 강화 연출(외부), 서버 권위 정산.
+
+---
+
+## 8. Codex character implementation note
+
+- Client formula added in `client/Source/IdleProject/ItemSystem/EnhanceFormula.h/.cpp`.
+- V1 max level is `5`, matching `FItemInstance.EnhanceLevel` ClampMax.
+- Cost curve: `100 * (CurrentLevel + 1)^2` for levels 0..4, and `0` at max level.
+- Success rates by current level: `{0.95, 0.85, 0.70, 0.55, 0.40}`; max level returns `0.0`.
+- `UInventoryComponent::EnhanceEquippedItem` applies success-only `+1`, broadcasts equipped change, and keeps existing equipment bonus multiplier behavior.
+- `UIdleGameInstance::TryEnhanceEquipped` handles gold gate, one-time gold spend, deterministic RNG seed path, success/failure result, quest progress via `RecordGearEnhanced()`, and `OnEnhanceResult`.

@@ -24,6 +24,8 @@ public:
 	void UnequipSlot(EItemSlot Slot);
 	FDerivedStats ComputeEquipmentBonus() const;
 	const FItemInstance* GetEquippedItem(EItemSlot Slot) const;
+	bool EnhanceEquippedItem(EItemSlot Slot);
+	int32 GetEquippedEnhanceLevel(EItemSlot Slot) const;
 
 private:
 	static constexpr int32 MaxItems = 100;

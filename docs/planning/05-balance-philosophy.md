@@ -446,6 +446,25 @@ do not raise the `level.ts` exponent toward 1.85-2.0 yet; keep the current curve
 and re-run the simulator after the next equipment, enhancement, or monster-data
 change.
 
+## PR #33 Equipment Enhancement V1
+
+Client V1 uses a conservative gold sink for the existing `EnhanceLevel` 0..5
+equipment multiplier.
+
+| Current level | Cost | Success rate |
+| ---: | ---: | ---: |
+| 0 | 100 | 95% |
+| 1 | 400 | 85% |
+| 2 | 900 | 70% |
+| 3 | 1600 | 55% |
+| 4 | 2500 | 40% |
+| 5 | 0 | 0% |
+
+The cost formula is `100 * (CurrentLevel + 1)^2` before max level. Failure
+does not destroy or downgrade equipment in V1; it consumes the attempt cost and
+records enhancement quest progress. The stat payoff remains the existing
+`1 + EnhanceLevel * 0.1` equipment bonus multiplier.
+
 Sensitivity notes:
 
 - EXP curve: current curve is acceptable for the first rebirth target.
