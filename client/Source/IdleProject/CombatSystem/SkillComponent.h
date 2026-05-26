@@ -19,7 +19,8 @@ enum class ESkillEffectType : uint8
 	DamageSingle = 0 UMETA(DisplayName = "Damage Single"),
 	DamageAoe = 1 UMETA(DisplayName = "Damage AOE"),
 	SelfBuff = 2 UMETA(DisplayName = "Self Buff"),
-	DashDamage = 3 UMETA(DisplayName = "Dash Damage")
+	DashDamage = 3 UMETA(DisplayName = "Dash Damage"),
+	Heal = 4 UMETA(DisplayName = "Heal")
 };
 
 /** 전사 스킬 V1 정적 정의입니다. SkillDB/DataTable 미러링은 후속 슬라이스에서 처리합니다. */
@@ -86,6 +87,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadDefaultArcherSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultThiefSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultClericSkills();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadSkillsForClass(EClassId ClassId);
@@ -155,6 +162,7 @@ private:
 	void UpdateTimedBuffs(float Now);
 	void ExecuteSkill(const FSkillDefinition& Skill, float Now, AActor* Target, const TArray<AActor*>& AoeTargets);
 	void ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Target);
+	void ApplyHeal(const FSkillDefinition& Skill);
 	void ApplySelfBuff(const FSkillDefinition& Skill, float Now);
 
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill")

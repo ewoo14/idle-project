@@ -131,6 +131,18 @@ V1 기준 마법사는 "최고 AoE DPS 후보"지만 방어 버프 수치와 평
 `USkillComponent::LoadDefault*Skills`의 DefinitionParity 테스트가 같은
 값을 검증한다.
 
+PR #29 extends this parity rule to all five V1 classes. Warrior, Mage, Archer,
+Thief, and Cleric each own exactly seven skill definitions, for 35 total
+definitions across server TypeScript and client `USkillComponent` automation.
+The parity guard checks `id`, `classId`, `type`, `effectType`, cooldown,
+coefficients, buff fields, and ultimate gauge gain fields.
+
+Heal is a Cleric-only V1 effect type. `heal` restores
+`round(MaxHp * 0.20)` on a 6 second cooldown, while `sanctuary` spends ultimate
+gauge and restores `round(MaxHp * 0.40)`. Heal effects must clamp at `MaxHp`,
+must not damage the selected target, and must remain budgeted as recovery
+rather than DPS when comparing the five class kits.
+
 ---
 
 ### 3.5 Combat Class Differential V1 Anchors
@@ -180,6 +192,37 @@ Automation coverage:
 - `client/Source/IdleProject/Tests/CombatTests.cpp` verifies
   `ComputeMagicDamage`, `ApplyCrit`, class damage routing, skill magic damage,
   skill crit damage, and `InitializeCombat` extended stats.
+
+---
+
+### 3.6 Thief / Cleric Class V1 Anchors
+
+PR #29 completes the five-class V1 client skill set. Thief uses the existing
+physical path with DEX/LUK identity: direct physical skills, one AoE, one
+dash-style back attack, passive dodge, passive crit, and an attack-speed ultimate
+buff. Cleric uses the magic path with WIS/INT identity: a magic damage skill,
+self heal, attack-speed blessing, defense purification, WIS-driven magic attack
+passive, max-HP passive, and a heal ultimate.
+
+Client skill values are mirrored in `client/Content/Data/SkillDB.csv` and
+`USkillComponent::LoadDefault*Skills`.
+
+| Class | Anchor | Value |
+| --- | --- | ---: |
+| Thief passive dodge | `nimble_hands` adds flat Dodge | +0.05 |
+| Thief passive crit | `lucky_instinct` adds flat CritRate | +0.05 |
+| Thief ultimate | `assassinate` damage coefficient | 5.3 |
+| Cleric heal | `heal` restores MaxHp ratio | 0.20 |
+| Cleric ultimate heal | `sanctuary` restores MaxHp ratio | 0.40 |
+| Cleric passive HP | `divine_vitality` multiplies max HP | 1.20 |
+
+Routing guardrails:
+
+- Cleric damage skills use `MagicAtk` vs `MagicDef`, matching Mage mitigation.
+- Thief damage skills use `Atk` vs `Def`, matching Warrior/Archer mitigation.
+- Heal never enters the damage path and clamps at `MaxHp`.
+- Server SkillDB parity remains a backend handoff item unless that slice owns
+  `server/src/core/data/skills.ts`.
 
 ---
 

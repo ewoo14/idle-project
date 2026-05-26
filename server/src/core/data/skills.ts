@@ -3,7 +3,12 @@ export type SkillDefinition = {
   classId: number;
   displayName: string;
   type: "active" | "passive" | "ultimate";
-  effectType: "damage_single" | "damage_aoe" | "self_buff" | "dash_damage";
+  effectType:
+    | "damage_single"
+    | "damage_aoe"
+    | "self_buff"
+    | "dash_damage"
+    | "heal";
   cooldown: number;
   damageCoeff: number;
   buffMagnitude: number;
@@ -294,6 +299,194 @@ export const archerSkillDefinitions: SkillDefinition[] = [
   },
 ];
 
+export const thiefSkillDefinitions: SkillDefinition[] = [
+  {
+    skillId: "shadow_stab",
+    classId: 4,
+    displayName: "Shadow Stab",
+    type: "active",
+    effectType: "damage_single",
+    cooldown: 3,
+    damageCoeff: 2.3,
+    buffMagnitude: 0,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "smoke_bomb",
+    classId: 4,
+    displayName: "Smoke Bomb",
+    type: "active",
+    effectType: "damage_aoe",
+    cooldown: 7,
+    damageCoeff: 1.5,
+    buffMagnitude: 0,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "evasion_stance",
+    classId: 4,
+    displayName: "Evasion Stance",
+    type: "active",
+    effectType: "self_buff",
+    cooldown: 10,
+    damageCoeff: 0,
+    buffMagnitude: 0.2,
+    buffDuration: 4,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "backstab",
+    classId: 4,
+    displayName: "Backstab",
+    type: "active",
+    effectType: "dash_damage",
+    cooldown: 9,
+    damageCoeff: 2.1,
+    buffMagnitude: 0,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "nimble_hands",
+    classId: 4,
+    displayName: "Nimble Hands",
+    type: "passive",
+    effectType: "self_buff",
+    cooldown: 0,
+    damageCoeff: 0,
+    buffMagnitude: 0.05,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "lucky_instinct",
+    classId: 4,
+    displayName: "Lucky Instinct",
+    type: "passive",
+    effectType: "self_buff",
+    cooldown: 0,
+    damageCoeff: 0,
+    buffMagnitude: 0.05,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "assassinate",
+    classId: 4,
+    displayName: "Assassinate",
+    type: "ultimate",
+    effectType: "damage_single",
+    cooldown: 0,
+    damageCoeff: 5.3,
+    buffMagnitude: 0.25,
+    buffDuration: 4,
+    gaugeGainOnHit: 11,
+    gaugeGainOnTakeDamage: 1,
+  },
+];
+
+export const clericSkillDefinitions: SkillDefinition[] = [
+  {
+    skillId: "holy_smite",
+    classId: 5,
+    displayName: "Holy Smite",
+    type: "active",
+    effectType: "damage_single",
+    cooldown: 3.2,
+    damageCoeff: 2,
+    buffMagnitude: 0,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "heal",
+    classId: 5,
+    displayName: "Heal",
+    type: "active",
+    effectType: "heal",
+    cooldown: 6,
+    damageCoeff: 0,
+    buffMagnitude: 0.2,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "blessing",
+    classId: 5,
+    displayName: "Blessing",
+    type: "active",
+    effectType: "self_buff",
+    cooldown: 10,
+    damageCoeff: 0,
+    buffMagnitude: 0.15,
+    buffDuration: 4,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "purify",
+    classId: 5,
+    displayName: "Purify",
+    type: "active",
+    effectType: "self_buff",
+    cooldown: 12,
+    damageCoeff: 0,
+    buffMagnitude: 0.25,
+    buffDuration: 4,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "wisdom_training",
+    classId: 5,
+    displayName: "Wisdom Training",
+    type: "passive",
+    effectType: "self_buff",
+    cooldown: 0,
+    damageCoeff: 0,
+    buffMagnitude: 0.1,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "divine_vitality",
+    classId: 5,
+    displayName: "Divine Vitality",
+    type: "passive",
+    effectType: "self_buff",
+    cooldown: 0,
+    damageCoeff: 0,
+    buffMagnitude: 0.2,
+    buffDuration: 0,
+    gaugeGainOnHit: 0,
+    gaugeGainOnTakeDamage: 0,
+  },
+  {
+    skillId: "sanctuary",
+    classId: 5,
+    displayName: "Sanctuary",
+    type: "ultimate",
+    effectType: "heal",
+    cooldown: 0,
+    damageCoeff: 0,
+    buffMagnitude: 0.4,
+    buffDuration: 0,
+    gaugeGainOnHit: 6,
+    gaugeGainOnTakeDamage: 6,
+  },
+];
+
 export function getSkillDefinitionsForClass(
   classId: number,
 ): SkillDefinition[] {
@@ -304,6 +497,10 @@ export function getSkillDefinitionsForClass(
       return mageSkillDefinitions;
     case 3:
       return archerSkillDefinitions;
+    case 4:
+      return thiefSkillDefinitions;
+    case 5:
+      return clericSkillDefinitions;
     default:
       return [];
   }

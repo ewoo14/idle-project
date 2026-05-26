@@ -300,8 +300,10 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 
 	const FClassOptionSeed Seeds[] = {
 		{ EClassId::Warrior, TEXT("CLASS_WARRIOR_NAME"), TEXT("CLASS_WARRIOR_ROLE"), TEXT("STR/CON") },
-		{ EClassId::Mage, TEXT("CLASS_MAGE_NAME"), TEXT("CLASS_MAGE_ROLE"), TEXT("INT") },
-		{ EClassId::Archer, TEXT("CLASS_ARCHER_NAME"), TEXT("CLASS_ARCHER_ROLE"), TEXT("DEX") }
+		{ EClassId::Mage, TEXT("CLASS_MAGE_NAME"), TEXT("CLASS_MAGE_ROLE"), TEXT("INT/WIS") },
+		{ EClassId::Archer, TEXT("CLASS_ARCHER_NAME"), TEXT("CLASS_ARCHER_ROLE"), TEXT("DEX/LUK") },
+		{ EClassId::Thief, TEXT("CLASS_THIEF_NAME"), TEXT("CLASS_THIEF_ROLE"), TEXT("DEX/LUK") },
+		{ EClassId::Cleric, TEXT("CLASS_CLERIC_NAME"), TEXT("CLASS_CLERIC_ROLE"), TEXT("WIS/INT") }
 	};
 
 	TArray<FIdleHUDClassSelectionOptionViewModel> Options;
@@ -778,10 +780,10 @@ void AIdleHUD::DrawClassSelectionPanel()
 	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = BuildClassSelectionOptions(IdleCharacter->GetClassId());
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = 322.0f * Scale;
-	const float HeaderHeight = 42.0f * Scale;
-	const float OptionHeight = 48.0f * Scale;
-	const float OptionGap = 8.0f * Scale;
-	const float Padding = 14.0f * Scale;
+	const float HeaderHeight = 38.0f * Scale;
+	const float OptionHeight = 34.0f * Scale;
+	const float OptionGap = 6.0f * Scale;
+	const float Padding = 10.0f * Scale;
 	const float PanelHeight = HeaderHeight + Padding + Options.Num() * OptionHeight + FMath::Max(0, Options.Num() - 1) * OptionGap + Padding;
 	const float X = 28.0f * Scale;
 	const float Y = 92.0f * Scale;
@@ -793,8 +795,8 @@ void AIdleHUD::DrawClassSelectionPanel()
 	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
 	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
 
-	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_TITLE")).ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
-	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_SUBTITLE")).ToString(), Theme::TextMuted, X + PanelWidth - 128.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_TITLE")).ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(IdleProject::Localization::UI(TEXT("CLASS_PANEL_SUBTITLE")).ToString(), Theme::TextMuted, X + PanelWidth - 92.0f * Scale, Y + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 
 	float OptionY = Y + HeaderHeight + Padding;
 	for (const FIdleHUDClassSelectionOptionViewModel& Option : Options)
@@ -810,17 +812,17 @@ void AIdleHUD::DrawClassSelectionOption(const FIdleHUDClassSelectionOptionViewMo
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 48.0f;
+	const float Scale = Height / 34.0f;
 	const FLinearColor StateColor = Option.bSelected ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
 	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
 	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
 
-	DrawText(Option.DisplayName.ToString(), Option.bSelected ? Theme::AccentGold : Theme::TextPrimary, X + 14.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.96f * Scale);
-	DrawText(Option.RoleLabel.ToString(), Theme::TextMuted, X + 82.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-	DrawText(Option.StatSummary.ToString(), Theme::AccentBlue, X + 14.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(Option.DisplayName.ToString(), Option.bSelected ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(Option.RoleLabel.ToString(), Theme::TextMuted, X + 70.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Option.StatSummary.ToString(), Theme::AccentBlue, X + 12.0f * Scale, Y + 20.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 
 	const FString StateLabel = IdleProject::Localization::UI(Option.bSelected ? TEXT("CLASS_SELECTED") : TEXT("CLASS_SELECT")).ToString();
-	DrawText(StateLabel, Option.bSelected ? Theme::AccentGold : Theme::TextMuted, X + Width - 74.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(StateLabel, Option.bSelected ? Theme::AccentGold : Theme::TextMuted, X + Width - 62.0f * Scale, Y + 11.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
 	AddHitBox(FVector2D(X, Y), FVector2D(Width, Height), MakeClassSelectionHitBoxName(Option.ClassId), true, 70);
 }
 
@@ -829,7 +831,7 @@ void AIdleHUD::SelectClassFromHitBox(FName BoxName)
 	FString RawClassId = BoxName.ToString();
 	RawClassId.RightChopInline(ClassSelectionHitBoxPrefix.Len());
 	const int32 ClassIdValue = FCString::Atoi(*RawClassId);
-	if (ClassIdValue < static_cast<int32>(EClassId::Warrior) || ClassIdValue > static_cast<int32>(EClassId::Archer))
+	if (ClassIdValue < static_cast<int32>(EClassId::Warrior) || ClassIdValue > static_cast<int32>(EClassId::Cleric))
 	{
 		return;
 	}
@@ -1259,7 +1261,7 @@ void AIdleHUD::DrawPetPanel()
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = HeaderHeight + 48.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
 	const float X = 28.0f * Scale;
-	const float Y = 332.0f * Scale;
+	const float Y = 360.0f * Scale;
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -1361,7 +1363,7 @@ void AIdleHUD::DrawSeasonPassPanel()
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = HeaderHeight + 30.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
 	const float X = 28.0f * Scale;
-	const float Y = 520.0f * Scale;
+	const float Y = 574.0f * Scale;
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);

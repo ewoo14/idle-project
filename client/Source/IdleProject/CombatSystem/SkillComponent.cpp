@@ -18,6 +18,15 @@ const FName ArcaneOverloadId(TEXT("arcane_overload"));
 const FName CriticalEyeId(TEXT("critical_eye"));
 const FName QuickDrawId(TEXT("quick_draw"));
 const FName EagleEyeId(TEXT("eagle_eye"));
+const FName EvasionStanceId(TEXT("evasion_stance"));
+const FName NimbleHandsId(TEXT("nimble_hands"));
+const FName LuckyInstinctId(TEXT("lucky_instinct"));
+const FName AssassinateId(TEXT("assassinate"));
+const FName BlessingId(TEXT("blessing"));
+const FName PurifyId(TEXT("purify"));
+const FName WisdomTrainingId(TEXT("wisdom_training"));
+const FName DivineVitalityId(TEXT("divine_vitality"));
+const FName SanctuaryId(TEXT("sanctuary"));
 
 FSkillDefinition MakeSkill(
 	const TCHAR* SkillId,
@@ -92,6 +101,32 @@ void USkillComponent::LoadDefaultArcherSkills()
 	Skills.Add(MakeSkill(TEXT("eagle_eye"), EClassId::Archer, TEXT("Eagle Eye"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f));
 }
 
+void USkillComponent::LoadDefaultThiefSkills()
+{
+	ResetSkillState();
+
+	Skills.Add(MakeSkill(TEXT("shadow_stab"), EClassId::Thief, TEXT("Shadow Stab"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("smoke_bomb"), EClassId::Thief, TEXT("Smoke Bomb"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("evasion_stance"), EClassId::Thief, TEXT("Evasion Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("backstab"), EClassId::Thief, TEXT("Backstab"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("nimble_hands"), EClassId::Thief, TEXT("Nimble Hands"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("lucky_instinct"), EClassId::Thief, TEXT("Lucky Instinct"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("assassinate"), EClassId::Thief, TEXT("Assassinate"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.3f, 0.25f, 4.0f, 11.0f, 1.0f));
+}
+
+void USkillComponent::LoadDefaultClericSkills()
+{
+	ResetSkillState();
+
+	Skills.Add(MakeSkill(TEXT("holy_smite"), EClassId::Cleric, TEXT("Holy Smite"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("heal"), EClassId::Cleric, TEXT("Heal"), ESkillType::Active, ESkillEffectType::Heal, 6.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("blessing"), EClassId::Cleric, TEXT("Blessing"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.15f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("purify"), EClassId::Cleric, TEXT("Purify"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.25f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("wisdom_training"), EClassId::Cleric, TEXT("Wisdom Training"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("divine_vitality"), EClassId::Cleric, TEXT("Divine Vitality"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("sanctuary"), EClassId::Cleric, TEXT("Sanctuary"), ESkillType::Ultimate, ESkillEffectType::Heal, 0.0f, 0.0f, 0.4f, 0.0f, 6.0f, 6.0f));
+}
+
 void USkillComponent::LoadSkillsForClass(EClassId ClassId)
 {
 	switch (ClassId)
@@ -101,6 +136,12 @@ void USkillComponent::LoadSkillsForClass(EClassId ClassId)
 		break;
 	case EClassId::Archer:
 		LoadDefaultArcherSkills();
+		break;
+	case EClassId::Thief:
+		LoadDefaultThiefSkills();
+		break;
+	case EClassId::Cleric:
+		LoadDefaultClericSkills();
 		break;
 	case EClassId::Warrior:
 	default:
@@ -302,6 +343,22 @@ void USkillComponent::ApplyPassivesToStats(FDerivedStats& InOutStats) const
 	{
 		InOutStats.AtkSpeed = FMath::RoundToFloat(InOutStats.AtkSpeed * 1.1f * 10.0f) / 10.0f;
 	}
+	if (FindSkill(NimbleHandsId))
+	{
+		InOutStats.Dodge = FMath::Clamp(InOutStats.Dodge + 0.05f, 0.0f, 1.0f);
+	}
+	if (FindSkill(LuckyInstinctId))
+	{
+		InOutStats.CritRate = FMath::Clamp(InOutStats.CritRate + 0.05f, 0.0f, 1.0f);
+	}
+	if (FindSkill(WisdomTrainingId))
+	{
+		InOutStats.MagicAtk = FMath::RoundToFloat(InOutStats.MagicAtk * 1.1f);
+	}
+	if (FindSkill(DivineVitalityId))
+	{
+		InOutStats.Hp = FMath::RoundToFloat(InOutStats.Hp * 1.2f);
+	}
 }
 
 float USkillComponent::GetGaugeGainOnHit() const
@@ -314,6 +371,14 @@ float USkillComponent::GetGaugeGainOnHit() const
 	if (!Ultimate)
 	{
 		Ultimate = FindSkill(EagleEyeId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(AssassinateId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(SanctuaryId);
 	}
 	return Ultimate ? Ultimate->GaugeGainOnHit : 0.0f;
 }
@@ -328,6 +393,14 @@ float USkillComponent::GetGaugeGainOnTakeDamage() const
 	if (!Ultimate)
 	{
 		Ultimate = FindSkill(EagleEyeId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(AssassinateId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(SanctuaryId);
 	}
 	return Ultimate ? Ultimate->GaugeGainOnTakeDamage : 0.0f;
 }
@@ -382,6 +455,10 @@ void USkillComponent::ExecuteSkill(const FSkillDefinition& Skill, float Now, AAc
 	{
 		ApplySelfBuff(Skill, Now);
 	}
+	else if (Skill.EffectType == ESkillEffectType::Heal)
+	{
+		ApplyHeal(Skill);
+	}
 	else if (Skill.EffectType == ESkillEffectType::DamageAoe)
 	{
 		for (AActor* AoeTarget : AoeTargets)
@@ -410,7 +487,7 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 		return;
 	}
 
-	const bool bMagicDamage = Skill.ClassId == EClassId::Mage;
+	const bool bMagicDamage = Skill.ClassId == EClassId::Mage || Skill.ClassId == EClassId::Cleric;
 	const float AttackPower = bMagicDamage ? OwnerCombat->MagicAtk : OwnerCombat->Atk;
 	const float Defense = bMagicDamage ? TargetCombat->MagicDef : TargetCombat->Def;
 	const float EffectiveDamageCoeff = GetEffectiveDamageCoeff(Skill.SkillId);
@@ -428,14 +505,34 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 	}
 }
 
+void USkillComponent::ApplyHeal(const FSkillDefinition& Skill)
+{
+	UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr;
+	if (!Combat || Combat->IsDead())
+	{
+		return;
+	}
+
+	const float HealAmount = FMath::RoundToFloat(Combat->MaxHp * FMath::Max(0.0f, Skill.BuffMagnitude));
+	Combat->CurrentHp = FMath::Clamp(Combat->CurrentHp + HealAmount, 0.0f, Combat->MaxHp);
+	Combat->OnHpChanged.Broadcast(Combat->CurrentHp);
+}
+
 void USkillComponent::ApplySelfBuff(const FSkillDefinition& Skill, float Now)
 {
-	if (Skill.SkillId == ShieldUpId || Skill.SkillId == ManaShieldId)
+	if (Skill.SkillId == ShieldUpId || Skill.SkillId == ManaShieldId || Skill.SkillId == PurifyId)
 	{
 		DefBuffMagnitude = Skill.BuffMagnitude;
 		DefBuffEndTime = Now + Skill.BuffDuration;
 	}
-	else if (Skill.SkillId == BerserkersFuryId || Skill.SkillId == ArcaneOverloadId || Skill.SkillId == FocusId || Skill.SkillId == EagleEyeId)
+	else if (
+		Skill.SkillId == BerserkersFuryId ||
+		Skill.SkillId == ArcaneOverloadId ||
+		Skill.SkillId == FocusId ||
+		Skill.SkillId == EagleEyeId ||
+		Skill.SkillId == EvasionStanceId ||
+		Skill.SkillId == AssassinateId ||
+		Skill.SkillId == BlessingId)
 	{
 		AtkSpeedBuffMagnitude = Skill.BuffMagnitude;
 		AtkSpeedBuffEndTime = Now + Skill.BuffDuration;

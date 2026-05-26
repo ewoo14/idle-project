@@ -1,48 +1,114 @@
 import { describe, expect, it } from "vitest";
 import {
   archerSkillDefinitions,
+  clericSkillDefinitions,
   getSkillDefinitionsForClass,
   mageSkillDefinitions,
+  type SkillDefinition,
+  thiefSkillDefinitions,
   warriorSkillDefinitions,
 } from "./skills.js";
 
-describe("warriorSkillDefinitions", () => {
-  it("mirrors the seven V1 warrior skills with server-readable fields", () => {
-    expect(warriorSkillDefinitions).toHaveLength(7);
-    expect(warriorSkillDefinitions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          skillId: "heavy_strike",
-          classId: 1,
-          type: "active",
-          cooldown: 4,
-          damageCoeff: 2.5,
-        }),
-        expect.objectContaining({
-          skillId: "whirlwind",
-          classId: 1,
-          type: "active",
-          effectType: "damage_aoe",
-          cooldown: 8,
-          damageCoeff: 1.8,
-        }),
-        expect.objectContaining({
-          skillId: "berserkers_fury",
-          classId: 1,
-          type: "ultimate",
-          damageCoeff: 6,
-          gaugeGainOnHit: 8,
-          gaugeGainOnTakeDamage: 5,
-        }),
-      ]),
-    );
-  });
-});
-
-describe("mageSkillDefinitions", () => {
-  it("mirrors the seven V1 mage skills with server-readable fields", () => {
-    expect(mageSkillDefinitions).toHaveLength(7);
-    expect(mageSkillDefinitions).toEqual([
+const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
+  [
+    1,
+    [
+      {
+        skillId: "heavy_strike",
+        classId: 1,
+        displayName: "강타",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 4,
+        damageCoeff: 2.5,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "whirlwind",
+        classId: 1,
+        displayName: "회전베기",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 8,
+        damageCoeff: 1.8,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "shield_up",
+        classId: 1,
+        displayName: "방패 올리기",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 12,
+        damageCoeff: 0,
+        buffMagnitude: 0.5,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "charge",
+        classId: 1,
+        displayName: "돌진",
+        type: "active",
+        effectType: "dash_damage",
+        cooldown: 10,
+        damageCoeff: 2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "weapon_mastery",
+        classId: 1,
+        displayName: "무기 숙련",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "toughness",
+        classId: 1,
+        displayName: "강인함",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "berserkers_fury",
+        classId: 1,
+        displayName: "광전사의 분노",
+        type: "ultimate",
+        effectType: "damage_single",
+        cooldown: 0,
+        damageCoeff: 6,
+        buffMagnitude: 0.3,
+        buffDuration: 4,
+        gaugeGainOnHit: 8,
+        gaugeGainOnTakeDamage: 5,
+      },
+    ],
+  ],
+  [
+    2,
+    [
       {
         skillId: "arcane_bolt",
         classId: 2,
@@ -134,14 +200,11 @@ describe("mageSkillDefinitions", () => {
         gaugeGainOnHit: 9,
         gaugeGainOnTakeDamage: 3,
       },
-    ]);
-  });
-});
-
-describe("archerSkillDefinitions", () => {
-  it("mirrors the seven V1 archer skills with server-readable fields", () => {
-    expect(archerSkillDefinitions).toHaveLength(7);
-    expect(archerSkillDefinitions).toEqual([
+    ],
+  ],
+  [
+    3,
+    [
       {
         skillId: "precision_shot",
         classId: 3,
@@ -233,7 +296,244 @@ describe("archerSkillDefinitions", () => {
         gaugeGainOnHit: 10,
         gaugeGainOnTakeDamage: 2,
       },
-    ]);
+    ],
+  ],
+  [
+    4,
+    [
+      {
+        skillId: "shadow_stab",
+        classId: 4,
+        displayName: "Shadow Stab",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 3,
+        damageCoeff: 2.3,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "smoke_bomb",
+        classId: 4,
+        displayName: "Smoke Bomb",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 7,
+        damageCoeff: 1.5,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "evasion_stance",
+        classId: 4,
+        displayName: "Evasion Stance",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 10,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "backstab",
+        classId: 4,
+        displayName: "Backstab",
+        type: "active",
+        effectType: "dash_damage",
+        cooldown: 9,
+        damageCoeff: 2.1,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "nimble_hands",
+        classId: 4,
+        displayName: "Nimble Hands",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.05,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "lucky_instinct",
+        classId: 4,
+        displayName: "Lucky Instinct",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.05,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "assassinate",
+        classId: 4,
+        displayName: "Assassinate",
+        type: "ultimate",
+        effectType: "damage_single",
+        cooldown: 0,
+        damageCoeff: 5.3,
+        buffMagnitude: 0.25,
+        buffDuration: 4,
+        gaugeGainOnHit: 11,
+        gaugeGainOnTakeDamage: 1,
+      },
+    ],
+  ],
+  [
+    5,
+    [
+      {
+        skillId: "holy_smite",
+        classId: 5,
+        displayName: "Holy Smite",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 3.2,
+        damageCoeff: 2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "heal",
+        classId: 5,
+        displayName: "Heal",
+        type: "active",
+        effectType: "heal",
+        cooldown: 6,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "blessing",
+        classId: 5,
+        displayName: "Blessing",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 10,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "purify",
+        classId: 5,
+        displayName: "Purify",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 12,
+        damageCoeff: 0,
+        buffMagnitude: 0.25,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "wisdom_training",
+        classId: 5,
+        displayName: "Wisdom Training",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.1,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "divine_vitality",
+        classId: 5,
+        displayName: "Divine Vitality",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "sanctuary",
+        classId: 5,
+        displayName: "Sanctuary",
+        type: "ultimate",
+        effectType: "heal",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.4,
+        buffDuration: 0,
+        gaugeGainOnHit: 6,
+        gaugeGainOnTakeDamage: 6,
+      },
+    ],
+  ],
+]);
+
+describe("warriorSkillDefinitions", () => {
+  it("mirrors the seven V1 warrior skills with server-readable fields", () => {
+    expect(warriorSkillDefinitions).toHaveLength(7);
+    expect(warriorSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(1),
+    );
+  });
+});
+
+describe("mageSkillDefinitions", () => {
+  it("mirrors the seven V1 mage skills with server-readable fields", () => {
+    expect(mageSkillDefinitions).toHaveLength(7);
+    expect(mageSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(2),
+    );
+  });
+});
+
+describe("archerSkillDefinitions", () => {
+  it("mirrors the seven V1 archer skills with server-readable fields", () => {
+    expect(archerSkillDefinitions).toHaveLength(7);
+    expect(archerSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(3),
+    );
+  });
+});
+
+describe("thiefSkillDefinitions", () => {
+  it("mirrors the seven V1 thief skills with server-readable fields", () => {
+    expect(thiefSkillDefinitions).toHaveLength(7);
+    expect(thiefSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(4),
+    );
+  });
+});
+
+describe("clericSkillDefinitions", () => {
+  it("mirrors the seven V1 cleric skills including heal effects", () => {
+    expect(clericSkillDefinitions).toHaveLength(7);
+    expect(clericSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(5),
+    );
   });
 });
 
@@ -242,15 +542,33 @@ describe("skill definition parity by class", () => {
     expect(getSkillDefinitionsForClass(1)).toBe(warriorSkillDefinitions);
     expect(getSkillDefinitionsForClass(2)).toBe(mageSkillDefinitions);
     expect(getSkillDefinitionsForClass(3)).toBe(archerSkillDefinitions);
+    expect(getSkillDefinitionsForClass(4)).toBe(thiefSkillDefinitions);
+    expect(getSkillDefinitionsForClass(5)).toBe(clericSkillDefinitions);
   });
 
-  it("keeps mage and archer class ids aligned with their lookup keys", () => {
-    for (const skill of getSkillDefinitionsForClass(2)) {
-      expect(skill.classId).toBe(2);
+  it("keeps every supported class id aligned with its lookup key", () => {
+    for (const classId of [1, 2, 3, 4, 5]) {
+      for (const skill of getSkillDefinitionsForClass(classId)) {
+        expect(skill.classId).toBe(classId);
+      }
     }
+  });
 
-    for (const skill of getSkillDefinitionsForClass(3)) {
-      expect(skill.classId).toBe(3);
+  it("contains 35 V1 skill definitions across the five supported classes", () => {
+    const allSkills = [1, 2, 3, 4, 5].flatMap((classId) =>
+      getSkillDefinitionsForClass(classId),
+    );
+
+    expect(allSkills).toHaveLength(35);
+    expect(new Set(allSkills.map((skill) => skill.skillId)).size).toBe(35);
+    expect(new Set(allSkills.map((skill) => skill.effectType))).toContain(
+      "heal",
+    );
+  });
+
+  it("keeps every class definition in exact parity with the V1 balance table", () => {
+    for (const [classId, expectedSkills] of expectedSkillDefinitionsByClass) {
+      expect(getSkillDefinitionsForClass(classId)).toEqual(expectedSkills);
     }
   });
 });
