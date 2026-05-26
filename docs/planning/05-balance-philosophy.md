@@ -240,6 +240,26 @@ V1 reset is free and returns allocated points to the available pool. Rebirth
 resets both available and allocated stat points because it resets character
 level to 1; rebirth bonus points remain a separate permanent progression input.
 
+Per-level grant is fixed at 5 points for every level-up after level 1 in V1.
+The server mirror in `server/src/core/formulas/statPoints.ts` and the client
+formula in `FStatPointFormula` must stay definition-parity guarded. Invalid
+fractional server levels are rejected before formula evaluation so backend
+simulation cannot drift from the client `int32` boundary.
+
+Primary allocation impact uses the existing `DeriveStats` paths:
+
+- STR: `PhysAtk += 2` per point before equipment and rebirth bonuses.
+- DEX: raises `AtkSpeed`, `MoveSpeed`, `Dodge`, and `Accuracy` through the
+  existing rounded rate formulas.
+- INT: raises `MagicAtk`, `Mp`, and `MagicDef` through the existing formulas.
+- WIS: raises `MagicAtk`, `Mp`, and `MagicDef` through the existing formulas.
+- CON: raises `Hp` by 10 per point and also contributes to `PhysDef`.
+- LUK: raises `CritRate`, `CritDmg`, and `Dodge` through the existing formulas.
+
+No paid reset, refund penalty, allocation cap, or server-authoritative spend
+validation ships in this V1. Those remain follow-up economy and persistence
+items after player telemetry exists.
+
 ### 3.8 Status / Element V1 Anchors
 
 PR #30 adds deterministic status effects and element multipliers to the existing

@@ -207,6 +207,7 @@ struct IDLEPROJECT_API FIdleHUDStatRowViewModel
 	EPrimaryStat Stat = EPrimaryStat::Str;
 	FText StatLabel;
 	FText ValueLabel;
+	FName AllocationHitBoxName;
 	int32 BaseValue = 0;
 	int32 AllocatedValue = 0;
 	int32 TotalValue = 0;
@@ -218,6 +219,7 @@ struct IDLEPROJECT_API FIdleHUDStatPanelViewModel
 	FText Title;
 	FText AvailableLabel;
 	FText ResetLabel;
+	FName ResetHitBoxName;
 	int32 AvailablePoints = 0;
 	bool bCanReset = false;
 	TArray<FIdleHUDStatRowViewModel> Rows;

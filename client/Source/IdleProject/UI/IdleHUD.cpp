@@ -485,6 +485,7 @@ FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrima
 		Args.Add(TEXT("Points"), FText::AsNumber(ViewModel.AvailablePoints));
 	});
 	ViewModel.ResetLabel = IdleProject::Localization::UI(TEXT("STAT_RESET"));
+	ViewModel.ResetHitBoxName = StatResetHitBoxName;
 
 	const EPrimaryStat StatOrder[] = {
 		EPrimaryStat::Str,
@@ -500,6 +501,7 @@ FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrima
 		FIdleHUDStatRowViewModel Row;
 		Row.Stat = Stat;
 		Row.StatLabel = FText::FromString(PrimaryStatToLabel(Stat));
+		Row.AllocationHitBoxName = MakeStatAllocationHitBoxName(Stat);
 		Row.BaseValue = FMath::RoundToInt(GetPrimaryStatValue(BaseStats, Stat));
 		Row.AllocatedValue = FMath::Max(0, FMath::RoundToInt(GetPrimaryStatValue(AllocatedStats, Stat)));
 		Row.TotalValue = Row.BaseValue + Row.AllocatedValue;
@@ -1487,7 +1489,7 @@ void AIdleHUD::DrawStatAllocationPanel()
 	DrawText(ViewModel.ResetLabel.ToString(), ViewModel.bCanReset ? Theme::TextPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 	if (ViewModel.bCanReset)
 	{
-		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), StatResetHitBoxName, true, 88);
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ResetHitBoxName, true, 88);
 	}
 
 	RefreshMouseInteraction();
@@ -1510,7 +1512,7 @@ void AIdleHUD::DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float 
 	DrawText(TEXT("+"), Row.bCanAllocate ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 6.0f * Scale, ButtonY + 2.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
 	if (Row.bCanAllocate)
 	{
-		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), MakeStatAllocationHitBoxName(Row.Stat), true, 88);
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), Row.AllocationHitBoxName, true, 88);
 	}
 }
 

@@ -47,10 +47,16 @@ bool FAllocatedPrimaryStatsDerivedImpactTest::RunTest(const FString& Parameters)
 	const FDerivedStats BaseDerived = FStatFormulas::DeriveStats(Primary, 1);
 
 	Primary.Str += 1.0f;
+	Primary.Int_ += 1.0f;
+	Primary.Wis += 1.0f;
+	Primary.Con += 1.0f;
+	Primary.Luk += 1.0f;
 	const FDerivedStats AllocatedDerived = FStatFormulas::DeriveStats(Primary, 1);
 
 	TestEqual(TEXT("One allocated STR raises physical attack by two"), AllocatedDerived.PhysAtk, BaseDerived.PhysAtk + 2.0f);
-	TestEqual(TEXT("One allocated STR does not alter max HP"), AllocatedDerived.Hp, BaseDerived.Hp);
+	TestEqual(TEXT("One allocated INT and WIS raise rounded magic attack"), AllocatedDerived.MagicAtk, BaseDerived.MagicAtk + 2.0f);
+	TestEqual(TEXT("One allocated CON raises max HP by ten"), AllocatedDerived.Hp, BaseDerived.Hp + 10.0f);
+	TestEqual(TEXT("One allocated LUK raises crit rate by 0.002"), AllocatedDerived.CritRate, BaseDerived.CritRate + 0.002f);
 
 	return true;
 }
@@ -70,6 +76,8 @@ bool FStatAllocationHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("STR row is first"), WithPoints.Rows[0].Stat, EPrimaryStat::Str);
 	TestEqual(TEXT("INT row maps to FPrimaryStats::Int_"), WithPoints.Rows[2].AllocatedValue, 2);
 	TestEqual(TEXT("LUK row includes allocated points"), WithPoints.Rows[5].TotalValue, 8);
+	TestEqual(TEXT("STR allocation hitbox is stable"), WithPoints.Rows[0].AllocationHitBoxName, FName(TEXT("StatAlloc_0")));
+	TestEqual(TEXT("Reset hitbox is stable"), WithPoints.ResetHitBoxName, FName(TEXT("StatReset")));
 	TestEqual(TEXT("Available points are clamped into the view model"), WithPoints.AvailablePoints, 4);
 	TestTrue(TEXT("Rows can allocate while points remain"), WithPoints.Rows[0].bCanAllocate);
 	TestTrue(TEXT("Reset is enabled when any stat is allocated"), WithPoints.bCanReset);

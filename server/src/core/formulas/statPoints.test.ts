@@ -28,6 +28,20 @@ describe("stat point formulas", () => {
     expect(getTotalStatPointsForLevel(level)).toBe(expected);
   });
 
+  it.each([
+    1.5,
+    2.5,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+  ])("rejects non-integer level %s to mirror the client int32 formula boundary", (level) => {
+    expect(() => getStatPointsForLevelUp(level)).toThrow(
+      "level must be an integer",
+    );
+    expect(() => getTotalStatPointsForLevel(level)).toThrow(
+      "level must be an integer",
+    );
+  });
+
   it("applies allocated primary stats before deriving secondary stats", () => {
     const primary: PrimaryStats = {
       str: 12,
@@ -62,5 +76,35 @@ describe("stat point formulas", () => {
     });
     expect(allocatedDerived.physAtk).toBe(baseDerived.physAtk + 6);
     expect(allocatedDerived.hp).toBe(baseDerived.hp + 10);
+  });
+
+  it("keeps each allocated primary stat on the same derived stat path as the client", () => {
+    const primary: PrimaryStats = {
+      str: 12,
+      dex: 6,
+      int: 3,
+      wis: 3,
+      con: 10,
+      luk: 4,
+    };
+    const allocated: PrimaryStats = {
+      str: 1,
+      dex: 0,
+      int: 1,
+      wis: 1,
+      con: 1,
+      luk: 1,
+    };
+
+    const baseDerived = deriveStats(primary, 1);
+    const allocatedDerived = deriveStats(
+      applyAllocatedStats(primary, allocated),
+      1,
+    );
+
+    expect(allocatedDerived.physAtk).toBe(baseDerived.physAtk + 2);
+    expect(allocatedDerived.magicAtk).toBe(baseDerived.magicAtk + 2);
+    expect(allocatedDerived.hp).toBe(baseDerived.hp + 10);
+    expect(allocatedDerived.critRate).toBe(baseDerived.critRate + 0.002);
   });
 });
