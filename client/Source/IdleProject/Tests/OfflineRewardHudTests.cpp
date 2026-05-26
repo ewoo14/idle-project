@@ -132,6 +132,39 @@ bool FRebirthHudViewModelTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FTranscendHudViewModelTest,
+	"IdleProject.UI.HUD.TranscendPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTranscendHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FIdleHUDTranscendViewModel LockedViewModel = IdleProject::UI::BuildTranscendViewModel(false, 4, 5, 0, 1.0f, 1.25f);
+	TestEqual(TEXT("Panel title uses approved English copy"), LockedViewModel.Title.ToString(), FString(TEXT("Transcendence")));
+	TestEqual(TEXT("Locked status explains transcend is unavailable"), LockedViewModel.StatusLabel.ToString(), FString(TEXT("Transcend Locked")));
+	TestEqual(TEXT("Requirement label exposes current rebirth progress"), LockedViewModel.RequirementLabel.ToString(), FString(TEXT("Rebirth 4 / 5")));
+	TestEqual(TEXT("Current multiplier is formatted with two decimals"), LockedViewModel.CurrentMultiplierLabel.ToString(), FString(TEXT("Current multiplier x1.00")));
+	TestEqual(TEXT("Preview multiplier advances from current count"), LockedViewModel.PreviewMultiplierLabel.ToString(), FString(TEXT("Next transcend x1.25")));
+	TestEqual(TEXT("Transcend count is exposed"), LockedViewModel.CountLabel.ToString(), FString(TEXT("Transcend 0")));
+	TestFalse(TEXT("Locked state disables transcend button"), LockedViewModel.bCanTranscend);
+
+	const FIdleHUDTranscendViewModel ReadyViewModel = IdleProject::UI::BuildTranscendViewModel(true, 5, 5, 1, 1.25f, 1.5f);
+	TestEqual(TEXT("Ready status uses approved English copy"), ReadyViewModel.StatusLabel.ToString(), FString(TEXT("Transcend Ready")));
+	TestEqual(TEXT("Ready requirement still shows threshold progress"), ReadyViewModel.RequirementLabel.ToString(), FString(TEXT("Rebirth 5 / 5")));
+	TestEqual(TEXT("Current multiplier reflects game instance multiplier"), ReadyViewModel.CurrentMultiplierLabel.ToString(), FString(TEXT("Current multiplier x1.25")));
+	TestEqual(TEXT("Preview multiplier reflects next transcend"), ReadyViewModel.PreviewMultiplierLabel.ToString(), FString(TEXT("Next transcend x1.50")));
+	TestEqual(TEXT("Button uses approved English copy"), ReadyViewModel.ButtonLabel.ToString(), FString(TEXT("Transcend")));
+	TestTrue(TEXT("Ready state enables transcend button"), ReadyViewModel.bCanTranscend);
+
+	const FIdleHUDTranscendViewModel OverflowViewModel = IdleProject::UI::BuildTranscendViewModel(true, 7, 5, 2, 1.5f, 1.75f);
+	TestEqual(TEXT("Requirement label keeps current rebirth count above threshold"), OverflowViewModel.RequirementLabel.ToString(), FString(TEXT("Rebirth 7 / 5")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEnhanceHudViewModelTest,
 	"IdleProject.UI.HUD.EnhancePanelViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
