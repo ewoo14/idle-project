@@ -55,3 +55,24 @@
   - GREEN: `Build.bat IdleProjectEditor Win64 Development` exited 0.
   - GREEN: `UnrealEditor-Cmd.exe ... -ExecCmds="Automation RunTests IdleProject.Character.Stats.CurrentStatsAccessors; Quit"` exited 0.
   - GREEN: `UnrealEditor-Cmd.exe ... -ExecCmds="Automation RunTests IdleProject; Quit"` found 104 tests and exited 0.
+
+## 9. Codex Designer/QA Notes (2026-05-26)
+
+- Added C++ HUD stat info ViewModel and toggle hit box:
+  `FIdleHUDStatInfoViewModel`, `BuildStatInfoViewModel(...)`, and
+  `StatInfoToggle`.
+- Panel reads final cached combat-facing values from
+  `GetCurrentPrimaryStats()`, `GetCurrentDerivedStats()`,
+  `GetCurrentLevel()`, `GetClassId()`, and `GetRebirthCount()`.
+- Primary rows: STR, DEX, INT, WIS, CON, LUK.
+- Derived rows: HP, physical attack, magic attack, physical defense, magic
+  defense, attack speed, crit rate, crit damage, dodge, and accuracy.
+- Formatting covered by Automation:
+  - integers: HP and flat attack/defense stats
+  - decimals: attack speed with two decimals
+  - percentages: crit rate, dodge, accuracy
+  - multiplier: crit damage
+- Added ko/en UI CSV keys for the stat info title, toggle, header, and derived
+  stat labels.
+- Added QA scenario:
+  `docs/qa/scenarios/M7-character-stats-panel-v1.md`.

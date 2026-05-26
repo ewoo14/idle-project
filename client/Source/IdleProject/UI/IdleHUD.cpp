@@ -32,6 +32,7 @@ const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
+const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
@@ -116,6 +117,26 @@ FText FormatAffixFlatLabel(const TCHAR* Key, float Value)
 	{
 		Args.Add(TEXT("Value"), FText::AsNumber(RoundedValue));
 	});
+}
+
+FText FormatIntegerLabel(float Value)
+{
+	return FText::AsNumber(FMath::RoundToInt(Value));
+}
+
+FText FormatFixedDecimalLabel(float Value, int32 Decimals)
+{
+	return FText::FromString(FString::Printf(TEXT("%.*f"), Decimals, Value));
+}
+
+FText FormatStatInfoPercentLabel(float Rate)
+{
+	return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(FMath::Clamp(Rate, 0.0f, 1.0f) * 100.0f)));
+}
+
+FText FormatMultiplierLabel(float Value)
+{
+	return FText::FromString(FString::Printf(TEXT("x%.2f"), FMath::Max(0.0f, Value)));
 }
 
 FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 Value)
@@ -335,6 +356,25 @@ float GetPrimaryStatValue(const FPrimaryStats& Stats, EPrimaryStat Stat)
 		return Stats.Luk;
 	default:
 		return 0.0f;
+	}
+}
+
+const TCHAR* ClassToLocalizationKey(EClassId ClassId)
+{
+	switch (ClassId)
+	{
+	case EClassId::Warrior:
+		return TEXT("CLASS_WARRIOR_NAME");
+	case EClassId::Mage:
+		return TEXT("CLASS_MAGE_NAME");
+	case EClassId::Archer:
+		return TEXT("CLASS_ARCHER_NAME");
+	case EClassId::Thief:
+		return TEXT("CLASS_THIEF_NAME");
+	case EClassId::Cleric:
+		return TEXT("CLASS_CLERIC_NAME");
+	default:
+		return TEXT("NONE_DASH");
 	}
 }
 
@@ -719,6 +759,58 @@ FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrima
 	return ViewModel;
 }
 
+FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount)
+{
+	FIdleHUDStatInfoViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("STAT_INFO_TITLE"));
+	ViewModel.ToggleLabel = IdleProject::Localization::UI(TEXT("STAT_INFO_TOGGLE"));
+	ViewModel.ToggleHitBoxName = StatInfoToggleHitBoxName;
+	ViewModel.HeaderLabel = FormatLocalizedUI(TEXT("STAT_INFO_HEADER_FORMAT"), [ClassId, Level, RebirthCount](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Class"), IdleProject::Localization::UI(ClassToLocalizationKey(ClassId)));
+		Args.Add(TEXT("Level"), FText::AsNumber(FMath::Max(1, Level)));
+		Args.Add(TEXT("Rebirth"), FText::AsNumber(FMath::Max(0, RebirthCount)));
+	});
+
+	const EPrimaryStat StatOrder[] = {
+		EPrimaryStat::Str,
+		EPrimaryStat::Dex,
+		EPrimaryStat::Int,
+		EPrimaryStat::Wis,
+		EPrimaryStat::Con,
+		EPrimaryStat::Luk
+	};
+
+	for (const EPrimaryStat Stat : StatOrder)
+	{
+		FIdleHUDStatInfoRowViewModel Row;
+		Row.StatLabel = FText::FromString(PrimaryStatToLabel(Stat));
+		Row.ValueLabel = FormatIntegerLabel(GetPrimaryStatValue(PrimaryStats, Stat));
+		ViewModel.PrimaryRows.Add(Row);
+	}
+
+	auto AddDerivedRow = [&ViewModel](const TCHAR* LabelKey, FText ValueLabel)
+	{
+		FIdleHUDStatInfoRowViewModel Row;
+		Row.StatLabel = IdleProject::Localization::UI(LabelKey);
+		Row.ValueLabel = MoveTemp(ValueLabel);
+		ViewModel.DerivedRows.Add(Row);
+	};
+
+	AddDerivedRow(TEXT("STAT_INFO_HP"), FormatIntegerLabel(DerivedStats.Hp));
+	AddDerivedRow(TEXT("STAT_INFO_PHYS_ATK"), FormatIntegerLabel(DerivedStats.PhysAtk));
+	AddDerivedRow(TEXT("STAT_INFO_MAGIC_ATK"), FormatIntegerLabel(DerivedStats.MagicAtk));
+	AddDerivedRow(TEXT("STAT_INFO_PHYS_DEF"), FormatIntegerLabel(DerivedStats.PhysDef));
+	AddDerivedRow(TEXT("STAT_INFO_MAGIC_DEF"), FormatIntegerLabel(DerivedStats.MagicDef));
+	AddDerivedRow(TEXT("STAT_INFO_ATK_SPEED"), FormatFixedDecimalLabel(DerivedStats.AtkSpeed, 2));
+	AddDerivedRow(TEXT("STAT_INFO_CRIT_RATE"), FormatStatInfoPercentLabel(DerivedStats.CritRate));
+	AddDerivedRow(TEXT("STAT_INFO_CRIT_DMG"), FormatMultiplierLabel(DerivedStats.CritDmg));
+	AddDerivedRow(TEXT("STAT_INFO_DODGE"), FormatStatInfoPercentLabel(DerivedStats.Dodge));
+	AddDerivedRow(TEXT("STAT_INFO_ACCURACY"), FormatStatInfoPercentLabel(DerivedStats.Accuracy));
+
+	return ViewModel;
+}
+
 FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
 {
 	FIdleHUDOfflineRewardViewModel ViewModel;
@@ -1092,6 +1184,7 @@ void AIdleHUD::DrawHUD()
 	DrawBossBar();
 	DrawRebirthPanel();
 	DrawStatAllocationPanel();
+	DrawStatInfoPanel();
 	DrawShopPanel();
 	DrawEnhancePanel();
 	DrawClassSelectionPanel();
@@ -1147,6 +1240,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == StatResetHitBoxName)
 	{
 		ResetStatAllocation();
+		return;
+	}
+	if (BoxName == StatInfoToggleHitBoxName)
+	{
+		ToggleStatInfoPanel();
 		return;
 	}
 	if (BoxName == RebirthHitBoxName)
@@ -2102,6 +2200,107 @@ void AIdleHUD::ResetStatAllocation()
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::DrawStatInfoPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!IdleGameInstance || !IdleCharacter)
+	{
+		return;
+	}
+
+	const FIdleHUDStatInfoViewModel ViewModel = BuildStatInfoViewModel(
+		IdleCharacter->GetCurrentPrimaryStats(),
+		IdleCharacter->GetCurrentDerivedStats(),
+		IdleCharacter->GetCurrentLevel(),
+		IdleCharacter->GetClassId(),
+		IdleGameInstance->GetRebirthCount());
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float ToggleX = Canvas->SizeX - 392.0f * Scale;
+	const float ToggleY = 92.0f * Scale;
+	DrawStatInfoToggle(ViewModel, ToggleX, ToggleY, Scale);
+	if (!bStatInfoVisible)
+	{
+		RefreshMouseInteraction();
+		return;
+	}
+
+	const float PanelWidth = 364.0f * Scale;
+	const float HeaderHeight = 62.0f * Scale;
+	const float RowHeight = 25.0f * Scale;
+	const float RowGap = 4.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const int32 RowCount = FMath::Max(ViewModel.PrimaryRows.Num(), ViewModel.DerivedRows.Num());
+	const float PanelHeight = HeaderHeight + RowCount * RowHeight + FMath::Max(0, RowCount - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = ToggleY + 38.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const float ColumnGap = 12.0f * Scale;
+	const float ColumnWidth = (PanelWidth - Padding * 2.0f - ColumnGap) * 0.5f;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.93f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.HeaderLabel.ToString(), Theme::TextMuted, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (int32 Index = 0; Index < RowCount; ++Index)
+	{
+		if (ViewModel.PrimaryRows.IsValidIndex(Index))
+		{
+			DrawStatInfoRow(ViewModel.PrimaryRows[Index], X + Padding, RowY, ColumnWidth, RowHeight, Theme::AccentBlue);
+		}
+		if (ViewModel.DerivedRows.IsValidIndex(Index))
+		{
+			DrawStatInfoRow(ViewModel.DerivedRows[Index], X + Padding + ColumnWidth + ColumnGap, RowY, ColumnWidth, RowHeight, Theme::AccentGold);
+		}
+		RowY += RowHeight + RowGap;
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawStatInfoToggle(const FIdleHUDStatInfoViewModel& ViewModel, float X, float Y, float Scale)
+{
+	using namespace IdleProject::UI;
+
+	const float Width = 126.0f * Scale;
+	const float Height = 30.0f * Scale;
+	DrawRect(bStatInfoVisible ? Theme::AccentGold : Theme::BgPanel.CopyWithNewOpacity(0.94f), X, Y, Width, Height);
+	DrawText(ViewModel.ToggleLabel.ToString(), bStatInfoVisible ? Theme::BgPrimary : Theme::TextPrimary, X + 13.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	AddHitBox(FVector2D(X, Y), FVector2D(Width, Height), ViewModel.ToggleHitBoxName, true, 88);
+}
+
+void AIdleHUD::DrawStatInfoRow(const FIdleHUDStatInfoRowViewModel& Row, float X, float Y, float Width, float Height, const FLinearColor& AccentColor)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 25.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	DrawRect(AccentColor.CopyWithNewOpacity(0.85f), X, Y, 3.0f * Scale, Height);
+	DrawText(Row.StatLabel.ToString(), Theme::TextMuted, X + 9.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.ValueLabel.ToString(), Theme::TextPrimary, X + Width - 52.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+}
+
+void AIdleHUD::ToggleStatInfoPanel()
+{
+	bStatInfoVisible = !bStatInfoVisible;
+	RefreshMouseInteraction();
+}
+
 void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
 {
 	using namespace IdleProject::UI;
@@ -2800,7 +2999,7 @@ void AIdleHUD::RefreshMouseInteraction()
 	}
 
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }
