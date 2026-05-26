@@ -1,6 +1,8 @@
 #include "CombatSystem/BattleAIComponent.h"
 
 #include "CharacterSystem/IdleCharacter.h"
+#include "CharacterSystem/IdleMonster.h"
+#include "CombatSystem/BossPhaseFormula.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
@@ -210,7 +212,20 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 		return;
 	}
 
-	const float Cooldown = 1.0f / FMath::Max(0.1f, OwnerCombat->AtkSpeed);
+	const AIdleMonster* OwnerMonster = Cast<AIdleMonster>(GetOwner());
+	const bool bIsBoss = OwnerMonster && OwnerMonster->IsBoss();
+	int32 BossPhase = 1;
+	float EffectiveAtk = OwnerCombat->Atk;
+	float EffectiveAtkSpeed = OwnerCombat->AtkSpeed;
+	if (bIsBoss)
+	{
+		const float HpRatio = OwnerCombat->CurrentHp / FMath::Max(1.0f, OwnerCombat->MaxHp);
+		BossPhase = FBossPhaseFormula::GetBossPhase(HpRatio);
+		EffectiveAtk *= FBossPhaseFormula::GetPhaseAtkMultiplier(BossPhase);
+		EffectiveAtkSpeed *= FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(BossPhase);
+	}
+
+	const float Cooldown = 1.0f / FMath::Max(0.1f, EffectiveAtkSpeed);
 	if (World->GetTimeSeconds() - LastAttackTime < Cooldown)
 	{
 		State = EBattleState::Attack;
@@ -219,9 +234,15 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 
 	LastAttackTime = World->GetTimeSeconds();
 	State = EBattleState::Attack;
-	const float BaseDamage = FCombatFormulas::ComputeDamage(OwnerCombat->Atk, TargetCombat->Def);
+	const float BaseDamage = FCombatFormulas::ComputeDamage(EffectiveAtk, TargetCombat->Def);
 	const bool bWasCrit = OwnerCombat->RollCrit();
-	const float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, bWasCrit, OwnerCombat->CritDmg);
+	float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, bWasCrit, OwnerCombat->CritDmg);
+	if (bIsBoss && World->GetTimeSeconds() - LastSpecialAttackTime >= FBossPhaseFormula::SpecialAttackIntervalSeconds)
+	{
+		FinalDamage *= FBossPhaseFormula::GetSpecialAttackDamageMultiplier();
+		LastSpecialAttackTime = World->GetTimeSeconds();
+		OnBossSpecialAttack.Broadcast(GetOwner());
+	}
 	TargetCombat->TakeDamageTyped(FinalDamage, GetOwner(), bWasCrit, EDamageKind::Physical);
 	if (USkillComponent* Skills = GetOwner()->FindComponentByClass<USkillComponent>())
 	{

@@ -6,6 +6,8 @@
 
 class UCombatComponent;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBossSpecialAttack, AActor*, Boss);
+
 UENUM(BlueprintType)
 enum class EBattleState : uint8
 {
@@ -44,6 +46,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|BattleAI")
 	TArray<AActor*> FindEnemiesInRange(float Radius) const;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|BattleAI")
+	FOnBossSpecialAttack OnBossSpecialAttack;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|BattleAI")
+	void Attack(AActor* TargetActor);
+
 	/**
 	 * 컨트롤러 없는(비-캐릭터 경로) 몬스터의 지면 추격 목표 위치를 계산합니다.
 	 * 횡스크롤(X-Z 평면)에서 추격은 화면 가로축 X 로만 이루어지고,
@@ -70,9 +78,9 @@ protected:
 private:
 	void UpdateBattle();
 	void MoveTowards(AActor* TargetActor, float DeltaSeconds);
-	void Attack(AActor* TargetActor);
 	UCombatComponent* GetOwnerCombat() const;
 
 	FTimerHandle BattleTimerHandle;
 	float LastAttackTime = -1000.0f;
+	float LastSpecialAttackTime = -1000.0f;
 };
