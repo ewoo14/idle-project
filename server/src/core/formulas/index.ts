@@ -21,6 +21,7 @@ export {
   rollItemSet,
 } from "./setBonus.js";
 export * from "./shop.js";
+export * from "./skillRank.js";
 export * from "./stage.js";
 export * from "./statPoints.js";
 export * from "./stats.js";

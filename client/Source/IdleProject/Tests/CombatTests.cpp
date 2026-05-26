@@ -578,13 +578,14 @@ bool FSkillRankPointsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rank is stored per skill"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(2));
 	TestFalse(TEXT("Cannot rank up without points"), Skills->RankUpSkill(HeavyStrike));
 
-	Skills->GrantSkillPoint(10);
-	for (int32 Index = 0; Index < 8; ++Index)
+	Skills->GrantSkillPoint(60);
+	for (int32 Index = 0; Index < 58; ++Index)
 	{
 		Skills->RankUpSkill(HeavyStrike);
 	}
-	TestEqual(TEXT("Rank is capped at max rank five"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(5));
+	TestEqual(TEXT("Rank is capped at max rank fifty"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(50));
 	TestFalse(TEXT("Max-rank skill cannot rank up"), Skills->CanRankUp(HeavyStrike));
+	TestFalse(TEXT("Rank up fails at max rank even with remaining points"), Skills->RankUpSkill(HeavyStrike));
 
 	return true;
 }
@@ -616,8 +617,25 @@ bool FSkillRankEffectiveValuesTest::RunTest(const FString& Parameters)
 	Skills->RankUpSkill(HeavyStrike);
 	Skills->RankUpSkill(HeavyStrike);
 
-	TestEqual(TEXT("Max rank damage coeff adds fifty percent"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 3.75f);
-	TestEqual(TEXT("Max rank cooldown reduces twenty five percent"), Skills->GetEffectiveCooldown(HeavyStrike), 3.0f);
+	TestEqual(TEXT("Rank five damage coeff keeps legacy fifty percent gain"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 3.75f);
+	TestEqual(TEXT("Rank five cooldown keeps legacy twenty five percent reduction"), Skills->GetEffectiveCooldown(HeavyStrike), 3.0f);
+
+	Skills->GrantSkillPoint(15);
+	for (int32 Index = 0; Index < 15; ++Index)
+	{
+		Skills->RankUpSkill(HeavyStrike);
+	}
+
+	TestEqual(TEXT("Rank twenty cooldown floors at point one seconds"), Skills->GetEffectiveCooldown(HeavyStrike), 0.1f);
+
+	Skills->GrantSkillPoint(30);
+	for (int32 Index = 0; Index < 30; ++Index)
+	{
+		Skills->RankUpSkill(HeavyStrike);
+	}
+
+	TestEqual(TEXT("Rank fifty damage coeff reaches six times base"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 15.0f);
+	TestEqual(TEXT("Rank fifty cooldown remains at point one seconds"), Skills->GetEffectiveCooldown(HeavyStrike), 0.1f);
 	TestEqual(TEXT("Zero-cooldown ultimate remains zero"), Skills->GetEffectiveCooldown(TEXT("berserkers_fury")), 0.0f);
 
 	return true;
@@ -1042,7 +1060,7 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Cooling skill is not ready"), Slots[0].bReady);
 	TestEqual(TEXT("Skill point balance is exposed per slot"), Slots[0].AvailableSkillPoints, static_cast<int32>(1));
 	TestEqual(TEXT("Current skill rank is exposed"), Slots[0].Rank, static_cast<int32>(1));
-	TestEqual(TEXT("Max skill rank is exposed"), Slots[0].MaxRank, static_cast<int32>(5));
+	TestEqual(TEXT("Max skill rank is exposed"), Slots[0].MaxRank, static_cast<int32>(50));
 	TestTrue(TEXT("Rank-up availability is exposed"), Slots[0].bCanRankUp);
 	TestEqual(TEXT("Unranked active skill still shows zero rank"), Slots[1].Rank, static_cast<int32>(0));
 
