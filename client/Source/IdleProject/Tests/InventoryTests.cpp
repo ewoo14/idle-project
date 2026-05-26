@@ -263,6 +263,42 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FShopPanelViewModelStateTest,
+	"IdleProject.UI.HUD.ShopPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopPanelViewModelStateTest::RunTest(const FString& Parameters)
+{
+	FShopPurchaseResult PurchaseResult;
+	PurchaseResult.bPurchased = true;
+	PurchaseResult.GoldSpent = 300;
+	PurchaseResult.Rarity = EItemRarity::Rare;
+	PurchaseResult.Slot = EItemSlot::Weapon;
+	PurchaseResult.ItemName = FText::FromString(TEXT("rare_sword"));
+
+	const FIdleHUDShopPanelViewModel Ready = IdleProject::UI::BuildShopPanelViewModel(300, 450, PurchaseResult);
+	TestEqual(TEXT("Shop panel exposes gear roll cost"), Ready.GearRollCost, static_cast<int64>(300));
+	TestTrue(TEXT("Shop panel enables purchase when gold is enough"), Ready.bCanBuyGearRoll);
+	TestEqual(TEXT("Shop gear roll hitbox is stable"), Ready.GearRollHitBoxName, FName(TEXT("ShopGearRoll")));
+	TestEqual(TEXT("Shop result carries purchased rarity"), Ready.LastResultRarity, EItemRarity::Rare);
+	TestTrue(TEXT("Shop result is visible after purchase"), Ready.bHasLastResult);
+	TestFalse(TEXT("Shop result is not an error after purchase"), Ready.bLastResultError);
+
+	const FIdleHUDShopPanelViewModel NoGold = IdleProject::UI::BuildShopPanelViewModel(300, 250, FShopPurchaseResult());
+	TestFalse(TEXT("Shop panel disables purchase when gold is short"), NoGold.bCanBuyGearRoll);
+	TestFalse(TEXT("Empty shop result is hidden"), NoGold.bHasLastResult);
+
+	FShopPurchaseResult FailedResult;
+	FailedResult.bPurchased = false;
+	FailedResult.GoldSpent = 300;
+	const FIdleHUDShopPanelViewModel Failed = IdleProject::UI::BuildShopPanelViewModel(300, 250, FailedResult);
+	TestTrue(TEXT("Failed purchase result is visible when a cost was attempted"), Failed.bHasLastResult);
+	TestTrue(TEXT("Failed purchase result is flagged as an error"), Failed.bLastResultError);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FInventoryEquipmentBonusTwoSlotsTest,
 	"IdleProject.Inventory.Bonus.TwoSlots",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

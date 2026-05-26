@@ -15,6 +15,7 @@
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ShopFormula.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
 
@@ -29,6 +30,7 @@ const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
+const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
@@ -251,6 +253,20 @@ FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
 FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
 {
 	return FName(*(StatAllocationHitBoxPrefix + FString::FromInt(static_cast<int32>(Stat))));
+}
+
+FText BuildShopResultLabel(const FShopPurchaseResult& Result)
+{
+	if (!Result.bPurchased)
+	{
+		return IdleProject::Localization::UI(TEXT("SHOP_RESULT_BLOCKED"));
+	}
+
+	return FormatLocalizedUI(TEXT("SHOP_RESULT_SUCCESS_FORMAT"), [&Result](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Rarity"), IdleProject::Localization::UI(RarityToLocalizationKey(Result.Rarity)));
+		Args.Add(TEXT("ItemName"), Result.ItemName);
+	});
 }
 
 const TCHAR* PrimaryStatToLabel(EPrimaryStat Stat)
@@ -580,6 +596,32 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 		}
 
 		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
+FIdleHUDShopPanelViewModel IdleProject::UI::BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult)
+{
+	FIdleHUDShopPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("SHOP_PANEL_TITLE"));
+	ViewModel.Gold = FMath::Max<int64>(0, Gold);
+	ViewModel.GearRollCost = FMath::Max<int64>(0, GearRollCost);
+	ViewModel.GearRollHitBoxName = ShopGearRollHitBoxName;
+	ViewModel.GoldLabel = FormatLocalizedUIWithInt64(TEXT("HUD_GOLD_FORMAT"), TEXT("Amount"), ViewModel.Gold);
+	ViewModel.CostLabel = FormatLocalizedUIWithInt64(TEXT("SHOP_GEAR_ROLL_COST_FORMAT"), TEXT("Cost"), ViewModel.GearRollCost);
+	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("SHOP_GEAR_ROLL_BUTTON"));
+	ViewModel.bCanBuyGearRoll = ViewModel.GearRollCost > 0 && ViewModel.Gold >= ViewModel.GearRollCost;
+	ViewModel.StatusLabel = ViewModel.bCanBuyGearRoll
+		? IdleProject::Localization::UI(TEXT("SHOP_STATUS_READY"))
+		: IdleProject::Localization::UI(TEXT("SHOP_STATUS_NEED_GOLD"));
+
+	ViewModel.bHasLastResult = LastResult.bPurchased || LastResult.GoldSpent > 0 || !LastResult.ItemName.IsEmpty();
+	ViewModel.bLastResultError = ViewModel.bHasLastResult && !LastResult.bPurchased;
+	ViewModel.LastResultRarity = LastResult.Rarity;
+	if (ViewModel.bHasLastResult)
+	{
+		ViewModel.LastResultLabel = BuildShopResultLabel(LastResult);
 	}
 
 	return ViewModel;
@@ -925,6 +967,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnExpChanged.AddDynamic(this, &AIdleHUD::HandleExpChanged);
 	IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleHUD::HandleLevelUp);
 	IdleGameInstance->OnEnhanceResult.AddDynamic(this, &AIdleHUD::HandleEnhanceResult);
+	IdleGameInstance->OnShopPurchase.AddDynamic(this, &AIdleHUD::HandleShopPurchase);
 	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
@@ -964,6 +1007,11 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	if (IdleGameInstance)
 	{
+		IdleGameInstance->OnGoldChanged.RemoveDynamic(this, &AIdleHUD::HandleGoldChanged);
+		IdleGameInstance->OnExpChanged.RemoveDynamic(this, &AIdleHUD::HandleExpChanged);
+		IdleGameInstance->OnLevelUp.RemoveDynamic(this, &AIdleHUD::HandleLevelUp);
+		IdleGameInstance->OnEnhanceResult.RemoveDynamic(this, &AIdleHUD::HandleEnhanceResult);
+		IdleGameInstance->OnShopPurchase.RemoveDynamic(this, &AIdleHUD::HandleShopPurchase);
 		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 	}
 
@@ -996,6 +1044,7 @@ void AIdleHUD::DrawHUD()
 	DrawBossBar();
 	DrawRebirthPanel();
 	DrawStatAllocationPanel();
+	DrawShopPanel();
 	DrawEnhancePanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
@@ -1055,6 +1104,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == RebirthHitBoxName)
 	{
 		TryRebirth();
+		return;
+	}
+	if (BoxName == ShopGearRollHitBoxName)
+	{
+		TryBuyGearRoll();
 		return;
 	}
 	if (BoxName.ToString().StartsWith(ClassSelectionHitBoxPrefix))
@@ -1157,6 +1211,20 @@ void AIdleHUD::HandleEnhanceResult(const FEnhanceAttemptResult& Result)
 		});
 	}
 
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::HandleShopPurchase(const FShopPurchaseResult& Result)
+{
+	LastShopPurchaseResult = Result;
+	if (!LastShopPurchaseResult.bPurchased && LastShopPurchaseResult.GoldSpent <= 0 && IdleGameInstance)
+	{
+		const UStageService* StageService = IdleGameInstance->GetStageService();
+		const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+		LastShopPurchaseResult.GoldSpent = FShopFormula::GetGearRollCost(GlobalStageIndex);
+	}
+
+	RefreshEquipmentSummary();
 	RefreshMouseInteraction();
 }
 
@@ -1656,6 +1724,90 @@ void AIdleHUD::DrawBossSpecialWarning(float Now)
 	DrawRect(BgPrimary.CopyWithNewOpacity(0.82f * Alpha), X, Y, Width, Height);
 	DrawRect(AccentRed.CopyWithNewOpacity(0.96f * Alpha), X, Y, 5.0f * Scale, Height);
 	DrawText(Warning, AccentRed.CopyWithNewOpacity(Alpha), X + 18.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.82f * Scale);
+}
+
+void AIdleHUD::DrawShopPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	const UStageService* StageService = IdleGameInstance->GetStageService();
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const FIdleHUDShopPanelViewModel ViewModel = BuildShopPanelViewModel(
+		FShopFormula::GetGearRollCost(GlobalStageIndex),
+		IdleGameInstance->GetGold(),
+		LastShopPurchaseResult);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 300.0f * Scale, 380.0f * Scale);
+	const float PanelHeight = (ViewModel.bHasLastResult ? 178.0f : 144.0f) * Scale;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 92.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const FLinearColor StateColor = ViewModel.bCanBuyGearRoll ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.68f);
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(StateColor, X, Y, PanelWidth, Border);
+	DrawRect(StateColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(StateColor, X, Y, Border, PanelHeight);
+	DrawRect(StateColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.GoldLabel.ToString(), Theme::AccentGold, X + PanelWidth - 110.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(ViewModel.CostLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::TextPrimary : Theme::AccentRed, X + Padding, Y + 54.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 82.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+
+	const float ButtonWidth = 112.0f * Scale;
+	const float ButtonHeight = 32.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + 68.0f * Scale;
+	DrawRect(ViewModel.bCanBuyGearRoll ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 16.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	if (ViewModel.bCanBuyGearRoll)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.GearRollHitBoxName, true, 84);
+	}
+
+	if (ViewModel.bHasLastResult)
+	{
+		const FLinearColor ResultColor = ViewModel.bLastResultError ? Theme::AccentRed : RarityToColor(ViewModel.LastResultRarity);
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.86f), X + Padding, Y + 118.0f * Scale, PanelWidth - Padding * 2.0f, 34.0f * Scale);
+		DrawRect(ResultColor, X + Padding, Y + 118.0f * Scale, 4.0f * Scale, 34.0f * Scale);
+		DrawText(ViewModel.LastResultLabel.ToString(), ResultColor, X + Padding + 12.0f * Scale, Y + 126.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryBuyGearRoll()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	IdleGameInstance->TryBuyGearRoll(PlayerInventory);
+	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::DrawEnhancePanel()
