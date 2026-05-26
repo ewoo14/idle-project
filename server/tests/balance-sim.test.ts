@@ -120,4 +120,60 @@ describe("balance simulator", () => {
       "V1 enhancement is a light early sink, not a Lv50 progression blocker",
     );
   });
+
+  it("reports rarity-scaled enhancement pressure and eight-slot Legendary cost", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(
+      report.json.model.enhancementPressure.rarityScenarios.map((row) => ({
+        rarity: row.rarity,
+        multiplier: row.multiplier,
+        expectedGoldCostToMax: row.expectedGoldCostToMax,
+        expectedHoursAtMedianGoldPerHour: row.expectedHoursAtMedianGoldPerHour,
+      })),
+    ).toEqual([
+      {
+        rarity: "Common",
+        multiplier: 1,
+        expectedGoldCostToMax: 11020.66,
+        expectedHoursAtMedianGoldPerHour: 0.017,
+      },
+      {
+        rarity: "Rare",
+        multiplier: 4,
+        expectedGoldCostToMax: 44082.63,
+        expectedHoursAtMedianGoldPerHour: 0.067,
+      },
+      {
+        rarity: "Epic",
+        multiplier: 8,
+        expectedGoldCostToMax: 88165.25,
+        expectedHoursAtMedianGoldPerHour: 0.135,
+      },
+      {
+        rarity: "Legendary",
+        multiplier: 16,
+        expectedGoldCostToMax: 176330.51,
+        expectedHoursAtMedianGoldPerHour: 0.269,
+      },
+    ]);
+    expect(
+      report.json.model.enhancementPressure.legendaryEightSlotExpectedGoldCost,
+    ).toBeCloseTo(1410644.08, 2);
+    expect(
+      report.json.model.enhancementPressure
+        .legendaryEightSlotExpectedHoursAtMedianGoldPerHour,
+    ).toBe(2.155);
+    expect(report.markdown).toContain("## Rarity Enhancement Pressure");
+    expect(report.markdown).toContain(
+      "| Legendary | 16 | 88000 | 176330.51 | 0.269h |",
+    );
+    expect(report.markdown).toContain(
+      "Eight Legendary slots: 1,410,644.08 expected gold",
+    );
+    expect(report.markdown).toContain(
+      "2.155h at sampled median Lv50 gold/hour",
+    );
+  });
 });

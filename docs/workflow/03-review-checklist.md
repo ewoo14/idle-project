@@ -16,6 +16,7 @@
 ---
 
 ## 1. 디자인 (UI/UX, 아트)
+
 - [ ] `docs/planning/04-art-direction.md` 와 정합
 - [ ] 컬러 토큰 사용 (하드코딩 금지)
 - [ ] 반응형 — 1080p / 1440p / 4K 에서 깨지지 않음
@@ -24,6 +25,7 @@
 - [ ] 아이콘/일러스트 라이선스 확인
 
 ## 2. 스토리 (시나리오, 대사)
+
 - [ ] 세계관 (에테르넬리아) 정합
 - [ ] 캐릭터 보이스 일관 (성격/말투)
 - [ ] 한글 맞춤법 / 띄어쓰기
@@ -31,6 +33,7 @@
 - [ ] 등급 (12세) 준수
 
 ## 3. 퀘스트 (퀘스트 데이터, 진행 로직)
+
 - [ ] 퀘스트 데이터 테이블 스키마 일치
 - [ ] 진행 조건 / 보상 / 후속 퀘스트 트리거 검증
 - [ ] 일일 퀘스트 리셋 시간 (UTC+9 자정)
@@ -38,6 +41,7 @@
 - [ ] 로컬라이즈 키 누락 없음
 
 ## 4. 캐릭터 · 아이템 · 능력치 (코어 데이터)
+
 - [ ] 능력치 공식 (`05-balance-philosophy.md`) 과 일치
 - [ ] 직업별 스킬 데이터 일관
 - [ ] 장비 옵션 한도 준수
@@ -45,6 +49,7 @@
 - [ ] 데이터 테이블 정렬/주석 명확
 
 ## 5. 밸런스 (수치, 곡선)
+
 - [ ] 시뮬레이션 결과 첨부
 - [ ] 환생 도달 시간 분포 정상 범위 (3~20h)
 - [ ] 인플레이션 위험 평가
@@ -52,6 +57,7 @@
 - [ ] 운영 영향 (기존 유저 너프/버프) 명시
 
 ## 6. 백엔드 / DB
+
 - [ ] API 스펙 (`docs/api/`) 동기 갱신
 - [ ] 마이그레이션 forward + (가능 시) rollback 제공
 - [ ] 입력 검증 (Fastify schema)
@@ -63,6 +69,7 @@
 - [ ] `.env.example` 갱신
 
 ## 7. QA (테스트, 회귀)
+
 - [ ] 시나리오 테스트 케이스 (Given / When / Then)
 - [ ] 회귀 테스트 — 기존 기능 영향 없음
 - [ ] 엣지 케이스 (오프라인, 0/음수, 동시성)
@@ -116,3 +123,5 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   guards.
 - [ ] The HUD enhancement panel displays rarity-scaled cost for each equipped
   slot while Common remains compatible with the PR #33 cost curve.
+- [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +5 pressure
+  and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.

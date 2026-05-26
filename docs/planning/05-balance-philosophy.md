@@ -794,12 +794,21 @@ Success rates, failure behavior, and the `1 + EnhanceLevel * 0.1` stat payoff do
 not change in this slice.
 
 Pressure check using the PR #33 expected Common +0 to +5 cost of 11,020.66 gold:
-a single Legendary item costs 176,330.56 expected gold, and eight Legendary
-slots cost 1,410,644.48 expected gold. Against the sampled PR #33 median Lv50
-blended income of 654,689 gold/hour, that full Legendary pass is about 2.154h
+a single Legendary item costs 176,330.51 expected gold, and eight Legendary
+slots cost 1,410,644.08 expected gold. Against the sampled PR #33 median Lv50
+blended income of 654,689 gold/hour, that full Legendary pass is about 2.155h
 of income. Common early enhancement remains unchanged while high-rarity
 enhancement becomes a visible midgame/endgame sink alongside the repeatable
 shop roll outlet from PR #38.
+
+The balance simulator reports these rarity scenarios:
+
+| Rarity | Multiplier | Minimum +0 to +5 gold | Expected +0 to +5 gold |
+| --- | ---: | ---: | ---: |
+| Common | 1 | 5,500 | 11,020.66 |
+| Rare | 4 | 22,000 | 44,082.63 |
+| Epic | 8 | 44,000 | 88,165.25 |
+| Legendary | 16 | 88,000 | 176,330.51 |
 
 ## PR #35 Boss Patterns V1
 
