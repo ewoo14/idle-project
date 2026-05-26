@@ -157,6 +157,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rebirth")
 	bool Rebirth();
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
+	int32 PreviewRebirthReward() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rebirth")
 	void MarkChapter1BossDefeated();
 

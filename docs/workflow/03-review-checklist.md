@@ -168,6 +168,18 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] UE Automation and server Vitest cover Mythic stat, rarity, affix, set,
   enhancement, HUD, localization, and Common-Legendary regression anchors.
 
+## PR #46 Character Checklist Addendum (Section 4)
+
+- [ ] `FRebirthFormula::GetRebirthPointsReward` returns 5 for count 0 at
+  level 100, 13 for count 4 at level 100, 10 for count 0 at level 150, and
+  18 for count 4 at level 150.
+- [ ] `UIdleGameInstance::Rebirth` adds the formula reward before incrementing
+  rebirth count and preserves the existing level, exp, stat allocation, gold
+  10%, chapter boss gate, and stage reset behavior.
+- [ ] `PreviewRebirthReward` uses the same formula inputs as the next
+  `Rebirth` call so HUD preview and applied reward cannot diverge.
+- [ ] The first level-100 rebirth remains a 5-point legacy-compatible reward.
+
 ## PR #42 Balance Checklist Addendum (Section 5)
 
 - [ ] `tools/balance-sim/reports/balance-sim-report.md` includes `Pet Feed

@@ -2,6 +2,7 @@
 
 #include "CharacterSystem/LevelFormulas.h"
 #include "GameCore/PetLevelFormula.h"
+#include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -287,8 +288,9 @@ bool UIdleGameInstance::Rebirth()
 		return false;
 	}
 
+	const int32 Reward = FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
 	++RebirthCount;
-	RebirthBonusPoints += 5;
+	RebirthBonusPoints += Reward;
 	CharacterLevel = 1;
 	CurrentExp = 0;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
@@ -306,6 +308,11 @@ bool UIdleGameInstance::Rebirth()
 	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
 	return true;
+}
+
+int32 UIdleGameInstance::PreviewRebirthReward() const
+{
+	return FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
 }
 
 void UIdleGameInstance::MarkChapter1BossDefeated()
