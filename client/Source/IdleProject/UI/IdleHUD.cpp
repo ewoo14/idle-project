@@ -38,22 +38,6 @@ constexpr float FloatingDamageHeadOffsetZ = 120.0f;
 constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
 constexpr float BossSpecialWarningDurationSeconds = 1.6f;
 
-FString RarityToString(EItemRarity Rarity)
-{
-	switch (Rarity)
-	{
-	case EItemRarity::Uncommon:
-		return TEXT("Uncommon");
-	case EItemRarity::Rare:
-		return TEXT("Rare");
-	case EItemRarity::Common:
-		return TEXT("Common");
-	case EItemRarity::None:
-	default:
-		return TEXT("None");
-	}
-}
-
 FString FormatIntegerWithCommas(int64 Value)
 {
 	FString Digits = FString::Printf(TEXT("%lld"), FMath::Abs(Value));
@@ -110,6 +94,26 @@ FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 
 	{
 		Args.Add(ArgName, FText::AsNumber(Value));
 	});
+}
+
+const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
+{
+	switch (Rarity)
+	{
+	case EItemRarity::Common:
+		return TEXT("RARITY_COMMON");
+	case EItemRarity::Uncommon:
+		return TEXT("RARITY_UNCOMMON");
+	case EItemRarity::Rare:
+		return TEXT("RARITY_RARE");
+	case EItemRarity::Epic:
+		return TEXT("RARITY_EPIC");
+	case EItemRarity::Legendary:
+		return TEXT("RARITY_LEGENDARY");
+	case EItemRarity::None:
+	default:
+		return TEXT("RARITY_NONE");
+	}
 }
 
 FText QuestTypeToLabel(EQuestType Type)
@@ -368,6 +372,33 @@ bool TryBuildStatusIndicator(ESkillStatusEffect Type, const TArray<FActiveSkillS
 }
 }
 
+FText IdleProject::UI::RarityToLabel(EItemRarity Rarity)
+{
+	return IdleProject::Localization::UI(RarityToLocalizationKey(Rarity));
+}
+
+FLinearColor IdleProject::UI::RarityToColor(EItemRarity Rarity)
+{
+	using namespace IdleProject::UI::Theme;
+
+	switch (Rarity)
+	{
+	case EItemRarity::Common:
+		return RarityCommon;
+	case EItemRarity::Uncommon:
+		return RarityUncommon;
+	case EItemRarity::Rare:
+		return RarityRare;
+	case EItemRarity::Epic:
+		return RarityEpic;
+	case EItemRarity::Legendary:
+		return RarityLegendary;
+	case EItemRarity::None:
+	default:
+		return TextMuted;
+	}
+}
+
 TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now)
 {
 	TArray<FIdleHUDSkillSlotViewModel> Slots;
@@ -475,7 +506,8 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 		Row.Slot = Slot;
 		Row.SlotLabel = IdleProject::Localization::UI(SlotToLocalizationKey(Slot));
 		Row.ItemName = Item ? Item->DisplayName : IdleProject::Localization::UI(TEXT("NONE_DASH"));
-		Row.RarityLabel = Item ? FText::FromString(RarityToString(Item->Rarity)) : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+		Row.RarityLabel = Item ? RarityToLabel(Item->Rarity) : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+		Row.RarityColor = Item ? RarityToColor(Item->Rarity) : IdleProject::UI::Theme::TextMuted;
 		Row.bEquipped = Item != nullptr;
 		Row.ButtonLabel = IdleProject::Localization::UI(TEXT("ACTION_ENHANCE"));
 
@@ -1213,14 +1245,16 @@ void AIdleHUD::RefreshEquipmentSummary()
 	}
 
 	FText WeaponLine = IdleProject::Localization::UI(TEXT("HUD_NO_WEAPON"));
+	FLinearColor WeaponColor = IdleProject::UI::Theme::TextMuted;
 	if (const FItemInstance* Weapon = PlayerInventory->GetEquippedItem(EItemSlot::Weapon))
 	{
 		WeaponLine = FormatLocalizedUI(TEXT("HUD_WEAPON_FORMAT"), [Weapon](FFormatNamedArguments& Args)
 		{
 			Args.Add(TEXT("Name"), Weapon->DisplayName);
-			Args.Add(TEXT("Rarity"), FText::FromString(RarityToString(Weapon->Rarity)));
+			Args.Add(TEXT("Rarity"), IdleProject::UI::RarityToLabel(Weapon->Rarity));
 			Args.Add(TEXT("Attack"), FText::AsNumber(FMath::RoundToInt(Weapon->BonusAtk)));
 		});
+		WeaponColor = IdleProject::UI::RarityToColor(Weapon->Rarity);
 	}
 
 	const EItemSlot ArmorSlots[] = {
@@ -1254,7 +1288,7 @@ void AIdleHUD::RefreshEquipmentSummary()
 		Args.Add(TEXT("Hp"), FText::AsNumber(FMath::RoundToInt(BonusHp)));
 	});
 
-	RootWidget->UpdateEquipment(WeaponLine, ArmorLine);
+	RootWidget->UpdateEquipment(WeaponLine, ArmorLine, WeaponColor);
 }
 
 USkillComponent* AIdleHUD::ResolvePlayerSkills() const
@@ -1594,8 +1628,9 @@ void AIdleHUD::DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float
 	DrawText(Row.SlotLabel.ToString(), Row.bCanEnhance ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	DrawText(Row.ItemName.ToString(), Row.bEquipped ? Theme::TextPrimary : Theme::TextMuted, X + 78.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
 	DrawText(Row.LevelLabel.ToString(), Row.bMaxLevel ? Theme::AccentGold : Theme::TextMuted, X + 10.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
-	DrawText(Row.CostLabel.ToString(), Row.bGoldEnough || Row.bMaxLevel ? Theme::TextMuted : Theme::AccentRed, X + 84.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
-	DrawText(Row.SuccessRateLabel.ToString(), Row.bCanEnhance ? Theme::AccentBlue : Theme::TextMuted, X + 156.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.RarityLabel.ToString(), Row.bEquipped ? Row.RarityColor : Theme::TextMuted, X + 78.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.CostLabel.ToString(), Row.bGoldEnough || Row.bMaxLevel ? Theme::TextMuted : Theme::AccentRed, X + 132.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.SuccessRateLabel.ToString(), Row.bCanEnhance ? Theme::AccentBlue : Theme::TextMuted, X + 206.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 
 	const float ButtonWidth = 72.0f * Scale;
 	const float ButtonHeight = 26.0f * Scale;

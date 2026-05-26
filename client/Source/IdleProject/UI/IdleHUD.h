@@ -193,6 +193,7 @@ struct IDLEPROJECT_API FIdleHUDEnhanceSlotViewModel
 	FText SlotLabel;
 	FText ItemName;
 	FText RarityLabel;
+	FLinearColor RarityColor = FLinearColor::White;
 	FText LevelLabel;
 	FText CostLabel;
 	FText SuccessRateLabel;
@@ -241,6 +242,8 @@ struct IDLEPROJECT_API FIdleHUDStatPanelViewModel
 
 namespace IdleProject::UI
 {
+IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
+IDLEPROJECT_API FLinearColor RarityToColor(EItemRarity Rarity);
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDStageViewModel BuildStageViewModel(const FStageInfo& StageInfo);

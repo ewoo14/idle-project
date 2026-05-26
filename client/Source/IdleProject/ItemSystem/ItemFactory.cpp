@@ -1,25 +1,9 @@
 #include "ItemSystem/ItemFactory.h"
 
+#include "ItemSystem/DropFormula.h"
+
 namespace
 {
-EItemRarity RollRarity()
-{
-	const float Roll = FMath::FRand();
-	if (Roll < 0.02f)
-	{
-		return EItemRarity::None;
-	}
-	if (Roll < 0.72f)
-	{
-		return EItemRarity::Common;
-	}
-	if (Roll < 0.92f)
-	{
-		return EItemRarity::Uncommon;
-	}
-	return EItemRarity::Rare;
-}
-
 EItemSlot RollSlot()
 {
 	const float Roll = FMath::FRandRange(0.0f, 100.0f);
@@ -62,6 +46,12 @@ FString GetRarityAdjective(EItemRarity Rarity)
 		return TEXT("정련된");
 	case EItemRarity::Rare:
 		return TEXT("광택의");
+	case EItemRarity::Epic:
+		return TEXT("Epic");
+	case EItemRarity::Legendary:
+		return TEXT("Legendary");
+	case EItemRarity::None:
+		return TEXT("Item");
 	case EItemRarity::Common:
 	default:
 		return TEXT("거친");
@@ -98,45 +88,18 @@ FString GetSlotNoun(EItemSlot Slot)
 FItemInstance FItemFactory::RandomDropFromMonster(int32 MonsterLevel)
 {
 	const int32 SafeLevel = FMath::Max(MonsterLevel, 1);
-	const EItemRarity Rarity = RollRarity();
+	FRandomStream RarityRng(FMath::Rand());
+	const EItemRarity Rarity = FDropFormula::RollRarityForLevel(SafeLevel, RarityRng);
 	if (Rarity == EItemRarity::None)
 	{
 		return FItemInstance();
 	}
 
 	const EItemSlot Slot = RollSlot();
-	const float BaseBonus = static_cast<float>(SafeLevel) * FMath::FRandRange(1.0f, 2.0f);
 
-	FItemInstance Item;
-	Item.Slot = Slot;
-	Item.Rarity = Rarity;
-	Item.EnhanceLevel = 0;
+	FItemInstance Item = FDropFormula::ComputeItemBonus(Slot, SafeLevel, Rarity, FMath::FRandRange(1.0f, 2.0f));
 	Item.DisplayName = FText::FromString(FString::Printf(TEXT("%s %s"), *GetRarityAdjective(Rarity), *GetSlotNoun(Slot)));
 	Item.ItemId = FName(*FString::Printf(TEXT("%s_%s_L%d"), *UEnum::GetValueAsString(Rarity), *UEnum::GetValueAsString(Slot), SafeLevel));
-
-	switch (Slot)
-	{
-	case EItemSlot::Weapon:
-		Item.BonusAtk = BaseBonus;
-		break;
-	case EItemSlot::Accessory:
-		Item.BonusAtk = BaseBonus * 0.5f;
-		Item.BonusDef = BaseBonus * 0.3f;
-		Item.BonusHp = BaseBonus * 2.0f;
-		break;
-	case EItemSlot::Helmet:
-	case EItemSlot::Top:
-	case EItemSlot::Bottom:
-	case EItemSlot::Shoes:
-	case EItemSlot::Gloves:
-	case EItemSlot::Cloak:
-		Item.BonusDef = BaseBonus * 0.7f;
-		Item.BonusHp = BaseBonus * 3.0f;
-		break;
-	case EItemSlot::None:
-	default:
-		break;
-	}
 
 	return Item;
 }

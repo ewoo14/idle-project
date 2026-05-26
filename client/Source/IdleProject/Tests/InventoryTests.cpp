@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ItemTypes.h"
@@ -23,6 +24,90 @@ FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, flo
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaRarityMultiplierTest,
+	"IdleProject.Inventory.DropFormula.RarityMultiplier",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaRarityMultiplierTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("None rarity has no stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::None), 0.0f);
+	TestEqual(TEXT("Common stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Common), 1.0f);
+	TestEqual(TEXT("Uncommon stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Uncommon), 1.3f);
+	TestEqual(TEXT("Rare stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Rare), 1.7f);
+	TestEqual(TEXT("Epic stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Epic), 2.3f);
+	TestEqual(TEXT("Legendary stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Legendary), 3.2f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaLevelRarityTrendTest,
+	"IdleProject.Inventory.DropFormula.LevelRarityTrend",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaLevelRarityTrendTest::RunTest(const FString& Parameters)
+{
+	constexpr int32 SampleCount = 2000;
+	int32 LowRareOrBetter = 0;
+	int32 HighRareOrBetter = 0;
+	int32 HighEpicOrBetter = 0;
+
+	FRandomStream LowLevelRng(3601);
+	FRandomStream HighLevelRng(3601);
+	for (int32 Index = 0; Index < SampleCount; ++Index)
+	{
+		if (FDropFormula::RollRarityForLevel(1, LowLevelRng) >= EItemRarity::Rare)
+		{
+			++LowRareOrBetter;
+		}
+
+		const EItemRarity HighRarity = FDropFormula::RollRarityForLevel(100, HighLevelRng);
+		if (HighRarity >= EItemRarity::Rare)
+		{
+			++HighRareOrBetter;
+		}
+		if (HighRarity >= EItemRarity::Epic)
+		{
+			++HighEpicOrBetter;
+		}
+	}
+
+	TestTrue(TEXT("High-level drops roll Rare+ more often than low-level drops"), HighRareOrBetter > LowRareOrBetter);
+	TestTrue(TEXT("High-level drops can roll Epic+"), HighEpicOrBetter > 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaComputeItemBonusTest,
+	"IdleProject.Inventory.DropFormula.ComputeItemBonus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaComputeItemBonusTest::RunTest(const FString& Parameters)
+{
+	const FItemInstance LegendaryWeapon = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, 10, EItemRarity::Legendary, 1.5f);
+	TestEqual(TEXT("Legendary weapon attack scales by level variance and rarity"), LegendaryWeapon.BonusAtk, 48.0f);
+	TestEqual(TEXT("Legendary weapon has no defense bonus"), LegendaryWeapon.BonusDef, 0.0f);
+	TestEqual(TEXT("Legendary weapon has no HP bonus"), LegendaryWeapon.BonusHp, 0.0f);
+
+	const FItemInstance EpicAccessory = FDropFormula::ComputeItemBonus(EItemSlot::Accessory, 10, EItemRarity::Epic, 1.0f);
+	TestEqual(TEXT("Epic accessory attack split"), EpicAccessory.BonusAtk, 11.5f);
+	TestEqual(TEXT("Epic accessory defense split"), EpicAccessory.BonusDef, 6.9f);
+	TestEqual(TEXT("Epic accessory HP split"), EpicAccessory.BonusHp, 46.0f);
+
+	const FItemInstance CommonWeapon = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, 1, EItemRarity::Common, 1.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base attack"), CommonWeapon.BonusAtk, 1.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base defense"), CommonWeapon.BonusDef, 0.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base HP"), CommonWeapon.BonusHp, 0.0f);
+
+	const FItemInstance RareArmor = FDropFormula::ComputeItemBonus(EItemSlot::Helmet, 10, EItemRarity::Rare, 2.0f);
+	TestEqual(TEXT("Rare armor defense uses float slot split"), RareArmor.BonusDef, 23.8f);
+	TestEqual(TEXT("Rare armor HP uses float slot split"), RareArmor.BonusHp, 102.0f);
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -209,7 +294,7 @@ bool FItemFactoryRandomDropRangeTest::RunTest(const FString& Parameters)
 	for (int32 Index = 0; Index < 100; ++Index)
 	{
 		const FItemInstance Drop = FItemFactory::RandomDropFromMonster(1);
-		TestTrue(TEXT("등급 범위"), Drop.Rarity >= EItemRarity::None && Drop.Rarity <= EItemRarity::Rare);
+		TestTrue(TEXT("등급 범위"), Drop.Rarity >= EItemRarity::None && Drop.Rarity <= EItemRarity::Legendary);
 
 		if (Drop.Rarity == EItemRarity::None)
 		{
@@ -221,6 +306,30 @@ bool FItemFactoryRandomDropRangeTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("보너스 중 하나 이상"), Drop.BonusAtk > 0.0f || Drop.BonusDef > 0.0f || Drop.BonusHp > 0.0f);
 		TestEqual(TEXT("드롭 강화 기본값"), Drop.EnhanceLevel, 0);
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FItemFactoryHighLevelDropIncludesExpandedRarityTest,
+	"IdleProject.Inventory.ItemFactory.HighLevelExpandedRarity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FItemFactoryHighLevelDropIncludesExpandedRarityTest::RunTest(const FString& Parameters)
+{
+	bool bFoundEpicOrLegendary = false;
+	for (int32 Index = 0; Index < 1000; ++Index)
+	{
+		const FItemInstance Drop = FItemFactory::RandomDropFromMonster(100);
+		if (Drop.Rarity >= EItemRarity::Epic)
+		{
+			bFoundEpicOrLegendary = true;
+			TestTrue(TEXT("Epic+ drop carries scaled stats"), FItemPowerScore::Compute(Drop) > 0);
+			break;
+		}
+	}
+
+	TestTrue(TEXT("High-level monster drops can produce Epic or Legendary items"), bFoundEpicOrLegendary);
 
 	return true;
 }

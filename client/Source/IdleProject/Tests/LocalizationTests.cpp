@@ -24,6 +24,15 @@ bool FIdleLocalizationLookupTest::RunTest(const FString& Parameters)
 		IdleProject::Localization::UI(TEXT("HUD_GOLD_FORMAT"), GoldArgs).ToString(),
 		FString(TEXT("Gold 1,200")));
 
+	TestEqual(TEXT("English rarity lookup includes Legendary"),
+		IdleProject::Localization::UI(TEXT("RARITY_LEGENDARY")).ToString(),
+		FString(TEXT("Legendary")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	TestEqual(TEXT("Korean rarity lookup includes Legendary"),
+		IdleProject::Localization::UI(TEXT("RARITY_LEGENDARY")).ToString(),
+		FString(TEXT("전설")));
+
 	TestEqual(TEXT("Unsupported language falls back to Korean"),
 		IdleProject::Localization::NormalizeLanguage(TEXT("ja")),
 		FString(TEXT("ko")));

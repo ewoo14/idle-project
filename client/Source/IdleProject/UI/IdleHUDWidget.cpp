@@ -39,25 +39,6 @@ FText FormatLevel(int32 Level)
 	return IdleProject::Localization::UI(TEXT("HUD_LEVEL_FORMAT"), Args);
 }
 
-FSlateColor ResolveEquipmentColor(const FText& WeaponName)
-{
-	using namespace IdleProject::UI;
-
-	const FString Text = WeaponName.ToString();
-	if (Text.Contains(TEXT("Rare")))
-	{
-		return Theme::RarityRare;
-	}
-	if (Text.Contains(TEXT("Uncommon")))
-	{
-		return Theme::RarityUncommon;
-	}
-	if (Text.Contains(TEXT("Common")))
-	{
-		return Theme::RarityCommon;
-	}
-	return Theme::TextMuted;
-}
 }
 
 void SIdleHUDWidget::Construct(const FArguments& InArgs)
@@ -185,11 +166,11 @@ void SIdleHUDWidget::UpdateLevel(int32 Level)
 	}
 }
 
-void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary)
+void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary, FLinearColor WeaponRarityColor)
 {
 	if (EquipmentText)
 	{
 		EquipmentText->SetText(FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponName, ArmorSummary));
-		EquipmentText->SetColorAndOpacity(ResolveEquipmentColor(WeaponName));
+		EquipmentText->SetColorAndOpacity(WeaponRarityColor);
 	}
 }

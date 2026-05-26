@@ -1,5 +1,11 @@
 export * from "./bossPhase.js";
 export * from "./combat.js";
+export {
+  computeItemBonus,
+  getRarityStatMultiplier,
+  type ItemRarity,
+  rollRarityForLevel,
+} from "./drop.js";
 export * from "./enhance.js";
 export * from "./equipment.js";
 export * from "./level.js";

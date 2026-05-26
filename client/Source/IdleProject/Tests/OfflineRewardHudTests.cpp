@@ -7,6 +7,7 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
+#include "UI/UIThemeTokens.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -151,6 +152,8 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	const FIdleHUDEnhanceSlotViewModel& WeaponRow = ViewModel.Rows[0];
 	TestEqual(TEXT("Weapon row targets weapon slot"), WeaponRow.Slot, EItemSlot::Weapon);
 	TestTrue(TEXT("Equipped weapon row is visible as equipped"), WeaponRow.bEquipped);
+	TestEqual(TEXT("Weapon row rarity label is localized"), WeaponRow.RarityLabel.ToString(), FString(TEXT("Rare")));
+	TestEqual(TEXT("Weapon row rarity color uses rare theme"), WeaponRow.RarityColor, IdleProject::UI::Theme::RarityRare);
 	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / +5")));
 	TestEqual(TEXT("Weapon next cost follows formula"), WeaponRow.Cost, static_cast<int64>(900));
 	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 900")));
@@ -184,6 +187,33 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Feedback success flag is carried into view model"), SuccessViewModel.bFeedbackSuccess);
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhanceHudRarityViewModelTest,
+	"IdleProject.UI.HUD.EnhancePanelRarityViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhanceHudRarityViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeHudTestItem(TEXT("epic_sword"), EItemSlot::Weapon, EItemRarity::Epic, 20.0f, 0.0f, 0.0f, 0));
+	Inventory->AddItem(MakeHudTestItem(TEXT("legendary_helmet"), EItemSlot::Helmet, EItemRarity::Legendary, 0.0f, 8.0f, 40.0f, 0));
+
+	const FIdleHUDEnhancePanelViewModel EnglishViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
+	TestEqual(TEXT("Epic row uses English rarity label"), EnglishViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("Epic")));
+	TestEqual(TEXT("Epic row uses epic theme color"), EnglishViewModel.Rows[0].RarityColor, IdleProject::UI::Theme::RarityEpic);
+	TestEqual(TEXT("Legendary row uses English rarity label"), EnglishViewModel.Rows[1].RarityLabel.ToString(), FString(TEXT("Legendary")));
+	TestEqual(TEXT("Legendary row uses legendary theme color"), EnglishViewModel.Rows[1].RarityColor, IdleProject::UI::Theme::RarityLegendary);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	const FIdleHUDEnhancePanelViewModel KoreanViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
+	TestEqual(TEXT("Epic row uses Korean rarity label"), KoreanViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("영웅")));
+	TestEqual(TEXT("Legendary row uses Korean rarity label"), KoreanViewModel.Rows[1].RarityLabel.ToString(), FString(TEXT("전설")));
+
 	return true;
 }
 
