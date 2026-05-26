@@ -224,7 +224,43 @@ Routing guardrails:
 - Server SkillDB parity remains a backend handoff item unless that slice owns
   `server/src/core/data/skills.ts`.
 
-### 3.7 Status / Element V1 Anchors
+### 3.7 Stat Allocation V1 Anchors
+
+PR #34 defines the client V1 stat allocation rule: each level-up to level 2 or
+higher grants 5 allocatable primary stat points. The cumulative allocation
+budget for level `n` is `5 * max(n - 1, 0)`.
+
+Allocated points are added to `DefaultPrimaryStats(ClassId, Level)` before
+`DeriveStats`, equipment bonuses, rebirth bonus points, and skill passives are
+folded into combat stats. This keeps the existing class growth curve intact
+when allocation is zero, while making STR/DEX/INT/WIS/CON/LUK choices affect
+the same derived formulas used by class and equipment progression.
+
+V1 reset is free and returns allocated points to the available pool. Rebirth
+resets both available and allocated stat points because it resets character
+level to 1; rebirth bonus points remain a separate permanent progression input.
+
+Per-level grant is fixed at 5 points for every level-up after level 1 in V1.
+The server mirror in `server/src/core/formulas/statPoints.ts` and the client
+formula in `FStatPointFormula` must stay definition-parity guarded. Invalid
+fractional server levels are rejected before formula evaluation so backend
+simulation cannot drift from the client `int32` boundary.
+
+Primary allocation impact uses the existing `DeriveStats` paths:
+
+- STR: `PhysAtk += 2` per point before equipment and rebirth bonuses.
+- DEX: raises `AtkSpeed`, `MoveSpeed`, `Dodge`, and `Accuracy` through the
+  existing rounded rate formulas.
+- INT: raises `MagicAtk`, `Mp`, and `MagicDef` through the existing formulas.
+- WIS: raises `MagicAtk`, `Mp`, and `MagicDef` through the existing formulas.
+- CON: raises `Hp` by 10 per point and also contributes to `PhysDef`.
+- LUK: raises `CritRate`, `CritDmg`, and `Dodge` through the existing formulas.
+
+No paid reset, refund penalty, allocation cap, or server-authoritative spend
+validation ships in this V1. Those remain follow-up economy and persistence
+items after player telemetry exists.
+
+### 3.8 Status / Element V1 Anchors
 
 PR #30 adds deterministic status effects and element multipliers to the existing
 damage path.

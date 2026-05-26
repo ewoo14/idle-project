@@ -156,7 +156,75 @@ void UIdleGameInstance::LevelUp()
 
 	++CharacterLevel;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	GrantStatPoints(FStatPointFormula::GetStatPointsForLevelUp(CharacterLevel));
 	OnLevelUp.Broadcast(CharacterLevel);
+}
+
+void UIdleGameInstance::GrantStatPoints(int32 Points)
+{
+	if (Points <= 0)
+	{
+		return;
+	}
+
+	AvailableStatPoints += Points;
+	OnStatPointsChanged.Broadcast();
+}
+
+bool UIdleGameInstance::AllocateStatPoint(EPrimaryStat Stat)
+{
+	if (AvailableStatPoints <= 0)
+	{
+		return false;
+	}
+
+	switch (Stat)
+	{
+	case EPrimaryStat::Str:
+		AllocatedStats.Str += 1.0f;
+		break;
+	case EPrimaryStat::Dex:
+		AllocatedStats.Dex += 1.0f;
+		break;
+	case EPrimaryStat::Int:
+		AllocatedStats.Int_ += 1.0f;
+		break;
+	case EPrimaryStat::Wis:
+		AllocatedStats.Wis += 1.0f;
+		break;
+	case EPrimaryStat::Con:
+		AllocatedStats.Con += 1.0f;
+		break;
+	case EPrimaryStat::Luk:
+		AllocatedStats.Luk += 1.0f;
+		break;
+	default:
+		return false;
+	}
+
+	--AvailableStatPoints;
+	OnStatPointsChanged.Broadcast();
+	return true;
+}
+
+void UIdleGameInstance::ResetStatPoints()
+{
+	const int32 SpentPoints =
+		FMath::RoundToInt(AllocatedStats.Str) +
+		FMath::RoundToInt(AllocatedStats.Dex) +
+		FMath::RoundToInt(AllocatedStats.Int_) +
+		FMath::RoundToInt(AllocatedStats.Wis) +
+		FMath::RoundToInt(AllocatedStats.Con) +
+		FMath::RoundToInt(AllocatedStats.Luk);
+
+	if (SpentPoints <= 0)
+	{
+		return;
+	}
+
+	AvailableStatPoints += SpentPoints;
+	AllocatedStats = FPrimaryStats();
+	OnStatPointsChanged.Broadcast();
 }
 
 bool UIdleGameInstance::CanRebirth() const
@@ -176,6 +244,8 @@ bool UIdleGameInstance::Rebirth()
 	CharacterLevel = 1;
 	CurrentExp = 0;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	AvailableStatPoints = 0;
+	AllocatedStats = FPrimaryStats();
 	Gold = FMath::FloorToInt64(static_cast<double>(Gold) * 0.1);
 	bChapter1BossDefeated = false;
 	if (StageService)
@@ -185,6 +255,7 @@ bool UIdleGameInstance::Rebirth()
 
 	OnGoldChanged.Broadcast(Gold);
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
+	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
 	return true;
 }
