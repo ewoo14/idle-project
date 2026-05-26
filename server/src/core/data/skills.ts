@@ -15,9 +15,34 @@ export type SkillDefinition = {
   buffDuration: number;
   gaugeGainOnHit: number;
   gaugeGainOnTakeDamage: number;
+  statusEffect: "none" | "poison" | "burn" | "freeze";
+  statusDuration: number;
+  statusMagnitude: number;
+  element: "none" | "fire" | "ice" | "lightning" | "holy";
 };
 
-export const warriorSkillDefinitions: SkillDefinition[] = [
+type SkillDefinitionSeed = Omit<
+  SkillDefinition,
+  "statusEffect" | "statusDuration" | "statusMagnitude" | "element"
+> &
+  Partial<
+    Pick<
+      SkillDefinition,
+      "statusEffect" | "statusDuration" | "statusMagnitude" | "element"
+    >
+  >;
+
+function defineSkills(skills: SkillDefinitionSeed[]): SkillDefinition[] {
+  return skills.map((skill) => ({
+    statusEffect: "none",
+    statusDuration: 0,
+    statusMagnitude: 0,
+    element: "none",
+    ...skill,
+  }));
+}
+
+export const warriorSkillDefinitions: SkillDefinition[] = defineSkills([
   {
     skillId: "heavy_strike",
     classId: 1,
@@ -109,9 +134,9 @@ export const warriorSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnHit: 8,
     gaugeGainOnTakeDamage: 5,
   },
-];
+]);
 
-export const mageSkillDefinitions: SkillDefinition[] = [
+export const mageSkillDefinitions: SkillDefinition[] = defineSkills([
   {
     skillId: "arcane_bolt",
     classId: 2,
@@ -124,6 +149,10 @@ export const mageSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    statusEffect: "burn",
+    statusDuration: 3,
+    statusMagnitude: 4,
+    element: "fire",
   },
   {
     skillId: "chain_lightning",
@@ -137,6 +166,7 @@ export const mageSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    element: "lightning",
   },
   {
     skillId: "mana_shield",
@@ -163,6 +193,10 @@ export const mageSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    statusEffect: "freeze",
+    statusDuration: 2,
+    statusMagnitude: 0.25,
+    element: "ice",
   },
   {
     skillId: "spell_mastery",
@@ -203,9 +237,9 @@ export const mageSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnHit: 9,
     gaugeGainOnTakeDamage: 3,
   },
-];
+]);
 
-export const archerSkillDefinitions: SkillDefinition[] = [
+export const archerSkillDefinitions: SkillDefinition[] = defineSkills([
   {
     skillId: "precision_shot",
     classId: 3,
@@ -297,9 +331,9 @@ export const archerSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnHit: 10,
     gaugeGainOnTakeDamage: 2,
   },
-];
+]);
 
-export const thiefSkillDefinitions: SkillDefinition[] = [
+export const thiefSkillDefinitions: SkillDefinition[] = defineSkills([
   {
     skillId: "shadow_stab",
     classId: 4,
@@ -312,6 +346,9 @@ export const thiefSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    statusEffect: "poison",
+    statusDuration: 3,
+    statusMagnitude: 3,
   },
   {
     skillId: "smoke_bomb",
@@ -325,6 +362,9 @@ export const thiefSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    statusEffect: "poison",
+    statusDuration: 3,
+    statusMagnitude: 2,
   },
   {
     skillId: "evasion_stance",
@@ -391,9 +431,9 @@ export const thiefSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnHit: 11,
     gaugeGainOnTakeDamage: 1,
   },
-];
+]);
 
-export const clericSkillDefinitions: SkillDefinition[] = [
+export const clericSkillDefinitions: SkillDefinition[] = defineSkills([
   {
     skillId: "holy_smite",
     classId: 5,
@@ -406,6 +446,7 @@ export const clericSkillDefinitions: SkillDefinition[] = [
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
+    element: "holy",
   },
   {
     skillId: "heal",
@@ -485,7 +526,7 @@ export const clericSkillDefinitions: SkillDefinition[] = [
     gaugeGainOnHit: 6,
     gaugeGainOnTakeDamage: 6,
   },
-];
+]);
 
 export function getSkillDefinitionsForClass(
   classId: number,

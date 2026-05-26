@@ -224,6 +224,44 @@ Routing guardrails:
 - Server SkillDB parity remains a backend handoff item unless that slice owns
   `server/src/core/data/skills.ts`.
 
+### 3.7 Status / Element V1 Anchors
+
+PR #30 adds deterministic status effects and element multipliers to the existing
+damage path.
+
+Rules:
+
+- Status effects are `None`, `Poison`, `Burn`, and `Freeze`.
+- `Poison` and `Burn` deal flat magic DoT once per second while active.
+- `Freeze` applies an attack-speed slow by `StatusMagnitude` and removes the
+  exact applied penalty when the status expires.
+- Skill elements are `None`, `Fire`, `Ice`, `Lightning`, and `Holy`.
+- `ComputeElementMultiplier(skillElement, targetWeakElement)` returns `1.5`
+  when the skill matches the target weakness, `0.5` for opposed pairs
+  (`Fire`/`Ice`, `Lightning`/`Holy`), and `1.0` for neutral or `None`.
+
+V1 skill assignments:
+
+| Skill | Status | Element |
+| --- | --- | --- |
+| `arcane_bolt` | Burn, 3s, 4 damage/tick | Fire |
+| `chain_lightning` | None | Lightning |
+| `meteor` | Freeze, 2s, 25% slow | Ice |
+| `shadow_stab` | Poison, 3s, 3 damage/tick | None |
+| `smoke_bomb` | Poison, 3s, 2 damage/tick | None |
+| `holy_smite` | None | Holy |
+
+Monster anchors:
+
+- Normal slime placeholder weakness: `Fire`.
+- Chapter 1 boss placeholder weakness: `Holy`.
+
+Automation coverage:
+
+- Client: element multiplier, DoT ticking/expiry, freeze slow/expiry, and skill
+  element/status application.
+- Server: formula multiplier anchors and SkillDB status/element parity.
+
 ---
 
 ## 4. 환생 (Rebirth) 경제

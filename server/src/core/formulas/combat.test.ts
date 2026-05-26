@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCrit,
+  computeElementMultiplier,
   computeClassDamage,
   computeDamage,
   computeMagicDamage,
@@ -57,6 +58,13 @@ describe("combat formulas", () => {
 
   it("computes magic damage with the same curve using MagicAtk vs MagicDef", () => {
     expect(computeMagicDamage(80, 20)).toBe(68);
+  });
+
+  it("computes element multipliers for weakness, resistance, and neutral hits", () => {
+    expect(computeElementMultiplier("None", "Fire")).toBe(1);
+    expect(computeElementMultiplier("Fire", "Fire")).toBe(1.5);
+    expect(computeElementMultiplier("Ice", "Fire")).toBe(0.5);
+    expect(computeElementMultiplier("Lightning", "Fire")).toBe(1);
   });
 
   it.each([

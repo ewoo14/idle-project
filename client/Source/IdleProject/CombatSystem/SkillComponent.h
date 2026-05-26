@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "Components/ActorComponent.h"
+#include "CombatSystem/StatusElementTypes.h"
 #include "SkillComponent.generated.h"
 
 UENUM(BlueprintType)
@@ -61,6 +62,18 @@ struct IDLEPROJECT_API FSkillDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
 	float GaugeGainOnTakeDamage = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
+	ESkillStatusEffect StatusEffect = ESkillStatusEffect::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill", meta = (ClampMin = "0.0"))
+	float StatusDuration = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
+	float StatusMagnitude = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
+	ESkillElement Element = ESkillElement::None;
 };
 
 /** 스킬 쿨다운, 궁극기 게이지, 패시브 스탯 보너스, 간단한 자기 버프를 관리합니다. */

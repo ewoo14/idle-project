@@ -36,6 +36,8 @@ void UCombatComponent::InitializeCombat(
 	CritRate = FMath::Clamp(InCritRate, 0.0f, 1.0f);
 	CritDmg = FMath::Max(1.0f, InCritDmg);
 	bDeathBroadcast = false;
+	ActiveStatuses.Reset();
+	LastAppliedStatusAtkSpeedPenalty = 0.0f;
 	OnHpChanged.Broadcast(CurrentHp);
 }
 
@@ -81,4 +83,97 @@ void UCombatComponent::TakeDamageTyped(float Damage, AActor* Instigator, bool bW
 bool UCombatComponent::IsDead() const
 {
 	return CurrentHp <= 0.0f;
+}
+
+void UCombatComponent::ApplyStatus(ESkillStatusEffect Type, float Duration, float Magnitude, float Now)
+{
+	if (Type == ESkillStatusEffect::None || Duration <= 0.0f || Magnitude <= 0.0f || IsDead())
+	{
+		return;
+	}
+
+	if (Type == ESkillStatusEffect::Freeze)
+	{
+		RemoveStatusAttackSpeedSlow();
+	}
+
+	ActiveStatuses.RemoveAll([Type](const FActiveSkillStatus& Status)
+	{
+		return Status.Type == Type;
+	});
+
+	FActiveSkillStatus Status;
+	Status.Type = Type;
+	Status.EndTime = Now + Duration;
+	Status.Magnitude = Magnitude;
+	Status.NextTickTime = Now + 1.0f;
+	ActiveStatuses.Add(Status);
+
+	if (Type == ESkillStatusEffect::Freeze)
+	{
+		ApplyCurrentStatusAttackSpeedSlow(Now);
+	}
+}
+
+void UCombatComponent::TickStatuses(float Now)
+{
+	if (IsDead())
+	{
+		return;
+	}
+
+	RemoveStatusAttackSpeedSlow();
+
+	for (FActiveSkillStatus& Status : ActiveStatuses)
+	{
+		if ((Status.Type == ESkillStatusEffect::Poison || Status.Type == ESkillStatusEffect::Burn) &&
+			Now >= Status.NextTickTime &&
+			Status.NextTickTime < Status.EndTime)
+		{
+			TakeDamageTyped(Status.Magnitude, GetOwner(), false, EDamageKind::Magic);
+			Status.NextTickTime += 1.0f;
+		}
+	}
+
+	ActiveStatuses.RemoveAll([Now](const FActiveSkillStatus& Status)
+	{
+		return Now >= Status.EndTime;
+	});
+
+	ApplyCurrentStatusAttackSpeedSlow(Now);
+}
+
+bool UCombatComponent::HasActiveStatus(ESkillStatusEffect Type) const
+{
+	return ActiveStatuses.ContainsByPredicate([Type](const FActiveSkillStatus& Status)
+	{
+		return Status.Type == Type;
+	});
+}
+
+void UCombatComponent::RemoveStatusAttackSpeedSlow()
+{
+	if (LastAppliedStatusAtkSpeedPenalty != 0.0f)
+	{
+		AtkSpeed = FMath::Max(0.1f, AtkSpeed + LastAppliedStatusAtkSpeedPenalty);
+		LastAppliedStatusAtkSpeedPenalty = 0.0f;
+	}
+}
+
+void UCombatComponent::ApplyCurrentStatusAttackSpeedSlow(float Now)
+{
+	float SlowMagnitude = 0.0f;
+	for (const FActiveSkillStatus& Status : ActiveStatuses)
+	{
+		if (Status.Type == ESkillStatusEffect::Freeze && Status.EndTime > Now)
+		{
+			SlowMagnitude = FMath::Max(SlowMagnitude, Status.Magnitude);
+		}
+	}
+
+	if (SlowMagnitude > 0.0f)
+	{
+		LastAppliedStatusAtkSpeedPenalty = AtkSpeed * FMath::Clamp(SlowMagnitude, 0.0f, 0.9f);
+		AtkSpeed = FMath::Max(0.1f, AtkSpeed - LastAppliedStatusAtkSpeedPenalty);
+	}
 }

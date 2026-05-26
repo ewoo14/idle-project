@@ -4,6 +4,7 @@
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "CombatSystem/StatusElementTypes.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "Components/SceneComponent.h"
 #include "DamageReceivedTestReceiver.h"
@@ -42,6 +43,10 @@ struct FExpectedSkillDefinition
 	float BuffDuration;
 	float GaugeGainOnHit;
 	float GaugeGainOnTakeDamage;
+	ESkillStatusEffect StatusEffect = ESkillStatusEffect::None;
+	float StatusDuration = 0.0f;
+	float StatusMagnitude = 0.0f;
+	ESkillElement Element = ESkillElement::None;
 };
 
 bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent& Skills, const FExpectedSkillDefinition& Expected)
@@ -66,6 +71,10 @@ bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent&
 	Test.TestEqual(*FString::Printf(TEXT("%s BuffDuration"), *Expected.SkillId.ToString()), Actual->BuffDuration, Expected.BuffDuration);
 	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnHit"), *Expected.SkillId.ToString()), Actual->GaugeGainOnHit, Expected.GaugeGainOnHit);
 	Test.TestEqual(*FString::Printf(TEXT("%s GaugeGainOnTakeDamage"), *Expected.SkillId.ToString()), Actual->GaugeGainOnTakeDamage, Expected.GaugeGainOnTakeDamage);
+	Test.TestEqual(*FString::Printf(TEXT("%s StatusEffect"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->StatusEffect), static_cast<int32>(Expected.StatusEffect));
+	Test.TestEqual(*FString::Printf(TEXT("%s StatusDuration"), *Expected.SkillId.ToString()), Actual->StatusDuration, Expected.StatusDuration);
+	Test.TestEqual(*FString::Printf(TEXT("%s StatusMagnitude"), *Expected.SkillId.ToString()), Actual->StatusMagnitude, Expected.StatusMagnitude);
+	Test.TestEqual(*FString::Printf(TEXT("%s Element"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->Element), static_cast<int32>(Expected.Element));
 	return true;
 }
 }
@@ -81,6 +90,10 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Minimum damage guarantee"), FCombatFormulas::ComputeDamage(10.0f, 100.0f), 0.5f);
 	TestEqual(TEXT("Zero defense damage"), FCombatFormulas::ComputeDamage(50.0f, 0.0f), 50.0f);
 	TestEqual(TEXT("Magic damage uses the same curve"), FCombatFormulas::ComputeMagicDamage(80.0f, 20.0f), 68.0f);
+	TestEqual(TEXT("No element keeps neutral damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::None, ESkillElement::Fire), 1.0f);
+	TestEqual(TEXT("Matching monster weakness amplifies damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Fire, ESkillElement::Fire), 1.5f);
+	TestEqual(TEXT("Opposed monster weakness resists damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Ice, ESkillElement::Fire), 0.5f);
+	TestEqual(TEXT("Unrelated element keeps neutral damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Lightning, ESkillElement::Fire), 1.0f);
 
 	FRandomStream NeverCritStream(12345);
 	FRandomStream AlwaysCritStream(12345);
@@ -89,6 +102,94 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Non crit leaves base damage unchanged"), FCombatFormulas::ApplyCrit(34.0f, false, 1.8f), 34.0f);
 	TestEqual(TEXT("Crit multiplies base damage"), FCombatFormulas::ApplyCrit(34.0f, true, 1.8f), 61.2f);
 	TestEqual(TEXT("Crit damage below one cannot reduce damage"), FCombatFormulas::ApplyCrit(34.0f, true, 0.5f), 34.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusDamageOverTimeTest,
+	"IdleProject.Combat.Status.DamageOverTime",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusDamageOverTimeTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	Combat->ApplyStatus(ESkillStatusEffect::Poison, 3.0f, 4.0f, 10.0f);
+	Combat->TickStatuses(10.5f);
+	TestEqual(TEXT("DoT waits until the first one-second tick"), Combat->CurrentHp, 100.0f);
+	Combat->TickStatuses(11.0f);
+	TestEqual(TEXT("Poison deals one tick of damage"), Combat->CurrentHp, 96.0f);
+	Combat->TickStatuses(12.0f);
+	TestEqual(TEXT("Poison deals a second tick of damage"), Combat->CurrentHp, 92.0f);
+	Combat->TickStatuses(13.1f);
+	TestEqual(TEXT("Expired poison stops ticking"), Combat->CurrentHp, 92.0f);
+	TestFalse(TEXT("Expired poison is removed"), Combat->HasActiveStatus(ESkillStatusEffect::Poison));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusFreezeSlowTest,
+	"IdleProject.Combat.Status.FreezeSlow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusFreezeSlowTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(100.0f, 10.0f, 0.0f, 2.0f);
+
+	Combat->ApplyStatus(ESkillStatusEffect::Freeze, 2.0f, 0.25f, 10.0f);
+	Combat->TickStatuses(10.0f);
+	TestEqual(TEXT("Freeze applies attack speed slow"), Combat->AtkSpeed, 1.5f);
+	TestTrue(TEXT("Freeze is active before expiry"), Combat->HasActiveStatus(ESkillStatusEffect::Freeze));
+
+	Combat->TickStatuses(12.1f);
+	TestEqual(TEXT("Freeze slow is removed on expiry"), Combat->AtkSpeed, 2.0f);
+	TestFalse(TEXT("Expired freeze is removed"), Combat->HasActiveStatus(ESkillStatusEffect::Freeze));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillElementStatusApplicationTest,
+	"IdleProject.Combat.Skills.ElementStatusApplication",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillElementStatusApplicationTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AIdleMonster* Target = NewObject<AIdleMonster>();
+	UCombatComponent* TargetCombat = Target->GetCombat();
+	TestNotNull(TEXT("Monster combat component exists"), TargetCombat);
+	if (!TargetCombat)
+	{
+		return false;
+	}
+
+	OwnerCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f, 100.0f, 0.0f, 0.0f, 1.5f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.5f);
+	Target->SetWeakElement(ESkillElement::Fire);
+	Skills->LoadDefaultMageSkills();
+	Skills->MarkSkillCast(TEXT("chain_lightning"), 10.0f);
+	Skills->MarkSkillCast(TEXT("mana_shield"), 10.0f);
+	Skills->MarkSkillCast(TEXT("meteor"), 10.0f);
+
+	TArray<AActor*> AoeTargets;
+	Skills->TickSkills(10.0f, Target, AoeTargets);
+
+	TestEqual(TEXT("Fire skill applies weakness multiplier to magic damage"), TargetCombat->CurrentHp, 640.0f);
+	TestTrue(TEXT("Fire skill applies burn status"), TargetCombat->HasActiveStatus(ESkillStatusEffect::Burn));
 
 	return true;
 }
@@ -589,10 +690,10 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultMageSkills();
 	const TArray<FExpectedSkillDefinition> MageSkills = {
-		{TEXT("arcane_bolt"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f, 0.0f, 0.0f},
-		{TEXT("chain_lightning"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("arcane_bolt"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Burn, 3.0f, 4.0f, ESkillElement::Fire},
+		{TEXT("chain_lightning"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Lightning},
 		{TEXT("mana_shield"), EClassId::Mage, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f, 0.0f, 0.0f},
-		{TEXT("meteor"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("meteor"), EClassId::Mage, ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.25f, ESkillElement::Ice},
 		{TEXT("spell_mastery"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
 		{TEXT("mana_flow"), EClassId::Mage, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("arcane_overload"), EClassId::Mage, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f},
@@ -625,8 +726,8 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultThiefSkills();
 	const TArray<FExpectedSkillDefinition> ThiefSkills = {
-		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f},
-		{TEXT("smoke_bomb"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::None},
+		{TEXT("smoke_bomb"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None},
 		{TEXT("evasion_stance"), EClassId::Thief, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
 		{TEXT("backstab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f, 0.0f, 0.0f},
 		{TEXT("nimble_hands"), EClassId::Thief, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.0f},
@@ -643,7 +744,7 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultClericSkills();
 	const TArray<FExpectedSkillDefinition> ClericSkills = {
-		{TEXT("holy_smite"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("holy_smite"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy},
 		{TEXT("heal"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::Heal, 6.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("blessing"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.15f, 4.0f, 0.0f, 0.0f},
 		{TEXT("purify"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.25f, 4.0f, 0.0f, 0.0f},

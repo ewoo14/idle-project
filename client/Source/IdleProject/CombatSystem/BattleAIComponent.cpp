@@ -132,6 +132,8 @@ void UBattleAIComponent::UpdateBattle()
 		return;
 	}
 
+	OwnerCombat->TickStatuses(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+
 	AActor* TargetActor = FindClosestEnemy();
 	if (!TargetActor)
 	{

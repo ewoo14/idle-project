@@ -1,5 +1,6 @@
 #include "CombatSystem/SkillComponent.h"
 
+#include "CharacterSystem/IdleMonster.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
 #include "Internationalization/IdleLocalization.h"
@@ -39,7 +40,11 @@ FSkillDefinition MakeSkill(
 	float BuffMagnitude,
 	float BuffDuration,
 	float GaugeGainOnHit = 0.0f,
-	float GaugeGainOnTakeDamage = 0.0f)
+	float GaugeGainOnTakeDamage = 0.0f,
+	ESkillStatusEffect StatusEffect = ESkillStatusEffect::None,
+	float StatusDuration = 0.0f,
+	float StatusMagnitude = 0.0f,
+	ESkillElement Element = ESkillElement::None)
 {
 	FSkillDefinition Skill;
 	Skill.SkillId = FName(SkillId);
@@ -53,6 +58,10 @@ FSkillDefinition MakeSkill(
 	Skill.BuffDuration = BuffDuration;
 	Skill.GaugeGainOnHit = GaugeGainOnHit;
 	Skill.GaugeGainOnTakeDamage = GaugeGainOnTakeDamage;
+	Skill.StatusEffect = StatusEffect;
+	Skill.StatusDuration = StatusDuration;
+	Skill.StatusMagnitude = StatusMagnitude;
+	Skill.Element = Element;
 	return Skill;
 }
 }
@@ -79,10 +88,10 @@ void USkillComponent::LoadDefaultMageSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("arcane_bolt"), EClassId::Mage, TEXT("Arcane Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("chain_lightning"), EClassId::Mage, TEXT("Chain Lightning"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("arcane_bolt"), EClassId::Mage, TEXT("Arcane Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.4f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Burn, 3.0f, 4.0f, ESkillElement::Fire));
+	Skills.Add(MakeSkill(TEXT("chain_lightning"), EClassId::Mage, TEXT("Chain Lightning"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Lightning));
 	Skills.Add(MakeSkill(TEXT("mana_shield"), EClassId::Mage, TEXT("Mana Shield"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("meteor"), EClassId::Mage, TEXT("Meteor"), ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("meteor"), EClassId::Mage, TEXT("Meteor"), ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.25f, ESkillElement::Ice));
 	Skills.Add(MakeSkill(TEXT("spell_mastery"), EClassId::Mage, TEXT("Spell Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("mana_flow"), EClassId::Mage, TEXT("Mana Flow"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("arcane_overload"), EClassId::Mage, TEXT("Arcane Overload"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f));
@@ -105,8 +114,8 @@ void USkillComponent::LoadDefaultThiefSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("shadow_stab"), EClassId::Thief, TEXT("Shadow Stab"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("smoke_bomb"), EClassId::Thief, TEXT("Smoke Bomb"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("shadow_stab"), EClassId::Thief, TEXT("Shadow Stab"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("smoke_bomb"), EClassId::Thief, TEXT("Smoke Bomb"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("evasion_stance"), EClassId::Thief, TEXT("Evasion Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("backstab"), EClassId::Thief, TEXT("Backstab"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("nimble_hands"), EClassId::Thief, TEXT("Nimble Hands"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
@@ -118,7 +127,7 @@ void USkillComponent::LoadDefaultClericSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("holy_smite"), EClassId::Cleric, TEXT("Holy Smite"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("holy_smite"), EClassId::Cleric, TEXT("Holy Smite"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
 	Skills.Add(MakeSkill(TEXT("heal"), EClassId::Cleric, TEXT("Heal"), ESkillType::Active, ESkillEffectType::Heal, 6.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("blessing"), EClassId::Cleric, TEXT("Blessing"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.15f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("purify"), EClassId::Cleric, TEXT("Purify"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.25f, 4.0f));
@@ -495,10 +504,18 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 		? FCombatFormulas::ComputeMagicDamage(AttackPower * EffectiveDamageCoeff, Defense)
 		: FCombatFormulas::ComputeDamage(AttackPower * EffectiveDamageCoeff, Defense);
 	const bool bWasCrit = OwnerCombat->RollCrit();
-	const float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, bWasCrit, OwnerCombat->CritDmg);
+	const ESkillElement TargetWeakElement = Target && Target->IsA<AIdleMonster>()
+		? CastChecked<AIdleMonster>(Target)->GetWeakElement()
+		: ESkillElement::None;
+	const float ElementDamage = BaseDamage * FCombatFormulas::ComputeElementMultiplier(Skill.Element, TargetWeakElement);
+	const float FinalDamage = FCombatFormulas::ApplyCrit(ElementDamage, bWasCrit, OwnerCombat->CritDmg);
 	const EDamageKind DamageKind = bMagicDamage ? EDamageKind::Magic : EDamageKind::Physical;
 
 	TargetCombat->TakeDamageTyped(FinalDamage, GetOwner(), bWasCrit, DamageKind);
+	if (Skill.StatusEffect != ESkillStatusEffect::None)
+	{
+		TargetCombat->ApplyStatus(Skill.StatusEffect, Skill.StatusDuration, Skill.StatusMagnitude, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+	}
 	if (Skill.Type != ESkillType::Ultimate)
 	{
 		AddGauge(Skill.GaugeGainOnHit);

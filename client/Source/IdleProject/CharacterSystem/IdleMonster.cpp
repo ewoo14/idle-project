@@ -81,6 +81,7 @@ void AIdleMonster::BeginPlay()
 void AIdleMonster::SetBoss(bool bInBoss)
 {
 	bIsBoss = bInBoss;
+	WeakElement = bIsBoss ? ESkillElement::Holy : ESkillElement::Fire;
 	if (PlaceholderMesh)
 	{
 		PlaceholderMesh->SetRelativeScale3D(bIsBoss ? FVector(1.35f, 1.35f, 1.35f) : FVector(0.75f, 0.75f, 0.75f));
