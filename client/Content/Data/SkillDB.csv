@@ -1,36 +1,36 @@
-SkillId,ClassId,NameEn,Type,EffectType,Cooldown,DamageCoeff,BuffMagnitude,BuffDuration,GaugeGainOnHit,GaugeGainOnTakeDamage
-heavy_strike,1,Heavy Strike,Active,DamageSingle,4.0,2.5,0.0,0.0,0.0,0.0
-whirlwind,1,Whirlwind,Active,DamageAoe,8.0,1.8,0.0,0.0,0.0,0.0
-shield_up,1,Shield Up,Active,SelfBuff,12.0,0.0,0.5,4.0,0.0,0.0
-charge,1,Charge,Active,DashDamage,10.0,2.0,0.0,0.0,0.0,0.0
-weapon_mastery,1,Weapon Mastery,Passive,SelfBuff,0.0,0.0,0.15,0.0,0.0,0.0
-toughness,1,Toughness,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0
-berserkers_fury,1,Berserker's Fury,Ultimate,DamageSingle,0.0,6.0,0.3,4.0,8.0,5.0
-arcane_bolt,2,Arcane Bolt,Active,DamageSingle,3.0,2.4,0.0,0.0,0.0,0.0
-chain_lightning,2,Chain Lightning,Active,DamageAoe,7.0,1.7,0.0,0.0,0.0,0.0
-mana_shield,2,Mana Shield,Active,SelfBuff,12.0,0.0,0.35,4.0,0.0,0.0
-meteor,2,Meteor,Active,DamageAoe,14.0,2.8,0.0,0.0,0.0,0.0
-spell_mastery,2,Spell Mastery,Passive,SelfBuff,0.0,0.0,0.15,0.0,0.0,0.0
-mana_flow,2,Mana Flow,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0
-arcane_overload,2,Arcane Overload,Ultimate,DamageAoe,0.0,5.5,0.25,4.0,9.0,3.0
-precision_shot,3,Precision Shot,Active,DamageSingle,3.5,2.2,0.0,0.0,0.0,0.0
-arrow_rain,3,Arrow Rain,Active,DamageAoe,8.0,1.6,0.0,0.0,0.0,0.0
-focus,3,Focus,Active,SelfBuff,10.0,0.0,0.2,4.0,0.0,0.0
-piercing_arrow,3,Piercing Arrow,Active,DashDamage,9.0,2.0,0.0,0.0,0.0,0.0
-critical_eye,3,Critical Eye,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0
-quick_draw,3,Quick Draw,Passive,SelfBuff,0.0,0.0,0.1,0.0,0.0,0.0
-eagle_eye,3,Eagle Eye,Ultimate,DamageSingle,0.0,5.0,0.25,4.0,10.0,2.0
-shadow_stab,4,Shadow Stab,Active,DamageSingle,3.0,2.3,0.0,0.0,0.0,0.0
-smoke_bomb,4,Smoke Bomb,Active,DamageAoe,7.0,1.5,0.0,0.0,0.0,0.0
-evasion_stance,4,Evasion Stance,Active,SelfBuff,10.0,0.0,0.2,4.0,0.0,0.0
-backstab,4,Backstab,Active,DashDamage,9.0,2.1,0.0,0.0,0.0,0.0
-nimble_hands,4,Nimble Hands,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0
-lucky_instinct,4,Lucky Instinct,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0
-assassinate,4,Assassinate,Ultimate,DamageSingle,0.0,5.3,0.25,4.0,11.0,1.0
-holy_smite,5,Holy Smite,Active,DamageSingle,3.2,2.0,0.0,0.0,0.0,0.0
-heal,5,Heal,Active,Heal,6.0,0.0,0.2,0.0,0.0,0.0
-blessing,5,Blessing,Active,SelfBuff,10.0,0.0,0.15,4.0,0.0,0.0
-purify,5,Purify,Active,SelfBuff,12.0,0.0,0.25,4.0,0.0,0.0
-wisdom_training,5,Wisdom Training,Passive,SelfBuff,0.0,0.0,0.1,0.0,0.0,0.0
-divine_vitality,5,Divine Vitality,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0
-sanctuary,5,Sanctuary,Ultimate,Heal,0.0,0.0,0.4,0.0,6.0,6.0
+SkillId,ClassId,NameEn,Type,EffectType,Cooldown,DamageCoeff,BuffMagnitude,BuffDuration,GaugeGainOnHit,GaugeGainOnTakeDamage,StatusEffect,StatusDuration,StatusMagnitude,Element
+heavy_strike,1,Heavy Strike,Active,DamageSingle,4.0,2.5,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+whirlwind,1,Whirlwind,Active,DamageAoe,8.0,1.8,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+shield_up,1,Shield Up,Active,SelfBuff,12.0,0.0,0.5,4.0,0.0,0.0,None,0.0,0.0,None
+charge,1,Charge,Active,DashDamage,10.0,2.0,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+weapon_mastery,1,Weapon Mastery,Passive,SelfBuff,0.0,0.0,0.15,0.0,0.0,0.0,None,0.0,0.0,None
+toughness,1,Toughness,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0,None,0.0,0.0,None
+berserkers_fury,1,Berserker's Fury,Ultimate,DamageSingle,0.0,6.0,0.3,4.0,8.0,5.0,None,0.0,0.0,None
+arcane_bolt,2,Arcane Bolt,Active,DamageSingle,3.0,2.4,0.0,0.0,0.0,0.0,Burn,3.0,4.0,Fire
+chain_lightning,2,Chain Lightning,Active,DamageAoe,7.0,1.7,0.0,0.0,0.0,0.0,None,0.0,0.0,Lightning
+mana_shield,2,Mana Shield,Active,SelfBuff,12.0,0.0,0.35,4.0,0.0,0.0,None,0.0,0.0,None
+meteor,2,Meteor,Active,DamageAoe,14.0,2.8,0.0,0.0,0.0,0.0,Freeze,2.0,0.25,Ice
+spell_mastery,2,Spell Mastery,Passive,SelfBuff,0.0,0.0,0.15,0.0,0.0,0.0,None,0.0,0.0,None
+mana_flow,2,Mana Flow,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0,None,0.0,0.0,None
+arcane_overload,2,Arcane Overload,Ultimate,DamageAoe,0.0,5.5,0.25,4.0,9.0,3.0,None,0.0,0.0,None
+precision_shot,3,Precision Shot,Active,DamageSingle,3.5,2.2,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+arrow_rain,3,Arrow Rain,Active,DamageAoe,8.0,1.6,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+focus,3,Focus,Active,SelfBuff,10.0,0.0,0.2,4.0,0.0,0.0,None,0.0,0.0,None
+piercing_arrow,3,Piercing Arrow,Active,DashDamage,9.0,2.0,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+critical_eye,3,Critical Eye,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0,None,0.0,0.0,None
+quick_draw,3,Quick Draw,Passive,SelfBuff,0.0,0.0,0.1,0.0,0.0,0.0,None,0.0,0.0,None
+eagle_eye,3,Eagle Eye,Ultimate,DamageSingle,0.0,5.0,0.25,4.0,10.0,2.0,None,0.0,0.0,None
+shadow_stab,4,Shadow Stab,Active,DamageSingle,3.0,2.3,0.0,0.0,0.0,0.0,Poison,3.0,3.0,None
+smoke_bomb,4,Smoke Bomb,Active,DamageAoe,7.0,1.5,0.0,0.0,0.0,0.0,Poison,3.0,2.0,None
+evasion_stance,4,Evasion Stance,Active,SelfBuff,10.0,0.0,0.2,4.0,0.0,0.0,None,0.0,0.0,None
+backstab,4,Backstab,Active,DashDamage,9.0,2.1,0.0,0.0,0.0,0.0,None,0.0,0.0,None
+nimble_hands,4,Nimble Hands,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0,None,0.0,0.0,None
+lucky_instinct,4,Lucky Instinct,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0,None,0.0,0.0,None
+assassinate,4,Assassinate,Ultimate,DamageSingle,0.0,5.3,0.25,4.0,11.0,1.0,None,0.0,0.0,None
+holy_smite,5,Holy Smite,Active,DamageSingle,3.2,2.0,0.0,0.0,0.0,0.0,None,0.0,0.0,Holy
+heal,5,Heal,Active,Heal,6.0,0.0,0.2,0.0,0.0,0.0,None,0.0,0.0,None
+blessing,5,Blessing,Active,SelfBuff,10.0,0.0,0.15,4.0,0.0,0.0,None,0.0,0.0,None
+purify,5,Purify,Active,SelfBuff,12.0,0.0,0.25,4.0,0.0,0.0,None,0.0,0.0,None
+wisdom_training,5,Wisdom Training,Passive,SelfBuff,0.0,0.0,0.1,0.0,0.0,0.0,None,0.0,0.0,None
+divine_vitality,5,Divine Vitality,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0,None,0.0,0.0,None
+sanctuary,5,Sanctuary,Ultimate,Heal,0.0,0.0,0.4,0.0,6.0,6.0,None,0.0,0.0,None

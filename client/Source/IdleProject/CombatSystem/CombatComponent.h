@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "CombatSystem/StatusElementTypes.h"
 #include "CombatComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeath, AActor*, DyingActor);
@@ -16,6 +17,24 @@ enum class EDamageKind : uint8
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDamageReceived, float, Amount, bool, bWasCrit, EDamageKind, Kind);
 DECLARE_MULTICAST_DELEGATE_FourParams(FOnAnyDamageReceived, AActor* /* DamagedActor */, float /* Amount */, bool /* bWasCrit */, EDamageKind /* Kind */);
+
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FActiveSkillStatus
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	ESkillStatusEffect Type = ESkillStatusEffect::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	float EndTime = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	float Magnitude = 0.0f;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
+	float NextTickTime = 0.0f;
+};
 
 /** 캐릭터와 몬스터가 공유하는 HP/공격력 기반 전투 상태 컴포넌트입니다. */
 UCLASS(ClassGroup = (Idle), meta = (BlueprintSpawnableComponent))
@@ -73,6 +92,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Combat")
 	void TakeDamageTyped(float Damage, AActor* Instigator, bool bWasCrit, EDamageKind Kind);
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Combat|Status")
+	void ApplyStatus(ESkillStatusEffect Type, float Duration, float Magnitude, float Now);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Combat|Status")
+	void TickStatuses(float Now);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Combat|Status")
+	bool HasActiveStatus(ESkillStatusEffect Type) const;
+
+	const TArray<FActiveSkillStatus>& GetActiveStatuses() const { return ActiveStatuses; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat")
 	bool IsDead() const;
 
@@ -81,6 +111,11 @@ public:
 	bool RollCrit();
 
 private:
+	void RemoveStatusAttackSpeedSlow();
+	void ApplyCurrentStatusAttackSpeedSlow(float Now);
+
 	bool bDeathBroadcast = false;
 	FRandomStream CritRandomStream;
+	TArray<FActiveSkillStatus> ActiveStatuses;
+	float LastAppliedStatusAtkSpeedPenalty = 0.0f;
 };

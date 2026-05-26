@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CombatSystem/StatusElementTypes.h"
 #include "GameFramework/Character.h"
 #include "IdleMonster.generated.h"
 
@@ -26,6 +27,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
 	bool IsBoss() const { return bIsBoss; }
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetWeakElement(ESkillElement InWeakElement) { WeakElement = InWeakElement; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
+	ESkillElement GetWeakElement() const { return WeakElement; }
 
 	float GetConfiguredMaxHp() const;
 	float GetConfiguredAttack() const;
@@ -54,6 +61,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	float BossAttack = 24.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	ESkillElement WeakElement = ESkillElement::Fire;
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);

@@ -38,6 +38,35 @@ export function applyCrit(
   return isCrit ? baseDamage * Math.max(1, critDmg) : baseDamage;
 }
 
+export type SkillElement = "None" | "Fire" | "Ice" | "Lightning" | "Holy";
+
+export function computeElementMultiplier(
+  skillElement: SkillElement,
+  targetWeakElement: SkillElement,
+): number {
+  if (skillElement === "None" || targetWeakElement === "None") {
+    return 1;
+  }
+
+  if (skillElement === targetWeakElement) {
+    return 1.5;
+  }
+
+  return isResistedElementPair(skillElement, targetWeakElement) ? 0.5 : 1;
+}
+
+function isResistedElementPair(
+  skillElement: SkillElement,
+  targetWeakElement: SkillElement,
+): boolean {
+  return (
+    (skillElement === "Fire" && targetWeakElement === "Ice") ||
+    (skillElement === "Ice" && targetWeakElement === "Fire") ||
+    (skillElement === "Lightning" && targetWeakElement === "Holy") ||
+    (skillElement === "Holy" && targetWeakElement === "Lightning")
+  );
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }

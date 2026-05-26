@@ -102,21 +102,25 @@ erDiagram
 마이그레이션 파일은 `server/migrations/0001_init.sql`, 롤백은 `server/migrations/0001_init.down.sql`이다.
 
 ## SkillDB Mirror
-PR #15 keeps combat execution authoritative in the Unreal client, but the server now has a read-only warrior SkillDB mirror at `server/src/core/data/skills.ts` for stable cross-reference.
+PR #15 keeps combat execution authoritative in the Unreal client, but the server now has a read-only SkillDB mirror at `server/src/core/data/skills.ts` for stable cross-reference. PR #30 extends the mirror with status and element fields.
 
 | Field | Meaning |
 | --- | --- |
 | `skillId` | Stable client/server skill identifier |
-| `classId` | Class owner; warrior is `1` |
+| `classId` | Class owner; warrior is `1`, mage `2`, archer `3`, thief `4`, cleric `5` |
 | `displayName` | Localized display name |
 | `type` | `active`, `passive`, or `ultimate` |
-| `effectType` | `damage_single`, `damage_aoe`, `self_buff`, or `dash_damage` |
+| `effectType` | `damage_single`, `damage_aoe`, `self_buff`, `dash_damage`, or `heal` |
 | `cooldown` | Cooldown seconds |
 | `damageCoeff` | ATK multiplier |
 | `buffMagnitude` | Buff amount as ratio |
 | `buffDuration` | Buff duration seconds |
 | `gaugeGainOnHit` | Ultimate gauge gained on normal hit |
 | `gaugeGainOnTakeDamage` | Ultimate gauge gained on taking damage |
+| `statusEffect` | `none`, `poison`, `burn`, or `freeze` |
+| `statusDuration` | Status duration seconds |
+| `statusMagnitude` | DoT tick damage or freeze slow ratio |
+| `element` | `none`, `fire`, `ice`, `lightning`, or `holy` |
 
 ## PetDB Mirror
 

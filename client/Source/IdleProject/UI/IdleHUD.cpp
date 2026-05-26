@@ -7,6 +7,7 @@
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
+#include "EngineUtils.h"
 #include "GameCore/IdleGameInstance.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -27,6 +28,7 @@ constexpr int32 RebirthBonusPointsPerRun = 5;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
 constexpr float FloatingDamageRisePixels = 32.0f;
 constexpr float FloatingDamageHeadOffsetZ = 120.0f;
+constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
 
 FString RarityToString(EItemRarity Rarity)
 {
@@ -148,6 +150,41 @@ FName MakeSeasonClaimHitBoxName(int32 Tier)
 FName MakeSkillRankHitBoxName(FName SkillId)
 {
 	return FName(*(SkillRankHitBoxPrefix + SkillId.ToString()));
+}
+
+bool TryBuildStatusIndicator(ESkillStatusEffect Type, const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale, FIdleHUDStatusIndicatorViewModel& OutIndicator)
+{
+	const FActiveSkillStatus* Status = Statuses.FindByPredicate([Type, Now](const FActiveSkillStatus& Candidate)
+	{
+		return Candidate.Type == Type && Candidate.EndTime > Now;
+	});
+	if (!Status)
+	{
+		return false;
+	}
+
+	OutIndicator.Type = Type;
+	OutIndicator.RemainingSeconds = FMath::Max(0.0f, Status->EndTime - Now);
+	OutIndicator.Size = 22.0f * HudScale;
+
+	switch (Type)
+	{
+	case ESkillStatusEffect::Poison:
+		OutIndicator.Label = TEXT("P");
+		OutIndicator.Color = IdleProject::UI::Theme::RarityUncommon;
+		return true;
+	case ESkillStatusEffect::Burn:
+		OutIndicator.Label = TEXT("B");
+		OutIndicator.Color = IdleProject::UI::Theme::RarityLegendary;
+		return true;
+	case ESkillStatusEffect::Freeze:
+		OutIndicator.Label = TEXT("F");
+		OutIndicator.Color = IdleProject::UI::Theme::AccentBlue;
+		return true;
+	case ESkillStatusEffect::None:
+	default:
+		return false;
+	}
 }
 }
 
@@ -441,6 +478,27 @@ FIdleHUDFloatingDamageViewModel IdleProject::UI::BuildFloatingDamageViewModel(co
 	return ViewModel;
 }
 
+TArray<FIdleHUDStatusIndicatorViewModel> IdleProject::UI::BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale)
+{
+	TArray<FIdleHUDStatusIndicatorViewModel> Indicators;
+	const ESkillStatusEffect DisplayOrder[] = {
+		ESkillStatusEffect::Poison,
+		ESkillStatusEffect::Burn,
+		ESkillStatusEffect::Freeze
+	};
+
+	for (const ESkillStatusEffect Type : DisplayOrder)
+	{
+		FIdleHUDStatusIndicatorViewModel Indicator;
+		if (TryBuildStatusIndicator(Type, Statuses, Now, HudScale, Indicator))
+		{
+			Indicators.Add(Indicator);
+		}
+	}
+
+	return Indicators;
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -525,6 +583,7 @@ void AIdleHUD::DrawHUD()
 	if (World)
 	{
 		DrawFloatingDamageTexts(World->GetTimeSeconds());
+		DrawStatusIndicators(World->GetTimeSeconds());
 	}
 }
 
@@ -1475,6 +1534,63 @@ void AIdleHUD::DrawFloatingDamageTexts(float Now)
 			ViewModel.ScreenPosition.Y,
 			Font,
 			ViewModel.TextScale);
+	}
+}
+
+void AIdleHUD::DrawStatusIndicators(float Now)
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas || !PlayerOwner)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const float HudScale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	for (TActorIterator<AActor> ActorIt(World); ActorIt; ++ActorIt)
+	{
+		AActor* Actor = *ActorIt;
+		if (!Actor)
+		{
+			continue;
+		}
+
+		const UCombatComponent* Combat = Actor->FindComponentByClass<UCombatComponent>();
+		if (!Combat)
+		{
+			continue;
+		}
+
+		const TArray<FIdleHUDStatusIndicatorViewModel> Indicators = BuildStatusIndicatorViewModels(Combat->GetActiveStatuses(), Now, HudScale);
+		if (Indicators.IsEmpty())
+		{
+			continue;
+		}
+
+		FVector2D ScreenPosition;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(Actor->GetActorLocation() + FVector(0.0, 0.0, StatusIndicatorHeadOffsetZ), ScreenPosition))
+		{
+			continue;
+		}
+
+		const float Gap = 4.0f * HudScale;
+		const float IndicatorSize = Indicators[0].Size;
+		const float TotalWidth = Indicators.Num() * IndicatorSize + (Indicators.Num() - 1) * Gap;
+		float X = ScreenPosition.X - TotalWidth * 0.5f;
+		const float Y = ScreenPosition.Y - IndicatorSize;
+		for (const FIdleHUDStatusIndicatorViewModel& Indicator : Indicators)
+		{
+			DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.74f), X - 1.0f * HudScale, Y - 1.0f * HudScale, IndicatorSize + 2.0f * HudScale, IndicatorSize + 2.0f * HudScale);
+			DrawRect(Indicator.Color.CopyWithNewOpacity(0.92f), X, Y, IndicatorSize, IndicatorSize);
+			DrawText(Indicator.Label, Theme::BgPrimary, X + 6.0f * HudScale, Y + 2.0f * HudScale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * HudScale);
+			X += IndicatorSize + Gap;
+		}
 	}
 }
 

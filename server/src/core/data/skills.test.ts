@@ -9,7 +9,38 @@ import {
   warriorSkillDefinitions,
 } from "./skills.js";
 
-const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
+type ExpectedSkillDefinition = Omit<
+  SkillDefinition,
+  "statusEffect" | "statusDuration" | "statusMagnitude" | "element"
+> &
+  Partial<
+    Pick<
+      SkillDefinition,
+      "statusEffect" | "statusDuration" | "statusMagnitude" | "element"
+    >
+  >;
+
+function withExpectedDefaults(skill: ExpectedSkillDefinition): SkillDefinition {
+  return {
+    statusEffect: "none",
+    statusDuration: 0,
+    statusMagnitude: 0,
+    element: "none",
+    ...skill,
+  };
+}
+
+function expectedSkillsForClass(classId: number): SkillDefinition[] {
+  return (
+    expectedSkillDefinitionsByClass.get(classId)?.map(withExpectedDefaults) ??
+    []
+  );
+}
+
+const expectedSkillDefinitionsByClass = new Map<
+  number,
+  ExpectedSkillDefinition[]
+>([
   [
     1,
     [
@@ -121,6 +152,10 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        statusEffect: "burn",
+        statusDuration: 3,
+        statusMagnitude: 4,
+        element: "fire",
       },
       {
         skillId: "chain_lightning",
@@ -134,6 +169,7 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        element: "lightning",
       },
       {
         skillId: "mana_shield",
@@ -160,6 +196,10 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        statusEffect: "freeze",
+        statusDuration: 2,
+        statusMagnitude: 0.25,
+        element: "ice",
       },
       {
         skillId: "spell_mastery",
@@ -313,6 +353,9 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        statusEffect: "poison",
+        statusDuration: 3,
+        statusMagnitude: 3,
       },
       {
         skillId: "smoke_bomb",
@@ -326,6 +369,9 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        statusEffect: "poison",
+        statusDuration: 3,
+        statusMagnitude: 2,
       },
       {
         skillId: "evasion_stance",
@@ -409,6 +455,7 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
         buffDuration: 0,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+        element: "holy",
       },
       {
         skillId: "heal",
@@ -495,45 +542,35 @@ const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
 describe("warriorSkillDefinitions", () => {
   it("mirrors the seven V1 warrior skills with server-readable fields", () => {
     expect(warriorSkillDefinitions).toHaveLength(7);
-    expect(warriorSkillDefinitions).toEqual(
-      expectedSkillDefinitionsByClass.get(1),
-    );
+    expect(warriorSkillDefinitions).toEqual(expectedSkillsForClass(1));
   });
 });
 
 describe("mageSkillDefinitions", () => {
   it("mirrors the seven V1 mage skills with server-readable fields", () => {
     expect(mageSkillDefinitions).toHaveLength(7);
-    expect(mageSkillDefinitions).toEqual(
-      expectedSkillDefinitionsByClass.get(2),
-    );
+    expect(mageSkillDefinitions).toEqual(expectedSkillsForClass(2));
   });
 });
 
 describe("archerSkillDefinitions", () => {
   it("mirrors the seven V1 archer skills with server-readable fields", () => {
     expect(archerSkillDefinitions).toHaveLength(7);
-    expect(archerSkillDefinitions).toEqual(
-      expectedSkillDefinitionsByClass.get(3),
-    );
+    expect(archerSkillDefinitions).toEqual(expectedSkillsForClass(3));
   });
 });
 
 describe("thiefSkillDefinitions", () => {
   it("mirrors the seven V1 thief skills with server-readable fields", () => {
     expect(thiefSkillDefinitions).toHaveLength(7);
-    expect(thiefSkillDefinitions).toEqual(
-      expectedSkillDefinitionsByClass.get(4),
-    );
+    expect(thiefSkillDefinitions).toEqual(expectedSkillsForClass(4));
   });
 });
 
 describe("clericSkillDefinitions", () => {
   it("mirrors the seven V1 cleric skills including heal effects", () => {
     expect(clericSkillDefinitions).toHaveLength(7);
-    expect(clericSkillDefinitions).toEqual(
-      expectedSkillDefinitionsByClass.get(5),
-    );
+    expect(clericSkillDefinitions).toEqual(expectedSkillsForClass(5));
   });
 });
 
@@ -567,8 +604,10 @@ describe("skill definition parity by class", () => {
   });
 
   it("keeps every class definition in exact parity with the V1 balance table", () => {
-    for (const [classId, expectedSkills] of expectedSkillDefinitionsByClass) {
-      expect(getSkillDefinitionsForClass(classId)).toEqual(expectedSkills);
+    for (const [classId] of expectedSkillDefinitionsByClass) {
+      expect(getSkillDefinitionsForClass(classId)).toEqual(
+        expectedSkillsForClass(classId),
+      );
     }
   });
 });

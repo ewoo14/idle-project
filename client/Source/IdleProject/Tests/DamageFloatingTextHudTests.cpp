@@ -79,4 +79,55 @@ bool FDamageFloatingTextHudViewModelTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStatusIndicatorHudViewModelTest,
+	"IdleProject.UI.HUD.StatusIndicatorViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStatusIndicatorHudViewModelTest::RunTest(const FString& Parameters)
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	TArray<FActiveSkillStatus> Statuses;
+	FActiveSkillStatus Burn;
+	Burn.Type = ESkillStatusEffect::Burn;
+	Burn.EndTime = 15.0f;
+	Statuses.Add(Burn);
+
+	FActiveSkillStatus Freeze;
+	Freeze.Type = ESkillStatusEffect::Freeze;
+	Freeze.EndTime = 13.5f;
+	Statuses.Add(Freeze);
+
+	FActiveSkillStatus Poison;
+	Poison.Type = ESkillStatusEffect::Poison;
+	Poison.EndTime = 14.0f;
+	Statuses.Add(Poison);
+
+	const TArray<FIdleHUDStatusIndicatorViewModel> Indicators = BuildStatusIndicatorViewModels(Statuses, 12.0f, 1.0f);
+
+	TestEqual(TEXT("HUD shows one indicator per active status"), Indicators.Num(), 3);
+	TestEqual(TEXT("Poison is shown first for stable horizontal layout"), static_cast<int32>(Indicators[0].Type), static_cast<int32>(ESkillStatusEffect::Poison));
+	TestEqual(TEXT("Poison uses a compact glyph"), Indicators[0].Label, FString(TEXT("P")));
+	TestEqual(TEXT("Poison uses green rarity token"), Indicators[0].Color.R, RarityUncommon.R);
+	TestEqual(TEXT("Poison remaining time is exposed"), Indicators[0].RemainingSeconds, 2.0f);
+
+	TestEqual(TEXT("Burn is shown second for stable horizontal layout"), static_cast<int32>(Indicators[1].Type), static_cast<int32>(ESkillStatusEffect::Burn));
+	TestEqual(TEXT("Burn uses a compact glyph"), Indicators[1].Label, FString(TEXT("B")));
+	TestEqual(TEXT("Burn uses legendary orange token"), Indicators[1].Color.G, RarityLegendary.G);
+
+	TestEqual(TEXT("Freeze is shown third for stable horizontal layout"), static_cast<int32>(Indicators[2].Type), static_cast<int32>(ESkillStatusEffect::Freeze));
+	TestEqual(TEXT("Freeze uses a compact glyph"), Indicators[2].Label, FString(TEXT("F")));
+	TestEqual(TEXT("Freeze uses blue token"), Indicators[2].Color.B, AccentBlue.B);
+
+	FActiveSkillStatus ExpiredPoison;
+	ExpiredPoison.Type = ESkillStatusEffect::Poison;
+	ExpiredPoison.EndTime = 11.5f;
+	const TArray<FIdleHUDStatusIndicatorViewModel> ExpiredIndicators = BuildStatusIndicatorViewModels({ExpiredPoison}, 12.0f, 1.0f);
+	TestTrue(TEXT("Expired statuses are hidden"), ExpiredIndicators.IsEmpty());
+
+	return true;
+}
+
 #endif
