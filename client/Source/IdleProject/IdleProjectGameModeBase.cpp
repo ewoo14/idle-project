@@ -33,6 +33,11 @@ void AIdleProjectGameModeBase::HandleStartingNewPlayer_Implementation(APlayerCon
 	SpawnInitialMonsters(NewPlayer);
 }
 
+bool AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(bool bRequestedBoss, bool bHasStageService, const FStageInfo& StageInfo)
+{
+	return bHasStageService ? StageInfo.bBossStage : bRequestedBoss;
+}
+
 void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 {
 	UWorld* World = GetWorld();
@@ -141,7 +146,7 @@ AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocat
 		const UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>();
 		const UStageService* StageService = GameInstance ? GameInstance->GetStageService() : nullptr;
 		const FStageInfo StageInfo = StageService ? StageService->GetCurrentStageInfo() : FStageInfo();
-		const bool bEffectiveBoss = bSpawnBoss || StageInfo.bBossStage;
+		const bool bEffectiveBoss = ShouldSpawnMonsterAsBoss(bSpawnBoss, StageService != nullptr, StageInfo);
 
 		Monster->SetBoss(bEffectiveBoss);
 		Monster->SetStageStatMultiplier(FStageFormula::ComputeMonsterStatMultiplier(StageInfo.GlobalStageIndex));

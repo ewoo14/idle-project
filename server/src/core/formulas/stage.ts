@@ -21,7 +21,7 @@ export function isBossStage(
 }
 
 export function getStageWeakElement(globalStageIndex: number): StageElement {
-  switch (globalStageIndex) {
+  switch (Math.max(0, globalStageIndex)) {
     case 2:
       return "Ice";
     case 3:
@@ -38,5 +38,7 @@ export function computeGlobalStageIndex(
   stage: number,
   stagesPerChapter = DEFAULT_STAGES_PER_CHAPTER,
 ): number {
-  return (chapter - 1) * stagesPerChapter + (stage - 1);
+  return (
+    (Math.max(1, chapter) - 1) * stagesPerChapter + (Math.max(1, stage) - 1)
+  );
 }

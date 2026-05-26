@@ -12,7 +12,7 @@ panels.
 Given `UStageService` reports Chapter 1 Stage 3 with `KillsThisStage = 7`,
 `KillsToAdvance = 10`, and weak element `Ice`
 When `AIdleHUD::DrawHUD` builds the stage indicator view model
-Then the HUD exposes `Stage 1-3 • 7/10`, progress ratio `0.7`, and a localized
+Then the HUD exposes `Stage 1-3 7/10`, progress ratio `0.7`, and a localized
 weak element label.
 
 Automation: `client/Source/IdleProject/Tests/DamageFloatingTextHudTests.cpp`
@@ -57,9 +57,10 @@ Automation: `client/Source/IdleProject/Tests/StageServiceTests.cpp`
 
 ## Edge Cases
 
-- `KillsToAdvance = 0` produces progress ratio `0.0` rather than division by
-  zero.
-- Kill progress above the target is clamped to a full progress bar.
+- `KillsToAdvance = 0` displays as `current/0` and produces progress ratio
+  `0.0` rather than division by zero.
+- Kill progress above the target is displayed as reported and clamped to a full
+  progress bar.
 - `None` weak element still produces a stable localized label and muted color.
 - Missing `UIdleGameInstance` or `UStageService` skips only the stage indicator.
 - Stage indicator layout stays top-center and does not overlap bottom skill

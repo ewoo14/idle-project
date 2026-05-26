@@ -45,6 +45,11 @@ void UStageService::AdvanceStage()
 
 void UStageService::MarkCurrentChapterBossDefeated()
 {
+	if (bCurrentChapterBossCleared)
+	{
+		return;
+	}
+
 	bCurrentChapterBossCleared = true;
 	KillsThisStage = GetKillsToAdvance();
 	OnStageChanged.Broadcast(GetCurrentStageInfo());

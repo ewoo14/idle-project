@@ -5,6 +5,7 @@
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/StageFormula.h"
 #include "GameCore/StageService.h"
+#include "IdleProjectGameModeBase.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -37,6 +38,34 @@ bool FIdleMonsterStageScalingTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Boss monster HP uses stage multiplier"), Monster->GetConfiguredMaxHp(), 575.0f);
 	TestEqual(TEXT("Boss monster attack uses stage multiplier"), Monster->GetConfiguredAttack(), 27.6f);
 	TestEqual(TEXT("Stage weak element can override boss default weakness"), Monster->GetWeakElement(), ESkillElement::Ice);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGameModeStageBossSpawnPolicyTest,
+	"IdleProject.GameMode.StageBossSpawnPolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGameModeStageBossSpawnPolicyTest::RunTest(const FString& Parameters)
+{
+	FStageInfo NormalStage;
+	NormalStage.bBossStage = false;
+
+	TestFalse(TEXT("Stage service normal stage ignores legacy initial boss slot"),
+		AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(true, true, NormalStage));
+	TestFalse(TEXT("Stage service normal stage keeps regular respawns normal"),
+		AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(false, true, NormalStage));
+
+	FStageInfo BossStage = NormalStage;
+	BossStage.bBossStage = true;
+	TestTrue(TEXT("Stage service boss stage always spawns boss"),
+		AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(false, true, BossStage));
+
+	TestTrue(TEXT("Missing stage service keeps legacy explicit boss spawn fallback"),
+		AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(true, false, NormalStage));
+	TestFalse(TEXT("Missing stage service keeps legacy normal spawn fallback"),
+		AIdleProjectGameModeBase::ShouldSpawnMonsterAsBoss(false, false, NormalStage));
 
 	return true;
 }

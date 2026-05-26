@@ -67,6 +67,7 @@ describe("stage formulas", () => {
   });
 
   it.each([
+    { chapter: 0, stage: 0, expectedGlobalStageIndex: 0 },
     { chapter: 1, stage: 1, expectedGlobalStageIndex: 0 },
     { chapter: 1, stage: 5, expectedGlobalStageIndex: 4 },
     { chapter: 2, stage: 1, expectedGlobalStageIndex: 5 },

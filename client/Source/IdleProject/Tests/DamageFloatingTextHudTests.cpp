@@ -30,7 +30,7 @@ bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 
 	const FIdleHUDStageViewModel NormalView = BuildStageViewModel(NormalStage);
 	TestEqual(TEXT("Stage title is localized"), NormalView.TitleLabel.ToString(), FString(TEXT("Stage")));
-	TestEqual(TEXT("Stage progress includes chapter, stage, and kills"), NormalView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 • 7/10")));
+	TestEqual(TEXT("Stage progress includes chapter, stage, and kills"), NormalView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 7/10")));
 	TestEqual(TEXT("Normal stage omits boss badge"), NormalView.BossBadgeLabel.ToString(), FString());
 	TestEqual(TEXT("Weak element is localized"), NormalView.WeaknessLabel.ToString(), FString(TEXT("Weak: Ice")));
 	TestEqual(TEXT("Progress ratio is clamped from kills"), NormalView.ProgressRatio, 0.7f);
@@ -48,6 +48,22 @@ bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Boss stage badge is localized"), BossView.BossBadgeLabel.ToString(), FString(TEXT("Boss")));
 	TestEqual(TEXT("Boss stage uses gold border color"), BossView.BorderColor.R, AccentGold.R);
 	TestEqual(TEXT("Fire weakness uses danger token"), BossView.WeaknessColor.R, AccentRed.R);
+
+	FStageInfo InvalidTargetStage = NormalStage;
+	InvalidTargetStage.KillsThisStage = 4;
+	InvalidTargetStage.KillsToAdvance = 0;
+
+	const FIdleHUDStageViewModel InvalidTargetView = BuildStageViewModel(InvalidTargetStage);
+	TestEqual(TEXT("Zero target is shown explicitly"), InvalidTargetView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 4/0")));
+	TestEqual(TEXT("Zero target produces empty progress ratio"), InvalidTargetView.ProgressRatio, 0.0f);
+
+	FStageInfo OverflowStage = NormalStage;
+	OverflowStage.KillsThisStage = 14;
+	OverflowStage.KillsToAdvance = 10;
+
+	const FIdleHUDStageViewModel OverflowView = BuildStageViewModel(OverflowStage);
+	TestEqual(TEXT("Overflow stage progress is displayed as reported"), OverflowView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 14/10")));
+	TestEqual(TEXT("Overflow stage progress ratio is clamped"), OverflowView.ProgressRatio, 1.0f);
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
