@@ -157,6 +157,7 @@ private:
 	void Attack(const FInputActionValue& Value);
 	void ToggleMenu(const FInputActionValue& Value);
 	void ToggleQuestLog(const FInputActionValue& Value);
+	int32 GetEffectiveLevel() const;
 
 	float LastObservedHp = 0.0f;
 	EBattleState LastObservedBattleState;

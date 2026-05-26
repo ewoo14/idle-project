@@ -65,14 +65,14 @@
   `GetCurrentPrimaryStats()`, `GetCurrentDerivedStats()`,
   `GetCurrentLevel()`, `GetClassId()`, and `GetRebirthCount()`.
 - Primary rows: STR, DEX, INT, WIS, CON, LUK.
-- Derived rows: HP, physical attack, magic attack, physical defense, magic
+- Derived rows: HP, MP, physical attack, magic attack, physical defense, magic
   defense, attack speed, crit rate, crit damage, dodge, and accuracy.
 - Formatting covered by Automation:
-  - integers: HP and flat attack/defense stats
-  - decimals: attack speed with two decimals
-  - percentages: crit rate, dodge, accuracy
+  - integers: HP, MP, and flat attack/defense stats
+  - percentages: attack speed, crit rate, dodge, accuracy
   - multiplier: crit damage
 - Added ko/en UI CSV keys for the stat info title, toggle, header, and derived
   stat labels.
 - Added QA scenario:
   `docs/qa/scenarios/M7-character-stats-panel-v1.md`.
+<!-- markdownlint-disable-file MD013 MD022 MD032 MD058 -->

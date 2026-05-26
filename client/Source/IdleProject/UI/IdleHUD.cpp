@@ -124,14 +124,14 @@ FText FormatIntegerLabel(float Value)
 	return FText::AsNumber(FMath::RoundToInt(Value));
 }
 
-FText FormatFixedDecimalLabel(float Value, int32 Decimals)
-{
-	return FText::FromString(FString::Printf(TEXT("%.*f"), Decimals, Value));
-}
-
 FText FormatStatInfoPercentLabel(float Rate)
 {
 	return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(FMath::Clamp(Rate, 0.0f, 1.0f) * 100.0f)));
+}
+
+FText FormatStatInfoScalarPercentLabel(float Value)
+{
+	return FText::FromString(FString::Printf(TEXT("%d%%"), FMath::RoundToInt(FMath::Max(0.0f, Value) * 100.0f)));
 }
 
 FText FormatMultiplierLabel(float Value)
@@ -798,11 +798,12 @@ FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimary
 	};
 
 	AddDerivedRow(TEXT("STAT_INFO_HP"), FormatIntegerLabel(DerivedStats.Hp));
+	AddDerivedRow(TEXT("STAT_INFO_MP"), FormatIntegerLabel(DerivedStats.Mp));
 	AddDerivedRow(TEXT("STAT_INFO_PHYS_ATK"), FormatIntegerLabel(DerivedStats.PhysAtk));
 	AddDerivedRow(TEXT("STAT_INFO_MAGIC_ATK"), FormatIntegerLabel(DerivedStats.MagicAtk));
 	AddDerivedRow(TEXT("STAT_INFO_PHYS_DEF"), FormatIntegerLabel(DerivedStats.PhysDef));
 	AddDerivedRow(TEXT("STAT_INFO_MAGIC_DEF"), FormatIntegerLabel(DerivedStats.MagicDef));
-	AddDerivedRow(TEXT("STAT_INFO_ATK_SPEED"), FormatFixedDecimalLabel(DerivedStats.AtkSpeed, 2));
+	AddDerivedRow(TEXT("STAT_INFO_ATK_SPEED"), FormatStatInfoScalarPercentLabel(DerivedStats.AtkSpeed));
 	AddDerivedRow(TEXT("STAT_INFO_CRIT_RATE"), FormatStatInfoPercentLabel(DerivedStats.CritRate));
 	AddDerivedRow(TEXT("STAT_INFO_CRIT_DMG"), FormatMultiplierLabel(DerivedStats.CritDmg));
 	AddDerivedRow(TEXT("STAT_INFO_DODGE"), FormatStatInfoPercentLabel(DerivedStats.Dodge));

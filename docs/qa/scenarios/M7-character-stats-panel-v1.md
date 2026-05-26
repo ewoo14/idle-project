@@ -4,7 +4,7 @@
 
 - C++ Canvas HUD character stat info toggle and panel.
 - Final primary stats: STR/DEX/INT/WIS/CON/LUK from `GetCurrentPrimaryStats()`.
-- Final derived stats: HP, physical attack, magic attack, physical defense,
+- Final derived stats: HP, MP, physical attack, magic attack, physical defense,
   magic defense, attack speed, crit rate, crit damage, dodge, and accuracy
   from `GetCurrentDerivedStats()`.
 - Header context: class, current level, and rebirth count.
@@ -56,10 +56,10 @@ been folded into `GetCurrentDerivedStats()`.
 
 When the stat info ViewModel is built.
 
-Then HP, physical attack, magic attack, physical defense, and magic defense
+Then HP, MP, physical attack, magic attack, physical defense, and magic defense
 are rounded as integers.
 
-And attack speed is shown with two decimals.
+And attack speed is shown as a percentage.
 
 And crit rate, dodge, and accuracy are shown as percentages.
 

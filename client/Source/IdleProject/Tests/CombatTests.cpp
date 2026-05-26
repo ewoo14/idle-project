@@ -7,10 +7,12 @@
 #include "CombatSystem/SkillComponent.h"
 #include "CombatSystem/StatusElementTypes.h"
 #include "CharacterSystem/IdleCharacter.h"
+#include "CharacterSystem/LevelFormulas.h"
 #include "BossSpecialAttackTestReceiver.h"
 #include "Components/SceneComponent.h"
 #include "DamageReceivedTestReceiver.h"
 #include "Engine/World.h"
+#include "GameCore/IdleGameInstance.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
@@ -1125,6 +1127,24 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+
+	GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+	GameInstance->MarkChapter1BossDefeated();
+	TestTrue(TEXT("Test setup rebirths once"), GameInstance->Rebirth());
+	GameInstance->LevelUp();
+	GameInstance->LevelUp();
+	GameInstance->GrantStatPoints(2);
+	TestTrue(TEXT("Allocated STR setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Str));
+	TestTrue(TEXT("Allocated INT setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Int));
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
@@ -1136,10 +1156,15 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 	}
 
 	Character->SetClassId(EClassId::Mage);
-	Character->HandleLevelUp(10);
 
-	const FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Mage, 10);
-	FDerivedStats ExpectedDerived = FStatFormulas::DeriveStats(ExpectedPrimary, 10);
+	FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Mage, GameInstance->GetCharacterLevel());
+	ExpectedPrimary.Str += 1.0f;
+	ExpectedPrimary.Int_ += 1.0f;
+	FDerivedStats ExpectedDerived = FStatFormulas::DeriveStats(
+		ExpectedPrimary,
+		GameInstance->GetCharacterLevel(),
+		FDerivedStats(),
+		GameInstance->GetRebirthBonusPoints());
 	const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
 	if (Skills)
 	{
@@ -1149,7 +1174,7 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
 	const UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>();
 
-	TestEqual(TEXT("Current level exposes clamped character level"), Character->GetCurrentLevel(), 10);
+	TestEqual(TEXT("Current level exposes game instance progression level"), Character->GetCurrentLevel(), GameInstance->GetCharacterLevel());
 	TestNotNull(TEXT("Skill component exists"), Skills);
 	TestEqual(TEXT("Current primary STR mirrors refreshed stats"), CurrentPrimary.Str, ExpectedPrimary.Str);
 	TestEqual(TEXT("Current primary INT mirrors refreshed stats"), CurrentPrimary.Int_, ExpectedPrimary.Int_);

@@ -129,12 +129,18 @@ bool FStatInfoHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Header includes class, level, and rebirth count"), ViewModel.HeaderLabel.ToString(), FString(TEXT("Mage  Lv. 42  Rebirth 3")));
 	TestEqual(TEXT("Stat info exposes six primary rows"), ViewModel.PrimaryRows.Num(), 6);
 	TestEqual(TEXT("Primary INT maps to FPrimaryStats::Int_"), ViewModel.PrimaryRows[2].ValueLabel.ToString(), FString(TEXT("7")));
-	TestEqual(TEXT("Stat info exposes ten derived rows"), ViewModel.DerivedRows.Num(), 10);
+	TestEqual(TEXT("Stat info exposes eleven derived rows"), ViewModel.DerivedRows.Num(), 11);
+	if (ViewModel.DerivedRows.Num() < 11)
+	{
+		IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+		return false;
+	}
 	TestEqual(TEXT("HP rounds to an integer"), ViewModel.DerivedRows[0].ValueLabel.ToString(), FString(TEXT("234")));
-	TestEqual(TEXT("Attack speed keeps two decimals"), ViewModel.DerivedRows[5].ValueLabel.ToString(), FString(TEXT("1.25")));
-	TestEqual(TEXT("Crit rate formats as percent"), ViewModel.DerivedRows[6].ValueLabel.ToString(), FString(TEXT("12%")));
-	TestEqual(TEXT("Crit damage formats as multiplier"), ViewModel.DerivedRows[7].ValueLabel.ToString(), FString(TEXT("x1.75")));
-	TestEqual(TEXT("Accuracy formats as percent"), ViewModel.DerivedRows[9].ValueLabel.ToString(), FString(TEXT("96%")));
+	TestEqual(TEXT("MP rounds to an integer"), ViewModel.DerivedRows[1].ValueLabel.ToString(), FString(TEXT("88")));
+	TestEqual(TEXT("Attack speed formats as percent"), ViewModel.DerivedRows[6].ValueLabel.ToString(), FString(TEXT("125%")));
+	TestEqual(TEXT("Crit rate formats as percent"), ViewModel.DerivedRows[7].ValueLabel.ToString(), FString(TEXT("12%")));
+	TestEqual(TEXT("Crit damage formats as multiplier"), ViewModel.DerivedRows[8].ValueLabel.ToString(), FString(TEXT("x1.75")));
+	TestEqual(TEXT("Accuracy formats as percent"), ViewModel.DerivedRows[10].ValueLabel.ToString(), FString(TEXT("96%")));
 	TestEqual(TEXT("Toggle hitbox name is stable"), ViewModel.ToggleHitBoxName, FName(TEXT("StatInfoToggle")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
