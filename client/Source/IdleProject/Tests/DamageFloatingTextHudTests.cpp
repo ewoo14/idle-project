@@ -30,7 +30,8 @@ bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 
 	const FIdleHUDStageViewModel NormalView = BuildStageViewModel(NormalStage);
 	TestEqual(TEXT("Stage title is localized"), NormalView.TitleLabel.ToString(), FString(TEXT("Stage")));
-	TestEqual(TEXT("Stage progress includes chapter, stage, and kills"), NormalView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 7/10")));
+	TestEqual(TEXT("Chapter label is localized separately"), NormalView.ChapterLabel.ToString(), FString(TEXT("Chapter 1")));
+	TestEqual(TEXT("Stage progress includes stage and kills"), NormalView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 7/10")));
 	TestEqual(TEXT("Normal stage omits boss badge"), NormalView.BossBadgeLabel.ToString(), FString());
 	TestEqual(TEXT("Weak element is localized"), NormalView.WeaknessLabel.ToString(), FString(TEXT("Weak: Ice")));
 	TestEqual(TEXT("Progress ratio is clamped from kills"), NormalView.ProgressRatio, 0.7f);
@@ -64,6 +65,41 @@ bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 	const FIdleHUDStageViewModel OverflowView = BuildStageViewModel(OverflowStage);
 	TestEqual(TEXT("Overflow stage progress is displayed as reported"), OverflowView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 14/10")));
 	TestEqual(TEXT("Overflow stage progress ratio is clamped"), OverflowView.ProgressRatio, 1.0f);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageChapterFeedbackHudViewModelTest,
+	"IdleProject.UI.HUD.StageChapterFeedbackViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageChapterFeedbackHudViewModelTest::RunTest(const FString& Parameters)
+{
+	using namespace IdleProject::UI;
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	FStageInfo ChapterTwoStage;
+	ChapterTwoStage.Chapter = 2;
+	ChapterTwoStage.Stage = 3;
+	ChapterTwoStage.KillsThisStage = 6;
+	ChapterTwoStage.KillsToAdvance = 12;
+	ChapterTwoStage.WeakElement = ESkillElement::Ice;
+
+	const FIdleHUDStageViewModel ChapterTwoView = BuildStageViewModel(ChapterTwoStage);
+	TestEqual(TEXT("Chapter two label is localized"), ChapterTwoView.ChapterLabel.ToString(), FString(TEXT("Chapter 2")));
+	TestEqual(TEXT("Chapter two progress preserves stage coordinate"), ChapterTwoView.ProgressLabel.ToString(), FString(TEXT("Stage 2-3 6/12")));
+
+	FStageInfo LightningStage = ChapterTwoStage;
+	LightningStage.Stage = 2;
+	LightningStage.WeakElement = ESkillElement::Lightning;
+	const FIdleHUDStageViewModel LightningView = BuildStageViewModel(LightningStage);
+	TestEqual(TEXT("Lightning weakness is localized"), LightningView.WeaknessLabel.ToString(), FString(TEXT("Weak: Lightning")));
+
+	TestEqual(TEXT("Chapter entry feedback is localized"), BuildChapterEntryFeedbackLabel(2).ToString(), FString(TEXT("Chapter 2 Enter")));
+	TestEqual(TEXT("Chapter clear feedback is localized"), BuildChapterClearFeedbackLabel(2).ToString(), FString(TEXT("Chapter 2 Cleared")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
