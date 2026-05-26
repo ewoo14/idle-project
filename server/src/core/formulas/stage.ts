@@ -5,7 +5,10 @@ export type StageElement = SkillElement;
 export const DEFAULT_STAGES_PER_CHAPTER = 5;
 
 export function computeMonsterStatMultiplier(globalStageIndex: number): number {
-  return 1 + Math.max(0, globalStageIndex) * 0.15;
+  const clampedIndex = Math.max(0, globalStageIndex);
+  return Math.fround(
+    Math.fround(1) + Math.fround(Math.fround(clampedIndex) * Math.fround(0.15)),
+  );
 }
 
 export function computeRewardMultiplier(globalStageIndex: number): number {

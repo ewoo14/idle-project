@@ -11,6 +11,16 @@ import {
   OFFLINE_EFFICIENCY,
 } from "../../server/src/core/formulas/offline.js";
 import {
+  BOSS_REWARD_BONUS,
+  computeKillExp,
+  computeKillGold,
+} from "../../server/src/core/formulas/reward.js";
+import {
+  computeMonsterStatMultiplier,
+  computeRewardMultiplier,
+  DEFAULT_STAGES_PER_CHAPTER,
+} from "../../server/src/core/formulas/stage.js";
+import {
   type ClassId,
   defaultPrimaryStats,
   deriveStats,
@@ -34,6 +44,11 @@ export type SimulationSample = {
   bossSeconds: number;
   expPerHourAtLevel50: number;
   goldPerHourAtLevel50: number;
+  level50StageIndex: number;
+  normalKillExpAtLevel50: number;
+  normalKillGoldAtLevel50: number;
+  bossKillExpAtLevel50: number;
+  bossKillGoldAtLevel50: number;
 };
 
 export type DistributionSummary = {
@@ -74,10 +89,22 @@ export type BalanceReport = {
       targetLevel: number;
       bossIncluded: boolean;
       formulas: string[];
+      rewardScaling: StageRewardComparison[];
     };
     distribution: SimulationDistribution;
     evaluation: BalanceEvaluation;
   };
+};
+
+export type StageRewardComparison = {
+  stage: string;
+  globalStageIndex: number;
+  monsterHpMultiplier: number;
+  rewardMultiplier: number;
+  normalExp: number;
+  normalGold: string;
+  bossExp: number;
+  bossGold: string;
 };
 
 const DEFAULT_RUNS = 1000;
@@ -152,7 +179,10 @@ export function buildBalanceReport(
         "server/src/core/formulas/combat.ts",
         "server/src/core/formulas/stats.ts",
         "server/src/core/formulas/offline.ts",
+        "server/src/core/formulas/reward.ts",
+        "server/src/core/formulas/stage.ts",
       ],
+      rewardScaling: buildStageRewardComparison(1),
     },
     distribution,
     evaluation,
@@ -198,8 +228,9 @@ function simulateRun(
 
   for (let level = 1; level < targetLevel; level += 1) {
     const requiredExp = expToNext(level);
+    const stageIndex = representativeStageIndex(level, targetLevel);
     const expPerSecond =
-      blendedExpPerSecond(level, classId, {
+      blendedExpPerSecond(level, stageIndex, classId, {
         activeShare,
         equipmentMultiplier,
         questMultiplier,
@@ -209,9 +240,15 @@ function simulateRun(
   }
 
   const bossSeconds = includeBoss
-    ? bossClearSeconds(targetLevel, classId, equipmentMultiplier)
+    ? bossClearSeconds(
+        targetLevel,
+        representativeStageIndex(targetLevel, targetLevel),
+        classId,
+        equipmentMultiplier,
+      )
     : 0;
   seconds += bossSeconds;
+  const level50StageIndex = representativeStageIndex(50, targetLevel);
 
   return {
     run,
@@ -223,7 +260,7 @@ function simulateRun(
     hoursToTarget: round(seconds / 3_600, 3),
     bossSeconds: round(bossSeconds, 1),
     expPerHourAtLevel50: Math.round(
-      blendedExpPerSecond(50, classId, {
+      blendedExpPerSecond(50, level50StageIndex, classId, {
         activeShare,
         equipmentMultiplier,
         questMultiplier,
@@ -231,18 +268,40 @@ function simulateRun(
       }) * 3_600,
     ),
     goldPerHourAtLevel50: Math.round(
-      blendedGoldPerSecond(50, classId, {
+      blendedGoldPerSecond(50, level50StageIndex, classId, {
         activeShare,
         equipmentMultiplier,
         questMultiplier,
         offlineEfficiency,
       }) * 3_600,
     ),
+    level50StageIndex,
+    normalKillExpAtLevel50: computeKillExp(
+      baseKillExp(50),
+      level50StageIndex,
+      false,
+    ),
+    normalKillGoldAtLevel50: computeKillGold(
+      baseKillGold(50),
+      level50StageIndex,
+      false,
+    ),
+    bossKillExpAtLevel50: computeKillExp(
+      baseKillExp(50),
+      level50StageIndex,
+      true,
+    ),
+    bossKillGoldAtLevel50: computeKillGold(
+      baseKillGold(50),
+      level50StageIndex,
+      true,
+    ),
   };
 }
 
 function blendedExpPerSecond(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   modifiers: {
     activeShare: number;
@@ -253,6 +312,7 @@ function blendedExpPerSecond(
 ): number {
   const active = activeExpPerSecond(
     level,
+    stageIndex,
     classId,
     modifiers.equipmentMultiplier,
   );
@@ -273,6 +333,7 @@ function blendedExpPerSecond(
 
 function blendedGoldPerSecond(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   modifiers: {
     activeShare: number;
@@ -283,6 +344,7 @@ function blendedGoldPerSecond(
 ): number {
   const active = activeGoldPerSecond(
     level,
+    stageIndex,
     classId,
     modifiers.equipmentMultiplier,
   );
@@ -300,37 +362,50 @@ function blendedGoldPerSecond(
 
 function activeExpPerSecond(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   equipmentMultiplier: number,
 ): number {
   const killsPerSecond = estimatedKillsPerSecond(
     level,
+    stageIndex,
     classId,
     equipmentMultiplier,
   );
-  return level * 12 * killsPerSecond * ACTIVE_EXP_TUNING;
+  return (
+    computeKillExp(baseKillExp(level), stageIndex, false) *
+    killsPerSecond *
+    ACTIVE_EXP_TUNING
+  );
 }
 
 function activeGoldPerSecond(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   equipmentMultiplier: number,
 ): number {
   const killsPerSecond = estimatedKillsPerSecond(
     level,
+    stageIndex,
     classId,
     equipmentMultiplier,
   );
-  return level * 8 * killsPerSecond * ACTIVE_GOLD_TUNING;
+  return (
+    computeKillGold(baseKillGold(level), stageIndex, false) *
+    killsPerSecond *
+    ACTIVE_GOLD_TUNING
+  );
 }
 
 function estimatedKillsPerSecond(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   equipmentMultiplier: number,
 ): number {
   const dps = playerDps(level, classId, equipmentMultiplier);
-  return Math.max(0.05, dps / monsterHp(level));
+  return Math.max(0.05, dps / monsterHp(level, stageIndex));
 }
 
 function playerDps(
@@ -351,15 +426,18 @@ function playerDps(
 
 function bossClearSeconds(
   level: number,
+  stageIndex: number,
   classId: ClassId,
   equipmentMultiplier: number,
 ): number {
-  const bossHp = monsterHp(level) * BOSS_HP_MULTIPLIER;
+  const bossHp = monsterHp(level, stageIndex) * BOSS_HP_MULTIPLIER;
   return bossHp / playerDps(level, classId, equipmentMultiplier);
 }
 
-function monsterHp(level: number): number {
-  return Math.round(level * 80 * 1.08 ** level);
+function monsterHp(level: number, stageIndex: number): number {
+  return Math.round(
+    level * 80 * 1.08 ** level * computeMonsterStatMultiplier(stageIndex),
+  );
 }
 
 function monsterDef(level: number): number {
@@ -370,6 +448,60 @@ function rebirthRamp(level: number): number {
   const progress =
     cumulativeExp(level) / Math.max(1, cumulativeExp(TARGET_LEVEL));
   return 1 + progress * 0.18;
+}
+
+function representativeStageIndex(level: number, targetLevel: number): number {
+  const normalizedProgress = Math.max(0, Math.min(level - 1, targetLevel - 1));
+  return Math.min(
+    DEFAULT_STAGES_PER_CHAPTER - 1,
+    Math.floor((normalizedProgress / targetLevel) * DEFAULT_STAGES_PER_CHAPTER),
+  );
+}
+
+function baseKillExp(level: number): number {
+  return level * 12;
+}
+
+function baseKillGold(level: number): number {
+  return level * 8;
+}
+
+function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
+  const baseGoldMin = 10;
+  const baseGoldMax = 15;
+  return Array.from(
+    { length: DEFAULT_STAGES_PER_CHAPTER },
+    (_, stageOffset) => {
+      const globalStageIndex =
+        (chapter - 1) * DEFAULT_STAGES_PER_CHAPTER + stageOffset;
+      const baseExp = baseKillExp(1);
+      const normalGoldMin = computeKillGold(
+        baseGoldMin,
+        globalStageIndex,
+        false,
+      );
+      const normalGoldMax = computeKillGold(
+        baseGoldMax,
+        globalStageIndex,
+        false,
+      );
+      const bossGoldMin = computeKillGold(baseGoldMin, globalStageIndex, true);
+      const bossGoldMax = computeKillGold(baseGoldMax, globalStageIndex, true);
+      return {
+        stage: `${chapter}-${stageOffset + 1}`,
+        globalStageIndex,
+        monsterHpMultiplier: round(
+          computeMonsterStatMultiplier(globalStageIndex),
+          3,
+        ),
+        rewardMultiplier: round(computeRewardMultiplier(globalStageIndex), 3),
+        normalExp: computeKillExp(baseExp, globalStageIndex, false),
+        normalGold: `${normalGoldMin}-${normalGoldMax}`,
+        bossExp: computeKillExp(baseExp, globalStageIndex, true),
+        bossGold: `${bossGoldMin}-${bossGoldMax}`,
+      };
+    },
+  );
 }
 
 function summarizeSamples(
@@ -405,22 +537,22 @@ function percentile(sortedValues: number[], rank: number): number {
 function buildRecommendations(status: BalanceEvaluation["status"]): string[] {
   if (status === "too-fast") {
     return [
-      "EXP curve: raise expToNext exponent toward 1.85-2.0 before touching combat coefficients.",
-      "gold per hour: reduce active gold tuning by 5-10% if enhancement pressure is too light.",
-      "offline efficiency: keep below active play and test 0.70-0.75 if p10 remains under 3h.",
+      "EXP curve: consider exponent 1.85-2.0 before combat tuning.",
+      "gold per hour: reduce active gold tuning by 5-10% if spend is light.",
+      "offline efficiency: test 0.70-0.75 if p10 drops under 3h.",
     ];
   }
   if (status === "too-slow") {
     return [
-      "EXP curve: keep exponent at 1.7 and avoid moving toward 1.85-2.0 until median returns below 10h.",
-      "gold per hour: increase early gold tuning by 5-10% before reducing enhancement costs.",
-      "offline efficiency: allow 0.75-0.80 only if active play remains clearly faster.",
+      "EXP curve: keep exponent 1.7 until median returns below 10h.",
+      "gold per hour: raise early tuning 5-10% before lowering costs.",
+      "offline efficiency: allow 0.75-0.80 only if active stays faster.",
     ];
   }
   return [
-    "EXP curve: keep the current level.ts curve; do not apply the 1.85-2.0 exponent increase yet.",
-    "gold per hour: keep active gold tuning stable and watch enhancement spend in the next slice.",
-    "offline efficiency: current 70-80% sampling keeps idle rewards below active progress.",
+    "EXP curve: keep current level.ts curve; do not raise exponent yet.",
+    "gold per hour: keep active tuning stable; watch enhancement spend.",
+    "offline efficiency: 70-80% keeps idle below active progress.",
   ];
 }
 
@@ -446,10 +578,28 @@ function renderMarkdown(report: BalanceReport["json"]): string {
       (recommendation) => `- ${recommendation}`,
     ),
     "",
+    "## Reward Scaling",
+    "",
+    `- Boss bonus: ${BOSS_REWARD_BONUS}x`,
+    "- Normal kill rewards use `computeKillExp` / `computeKillGold`.",
+    "- Source: `server/src/core/formulas/reward.ts`.",
+    "- Monster HP and reward multipliers both reuse the stage index ramp.",
+    "- Result: 1-1 through 1-5 keep reward-per-HP pressure stable before boss bonuses.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.rewardScaling.map(
+      (row) =>
+        `| ${row.stage} | ${row.globalStageIndex} | ${row.monsterHpMultiplier} | ${row.rewardMultiplier} | ${row.normalExp} | ${row.normalGold} | ${row.bossExp} | ${row.bossGold} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
     "## Formula Sources",
     "",
     ...report.model.formulas.map((source) => `- ${source}`),
-    "",
   ];
   return `${lines.join("\n")}\n`;
 }

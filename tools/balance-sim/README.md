@@ -29,10 +29,17 @@ the rule source:
 - `server/src/core/formulas/combat.ts`
 - `server/src/core/formulas/stats.ts`
 - `server/src/core/formulas/offline.ts`
+- `server/src/core/formulas/reward.ts`
+- `server/src/core/formulas/stage.ts`
 
 Each run samples class, active play share, equipment multiplier, quest EXP
 variance, and offline efficiency. The summary reports p10, median, p90, and
 min/max hours to reach Lv100 and clear the boss.
+
+PR #32 adds kill reward scaling to the model. Active kill EXP and gold now call
+`computeKillExp` / `computeKillGold`, and the same global stage index ramp
+drives monster HP and kill rewards. The Chapter 1 comparison table in the
+generated report is the review artifact for reward-vs-HP scaling.
 
 ## V1 Interpretation
 
@@ -51,12 +58,14 @@ current production formulas against the rebirth target in
 
 Seed `23`, 1000 runs:
 
-- p10: 6.074h
-- median: 6.529h
-- p90: 6.979h
-- min/max: 5.853h / 7.184h
+- p10: 4.9h
+- median: 5.324h
+- p90: 5.758h
+- min/max: 4.582h / 6.128h
 
 The median is inside the 5-10h target and the full distribution is inside the
 3-20h acceptable range, so this slice keeps the current EXP curve unchanged.
-The sensitivity recommendation is to monitor enhancement gold pressure in the
-next balance slice before changing combat or EXP coefficients.
+BossBonus remains 8x and the stage reward multiplier remains
+`1 + globalStageIndex * 0.15`. The sensitivity recommendation is to monitor
+enhancement gold pressure in the next balance slice before changing combat or
+EXP coefficients.

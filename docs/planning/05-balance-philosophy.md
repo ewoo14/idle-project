@@ -508,6 +508,7 @@ Automation coverage:
   the effective damage coefficient in `TickSkills`/damage application.
 - `IdleProject.Character.LevelUp.GrantsSkillPoint` verifies the character
   level-up handler grants one skill point.
+
 ---
 
 ## PR #31 스테이지 진행 V1 수치
@@ -527,3 +528,58 @@ Automation coverage:
 1-5 보스 처치 시 `MarkChapter1BossDefeated()`와 연계해 환생 조건의
 "챕터 1 보스 격파" 플래그를 세운다. V1은 다음 챕터 전환 없이 1-5 클리어
 상태를 유지한다.
+<!-- markdownlint-disable MD003 MD026 -->
+
+---
+
+<!-- markdownlint-enable MD003 MD026 -->
+
+## PR #32 Kill Reward Scaling V1 Result
+
+Kill EXP and gold now scale with the same stage progression ramp used by
+monster HP/ATK:
+
+```text
+RewardMultiplier(globalStageIndex) = 1 + globalStageIndex * 0.15
+KillReward = round(baseReward * RewardMultiplier * (isBoss ? 8 : 1))
+MonsterDropLevel = 1 + globalStageIndex
+```
+
+Chapter 1 uses global stage indexes 0 through 4:
+
+<!-- markdownlint-disable MD013 -->
+
+| Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1-1 | 0 | 1.00 | 1.00 | 12 | 10-15 | 96 | 80-120 |
+| 1-2 | 1 | 1.15 | 1.15 | 14 | 11-17 | 110 | 92-138 |
+| 1-3 | 2 | 1.30 | 1.30 | 16 | 13-19 | 125 | 104-156 |
+| 1-4 | 3 | 1.45 | 1.45 | 17 | 15-22 | 139 | 116-174 |
+| 1-5 | 4 | 1.60 | 1.60 | 19 | 16-24 | 154 | 128-192 |
+
+<!-- markdownlint-enable MD013 -->
+
+Because HP and normal rewards share the same `1 + idx * 0.15` ramp, normal
+reward-per-HP pressure stays stable across 1-1 to 1-5. The 8x boss bonus is the
+intentional spike for stage cap clears and should be reviewed separately from
+normal farm pacing.
+
+Gold ranges mirror the current client drop baseline, `10 + RandRange(0, 5)`,
+before pet gold bonuses are applied. Equipment drop level remains
+`1 + globalStageIndex`, so stage 1-1 drops level 1 items and stage 1-5 drops
+level 5 items.
+
+PR #32 simulator result, seed `23`, 1000 runs:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.900 |
+| median | 5.324 |
+| p90 | 5.758 |
+| min | 4.582 |
+| max | 6.128 |
+
+The median remains inside the 5-10h first-rebirth target, and every sampled run
+remains inside the 3-20h review band. No EXP curve change is applied in this
+slice. Keep BossBonus at 8x and re-run `npm run balance:sim` after enhancement
+spend or Chapter 2 reward data changes.

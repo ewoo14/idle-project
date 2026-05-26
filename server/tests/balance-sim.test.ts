@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildBalanceReport,
   evaluateBalance,
+  type SimulationSample,
   simulateRebirthDistribution,
 } from "../../tools/balance-sim/index.js";
+import {
+  computeKillExp,
+  computeKillGold,
+} from "../src/core/formulas/reward.js";
 
 describe("balance simulator", () => {
   it("produces a deterministic 1000-run rebirth distribution", () => {
@@ -42,5 +47,41 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("median");
     expect(report.markdown).toContain("Sensitivity");
     expect(report.markdown).toContain("EXP curve");
+  });
+
+  it("samples kill rewards through the shared stage reward formula", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1, seed: 23 });
+    const sample = distribution.samples[0] as SimulationSample & {
+      level50StageIndex?: number;
+      normalKillExpAtLevel50?: number;
+      normalKillGoldAtLevel50?: number;
+      bossKillExpAtLevel50?: number;
+      bossKillGoldAtLevel50?: number;
+    };
+
+    expect(sample.level50StageIndex).toBe(2);
+    expect(sample.normalKillExpAtLevel50).toBe(
+      computeKillExp(50 * 12, 2, false),
+    );
+    expect(sample.normalKillGoldAtLevel50).toBe(
+      computeKillGold(50 * 8, 2, false),
+    );
+    expect(sample.bossKillExpAtLevel50).toBe(computeKillExp(50 * 12, 2, true));
+    expect(sample.bossKillGoldAtLevel50).toBe(computeKillGold(50 * 8, 2, true));
+  });
+
+  it("documents reward scaling against monster HP scaling in the report", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/reward.ts",
+    );
+    expect(report.markdown).toContain("## Reward Scaling");
+    expect(report.markdown).toContain("1-5");
+    expect(report.markdown).toContain("Boss bonus: 8x");
+    expect(report.markdown).toContain(
+      "| 1-1 | 0 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
+    );
   });
 });

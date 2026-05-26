@@ -80,3 +80,16 @@
 - **[칭찬]**: 좋은 사례 강조. 학습 공유.
 
 TM 종합 시 **블로커는 0개** 가 머지 조건.
+
+---
+
+## PR #32 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes 1000-run
+  p10/median/p90 and min/max first-rebirth hours.
+- [ ] Report confirms median is inside 5-10h and every sampled run is inside
+  the 3-20h review band.
+- [ ] Reward scaling table compares Stage 1-1 through 1-5 HP multiplier,
+  reward multiplier, normal rewards, and 8x boss rewards.
+- [ ] Simulator imports `reward.ts` and `stage.ts` rather than duplicating
+  kill reward or stage multiplier constants.

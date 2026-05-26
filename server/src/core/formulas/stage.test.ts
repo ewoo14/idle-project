@@ -13,9 +13,10 @@ describe("stage formulas", () => {
   it.each([
     { globalStageIndex: -1, expectedMultiplier: 1 },
     { globalStageIndex: 0, expectedMultiplier: 1 },
-    { globalStageIndex: 2, expectedMultiplier: 1.3 },
-    { globalStageIndex: 3, expectedMultiplier: 1.45 },
-    { globalStageIndex: 4, expectedMultiplier: 1.6 },
+    { globalStageIndex: 1, expectedMultiplier: 1.149999976158142 },
+    { globalStageIndex: 2, expectedMultiplier: 1.2999999523162842 },
+    { globalStageIndex: 3, expectedMultiplier: 1.4500000476837158 },
+    { globalStageIndex: 4, expectedMultiplier: 1.600000023841858 },
   ])("mirrors client monster stat multiplier for global stage index $globalStageIndex", ({
     globalStageIndex,
     expectedMultiplier,
