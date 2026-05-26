@@ -786,12 +786,24 @@ EnhanceCost = 100 * (CurrentLevel + 1)^2 * RarityCostMultiplier
 | Epic | 8 |
 | Legendary | 16 |
 
-The single-argument client/server helper remains Common-compatible so existing
-Common anchors keep their PR #33 values. Equipped-item enhancement and the HUD
-panel must pass the actual equipped rarity. A Rare +0 attempt costs 400 gold,
-and a Legendary +0 attempt costs 1,600 gold; max-level items still cost 0.
-Success rates, failure behavior, and the `1 + EnhanceLevel * 0.1` stat payoff do
-not change in this slice.
+The design intent is to keep Common enhancement as the low-friction early-game
+path while making high-rarity gear a deliberate gold sink. The single-argument
+client/server helper remains Common-compatible so existing Common anchors keep
+their PR #33 values. Equipped-item enhancement and the HUD panel must pass the
+actual equipped rarity. A Rare +0 attempt costs 400 gold, and a Legendary +0
+attempt costs 1,600 gold; max-level items still cost 0. Success rates, failure
+behavior, and the `1 + EnhanceLevel * 0.1` stat payoff do not change in this
+slice.
+
+Side effects to monitor:
+
+- Early Common gear should remain at the PR #33 cost curve with no new onboarding
+  tax.
+- Rare+ items can fail the gold gate even when the player has enough gold for a
+  Common item at the same level; HUD cost display and `TryEnhanceEquipped` spend
+  must use the same rarity.
+- Legendary enhancement creates meaningful midgame/endgame pressure, but the
+  repeatable PR #38 shop remains the broader surplus-gold outlet.
 
 Pressure check using the PR #33 expected Common +0 to +5 cost of 11,020.66 gold:
 a single Legendary item costs 176,330.51 expected gold, and eight Legendary

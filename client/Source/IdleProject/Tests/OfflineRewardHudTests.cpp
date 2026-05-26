@@ -144,10 +144,10 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	Inventory->AddItem(MakeHudTestItem(TEXT("iron_sword"), EItemSlot::Weapon, EItemRarity::Rare, 12.0f, 0.0f, 0.0f, 2));
 	Inventory->AddItem(MakeHudTestItem(TEXT("training_helmet"), EItemSlot::Helmet, EItemRarity::Common, 0.0f, 3.0f, 15.0f, FEnhanceFormula::MaxEnhanceLevel));
 
-	const FIdleHUDEnhancePanelViewModel ViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
+	const FIdleHUDEnhancePanelViewModel ViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 4000, FText::GetEmpty(), false);
 	TestEqual(TEXT("Enhance panel title uses localized copy"), ViewModel.Title.ToString(), FString(TEXT("Enhancement")));
 	TestEqual(TEXT("Enhance panel shows all equipment slots"), ViewModel.Rows.Num(), 8);
-	TestEqual(TEXT("Panel gold label exposes current gold"), ViewModel.GoldLabel.ToString(), FString(TEXT("Gold 1,000")));
+	TestEqual(TEXT("Panel gold label exposes current gold"), ViewModel.GoldLabel.ToString(), FString(TEXT("Gold 4,000")));
 
 	const FIdleHUDEnhanceSlotViewModel& WeaponRow = ViewModel.Rows[0];
 	TestEqual(TEXT("Weapon row targets weapon slot"), WeaponRow.Slot, EItemSlot::Weapon);
@@ -155,8 +155,8 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weapon row rarity label is localized"), WeaponRow.RarityLabel.ToString(), FString(TEXT("Rare")));
 	TestEqual(TEXT("Weapon row rarity color uses rare theme"), WeaponRow.RarityColor, IdleProject::UI::Theme::RarityRare);
 	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / +5")));
-	TestEqual(TEXT("Weapon next cost follows formula"), WeaponRow.Cost, static_cast<int64>(900));
-	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 900")));
+	TestEqual(TEXT("Weapon next cost follows rarity-scaled formula"), WeaponRow.Cost, static_cast<int64>(3600));
+	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 3,600")));
 	TestEqual(TEXT("Weapon success rate follows formula"), WeaponRow.SuccessRate, 0.70f);
 	TestEqual(TEXT("Weapon success label is localized"), WeaponRow.SuccessRateLabel.ToString(), FString(TEXT("Success 70%")));
 	TestTrue(TEXT("Enough gold and below max enables enhance"), WeaponRow.bCanEnhance);
@@ -180,7 +180,7 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 
 	const FIdleHUDEnhancePanelViewModel SuccessViewModel = IdleProject::UI::BuildEnhancePanelViewModel(
 		*Inventory,
-		1000,
+		4000,
 		FText::FromString(TEXT("Success +3")),
 		true);
 	TestEqual(TEXT("Feedback label is carried into view model"), SuccessViewModel.FeedbackLabel.ToString(), FString(TEXT("Success +3")));

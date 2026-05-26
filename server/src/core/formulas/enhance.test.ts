@@ -47,6 +47,18 @@ describe("enhance formulas", () => {
   });
 
   it.each([
+    ["Common", [100, 400, 900, 1600, 2500, 0]],
+    ["Uncommon", [200, 800, 1800, 3200, 5000, 0]],
+    ["Rare", [400, 1600, 3600, 6400, 10000, 0]],
+    ["Epic", [800, 3200, 7200, 12800, 20000, 0]],
+    ["Legendary", [1600, 6400, 14400, 25600, 40000, 0]],
+  ] as const)("matches the UE5 rarity-scaled cost table for %s", (rarity, expectedCosts) => {
+    for (const [currentLevel, expected] of expectedCosts.entries()) {
+      expect(getEnhanceCost(currentLevel, rarity)).toBe(expected);
+    }
+  });
+
+  it.each([
     [0, 0.95],
     [1, 0.85],
     [2, 0.7],
