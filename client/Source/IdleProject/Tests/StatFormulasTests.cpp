@@ -88,6 +88,13 @@ bool FStatFormulasDerivedTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Equipment attack speed affix increases final attack speed"), AffixDerived.AtkSpeed, 1.1f);
 	TestEqual(TEXT("Equipment magic attack affix increases final magic attack"), AffixDerived.MagicAtk, 13.0f);
 
+	FDerivedStats OversizedAffixBonus;
+	OversizedAffixBonus.CritRate = 3.0f;
+	OversizedAffixBonus.AtkSpeed = 9.0f;
+	const FDerivedStats ClampedAffixDerived = FStatFormulas::DeriveStats(WarriorLevel1, 1, OversizedAffixBonus);
+	TestEqual(TEXT("Equipment crit affix keeps final crit clamp"), ClampedAffixDerived.CritRate, 1.0f);
+	TestEqual(TEXT("Equipment attack speed affix keeps final attack speed clamp"), ClampedAffixDerived.AtkSpeed, 3.0f);
+
 	return true;
 }
 

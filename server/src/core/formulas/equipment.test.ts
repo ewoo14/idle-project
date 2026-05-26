@@ -87,6 +87,30 @@ const clientServerEquipmentAnchors = [
     },
   },
   {
+    name: "enhanced affix weapon",
+    item: {
+      itemId: "rare_affix_weapon",
+      slot: 1,
+      rarity: 3,
+      bonusAtk: 10,
+      bonusDef: 0,
+      bonusHp: 0,
+      bonusCritRate: 0.02,
+      bonusAtkSpeed: 0.1,
+      bonusMagicAtk: 5,
+      enhanceLevel: 2,
+    } satisfies ItemInstance,
+    clientPowerScore: 54,
+    clientBonus: {
+      bonusAtk: 12,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0.024,
+      atkSpeed: 0.12,
+      magicAtk: 6,
+    },
+  },
+  {
     name: "empty top low stats",
     item: {
       itemId: "common_top",

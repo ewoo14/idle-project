@@ -97,4 +97,29 @@ describe("stats formulas", () => {
       deriveStats(primary, 42, { magicAtk: 7 }),
     );
   });
+  it("applies affix equipment bonuses and keeps final clamps", () => {
+    const primary = defaultPrimaryStats(1, 1);
+
+    expect(
+      deriveStats(primary, 1, {
+        critRate: 0.02,
+        atkSpeed: 0.1,
+        magicAtk: 5,
+      }),
+    ).toMatchObject({
+      critRate: 0.028,
+      atkSpeed: 1.1,
+      magicAtk: 13,
+    });
+
+    expect(
+      deriveStats(primary, 1, {
+        critRate: 3,
+        atkSpeed: 9,
+      }),
+    ).toMatchObject({
+      critRate: 1,
+      atkSpeed: 3,
+    });
+  });
 });

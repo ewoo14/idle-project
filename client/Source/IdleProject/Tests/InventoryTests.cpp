@@ -29,6 +29,38 @@ FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, flo
 	Item.BonusMagicAtk = MagicAtk;
 	return Item;
 }
+
+int32 CountAffixes(const FItemInstance& Item)
+{
+	return (Item.BonusCritRate > 0.0f ? 1 : 0)
+		+ (Item.BonusAtkSpeed > 0.0f ? 1 : 0)
+		+ (Item.BonusMagicAtk > 0.0f ? 1 : 0);
+}
+
+void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, const FItemInstance& Item)
+{
+	const int32 AffixCount = CountAffixes(Item);
+	switch (Item.Rarity)
+	{
+	case EItemRarity::Common:
+		Test.TestEqual(FString::Printf(TEXT("%s Common has no affixes"), Context), AffixCount, 0);
+		break;
+	case EItemRarity::Uncommon:
+	case EItemRarity::Rare:
+		Test.TestEqual(FString::Printf(TEXT("%s Uncommon/Rare has one affix"), Context), AffixCount, 1);
+		break;
+	case EItemRarity::Epic:
+		Test.TestEqual(FString::Printf(TEXT("%s Epic has two affixes"), Context), AffixCount, 2);
+		break;
+	case EItemRarity::Legendary:
+		Test.TestTrue(FString::Printf(TEXT("%s Legendary has two or three affixes"), Context), AffixCount >= 2 && AffixCount <= 3);
+		break;
+	case EItemRarity::None:
+	default:
+		Test.TestEqual(FString::Printf(TEXT("%s None has no affixes"), Context), AffixCount, 0);
+		break;
+	}
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -142,6 +174,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 {
 	FItemInstance Common = MakeTestItem(TEXT("common_sword"), EItemSlot::Weapon, EItemRarity::Common, 1.0f, 0.0f, 0.0f);
+	Common.BonusCritRate = 0.05f;
+	Common.BonusAtkSpeed = 0.15f;
+	Common.BonusMagicAtk = 30.0f;
 	FRandomStream CommonRng(4001);
 	FDropFormula::RollAffixes(Common.Rarity, 20, CommonRng, Common);
 	TestEqual(TEXT("Common items roll no crit affix"), Common.BonusCritRate, 0.0f);
@@ -149,21 +184,18 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Common items roll no magic affix"), Common.BonusMagicAtk, 0.0f);
 
 	FItemInstance Uncommon = MakeTestItem(TEXT("uncommon_sword"), EItemSlot::Weapon, EItemRarity::Uncommon, 1.0f, 0.0f, 0.0f);
+	Uncommon.BonusCritRate = 0.05f;
+	Uncommon.BonusAtkSpeed = 0.15f;
+	Uncommon.BonusMagicAtk = 30.0f;
 	FRandomStream UncommonRng(4001);
 	FDropFormula::RollAffixes(Uncommon.Rarity, 20, UncommonRng, Uncommon);
-	const int32 UncommonAffixCount =
-		(Uncommon.BonusCritRate > 0.0f ? 1 : 0) +
-		(Uncommon.BonusAtkSpeed > 0.0f ? 1 : 0) +
-		(Uncommon.BonusMagicAtk > 0.0f ? 1 : 0);
+	const int32 UncommonAffixCount = CountAffixes(Uncommon);
 	TestEqual(TEXT("Uncommon rolls one affix"), UncommonAffixCount, 1);
 
 	FItemInstance Epic = MakeTestItem(TEXT("epic_sword"), EItemSlot::Weapon, EItemRarity::Epic, 1.0f, 0.0f, 0.0f);
 	FRandomStream EpicRng(4002);
 	FDropFormula::RollAffixes(Epic.Rarity, 20, EpicRng, Epic);
-	const int32 EpicAffixCount =
-		(Epic.BonusCritRate > 0.0f ? 1 : 0) +
-		(Epic.BonusAtkSpeed > 0.0f ? 1 : 0) +
-		(Epic.BonusMagicAtk > 0.0f ? 1 : 0);
+	const int32 EpicAffixCount = CountAffixes(Epic);
 	TestEqual(TEXT("Epic rolls two unique affixes"), EpicAffixCount, 2);
 	TestTrue(TEXT("Crit affix stays in range when present"), Epic.BonusCritRate == 0.0f || (Epic.BonusCritRate >= 0.01f && Epic.BonusCritRate <= 0.05f));
 	TestTrue(TEXT("Attack speed affix stays in range when present"), Epic.BonusAtkSpeed == 0.0f || (Epic.BonusAtkSpeed >= 0.05f && Epic.BonusAtkSpeed <= 0.15f));
@@ -175,10 +207,7 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	FRandomStream LegendaryRngB(4003);
 	FDropFormula::RollAffixes(LegendaryA.Rarity, 20, LegendaryRngA, LegendaryA);
 	FDropFormula::RollAffixes(LegendaryB.Rarity, 20, LegendaryRngB, LegendaryB);
-	const int32 LegendaryAffixCount =
-		(LegendaryA.BonusCritRate > 0.0f ? 1 : 0) +
-		(LegendaryA.BonusAtkSpeed > 0.0f ? 1 : 0) +
-		(LegendaryA.BonusMagicAtk > 0.0f ? 1 : 0);
+	const int32 LegendaryAffixCount = CountAffixes(LegendaryA);
 	TestTrue(TEXT("Legendary rolls two or three affixes"), LegendaryAffixCount >= 2 && LegendaryAffixCount <= 3);
 	TestEqual(TEXT("Legendary roll is deterministic for crit"), LegendaryA.BonusCritRate, LegendaryB.BonusCritRate);
 	TestEqual(TEXT("Legendary roll is deterministic for speed"), LegendaryA.BonusAtkSpeed, LegendaryB.BonusAtkSpeed);
@@ -509,6 +538,7 @@ bool FItemFactoryRandomDropRangeTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("슬롯 범위"), Drop.Slot >= EItemSlot::Weapon && Drop.Slot <= EItemSlot::Accessory);
 		TestTrue(TEXT("보너스 중 하나 이상"), Drop.BonusAtk > 0.0f || Drop.BonusDef > 0.0f || Drop.BonusHp > 0.0f);
 		TestEqual(TEXT("드롭 강화 기본값"), Drop.EnhanceLevel, 0);
+		TestAffixCountForRarity(*this, TEXT("RandomDropFromMonster"), Drop);
 	}
 
 	return true;
@@ -529,6 +559,7 @@ bool FItemFactoryHighLevelDropIncludesExpandedRarityTest::RunTest(const FString&
 		{
 			bFoundEpicOrLegendary = true;
 			TestTrue(TEXT("Epic+ drop carries scaled stats"), FItemPowerScore::Compute(Drop) > 0);
+			TestAffixCountForRarity(*this, TEXT("High-level random drop"), Drop);
 			break;
 		}
 	}

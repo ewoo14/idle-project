@@ -117,6 +117,25 @@ describe("drop formulas", () => {
     });
   });
 
+  it("keeps one-affix rarity rolls unique without stale affix carryover", () => {
+    const rolls = [0.99, 0.99, 0.5];
+    const rng = () => rolls.shift() ?? 0;
+    const affixes = rollAffixes("Uncommon", 20, rng);
+    const affixCount = [
+      affixes.bonusCritRate,
+      affixes.bonusAtkSpeed,
+      affixes.bonusMagicAtk,
+    ].filter((value) => value > 0).length;
+
+    expect(affixCount).toBe(1);
+    expect(affixes.bonusCritRate).toBeGreaterThanOrEqual(0);
+    expect(affixes.bonusCritRate).toBeLessThanOrEqual(0.05);
+    expect(affixes.bonusAtkSpeed).toBeGreaterThanOrEqual(0);
+    expect(affixes.bonusAtkSpeed).toBeLessThanOrEqual(0.15);
+    expect(affixes.bonusMagicAtk).toBeGreaterThanOrEqual(0);
+    expect(affixes.bonusMagicAtk).toBeLessThanOrEqual(30);
+  });
+
   it("rolls unique deterministic affixes with client ranges and rounding", () => {
     const rolls = [0.5, 0, 0.99, 0.5, 0.5, 0.5];
     const rng = () => rolls.shift() ?? 0;

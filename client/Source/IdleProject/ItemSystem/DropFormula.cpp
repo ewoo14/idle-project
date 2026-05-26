@@ -133,6 +133,10 @@ FItemInstance FDropFormula::ComputeItemBonus(EItemSlot Slot, int32 Level, EItemR
 
 void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& Rng, FItemInstance& OutItem)
 {
+	OutItem.BonusCritRate = 0.0f;
+	OutItem.BonusAtkSpeed = 0.0f;
+	OutItem.BonusMagicAtk = 0.0f;
+
 	const int32 AffixCount = GetAffixCount(Rarity, Rng);
 	if (AffixCount <= 0)
 	{

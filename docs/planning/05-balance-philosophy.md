@@ -846,27 +846,36 @@ V1 affix types:
 | --- | ---: |
 | CritRate | +0.01 to +0.05 |
 | AtkSpeed | +0.05 to +0.15 |
-| MagicAtk | round(Level * 0.5 to Level * 1.5) |
+| MagicAtk | round(Level times 0.5 to Level times 1.5) |
 
-`FDropFormula::RollAffixes` uses an injected `FRandomStream` and picks unique
-affix types per item. `UInventoryComponent::ComputeEquipmentBonus` applies the
-same `1 + EnhanceLevel * 0.1` multiplier to affix bonuses as to ATK/DEF/HP,
-then `FStatFormulas::DeriveStats` keeps the existing final clamps: AtkSpeed
-0.5-3.0 and CritRate 0-1.
+`FDropFormula::RollAffixes` uses an injected `FRandomStream`, clears previous
+affix fields before every roll, and picks unique affix types per item. Common
+and None therefore always resolve to zero affixes even if an item instance is
+reused by a test, reroll, or future shop path. `UInventoryComponent::ComputeEquipmentBonus`
+applies the same `1 + EnhanceLevel * 0.1` multiplier to affix bonuses as to
+ATK/DEF/HP, then `FStatFormulas::DeriveStats` keeps the existing final clamps:
+AtkSpeed 0.5-3.0 and CritRate 0-1.
 
 PowerScore now values affixes before enhancement:
 
 ```text
-PowerScore = round((ATK + DEF + HP / 10 + CritRate * 1000 + AtkSpeed * 100 + MagicAtk)
-  * (1 + EnhanceLevel * 0.1))
+PowerScore = round((ATK + DEF + HP / 10 + CritRate times 1000 + AtkSpeed times 100 + MagicAtk)
+  times (1 + EnhanceLevel times 0.1))
 ```
 
 Automation coverage:
 
 - `IdleProject.Inventory.DropFormula.RollAffixes`
+- `IdleProject.Inventory.ItemFactory.RandomDropRange`
+- `IdleProject.Inventory.ItemFactory.HighLevelExpandedRarity`
 - `IdleProject.Inventory.Bonus.Affixes`
 - `IdleProject.Inventory.ItemPowerScore.Deterministic`
 - `IdleProject.Character.StatFormulas.DeriveStats`
+
+HUD copy stays compact and scan-friendly: only positive affixes are shown, in
+CritRate / AtkSpeed / MagicAtk order, using localized labels such as
+`Crit +3% / ASPD +0.10 / MATK +12`. Prefix/suffix names, reroll currencies,
+potential lines, set effects, and additional affix types remain follow-up scope.
 
 ## PR #35 Boss Patterns V1
 
