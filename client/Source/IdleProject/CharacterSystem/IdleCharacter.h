@@ -123,6 +123,9 @@ private:
 	void HandleEquippedChanged(EItemSlot Slot);
 
 	UFUNCTION()
+	void HandleStatPointsChanged();
+
+	UFUNCTION()
 	void HandleHpChanged(float NewHp);
 
 	UFUNCTION()

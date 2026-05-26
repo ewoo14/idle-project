@@ -114,6 +114,7 @@ void AIdleCharacter::BeginPlay()
 	if (UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
 	{
 		IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleCharacter::HandleLevelUp);
+		IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleCharacter::HandleStatPointsChanged);
 	}
 }
 
@@ -145,10 +146,21 @@ void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 void AIdleCharacter::RefreshDerivedStats()
 {
-	const FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
+	FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
 	const FDerivedStats EquipBonus = Inventory ? Inventory->ComputeEquipmentBonus() : FDerivedStats();
 	const UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>();
 	const int32 RebirthBonusPoints = IdleGameInstance ? IdleGameInstance->GetRebirthBonusPoints() : 0;
+	if (IdleGameInstance)
+	{
+		const FPrimaryStats Allocated = IdleGameInstance->GetAllocatedPrimaryStats();
+		Primary.Str += Allocated.Str;
+		Primary.Dex += Allocated.Dex;
+		Primary.Int_ += Allocated.Int_;
+		Primary.Wis += Allocated.Wis;
+		Primary.Con += Allocated.Con;
+		Primary.Luk += Allocated.Luk;
+	}
+
 	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus, RebirthBonusPoints);
 	if (Skills)
 	{
@@ -210,6 +222,11 @@ void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)
 	RefreshDerivedStats();
 }
 
+void AIdleCharacter::HandleStatPointsChanged()
+{
+	RefreshDerivedStats();
+}
+
 void AIdleCharacter::HandleHpChanged(float NewHp)
 {
 	if (Facial && NewHp < LastObservedHp)
@@ -230,6 +247,9 @@ void AIdleCharacter::HandleDeath(AActor* DyingActor)
 
 void AIdleCharacter::HandleLevelUp(int32 NewLevel)
 {
+	Level = FMath::Max(1, NewLevel);
+	RefreshDerivedStats();
+
 	if (Skills)
 	{
 		Skills->GrantSkillPoint(1);

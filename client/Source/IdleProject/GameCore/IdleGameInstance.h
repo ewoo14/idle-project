@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "CharacterSystem/StatFormulas.h"
+#include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -16,6 +18,7 @@ class UInventoryComponent;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatPointsChanged);
 
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FEnhanceAttemptResult
@@ -89,6 +92,21 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void LevelUp();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Stats")
+	void GrantStatPoints(int32 Points);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Stats")
+	bool AllocateStatPoint(EPrimaryStat Stat);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Stats")
+	void ResetStatPoints();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	FPrimaryStats GetAllocatedPrimaryStats() const { return AllocatedStats; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	int32 GetAvailableStatPoints() const { return AvailableStatPoints; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
 	bool CanRebirth() const;
@@ -190,6 +208,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
 	FOnLevelUp OnLevelUp;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Stats")
+	FOnStatPointsChanged OnStatPointsChanged;
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Enhance")
 	FOnEnhanceResult OnEnhanceResult;
 
@@ -233,6 +254,12 @@ private:
 
 	UPROPERTY()
 	int32 RebirthBonusPoints = 0;
+
+	UPROPERTY()
+	int32 AvailableStatPoints = 0;
+
+	UPROPERTY()
+	FPrimaryStats AllocatedStats;
 
 	UPROPERTY()
 	bool bChapter1BossDefeated = false;
