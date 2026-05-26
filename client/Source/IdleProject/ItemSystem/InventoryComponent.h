@@ -19,7 +19,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Inventory")
 	FOnEquippedChanged OnEquippedChanged;
 
-	void AddItem(const FItemInstance& NewItem);
+	bool AddItem(const FItemInstance& NewItem);
+	bool CanAddItem(const FItemInstance& NewItem) const;
+	int32 GetItemCount() const { return Items.Num(); }
 	void EquipItem(int32 ItemIndex);
 	void UnequipSlot(EItemSlot Slot);
 	FDerivedStats ComputeEquipmentBonus() const;

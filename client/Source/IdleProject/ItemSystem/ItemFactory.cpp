@@ -83,16 +83,19 @@ FString GetSlotNoun(EItemSlot Slot)
 		return TEXT("장비");
 	}
 }
-}
 
-FItemInstance FItemFactory::RandomDropFromMonster(int32 MonsterLevel)
+FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem)
 {
-	const int32 SafeLevel = FMath::Max(MonsterLevel, 1);
+	const int32 SafeLevel = FMath::Max(Level, 1);
 	FRandomStream RarityRng(FMath::Rand());
-	const EItemRarity Rarity = FDropFormula::RollRarityForLevel(SafeLevel, RarityRng);
+	EItemRarity Rarity = FDropFormula::RollRarityForLevel(SafeLevel, RarityRng);
 	if (Rarity == EItemRarity::None)
 	{
-		return FItemInstance();
+		if (!bGuaranteeItem)
+		{
+			return FItemInstance();
+		}
+		Rarity = EItemRarity::Common;
 	}
 
 	const EItemSlot Slot = RollSlot();
@@ -102,4 +105,15 @@ FItemInstance FItemFactory::RandomDropFromMonster(int32 MonsterLevel)
 	Item.ItemId = FName(*FString::Printf(TEXT("%s_%s_L%d"), *UEnum::GetValueAsString(Rarity), *UEnum::GetValueAsString(Slot), SafeLevel));
 
 	return Item;
+}
+}
+
+FItemInstance FItemFactory::RandomDropFromMonster(int32 MonsterLevel)
+{
+	return BuildDropForLevel(MonsterLevel, false);
+}
+
+FItemInstance FItemFactory::GuaranteedDropForLevel(int32 Level)
+{
+	return BuildDropForLevel(Level, true);
 }

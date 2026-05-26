@@ -16,11 +16,21 @@ UInventoryComponent::UInventoryComponent()
 	EquippedIndex.Add(EItemSlot::Accessory, INDEX_NONE);
 }
 
-void UInventoryComponent::AddItem(const FItemInstance& NewItem)
+bool UInventoryComponent::CanAddItem(const FItemInstance& NewItem) const
 {
 	if (Items.Num() >= MaxItems || NewItem.Slot == EItemSlot::None || NewItem.Rarity == EItemRarity::None)
 	{
-		return;
+		return false;
+	}
+
+	return true;
+}
+
+bool UInventoryComponent::AddItem(const FItemInstance& NewItem)
+{
+	if (!CanAddItem(NewItem))
+	{
+		return false;
 	}
 
 	const int32 NewIndex = Items.Add(NewItem);
@@ -29,6 +39,7 @@ void UInventoryComponent::AddItem(const FItemInstance& NewItem)
 	{
 		EquipItem(NewIndex);
 	}
+	return true;
 }
 
 void UInventoryComponent::EquipItem(int32 ItemIndex)

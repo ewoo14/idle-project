@@ -1,11 +1,14 @@
 #include "GameCore/IdleGameInstance.h"
 
 #include "CharacterSystem/LevelFormulas.h"
+#include "GameCore/RewardFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
 
 void UIdleGameInstance::Init()
@@ -121,6 +124,48 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 
 	RecordGearEnhanced();
 	OnEnhanceResult.Broadcast(Result);
+	return Result;
+}
+
+FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll()
+{
+	return TryBuyGearRoll(FindPlayerInventory());
+}
+
+FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inventory)
+{
+	FShopPurchaseResult Result;
+	if (!Inventory)
+	{
+		OnShopPurchase.Broadcast(Result);
+		return Result;
+	}
+
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const int64 Cost = FShopFormula::GetGearRollCost(GlobalStageIndex);
+	if (Cost <= 0 || Gold < Cost)
+	{
+		OnShopPurchase.Broadcast(Result);
+		return Result;
+	}
+
+	const int32 MonsterLevel = FRewardFormula::GetMonsterLevelForStage(GlobalStageIndex);
+	const FItemInstance Item = FItemFactory::GuaranteedDropForLevel(MonsterLevel);
+	if (!Inventory->CanAddItem(Item))
+	{
+		OnShopPurchase.Broadcast(Result);
+		return Result;
+	}
+
+	AddGold(-Cost);
+	Inventory->AddItem(Item);
+
+	Result.bPurchased = true;
+	Result.GoldSpent = Cost;
+	Result.Rarity = Item.Rarity;
+	Result.Slot = Item.Slot;
+	Result.ItemName = Item.DisplayName;
+	OnShopPurchase.Broadcast(Result);
 	return Result;
 }
 
