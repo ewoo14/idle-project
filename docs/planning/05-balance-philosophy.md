@@ -484,22 +484,26 @@ change.
 
 ## PR #33 Equipment Enhancement V1
 
-Client V1 uses a conservative gold sink for the existing `EnhanceLevel` 0..5
-equipment multiplier.
+Client V1 now uses a long-tail gold sink for the existing `EnhanceLevel`
+equipment multiplier, expanded from 0..5 to 0..50 in PR #44.
 
 | Current level | Cost | Success rate |
 | ---: | ---: | ---: |
 | 0 | 100 | 95% |
-| 1 | 400 | 85% |
-| 2 | 900 | 70% |
-| 3 | 1600 | 55% |
-| 4 | 2500 | 40% |
-| 5 | 0 | 0% |
+| 1 | 400 | 93.2% |
+| 4 | 2500 | 87.8% |
+| 10 | 12100 | 77% |
+| 25 | 67600 | 50% |
+| 40 | 168100 | 23% |
+| 49 | 250000 | 6.8% |
+| 50 | 0 | 0% |
 
-The cost formula is `100 * (CurrentLevel + 1)^2` before max level. Failure
-does not destroy or downgrade equipment in V1; it consumes the attempt cost and
-records enhancement quest progress. The stat payoff remains the existing
-`1 + EnhanceLevel * 0.1` equipment bonus multiplier.
+The cost formula is `100 * (CurrentLevel + 1)^2` before max level. The success
+curve is `clamp(0.95 - CurrentLevel * 0.018, 0.05, 0.95)`, with level 50
+returning 0 because there is no next enhancement. Failure does not destroy or
+downgrade equipment in V1; it consumes the attempt cost and records enhancement
+quest progress. The stat payoff remains the existing `1 + EnhanceLevel * 0.1`
+equipment bonus multiplier, making Lv50 equipment apply a 6.0x multiplier.
 
 Sensitivity notes:
 
@@ -509,14 +513,12 @@ Sensitivity notes:
 - Offline efficiency: current sampled 70-80% band keeps idle progress below
   active play while staying relevant.
 - Simulator pressure check: the deterministic 1000-run balance report imports
-  `server/src/core/formulas/enhance.ts` and models +0 to +5 enhancement spend.
-  The minimum all-success cost is 5,500 gold, while expected cost using
-  `cost / successRate` is 11,020.66 gold. Against the sampled median Lv50
-  active/idle blended gold rate, a single +0 to +5 path is only about 0.017h
-  of income. Treat this as a baseline pressure check, not evidence that V1 is
-  a meaningful midgame sink. V1 deliberately avoids blocking first rebirth;
-  later slices should raise pressure through higher-level cost bands, material
-  requirements, or repeated-slot enhancement demand after real gold telemetry.
+  `server/src/core/formulas/enhance.ts` and models +0 to +50 enhancement spend.
+  The minimum all-success cost is 4,292,500 gold, while expected cost using
+  `cost / successRate` is 22,717,602.91 gold. Against the sampled median Lv50
+  active/idle blended gold rate, a single Common +0 to +50 path is about 34.7h
+  of income. Treat this as the first long-tail gold sink baseline; high-rarity
+  and multi-slot enhancement intentionally extend beyond first-rebirth pacing.
 - Reward parity check: PR #32 reward scaling remains aligned with monster HP
   scaling because both use `1 + globalStageIndex * 0.15`. Chapter 1 normal
   reward-per-HP pressure stays stable across 1-1 to 1-5; the 8x boss reward
@@ -558,8 +560,8 @@ Parity anchors:
   armor DEF `0.7` / HP `3.0`, accessory ATK `0.5` / DEF `0.3` / HP `2.0`.
 - Lv100 variance `1.0` produces base bonuses of Rare `170`, Epic `230`, and
   Legendary `320` before slot split.
-- Enhancement remains a separate #33 multiplier. A Legendary Lv100 weapon at
-  +5 has PowerScore `round(320 * 1.5) = 480`; rarity does not bypass the
+- Enhancement remains a separate #33/#44 multiplier. A Legendary Lv100 weapon
+  at +50 has PowerScore `round(320 * 6.0) = 1920`; rarity does not bypass the
   existing `EnhanceLevel` formula.
 - Server `drop.ts` intentionally uses `Math.fround` at the same public formula
   boundaries as client `float` arithmetic so parity tests can compare exact
@@ -754,9 +756,9 @@ Representative costs:
 
 Pressure check against PR #33:
 
-- Enhancement remains a light single-item sink: expected +0 to +5 cost is
-  11,020.66 gold, or 0.017h at the sampled median Lv50 blended income of
-  654,689 gold/hour.
+- Enhancement is now a long-tail single-item sink: expected Common +0 to +50
+  cost is 22,717,602.91 gold, or 34.7h at the sampled median Lv50 blended
+  income of 654,689 gold/hour.
 - At that same sampled income, the V1 shop can absorb about 2,182 rolls/hour
   at idx 0, 1,364 rolls/hour at idx 4, or 929 rolls/hour at idx 9 if the player
   repeatedly buys gear.
@@ -791,9 +793,9 @@ path while making high-rarity gear a deliberate gold sink. The single-argument
 client/server helper remains Common-compatible so existing Common anchors keep
 their PR #33 values. Equipped-item enhancement and the HUD panel must pass the
 actual equipped rarity. A Rare +0 attempt costs 400 gold, and a Legendary +0
-attempt costs 1,600 gold; max-level items still cost 0. Success rates, failure
-behavior, and the `1 + EnhanceLevel * 0.1` stat payoff do not change in this
-slice.
+attempt costs 1,600 gold; max-level items still cost 0. PR #44 updates the
+success-rate curve and max level, while failure behavior and the
+`1 + EnhanceLevel * 0.1` stat payoff remain intact.
 
 Side effects to monitor:
 
@@ -805,22 +807,23 @@ Side effects to monitor:
 - Legendary enhancement creates meaningful midgame/endgame pressure, but the
   repeatable PR #38 shop remains the broader surplus-gold outlet.
 
-Pressure check using the PR #33 expected Common +0 to +5 cost of 11,020.66 gold:
-a single Legendary item costs 176,330.51 expected gold, and eight Legendary
-slots cost 1,410,644.08 expected gold. Against the sampled PR #33 median Lv50
-blended income of 654,689 gold/hour, that full Legendary pass is about 2.155h
-of income. Common early enhancement remains unchanged while high-rarity
-enhancement becomes a visible midgame/endgame sink alongside the repeatable
-shop roll outlet from PR #38.
+Pressure check using the PR #44 expected Common +0 to +50 cost of
+22,717,602.91 gold: a single Legendary item costs 363,481,646.52 expected gold,
+and eight Legendary slots cost 2,907,853,172.16 expected gold. Against the
+sampled PR #33 median Lv50 blended income of 654,689 gold/hour, that full
+Legendary pass is about 4441.579h of income. Common early enhancement still
+starts at the PR #33 cost curve while high-rarity enhancement becomes an
+open-ended midgame/endgame sink alongside the repeatable shop roll outlet from
+PR #38.
 
 The balance simulator reports these rarity scenarios:
 
-| Rarity | Multiplier | Minimum +0 to +5 gold | Expected +0 to +5 gold |
+| Rarity | Multiplier | Minimum +0 to +50 gold | Expected +0 to +50 gold |
 | --- | ---: | ---: | ---: |
-| Common | 1 | 5,500 | 11,020.66 |
-| Rare | 4 | 22,000 | 44,082.63 |
-| Epic | 8 | 44,000 | 88,165.25 |
-| Legendary | 16 | 88,000 | 176,330.51 |
+| Common | 1 | 4,292,500 | 22,717,602.91 |
+| Rare | 4 | 17,170,000 | 90,870,411.63 |
+| Epic | 8 | 34,340,000 | 181,740,823.26 |
+| Legendary | 16 | 68,680,000 | 363,481,646.52 |
 
 ## PR #40 Item Affix V1
 

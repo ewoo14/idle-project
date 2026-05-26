@@ -9,7 +9,7 @@ import {
 
 describe("enhance formulas", () => {
   it("matches the UE5 max enhance level", () => {
-    expect(MAX_ENHANCE_LEVEL).toBe(5);
+    expect(MAX_ENHANCE_LEVEL).toBe(50);
   });
 
   it.each([
@@ -18,8 +18,10 @@ describe("enhance formulas", () => {
     [2, 900],
     [3, 1600],
     [4, 2500],
-    [5, 0],
-    [6, 0],
+    [5, 3600],
+    [49, 250000],
+    [50, 0],
+    [51, 0],
   ])("computes enhance cost for current level %i", (currentLevel, expected) => {
     expect(getEnhanceCost(currentLevel)).toBe(expected);
   });
@@ -52,22 +54,31 @@ describe("enhance formulas", () => {
     ["Rare", [400, 1600, 3600, 6400, 10000, 0]],
     ["Epic", [800, 3200, 7200, 12800, 20000, 0]],
     ["Legendary", [1600, 6400, 14400, 25600, 40000, 0]],
-  ] as const)("matches the UE5 rarity-scaled cost table for %s", (rarity, expectedCosts) => {
+  ] as const)("keeps the old +0 to +4 rarity-scaled cost table for %s", (rarity, expectedCosts) => {
     for (const [currentLevel, expected] of expectedCosts.entries()) {
-      expect(getEnhanceCost(currentLevel, rarity)).toBe(expected);
+      const level =
+        currentLevel === expectedCosts.length - 1 ? 50 : currentLevel;
+      expect(getEnhanceCost(level, rarity)).toBe(expected);
     }
+  });
+
+  it("applies rarity multiplier through level 49", () => {
+    expect(getEnhanceCost(49, "Common")).toBe(250000);
+    expect(getEnhanceCost(49, "Rare")).toBe(1000000);
+    expect(getEnhanceCost(49, "Legendary")).toBe(4000000);
   });
 
   it.each([
     [0, 0.95],
-    [1, 0.85],
-    [2, 0.7],
-    [3, 0.55],
-    [4, 0.4],
-    [5, 0],
-    [6, 0],
+    [4, 0.878],
+    [10, 0.77],
+    [25, 0.5],
+    [40, 0.23],
+    [49, 0.068],
+    [50, 0],
+    [51, 0],
   ])("computes enhance success rate for current level %i", (currentLevel, expected) => {
-    expect(getEnhanceSuccessRate(currentLevel)).toBe(expected);
+    expect(getEnhanceSuccessRate(currentLevel)).toBeCloseTo(expected, 6);
   });
 
   it("clamps negative levels to the level zero success rate", () => {

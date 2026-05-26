@@ -355,7 +355,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Max enhance level matches item clamp"), FEnhanceFormula::MaxEnhanceLevel, 5);
+	TestEqual(TEXT("Max enhance level matches item clamp"), FEnhanceFormula::MaxEnhanceLevel, 50);
 	TestEqual(TEXT("Level 0 cost"), FEnhanceFormula::GetEnhanceCost(0), static_cast<int64>(100));
 	TestEqual(TEXT("Level 1 cost"), FEnhanceFormula::GetEnhanceCost(1), static_cast<int64>(400));
 	TestEqual(TEXT("Negative level uses level 0 cost"), FEnhanceFormula::GetEnhanceCost(-1), static_cast<int64>(100));
@@ -374,9 +374,15 @@ bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rare level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Rare), static_cast<int64>(10000));
 	TestEqual(TEXT("Epic level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Epic), static_cast<int64>(20000));
 	TestEqual(TEXT("Legendary level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Legendary), static_cast<int64>(40000));
+	TestEqual(TEXT("Common level 49 cost reaches 50-level sink"), FEnhanceFormula::GetEnhanceCost(49), static_cast<int64>(250000));
+	TestEqual(TEXT("Legendary level 49 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(49, EItemRarity::Legendary), static_cast<int64>(4000000));
 
 	TestEqual(TEXT("Level 0 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(0), 0.95f);
-	TestEqual(TEXT("Level 4 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(4), 0.40f);
+	TestTrue(TEXT("Level 4 success rate remains on the 50-level curve"), FMath::IsNearlyEqual(FEnhanceFormula::GetEnhanceSuccessRate(4), 0.878f, 0.0001f));
+	TestTrue(TEXT("Level 10 success rate follows linear curve"), FMath::IsNearlyEqual(FEnhanceFormula::GetEnhanceSuccessRate(10), 0.77f, 0.0001f));
+	TestTrue(TEXT("Level 25 success rate reaches midpoint pressure"), FMath::IsNearlyEqual(FEnhanceFormula::GetEnhanceSuccessRate(25), 0.50f, 0.0001f));
+	TestTrue(TEXT("Level 40 success rate reaches high-level pressure"), FMath::IsNearlyEqual(FEnhanceFormula::GetEnhanceSuccessRate(40), 0.23f, 0.0001f));
+	TestTrue(TEXT("Level 49 success rate stays above floor"), FMath::IsNearlyEqual(FEnhanceFormula::GetEnhanceSuccessRate(49), 0.068f, 0.0001f));
 	TestEqual(TEXT("Max level success rate"), FEnhanceFormula::GetEnhanceSuccessRate(FEnhanceFormula::MaxEnhanceLevel), 0.0f);
 
 	FRandomStream AlwaysSucceeds(123);
@@ -450,6 +456,8 @@ bool FInventoryEnhanceEquippedItemTest::RunTest(const FString& Parameters)
 	}
 
 	TestEqual(TEXT("Enhance level reaches max"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel);
+	const FDerivedStats MaxBonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Lv50 enhanced item applies x6 equipment attack bonus"), MaxBonus.PhysAtk, 60.0f);
 	TestFalse(TEXT("Enhance fails at max level"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
 	TestFalse(TEXT("Enhance fails when slot is empty"), Inventory->EnhanceEquippedItem(EItemSlot::Helmet));
 

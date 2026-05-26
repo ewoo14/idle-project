@@ -103,14 +103,14 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 
 ## PR #33 Balance Checklist Addendum (Section 5)
 
-- [ ] Balance report includes enhancement spend pressure for +0 through +5:
+- [ ] Balance report includes enhancement spend pressure for +0 through +50:
   minimum all-success cost, expected cost using `cost / successRate`, and
   expected hours against sampled median Lv50 gold/hour.
 - [ ] Simulator imports `server/src/core/formulas/enhance.ts` rather than
   duplicating enhancement cost, success rate, or max-level constants.
-- [ ] `docs/planning/05-balance-philosophy.md` documents MaxLevel 5, the
-  `100 * (CurrentLevel + 1)^2` cost curve, success rates, no downgrade or
-  destruction on failure, and the `1 + EnhanceLevel * 0.1` stat payoff.
+- [ ] `docs/planning/05-balance-philosophy.md` documents MaxLevel 50, the
+  `100 * (CurrentLevel + 1)^2` cost curve, 50-level success-rate curve, no
+  downgrade or destruction on failure, and the `1 + EnhanceLevel * 0.1` stat payoff.
 - [ ] Reward-vs-HP parity remains documented for Stage 1-1 through 1-5, with
   the 8x boss reward bonus reviewed separately from normal farming.
 
@@ -123,8 +123,22 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   guards.
 - [ ] The HUD enhancement panel displays rarity-scaled cost for each equipped
   slot while Common remains compatible with the PR #33 cost curve.
-- [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +5 pressure
+- [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +50 pressure
   and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.
+
+## PR #44 Character Checklist Addendum (Section 4)
+
+- [ ] `FEnhanceFormula::MaxEnhanceLevel` and `FItemInstance.EnhanceLevel`
+  ClampMax are both 50.
+- [ ] `GetEnhanceSuccessRate` uses the deterministic 50-level curve
+  `clamp(0.95 - CurrentLevel * 0.018, 0.05, 0.95)`, with level 50 returning 0.
+- [ ] `GetEnhanceCost(CurrentLevel, Rarity)` keeps
+  `100 * (CurrentLevel + 1)^2 * RarityCostMultiplier` through level 49 and
+  returns 0 at level 50+.
+- [ ] `UInventoryComponent::ComputeEquipmentBonus` keeps
+  `1 + EnhanceLevel * 0.1`, so Lv50 equipment applies a 6.0x multiplier.
+- [ ] `TryEnhanceEquipped` and the HUD use `FEnhanceFormula::MaxEnhanceLevel`
+  rather than hard-coded 5-level assumptions.
 
 ## PR #42 Balance Checklist Addendum (Section 5)
 

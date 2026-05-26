@@ -1,4 +1,4 @@
-export const MAX_ENHANCE_LEVEL = 5;
+export const MAX_ENHANCE_LEVEL = 50;
 
 export type EnhanceItemRarity =
   | "None"
@@ -9,7 +9,9 @@ export type EnhanceItemRarity =
   | "Legendary";
 
 const BASE_ENHANCE_COST = 100;
-const ENHANCE_SUCCESS_RATES = [0.95, 0.85, 0.7, 0.55, 0.4] as const;
+const MAX_ENHANCE_SUCCESS_RATE = 0.95;
+const MIN_ENHANCE_SUCCESS_RATE = 0.05;
+const ENHANCE_SUCCESS_RATE_DECAY_PER_LEVEL = 0.018;
 
 export function getRarityCostMultiplier(rarity: EnhanceItemRarity): number {
   switch (rarity) {
@@ -53,7 +55,14 @@ export function getEnhanceSuccessRate(currentLevel: number): number {
     0,
     Math.min(currentLevel, MAX_ENHANCE_LEVEL - 1),
   );
-  return ENHANCE_SUCCESS_RATES[clampedLevel];
+  return Math.max(
+    MIN_ENHANCE_SUCCESS_RATE,
+    Math.min(
+      MAX_ENHANCE_SUCCESS_RATE,
+      MAX_ENHANCE_SUCCESS_RATE -
+        clampedLevel * ENHANCE_SUCCESS_RATE_DECAY_PER_LEVEL,
+    ),
+  );
 }
 
 export function rollEnhanceSuccess(
