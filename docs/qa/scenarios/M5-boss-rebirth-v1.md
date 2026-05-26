@@ -27,7 +27,7 @@ Given a level 100 character has defeated the Chapter 1 boss and has 1,234
 gold  
 When the player performs rebirth  
 Then `rebirthCount` increases by `1`  
-And `rebirthBonusPoints` increases by `5`  
+And the first Lv100 rebirth increases `rebirthBonusPoints` by `5`  
 And level resets to `1`  
 And EXP resets to `0`  
 And gold keeps `10%` rounded down  
@@ -85,6 +85,11 @@ When `PreviewRebirthReward()` returns the scaled reward for the next
 rebirth  
 Then the HUD uses that exact preview value instead of the legacy fixed `+5`
 copy.
+
+Given the player has four prior rebirths and reaches level 150  
+When the player performs rebirth  
+Then the applied reward is `18` points  
+And the pre-rebirth preview also reads `+18`.
 
 Automation: `client/Source/IdleProject/Tests/RebirthTests.cpp`,
 `client/Source/IdleProject/Tests/OfflineRewardHudTests.cpp`

@@ -19,6 +19,8 @@ bool FRebirthFormulaRewardTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fifth rebirth at level 100 adds count scaling"), FRebirthFormula::GetRebirthPointsReward(4, 100), static_cast<int32>(13));
 	TestEqual(TEXT("First rebirth at level 150 adds level scaling"), FRebirthFormula::GetRebirthPointsReward(0, 150), static_cast<int32>(10));
 	TestEqual(TEXT("Fifth rebirth at level 150 combines count and level scaling"), FRebirthFormula::GetRebirthPointsReward(4, 150), static_cast<int32>(18));
+	TestEqual(TEXT("Level 109 keeps the level 100 reward floor"), FRebirthFormula::GetRebirthPointsReward(0, 109), static_cast<int32>(5));
+	TestEqual(TEXT("Level 110 adds the first level bonus point"), FRebirthFormula::GetRebirthPointsReward(0, 110), static_cast<int32>(6));
 	TestEqual(TEXT("Negative inputs clamp to first level 100 reward"), FRebirthFormula::GetRebirthPointsReward(-1, 1), static_cast<int32>(5));
 
 	return true;
