@@ -265,17 +265,32 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	UPetService* Pets = NewObject<UPetService>();
 	Pets->InitializeDefaultPets();
 	TestTrue(TEXT("Dog is equipped for the pet HUD seed"), Pets->EquipPet(TEXT("dog")));
+	TestTrue(TEXT("Dog is fed once for the pet growth HUD seed"), Pets->FeedPet(TEXT("dog")));
+	for (int32 Level = 0; Level < FPetLevelFormula::MaxPetLevel; ++Level)
+	{
+		TestTrue(TEXT("Bird reaches max level for disabled feed state"), Pets->FeedPet(TEXT("bird")));
+	}
 
 	const FIdleHUDPetPanelViewModel PetPanel = IdleProject::UI::BuildPetPanelViewModel(
 		Pets->GetPetDefinitions(),
 		Pets->GetEquippedPetId(),
 		Pets->GetEquippedPetGoldBonusPercent(),
-		Pets->GetEquippedPetDropBonusPercent());
+		Pets->GetEquippedPetDropBonusPercent(),
+		2000,
+		[Pets](const FString& PetId)
+		{
+			return Pets->GetPetLevel(PetId);
+		});
 
 	TestEqual(TEXT("Pet HUD shows both V1 pets"), PetPanel.Rows.Num(), 2);
 	TestTrue(TEXT("Dog row is marked equipped"), PetPanel.Rows[0].bEquipped);
 	TestFalse(TEXT("Bird row is not equipped"), PetPanel.Rows[1].bEquipped);
-	TestTrue(TEXT("Equipped pet summary includes gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("20%")));
+	TestTrue(TEXT("Dog row shows level one"), PetPanel.Rows[0].LevelLabel.ToString().Contains(TEXT("1")));
+	TestTrue(TEXT("Dog row shows the next feed cost"), PetPanel.Rows[0].FeedCostLabel.ToString().Contains(TEXT("2,000")));
+	TestTrue(TEXT("Dog row can be fed when gold covers the next cost"), PetPanel.Rows[0].bCanFeed);
+	TestTrue(TEXT("Dog row exposes feed action label"), PetPanel.Rows[0].FeedActionLabel.ToString().Len() > 0);
+	TestTrue(TEXT("Bird row cannot be fed at max level"), PetPanel.Rows[1].bFeedDisabled);
+	TestTrue(TEXT("Equipped pet summary includes scaled gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("22%")));
 	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
 
 	USeasonService* Season = NewObject<USeasonService>();
