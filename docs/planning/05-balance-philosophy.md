@@ -372,3 +372,42 @@ Sensitivity notes:
   available.
 - Offline efficiency: current sampled 70-80% band keeps idle progress below
   active play while staying relevant.
+
+---
+
+## PR #27 Skill Rank Points V1 Anchors
+
+Skill rank points are a client-combat V1 progression layer, separate from stat
+points and rebirth points.
+
+Rules:
+
+- `AIdleCharacter::HandleLevelUp` grants `USkillComponent` exactly 1 skill
+  point per level-up event.
+- Each skill has an independent rank stored by `SkillId`.
+- `MaxRank` is 5.
+- `RankUpSkill(SkillId)` spends 1 skill point and increases that skill by 1
+  rank when the skill is loaded, points are available, and rank is below max.
+- Damage skills use
+  `effectiveDamageCoeff = baseDamageCoeff * (1 + rank * 0.10)`.
+- Cooldown lookups use
+  `effectiveCooldown = max(0.1, baseCooldown * (1 - rank * 0.05))` for skills
+  with positive base cooldown. Zero-cooldown skills stay zero.
+
+V1 policy:
+
+- Class switching keeps the global point/rank state in memory. A rank only
+  applies when its matching `SkillId` exists in the currently loaded skill set.
+- Rebirth-specific reset or preservation rules are deferred to a later slice.
+- No server persistence or formula mirror is shipped in this C++-only step.
+
+Automation coverage:
+
+- `IdleProject.Combat.Skills.RankPoints` verifies point grants, rank-up spend,
+  missing-skill rejection, no-point rejection, and max-rank clamp.
+- `IdleProject.Combat.Skills.RankEffectiveValues` verifies rank 2 damage and
+  cooldown effective values plus cooldown remaining/ratio routing.
+- `IdleProject.Combat.Skills.RankDamageApplication` verifies ranked damage uses
+  the effective damage coefficient in `TickSkills`/damage application.
+- `IdleProject.Character.LevelUp.GrantsSkillPoint` verifies the character
+  level-up handler grants one skill point.

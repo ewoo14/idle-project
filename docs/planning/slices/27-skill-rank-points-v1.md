@@ -52,3 +52,32 @@
 
 ## 7. 후속
 - 스킬 리스펙, 스킬 트리 선행 분기, 스킬별 고유 강화, 환생 전용 슬롯, 서버 persist/검증.
+
+---
+
+## 8. Codex Character Implementation Note
+
+Implemented in C++ for PR #27:
+
+- `USkillComponent`
+  - Adds `SkillRanks`, `SkillPoints`, and `MaxRank = 5`.
+  - Adds `GrantSkillPoint`, `GetSkillPoints`, `GetSkillRank`, `CanRankUp`,
+    `RankUpSkill`, `GetEffectiveDamageCoeff`, and `GetEffectiveCooldown`.
+  - Routes `IsReady`, `GetCooldownRemaining`, `GetCooldownRatio`, and damage
+    application through effective rank values.
+- `AIdleCharacter`
+  - `HandleLevelUp` grants 1 skill point to the attached skill component.
+
+Balance anchors:
+
+- Damage coefficient: `base * (1 + rank * 0.10)`.
+- Cooldown: zero stays zero; positive cooldown uses
+  `max(0.1, base * (1 - rank * 0.05))`.
+- V1 class switching keeps rank/point state in memory. Ranks only affect a skill
+  while that skill ID is loaded.
+- Rebirth reset/preservation and server persistence remain future work.
+
+Verification:
+
+- `Build.bat IdleProjectEditor Win64 Development -Project=client/IdleProject.uproject -WaitMutex`
+- `UnrealEditor-Cmd.exe client/IdleProject.uproject -unattended -nop4 -nosplash -NullRHI -ExecCmds="Automation RunTests IdleProject; Quit" -TestExit="Automation Test Queue Empty"`

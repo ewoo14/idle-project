@@ -150,10 +150,71 @@ float USkillComponent::GetCooldownRemaining(FName SkillId, float Now) const
 		return 0.0f;
 	}
 
-	return FMath::Max(0.0f, Skill->Cooldown - (Now - *LastCastTime));
+	const float EffectiveCooldown = GetEffectiveCooldown(SkillId);
+	return FMath::Max(0.0f, EffectiveCooldown - (Now - *LastCastTime));
 }
 
 float USkillComponent::GetCooldownRatio(FName SkillId, float Now) const
+{
+	const float EffectiveCooldown = GetEffectiveCooldown(SkillId);
+	if (EffectiveCooldown <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	return FMath::Clamp(GetCooldownRemaining(SkillId, Now) / EffectiveCooldown, 0.0f, 1.0f);
+}
+
+void USkillComponent::GrantSkillPoint(int32 Amount)
+{
+	if (Amount <= 0)
+	{
+		return;
+	}
+
+	SkillPoints += Amount;
+}
+
+int32 USkillComponent::GetSkillPoints() const
+{
+	return SkillPoints;
+}
+
+int32 USkillComponent::GetSkillRank(FName SkillId) const
+{
+	const int32* Rank = SkillRanks.Find(SkillId);
+	return Rank ? FMath::Clamp(*Rank, 0, MaxRank) : 0;
+}
+
+bool USkillComponent::CanRankUp(FName SkillId) const
+{
+	return SkillPoints > 0 && FindSkill(SkillId) && GetSkillRank(SkillId) < MaxRank;
+}
+
+bool USkillComponent::RankUpSkill(FName SkillId)
+{
+	if (!CanRankUp(SkillId))
+	{
+		return false;
+	}
+
+	SkillRanks.FindOrAdd(SkillId) = GetSkillRank(SkillId) + 1;
+	--SkillPoints;
+	return true;
+}
+
+float USkillComponent::GetEffectiveDamageCoeff(FName SkillId) const
+{
+	const FSkillDefinition* Skill = FindSkill(SkillId);
+	if (!Skill)
+	{
+		return 0.0f;
+	}
+
+	return Skill->DamageCoeff * (1.0f + static_cast<float>(GetSkillRank(SkillId)) * 0.1f);
+}
+
+float USkillComponent::GetEffectiveCooldown(FName SkillId) const
 {
 	const FSkillDefinition* Skill = FindSkill(SkillId);
 	if (!Skill || Skill->Cooldown <= 0.0f)
@@ -161,7 +222,8 @@ float USkillComponent::GetCooldownRatio(FName SkillId, float Now) const
 		return 0.0f;
 	}
 
-	return FMath::Clamp(GetCooldownRemaining(SkillId, Now) / Skill->Cooldown, 0.0f, 1.0f);
+	const float ReducedCooldown = Skill->Cooldown * (1.0f - static_cast<float>(GetSkillRank(SkillId)) * 0.05f);
+	return FMath::Max(0.1f, ReducedCooldown);
 }
 
 bool USkillComponent::MarkSkillCast(FName SkillId, float Now)
@@ -351,9 +413,10 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 	const bool bMagicDamage = Skill.ClassId == EClassId::Mage;
 	const float AttackPower = bMagicDamage ? OwnerCombat->MagicAtk : OwnerCombat->Atk;
 	const float Defense = bMagicDamage ? TargetCombat->MagicDef : TargetCombat->Def;
+	const float EffectiveDamageCoeff = GetEffectiveDamageCoeff(Skill.SkillId);
 	const float BaseDamage = bMagicDamage
-		? FCombatFormulas::ComputeMagicDamage(AttackPower * Skill.DamageCoeff, Defense)
-		: FCombatFormulas::ComputeDamage(AttackPower * Skill.DamageCoeff, Defense);
+		? FCombatFormulas::ComputeMagicDamage(AttackPower * EffectiveDamageCoeff, Defense)
+		: FCombatFormulas::ComputeDamage(AttackPower * EffectiveDamageCoeff, Defense);
 	const float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, OwnerCombat->RollCrit(), OwnerCombat->CritDmg);
 
 	TargetCombat->TakeDamage(FinalDamage, GetOwner());

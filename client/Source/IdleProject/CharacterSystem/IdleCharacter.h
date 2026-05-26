@@ -45,6 +45,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Class")
 	EClassId GetClassId() const;
 
+	UFUNCTION()
+	void HandleLevelUp(int32 NewLevel);
+
 protected:
 	/** 횡스크롤 카메라 거리와 충돌 처리를 담당합니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Camera")
@@ -124,9 +127,6 @@ private:
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);
-
-	UFUNCTION()
-	void HandleLevelUp(int32 NewLevel);
 
 	void ConfigureInputActions();
 	void RegisterDefaultMappingContext();

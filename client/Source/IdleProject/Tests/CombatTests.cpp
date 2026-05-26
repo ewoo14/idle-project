@@ -269,6 +269,130 @@ bool FSkillCooldownTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillRankPointsTest,
+	"IdleProject.Combat.Skills.RankPoints",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillRankPointsTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	const FName HeavyStrike(TEXT("heavy_strike"));
+	TestEqual(TEXT("Initial skill points are zero"), Skills->GetSkillPoints(), static_cast<int32>(0));
+	TestEqual(TEXT("Initial skill rank is zero"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(0));
+	TestFalse(TEXT("Unknown skill cannot rank up"), Skills->CanRankUp(TEXT("missing_skill")));
+
+	Skills->GrantSkillPoint(2);
+	Skills->GrantSkillPoint(-1);
+	TestEqual(TEXT("Positive grants add points and negative grants are ignored"), Skills->GetSkillPoints(), static_cast<int32>(2));
+	TestTrue(TEXT("Known skill can rank up when points are available"), Skills->CanRankUp(HeavyStrike));
+
+	TestTrue(TEXT("First rank up succeeds"), Skills->RankUpSkill(HeavyStrike));
+	TestTrue(TEXT("Second rank up succeeds"), Skills->RankUpSkill(HeavyStrike));
+	TestEqual(TEXT("Rank up spends one point per rank"), Skills->GetSkillPoints(), static_cast<int32>(0));
+	TestEqual(TEXT("Rank is stored per skill"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(2));
+	TestFalse(TEXT("Cannot rank up without points"), Skills->RankUpSkill(HeavyStrike));
+
+	Skills->GrantSkillPoint(10);
+	for (int32 Index = 0; Index < 8; ++Index)
+	{
+		Skills->RankUpSkill(HeavyStrike);
+	}
+	TestEqual(TEXT("Rank is capped at max rank five"), Skills->GetSkillRank(HeavyStrike), static_cast<int32>(5));
+	TestFalse(TEXT("Max-rank skill cannot rank up"), Skills->CanRankUp(HeavyStrike));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillRankEffectiveValuesTest,
+	"IdleProject.Combat.Skills.RankEffectiveValues",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillRankEffectiveValuesTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+
+	const FName HeavyStrike(TEXT("heavy_strike"));
+	Skills->GrantSkillPoint(2);
+	Skills->RankUpSkill(HeavyStrike);
+	Skills->RankUpSkill(HeavyStrike);
+
+	TestEqual(TEXT("Rank two damage coeff adds twenty percent"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 3.0f);
+	TestEqual(TEXT("Rank two cooldown reduces ten percent"), Skills->GetEffectiveCooldown(HeavyStrike), 3.6f);
+
+	Skills->MarkSkillCast(HeavyStrike, 10.0f);
+	TestEqual(TEXT("Cooldown remaining uses effective cooldown"), Skills->GetCooldownRemaining(HeavyStrike, 12.0f), 1.6f);
+	TestEqual(TEXT("Cooldown ratio uses effective cooldown"), Skills->GetCooldownRatio(HeavyStrike, 12.0f), 1.6f / 3.6f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillRankDamageApplicationTest,
+	"IdleProject.Combat.Skills.RankDamageApplication",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillRankDamageApplicationTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 0.0f, 1.0f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	Skills->LoadDefaultWarriorSkills();
+	Skills->GrantSkillPoint(1);
+	Skills->RankUpSkill(TEXT("heavy_strike"));
+	Skills->MarkSkillCast(TEXT("whirlwind"), 19.0f);
+	Skills->MarkSkillCast(TEXT("shield_up"), 19.0f);
+	Skills->MarkSkillCast(TEXT("charge"), 19.0f);
+
+	Skills->TickSkills(20.0f, Target, TArray<AActor*>());
+
+	TestEqual(TEXT("Ranked heavy strike uses effective damage coefficient"), TargetCombat->CurrentHp, 725.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterLevelUpSkillPointTest,
+	"IdleProject.Character.LevelUp.GrantsSkillPoint",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterLevelUpSkillPointTest::RunTest(const FString& Parameters)
+{
+	AIdleCharacter* Character = NewObject<AIdleCharacter>();
+	TestNotNull(TEXT("Idle character is created"), Character);
+	if (!Character)
+	{
+		return false;
+	}
+
+	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	TestNotNull(TEXT("Skill component exists"), Skills);
+	if (!Skills)
+	{
+		return false;
+	}
+
+	const int32 BeforePoints = Skills->GetSkillPoints();
+	Character->HandleLevelUp(2);
+
+	TestEqual(TEXT("Level-up handler grants one skill point"), Skills->GetSkillPoints(), BeforePoints + 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSkillClassDefaultsTest,
 	"IdleProject.Combat.Skills.ClassDefaults",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
