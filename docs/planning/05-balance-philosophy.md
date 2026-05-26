@@ -476,9 +476,11 @@ Sensitivity notes:
   `server/src/core/formulas/enhance.ts` and models +0 to +5 enhancement spend.
   The minimum all-success cost is 5,500 gold, while expected cost using
   `cost / successRate` is 11,020.66 gold. Against the sampled median Lv50
-  active/idle blended gold rate, a single +0 to +5 path is about 0.017h of
-  income, so V1 enhancement is a light early sink rather than a first-rebirth
-  blocker.
+  active/idle blended gold rate, a single +0 to +5 path is only about 0.017h
+  of income. Treat this as a baseline pressure check, not evidence that V1 is
+  a meaningful midgame sink. V1 deliberately avoids blocking first rebirth;
+  later slices should raise pressure through higher-level cost bands, material
+  requirements, or repeated-slot enhancement demand after real gold telemetry.
 - Reward parity check: PR #32 reward scaling remains aligned with monster HP
   scaling because both use `1 + globalStageIndex * 0.15`. Chapter 1 normal
   reward-per-HP pressure stays stable across 1-1 to 1-5; the 8x boss reward

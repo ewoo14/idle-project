@@ -37,6 +37,16 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
 	Inventory->AddItem(MakeEnhanceTestItem(TEXT("rare_sword"), EItemSlot::Weapon));
 
+	const FEnhanceAttemptResult InvalidSlot = GameInstance->TryEnhanceEquipped(EItemSlot::None, Inventory);
+	TestFalse(TEXT("Invalid slot does not attempt enhance"), InvalidSlot.bAttempted);
+	TestEqual(TEXT("Invalid slot spends nothing"), InvalidSlot.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Invalid slot returns no new level"), InvalidSlot.NewLevel, INDEX_NONE);
+
+	const FEnhanceAttemptResult EmptySlot = GameInstance->TryEnhanceEquipped(EItemSlot::Helmet, Inventory);
+	TestFalse(TEXT("Empty equipped slot does not attempt enhance"), EmptySlot.bAttempted);
+	TestEqual(TEXT("Empty equipped slot spends nothing"), EmptySlot.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Empty equipped slot reports missing level"), EmptySlot.NewLevel, INDEX_NONE);
+
 	const FEnhanceAttemptResult NoGold = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
 	TestFalse(TEXT("Insufficient gold does not attempt enhance"), NoGold.bAttempted);
 	TestEqual(TEXT("Insufficient gold spends nothing"), NoGold.GoldSpent, static_cast<int64>(0));
@@ -72,9 +82,12 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 
 	GameInstance->SetEnhanceRandomSeed(FailingSeed);
 	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1));
+	const int64 GoldBeforeFailure = GameInstance->GetGold();
 	const FEnhanceAttemptResult Failure = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, FailInventory);
 	TestTrue(TEXT("Failed roll still attempts enhance"), Failure.bAttempted);
 	TestFalse(TEXT("Failed roll reports failure"), Failure.bSuccess);
+	TestEqual(TEXT("Failed roll spends exactly one attempt cost"), Failure.GoldSpent, FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1));
+	TestEqual(TEXT("Failed roll deducts gold once"), GameInstance->GetGold(), GoldBeforeFailure - Failure.GoldSpent);
 	TestEqual(TEXT("Failed roll keeps current level"), Failure.NewLevel, FEnhanceFormula::MaxEnhanceLevel - 1);
 	TestEqual(TEXT("Failed roll does not mutate item level"), FailInventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel - 1);
 

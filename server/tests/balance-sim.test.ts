@@ -116,5 +116,8 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("## Enhancement Spend Pressure");
     expect(report.markdown).toContain("Expected +0 to +5 gold cost");
     expect(report.markdown).toContain("11020.66");
+    expect(report.markdown).toContain(
+      "V1 enhancement is a light early sink, not a Lv50 progression blocker",
+    );
   });
 });

@@ -44,6 +44,9 @@
 - Median sampled Lv50 gold/hour: 654689
 - Expected +0 to +5 cost at median Lv50 gold/hour: 0.017h
 - Failure consumes gold only; no downgrade or destruction is modeled in V1.
+- V1 enhancement is a light early sink, not a Lv50 progression blocker;
+  use this report as a pressure baseline before raising costs or adding
+  material sinks.
 
 <!-- markdownlint-disable MD013 -->
 

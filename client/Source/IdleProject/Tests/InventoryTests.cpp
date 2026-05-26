@@ -4,6 +4,7 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ItemTypes.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -111,6 +112,50 @@ bool FInventoryEnhanceEquippedItemTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Enhance level reaches max"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel);
 	TestFalse(TEXT("Enhance fails at max level"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
 	TestFalse(TEXT("Enhance fails when slot is empty"), Inventory->EnhanceEquippedItem(EItemSlot::Helmet));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhancePanelViewModelStateTest,
+	"IdleProject.UI.HUD.EnhancePanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0));
+
+	const FIdleHUDEnhancePanelViewModel NoGold = IdleProject::UI::BuildEnhancePanelViewModel(
+		*Inventory,
+		0,
+		FText::GetEmpty(),
+		false);
+	TestEqual(TEXT("Enhance panel exposes all equipment slots"), NoGold.Rows.Num(), 8);
+	TestEqual(TEXT("Weapon row uses current enhance level"), NoGold.Rows[0].EnhanceLevel, 0);
+	TestEqual(TEXT("Weapon row shows level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(100));
+	TestFalse(TEXT("Weapon row is disabled without gold"), NoGold.Rows[0].bCanEnhance);
+	TestFalse(TEXT("Weapon row reports insufficient gold"), NoGold.Rows[0].bGoldEnough);
+	TestFalse(TEXT("Empty helmet row is not enhanceable"), NoGold.Rows[1].bCanEnhance);
+	TestFalse(TEXT("Empty helmet row reports no equipment"), NoGold.Rows[1].bEquipped);
+
+	const FIdleHUDEnhancePanelViewModel EnoughGold = IdleProject::UI::BuildEnhancePanelViewModel(
+		*Inventory,
+		FEnhanceFormula::GetEnhanceCost(0),
+		FText::GetEmpty(),
+		false);
+	TestTrue(TEXT("Weapon row enables when equipped and gold is enough"), EnoughGold.Rows[0].bCanEnhance);
+
+	UInventoryComponent* MaxInventory = NewObject<UInventoryComponent>();
+	MaxInventory->AddItem(MakeTestItem(TEXT("max_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, FEnhanceFormula::MaxEnhanceLevel));
+	const FIdleHUDEnhancePanelViewModel MaxLevel = IdleProject::UI::BuildEnhancePanelViewModel(
+		*MaxInventory,
+		100000,
+		FText::GetEmpty(),
+		false);
+	TestTrue(TEXT("Max level row reports max state"), MaxLevel.Rows[0].bMaxLevel);
+	TestFalse(TEXT("Max level row is disabled"), MaxLevel.Rows[0].bCanEnhance);
+	TestEqual(TEXT("Max level row has zero next cost"), MaxLevel.Rows[0].Cost, static_cast<int64>(0));
 
 	return true;
 }
