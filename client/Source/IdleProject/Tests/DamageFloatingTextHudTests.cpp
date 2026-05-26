@@ -91,6 +91,12 @@ bool FBossHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Boss phase label is localized"), PhaseTwoView.PhaseLabel.ToString(), FString(TEXT("Phase 2")));
 	TestEqual(TEXT("Phase 2 uses warning color"), PhaseTwoView.PhaseColor.G, Warn.G);
 
+	const FIdleHUDBossViewModel PhaseTwoBoundaryView = BuildBossViewModel(330.0f, 500.0f);
+	TestEqual(TEXT("Boss HUD mirrors 0.66 boundary as phase 2"), PhaseTwoBoundaryView.Phase, 2);
+
+	const FIdleHUDBossViewModel PhaseThreeBoundaryView = BuildBossViewModel(165.0f, 500.0f);
+	TestEqual(TEXT("Boss HUD mirrors 0.33 boundary as phase 3"), PhaseThreeBoundaryView.Phase, 3);
+
 	const FIdleHUDBossViewModel PhaseThreeView = BuildBossViewModel(0.0f, 500.0f);
 	TestEqual(TEXT("Zero HP remains phase 3"), PhaseThreeView.Phase, 3);
 	TestEqual(TEXT("Empty HP bar is allowed for a defeated boss frame"), PhaseThreeView.HpRatio, 0.0f);

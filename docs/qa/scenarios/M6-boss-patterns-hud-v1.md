@@ -44,6 +44,17 @@ Given the boss `UBattleAIComponent` broadcasts `OnBossSpecialAttack`
 When the HUD receives the event  
 Then a localized warning banner is shown near the boss bar for a short duration.
 
+Given a boss has just entered combat
+When the first basic attack lands before 6 seconds have elapsed
+Then the attack uses the current phase damage multiplier but does not trigger
+the special attack warning.
+
+Given 6 seconds have elapsed since boss combat started or since the previous
+special attack
+When the next boss attack lands
+Then the special damage multiplier applies and `OnBossSpecialAttack`
+broadcasts once.
+
 Given the boss despawns or the HUD ends play  
 When the HUD unbinds from the boss battle AI  
 Then later broadcasts do not call stale HUD delegates.

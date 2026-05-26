@@ -83,4 +83,5 @@ private:
 	FTimerHandle BattleTimerHandle;
 	float LastAttackTime = -1000.0f;
 	float LastSpecialAttackTime = -1000.0f;
+	bool bHasInitializedSpecialAttackClock = false;
 };

@@ -25,6 +25,11 @@ void UBattleAIComponent::StartBattle()
 	}
 
 	State = EBattleState::Idle;
+	if (const AIdleMonster* OwnerMonster = Cast<AIdleMonster>(GetOwner()); OwnerMonster && OwnerMonster->IsBoss())
+	{
+		LastSpecialAttackTime = World->GetTimeSeconds();
+		bHasInitializedSpecialAttackClock = true;
+	}
 	World->GetTimerManager().SetTimer(BattleTimerHandle, this, &UBattleAIComponent::UpdateBattle, BattleInterval, true, BattleInterval);
 }
 
@@ -225,22 +230,28 @@ void UBattleAIComponent::Attack(AActor* TargetActor)
 		EffectiveAtkSpeed *= FBossPhaseFormula::GetPhaseAtkSpeedMultiplier(BossPhase);
 	}
 
+	const float Now = World->GetTimeSeconds();
 	const float Cooldown = 1.0f / FMath::Max(0.1f, EffectiveAtkSpeed);
-	if (World->GetTimeSeconds() - LastAttackTime < Cooldown)
+	if (Now - LastAttackTime < Cooldown)
 	{
 		State = EBattleState::Attack;
 		return;
 	}
 
-	LastAttackTime = World->GetTimeSeconds();
+	LastAttackTime = Now;
 	State = EBattleState::Attack;
 	const float BaseDamage = FCombatFormulas::ComputeDamage(EffectiveAtk, TargetCombat->Def);
 	const bool bWasCrit = OwnerCombat->RollCrit();
 	float FinalDamage = FCombatFormulas::ApplyCrit(BaseDamage, bWasCrit, OwnerCombat->CritDmg);
-	if (bIsBoss && World->GetTimeSeconds() - LastSpecialAttackTime >= FBossPhaseFormula::SpecialAttackIntervalSeconds)
+	if (bIsBoss && !bHasInitializedSpecialAttackClock)
+	{
+		LastSpecialAttackTime = Now;
+		bHasInitializedSpecialAttackClock = true;
+	}
+	if (bIsBoss && Now - LastSpecialAttackTime >= FBossPhaseFormula::SpecialAttackIntervalSeconds)
 	{
 		FinalDamage *= FBossPhaseFormula::GetSpecialAttackDamageMultiplier();
-		LastSpecialAttackTime = World->GetTimeSeconds();
+		LastSpecialAttackTime = Now;
 		OnBossSpecialAttack.Broadcast(GetOwner());
 	}
 	TargetCombat->TakeDamageTyped(FinalDamage, GetOwner(), bWasCrit, EDamageKind::Physical);
