@@ -101,8 +101,15 @@ struct IDLEPROJECT_API FIdleHUDPetRowViewModel
 	FString PetId;
 	FText Name;
 	FText BonusLabel;
+	FText LevelLabel;
+	FText FeedCostLabel;
 	FText ActionLabel;
+	FText FeedActionLabel;
+	FText StatusLabel;
 	bool bEquipped = false;
+	bool bCanFeed = false;
+	bool bFeedDisabled = true;
+	bool bMaxLevel = false;
 };
 
 struct IDLEPROJECT_API FIdleHUDPetPanelViewModel
@@ -288,7 +295,7 @@ IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
 IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
-IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent);
+IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel);
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
 IDLEPROJECT_API FIdleHUDBossViewModel BuildBossViewModel(float CurrentHp, float MaxHp);
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
@@ -337,6 +344,9 @@ protected:
 
 	UFUNCTION()
 	void HandleShopPurchase(const FShopPurchaseResult& Result);
+
+	UFUNCTION()
+	void HandlePetFed(const FPetFeedResult& Result);
 
 	UFUNCTION()
 	void HandleStatPointsChanged();
@@ -395,6 +405,7 @@ private:
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipPetFromHitBox(FName BoxName);
+	void TryFeedPetFromHitBox(FName BoxName);
 	void DrawSeasonPassPanel();
 	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimSeasonTierFromHitBox(FName BoxName);
@@ -417,7 +428,10 @@ private:
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
 	FText EnhanceFeedbackLabel;
+	FText PetFeedbackLabel;
 	bool bEnhanceFeedbackSuccess = false;
+	bool bPetFeedbackSuccess = false;
+	float PetFeedbackStartTime = -1000.0f;
 	FShopPurchaseResult LastShopPurchaseResult;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
 	FDelegateHandle AnyDamageReceivedHandle;

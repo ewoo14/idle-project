@@ -126,6 +126,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +5 pressure
   and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.
 
+## PR #42 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes `Pet Feed
+  Gold Pressure` with 1000-run sampled Lv50 median gold/hour.
+- [ ] Pet feed pressure imports `server/src/core/formulas/petLevel.ts` instead
+  of duplicating `MAX_PET_LEVEL`, `getFeedCost`, or bonus multiplier constants.
+- [ ] Report shows Lv0 to Lv10 total feed cost of 192,500 gold and the
+  per-level cumulative feed-cost table.
+- [ ] Report compares dog gold bonus 20% to 40%, bird drop bonus 15% to 30%,
+  and dog payback of about 1.47h at 654,689 median Lv50 gold/hour.
+- [ ] `docs/planning/05-balance-philosophy.md` documents the formula,
+  compounding/payback interpretation, and gold-sink guardrails.
+
 ## PR #40 Character Checklist Addendum (Section 4)
 
 - [ ] `FItemInstance` keeps affix defaults at zero for legacy item regression.

@@ -18,6 +18,11 @@ import {
   OFFLINE_EFFICIENCY,
 } from "../../server/src/core/formulas/offline.js";
 import {
+  getEffectiveBonusPercent,
+  getFeedCost,
+  MAX_PET_LEVEL,
+} from "../../server/src/core/formulas/petLevel.js";
+import {
   BOSS_REWARD_BONUS,
   computeKillExp,
   computeKillGold,
@@ -98,6 +103,7 @@ export type BalanceReport = {
       formulas: string[];
       rewardScaling: StageRewardComparison[];
       enhancementPressure: EnhancementPressure;
+      petFeedPressure: PetFeedPressure;
     };
     distribution: SimulationDistribution;
     evaluation: BalanceEvaluation;
@@ -137,6 +143,30 @@ export type EnhancementPressure = {
   rows: EnhancementPressureRow[];
 };
 
+export type PetFeedPressureRow = {
+  currentLevel: number;
+  nextLevel: number;
+  feedCost: number;
+  cumulativeFeedCost: number;
+  dogGoldBonusPercentAfterFeed: number;
+  birdDropBonusPercentAfterFeed: number;
+};
+
+export type PetFeedPressure = {
+  maxLevel: number;
+  totalFeedCostToMax: number;
+  medianGoldPerHourAtLevel50: number;
+  dogBaseGoldBonusPercent: number;
+  dogMaxGoldBonusPercent: number;
+  dogGoldBonusDeltaPercentAtMax: number;
+  birdBaseDropBonusPercent: number;
+  birdMaxDropBonusPercent: number;
+  birdDropBonusDeltaPercentAtMax: number;
+  incrementalGoldPerHourAtMedian: number;
+  paybackHoursAtMedianGoldPerHour: number;
+  rows: PetFeedPressureRow[];
+};
+
 export type EnhancementRarityScenario = {
   rarity: EnhanceItemRarity;
   multiplier: number;
@@ -163,6 +193,8 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Legendary",
 ];
 const EQUIPMENT_SLOT_COUNT = 8;
+const DOG_GOLD_BONUS_PERCENT = 20;
+const BIRD_DROP_BONUS_PERCENT = 15;
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -227,9 +259,11 @@ export function buildBalanceReport(
         "server/src/core/formulas/reward.ts",
         "server/src/core/formulas/stage.ts",
         "server/src/core/formulas/enhance.ts",
+        "server/src/core/formulas/petLevel.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
+      petFeedPressure: buildPetFeedPressure(distribution.samples),
     },
     distribution,
     evaluation,
@@ -640,6 +674,80 @@ function buildEnhancementRarityScenario(
   };
 }
 
+function buildPetFeedPressure(samples: SimulationSample[]): PetFeedPressure {
+  let cumulativeFeedCost = 0;
+  const rows = Array.from({ length: MAX_PET_LEVEL }, (_, currentLevel) => {
+    const feedCost = getFeedCost(currentLevel);
+    cumulativeFeedCost += feedCost;
+    const nextLevel = currentLevel + 1;
+    return {
+      currentLevel,
+      nextLevel,
+      feedCost,
+      cumulativeFeedCost,
+      dogGoldBonusPercentAfterFeed: round(
+        getEffectiveBonusPercent(DOG_GOLD_BONUS_PERCENT, nextLevel),
+        3,
+      ),
+      birdDropBonusPercentAfterFeed: round(
+        getEffectiveBonusPercent(BIRD_DROP_BONUS_PERCENT, nextLevel),
+        3,
+      ),
+    };
+  });
+  const medianGoldPerHourAtLevel50 = percentile(
+    samples
+      .map((sample) => sample.goldPerHourAtLevel50)
+      .sort((left, right) => left - right),
+    0.5,
+  );
+  const dogBaseGoldBonusPercent = getEffectiveBonusPercent(
+    DOG_GOLD_BONUS_PERCENT,
+    0,
+  );
+  const dogMaxGoldBonusPercent = getEffectiveBonusPercent(
+    DOG_GOLD_BONUS_PERCENT,
+    MAX_PET_LEVEL,
+  );
+  const birdBaseDropBonusPercent = getEffectiveBonusPercent(
+    BIRD_DROP_BONUS_PERCENT,
+    0,
+  );
+  const birdMaxDropBonusPercent = getEffectiveBonusPercent(
+    BIRD_DROP_BONUS_PERCENT,
+    MAX_PET_LEVEL,
+  );
+  const dogGoldBonusDeltaPercentAtMax = round(
+    dogMaxGoldBonusPercent - dogBaseGoldBonusPercent,
+    3,
+  );
+  const incrementalGoldPerHourAtMedian = round(
+    medianGoldPerHourAtLevel50 * (dogGoldBonusDeltaPercentAtMax / 100),
+    3,
+  );
+
+  return {
+    maxLevel: MAX_PET_LEVEL,
+    totalFeedCostToMax: cumulativeFeedCost,
+    medianGoldPerHourAtLevel50,
+    dogBaseGoldBonusPercent,
+    dogMaxGoldBonusPercent,
+    dogGoldBonusDeltaPercentAtMax,
+    birdBaseDropBonusPercent,
+    birdMaxDropBonusPercent,
+    birdDropBonusDeltaPercentAtMax: round(
+      birdMaxDropBonusPercent - birdBaseDropBonusPercent,
+      3,
+    ),
+    incrementalGoldPerHourAtMedian,
+    paybackHoursAtMedianGoldPerHour: round(
+      cumulativeFeedCost / Math.max(1, incrementalGoldPerHourAtMedian),
+      3,
+    ),
+    rows,
+  };
+}
+
 function summarizeSamples(
   samples: SimulationSample[],
   targetLevel: number,
@@ -770,6 +878,31 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.enhancementPressure.rarityScenarios.map(
       (row) =>
         `| ${row.rarity} | ${row.multiplier} | ${row.goldCostFloorToMax} | ${row.expectedGoldCostToMax} | ${row.expectedHoursAtMedianGoldPerHour}h |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Pet Feed Gold Pressure",
+    "",
+    `- Max pet level: ${report.model.petFeedPressure.maxLevel}`,
+    `- Total Lv0 to Lv10 feed cost: ${report.model.petFeedPressure.totalFeedCostToMax}`,
+    `- Dog gold bonus: ${report.model.petFeedPressure.dogBaseGoldBonusPercent}% to ${report.model.petFeedPressure.dogMaxGoldBonusPercent}% (+${report.model.petFeedPressure.dogGoldBonusDeltaPercentAtMax} percentage points).`,
+    `- Bird drop bonus: ${report.model.petFeedPressure.birdBaseDropBonusPercent}% to ${report.model.petFeedPressure.birdMaxDropBonusPercent}% (+${report.model.petFeedPressure.birdDropBonusDeltaPercentAtMax} percentage points).`,
+    `- Median sampled Lv50 gold/hour: ${report.model.petFeedPressure.medianGoldPerHourAtLevel50}`,
+    `- Incremental dog gold at median: ${report.model.petFeedPressure.incrementalGoldPerHourAtMedian}/h.`,
+    `- Dog payback at median Lv50 gold/hour: ${report.model.petFeedPressure.paybackHoursAtMedianGoldPerHour}h.`,
+    "- This treats the Lv10 dog upgrade as an income investment against the",
+    "  existing PR #32 sampled blended gold rate. It does not grant combat power,",
+    "  so the sink competes with enhancement/shop gold without shortening",
+    "  first-rebirth EXP pacing directly.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Current | Next | Feed cost | Cumulative cost | Dog gold after feed | Bird drop after feed |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.petFeedPressure.rows.map(
+      (row) =>
+        `| Lv${row.currentLevel} | Lv${row.nextLevel} | ${row.feedCost} | ${row.cumulativeFeedCost} | ${row.dogGoldBonusPercentAfterFeed}% | ${row.birdDropBonusPercentAfterFeed}% |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

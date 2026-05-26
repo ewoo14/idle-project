@@ -12,6 +12,7 @@
 #include "Engine/GameViewportClient.h"
 #include "EngineUtils.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/PetLevelFormula.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -26,6 +27,7 @@ const FName RebirthHitBoxName(TEXT("RebirthAction"));
 const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
+const FString PetFeedHitBoxPrefix(TEXT("PetFeed_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
@@ -41,6 +43,7 @@ constexpr float FloatingDamageHeadOffsetZ = 120.0f;
 constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
 constexpr float BossSpecialWarningDurationSeconds = 1.6f;
 constexpr float StageFeedbackDurationSeconds = 2.2f;
+constexpr float PetFeedbackDurationSeconds = 2.2f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -195,6 +198,28 @@ FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
 	}
 }
 
+FText BuildPetLevelLabel(int32 Level)
+{
+	return FormatLocalizedUI(TEXT("PET_LEVEL_FORMAT"), [Level](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Level"), FText::AsNumber(Level));
+		Args.Add(TEXT("MaxLevel"), FText::AsNumber(FPetLevelFormula::MaxPetLevel));
+	});
+}
+
+FText BuildPetFeedCostLabel(int64 FeedCost)
+{
+	if (FeedCost <= 0)
+	{
+		return IdleProject::Localization::UI(TEXT("PET_FEED_COST_MAX"));
+	}
+
+	return FormatLocalizedUI(TEXT("PET_FEED_COST_FORMAT"), [FeedCost](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(FeedCost)));
+	});
+}
+
 FText SeasonRewardToLabel(ESeasonRewardType Type, int64 Amount)
 {
 	switch (Type)
@@ -281,6 +306,11 @@ FName MakeClassSelectionHitBoxName(EClassId ClassId)
 FName MakePetEquipHitBoxName(const FString& PetId)
 {
 	return FName(*(PetEquipHitBoxPrefix + PetId));
+}
+
+FName MakePetFeedHitBoxName(const FString& PetId)
+{
+	return FName(*(PetFeedHitBoxPrefix + PetId));
 }
 
 FName MakeSeasonClaimHitBoxName(int32 Tier)
@@ -946,7 +976,7 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	return Options;
 }
 
-FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent)
+FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel)
 {
 	FIdleHUDPetPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("PET_PANEL_TITLE"));
@@ -967,12 +997,28 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 
 	for (const FPetDefinition& Definition : PetDefinitions)
 	{
+		const int32 Level = FMath::Clamp(GetPetLevel(Definition.PetId), 0, FPetLevelFormula::MaxPetLevel);
+		const int64 FeedCost = FPetLevelFormula::GetFeedCost(Level);
+		const bool bMaxLevel = Level >= FPetLevelFormula::MaxPetLevel;
+		const bool bCanFeed = !bMaxLevel && FeedCost > 0 && Gold >= FeedCost;
+
 		FIdleHUDPetRowViewModel Row;
 		Row.PetId = Definition.PetId;
 		Row.Name = Definition.Name;
-		Row.BonusLabel = PetBonusTypeToLabel(Definition.BonusType, Definition.BonusPercent);
+		Row.BonusLabel = PetBonusTypeToLabel(Definition.BonusType, Definition.BonusPercent * FPetLevelFormula::GetBonusMultiplier(Level));
+		Row.LevelLabel = BuildPetLevelLabel(Level);
+		Row.FeedCostLabel = BuildPetFeedCostLabel(FeedCost);
 		Row.bEquipped = Definition.PetId == EquippedPetId;
 		Row.ActionLabel = IdleProject::Localization::UI(Row.bEquipped ? TEXT("ACTION_EQUIPPED") : TEXT("ACTION_EQUIP"));
+		Row.FeedActionLabel = IdleProject::Localization::UI(TEXT("ACTION_FEED"));
+		Row.bCanFeed = bCanFeed;
+		Row.bFeedDisabled = !bCanFeed;
+		Row.bMaxLevel = bMaxLevel;
+		Row.StatusLabel = bMaxLevel
+			? IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_MAX"))
+			: (bCanFeed
+				? IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_READY"))
+				: IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_NEED_GOLD")));
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -1109,6 +1155,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleHUD::HandleLevelUp);
 	IdleGameInstance->OnEnhanceResult.AddDynamic(this, &AIdleHUD::HandleEnhanceResult);
 	IdleGameInstance->OnShopPurchase.AddDynamic(this, &AIdleHUD::HandleShopPurchase);
+	IdleGameInstance->OnPetFed.AddDynamic(this, &AIdleHUD::HandlePetFed);
 	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
@@ -1153,6 +1200,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		IdleGameInstance->OnLevelUp.RemoveDynamic(this, &AIdleHUD::HandleLevelUp);
 		IdleGameInstance->OnEnhanceResult.RemoveDynamic(this, &AIdleHUD::HandleEnhanceResult);
 		IdleGameInstance->OnShopPurchase.RemoveDynamic(this, &AIdleHUD::HandleShopPurchase);
+		IdleGameInstance->OnPetFed.RemoveDynamic(this, &AIdleHUD::HandlePetFed);
 		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 	}
 
@@ -1216,6 +1264,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(PetEquipHitBoxPrefix))
 	{
 		EquipPetFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PetFeedHitBoxPrefix))
+	{
+		TryFeedPetFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(SeasonClaimHitBoxPrefix))
@@ -1372,6 +1425,27 @@ void AIdleHUD::HandleShopPurchase(const FShopPurchaseResult& Result)
 	}
 
 	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::HandlePetFed(const FPetFeedResult& Result)
+{
+	bPetFeedbackSuccess = Result.bFed;
+	if (Result.bFed)
+	{
+		PetFeedbackLabel = FormatLocalizedUI(TEXT("PET_FEED_FEEDBACK_SUCCESS_FORMAT"), [&Result](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(Result.NewLevel));
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Result.GoldSpent)));
+		});
+	}
+	else
+	{
+		PetFeedbackLabel = IdleProject::Localization::UI(TEXT("PET_FEED_FEEDBACK_BLOCKED"));
+	}
+
+	const UWorld* World = GetWorld();
+	PetFeedbackStartTime = World ? World->GetTimeSeconds() : 0.0f;
 	RefreshMouseInteraction();
 }
 
@@ -2708,15 +2782,25 @@ void AIdleHUD::DrawPetPanel()
 		PetService->GetPetDefinitions(),
 		PetService->GetEquippedPetId(),
 		IdleGameInstance->GetEquippedPetGoldBonusPercent(),
-		IdleGameInstance->GetEquippedPetDropBonusPercent());
+		IdleGameInstance->GetEquippedPetDropBonusPercent(),
+		IdleGameInstance->GetGold(),
+		[PetService](const FString& PetId)
+		{
+			return PetService->GetPetLevel(PetId);
+		});
+
+	const UWorld* World = GetWorld();
+	const float PetFeedbackElapsed = World ? World->GetTimeSeconds() - PetFeedbackStartTime : 0.0f;
+	const bool bShowPetFeedback = !PetFeedbackLabel.IsEmpty() && PetFeedbackElapsed <= PetFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = 322.0f * Scale;
 	const float HeaderHeight = 44.0f * Scale;
-	const float RowHeight = 42.0f * Scale;
+	const float RowHeight = 64.0f * Scale;
 	const float RowGap = 8.0f * Scale;
 	const float Padding = 14.0f * Scale;
-	const float PanelHeight = HeaderHeight + 48.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float FeedbackHeight = bShowPetFeedback ? 26.0f * Scale : 0.0f;
+	const float PanelHeight = HeaderHeight + 48.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
 	const float X = 28.0f * Scale;
 	const float Y = 360.0f * Scale;
 	const float Border = 2.0f * Scale;
@@ -2738,6 +2822,12 @@ void AIdleHUD::DrawPetPanel()
 		DrawPetRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
 		RowY += RowHeight + RowGap;
 	}
+
+	if (bShowPetFeedback)
+	{
+		const FLinearColor FeedbackColor = bPetFeedbackSuccess ? Theme::AccentGold : Theme::Warn;
+		DrawText(PetFeedbackLabel.ToString(), FeedbackColor, X + Padding, RowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	}
 	RefreshMouseInteraction();
 }
 
@@ -2745,23 +2835,34 @@ void AIdleHUD::DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, 
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 42.0f;
+	const float Scale = Height / 64.0f;
 	const FLinearColor StateColor = Row.bEquipped ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
 	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
 	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
 
-	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * Scale);
-	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 92.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+	DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, X + 92.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 12.0f * Scale, Y + 29.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.FeedCostLabel.ToString(), Theme::TextMuted, X + 110.0f * Scale, Y + 29.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.StatusLabel.ToString(), Row.bCanFeed ? Theme::AccentBlue : Theme::Warn, X + 12.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 
 	const float ButtonWidth = 78.0f * Scale;
-	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonHeight = 24.0f * Scale;
 	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
-	const float ButtonY = Y + 8.0f * Scale;
+	const float ButtonY = Y + 7.0f * Scale;
 	DrawRect(Row.bEquipped ? Theme::BgPanel : Theme::AccentGold, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(Row.ActionLabel.ToString(), Row.bEquipped ? Theme::TextMuted : Theme::BgPrimary, ButtonX + 11.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(Row.ActionLabel.ToString(), Row.bEquipped ? Theme::TextMuted : Theme::BgPrimary, ButtonX + 11.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	if (!Row.bEquipped)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetEquipHitBoxName(Row.PetId), true, 82);
+	}
+
+	const float FeedButtonY = Y + 34.0f * Scale;
+	DrawRect(Row.bCanFeed ? Theme::AccentBlue : Theme::BgPanel, ButtonX, FeedButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.FeedActionLabel.ToString(), Row.bCanFeed ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 11.0f * Scale, FeedButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	if (Row.bCanFeed)
+	{
+		AddHitBox(FVector2D(ButtonX, FeedButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetFeedHitBoxName(Row.PetId), true, 83);
 	}
 }
 
@@ -2781,6 +2882,26 @@ void AIdleHUD::EquipPetFromHitBox(FName BoxName)
 	if (!PetId.IsEmpty())
 	{
 		IdleGameInstance->EquipPet(PetId);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryFeedPetFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString PetId = BoxName.ToString();
+	PetId.RightChopInline(PetFeedHitBoxPrefix.Len());
+	if (!PetId.IsEmpty())
+	{
+		IdleGameInstance->TryFeedPet(PetId);
 	}
 	RefreshMouseInteraction();
 }

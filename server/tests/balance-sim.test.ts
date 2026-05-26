@@ -176,4 +176,34 @@ describe("balance simulator", () => {
       "2.155h at sampled median Lv50 gold/hour",
     );
   });
+
+  it("reports pet feed cost pressure and gold-bonus payback", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.petFeedPressure.maxLevel).toBe(10);
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/petLevel.ts",
+    );
+    expect(report.json.model.petFeedPressure.totalFeedCostToMax).toBe(192500);
+    expect(
+      report.json.model.petFeedPressure.dogGoldBonusDeltaPercentAtMax,
+    ).toBe(20);
+    expect(
+      report.json.model.petFeedPressure.paybackHoursAtMedianGoldPerHour,
+    ).toBe(1.47);
+    expect(report.json.model.petFeedPressure.rows.at(-1)).toEqual({
+      currentLevel: 9,
+      nextLevel: 10,
+      feedCost: 50000,
+      cumulativeFeedCost: 192500,
+      dogGoldBonusPercentAfterFeed: 40,
+      birdDropBonusPercentAfterFeed: 30,
+    });
+    expect(report.markdown).toContain("## Pet Feed Gold Pressure");
+    expect(report.markdown).toContain("Total Lv0 to Lv10 feed cost: 192500");
+    expect(report.markdown).toContain(
+      "payback at median Lv50 gold/hour: 1.47h",
+    );
+  });
 });

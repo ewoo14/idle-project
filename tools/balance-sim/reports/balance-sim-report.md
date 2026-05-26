@@ -78,6 +78,37 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Pet Feed Gold Pressure
+
+- Max pet level: 10
+- Total Lv0 to Lv10 feed cost: 192500
+- Dog gold bonus: 20% to 40% (+20 percentage points).
+- Bird drop bonus: 15% to 30% (+15 percentage points).
+- Median sampled Lv50 gold/hour: 654689
+- Incremental dog gold at median: 130937.8/h.
+- Dog payback at median Lv50 gold/hour: 1.47h.
+- This treats the Lv10 dog upgrade as an income investment against the
+  existing PR #32 sampled blended gold rate. It does not grant combat power,
+  so the sink competes with enhancement/shop gold without shortening
+  first-rebirth EXP pacing directly.
+
+<!-- markdownlint-disable MD013 -->
+
+| Current | Next | Feed cost | Cumulative cost | Dog gold after feed | Bird drop after feed |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| Lv0 | Lv1 | 500 | 500 | 22% | 16.5% |
+| Lv1 | Lv2 | 2000 | 2500 | 24% | 18% |
+| Lv2 | Lv3 | 4500 | 7000 | 26% | 19.5% |
+| Lv3 | Lv4 | 8000 | 15000 | 28% | 21% |
+| Lv4 | Lv5 | 12500 | 27500 | 30% | 22.5% |
+| Lv5 | Lv6 | 18000 | 45500 | 32% | 24% |
+| Lv6 | Lv7 | 24500 | 70000 | 34% | 25.5% |
+| Lv7 | Lv8 | 32000 | 102000 | 36% | 27% |
+| Lv8 | Lv9 | 40500 | 142500 | 38% | 28.5% |
+| Lv9 | Lv10 | 50000 | 192500 | 40% | 30% |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Formula Sources
 
 - server/src/core/formulas/level.ts
@@ -87,3 +118,4 @@
 - server/src/core/formulas/reward.ts
 - server/src/core/formulas/stage.ts
 - server/src/core/formulas/enhance.ts
+- server/src/core/formulas/petLevel.ts
