@@ -6,6 +6,7 @@
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 #include "CombatSystem/StatusElementTypes.h"
+#include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "BossSpecialAttackTestReceiver.h"
@@ -15,6 +16,7 @@
 #include "GameCore/IdleGameInstance.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "Internationalization/IdleLocalization.h"
+#include "ItemSystem/InventoryComponent.h"
 #include "UI/IdleHUD.h"
 
 namespace
@@ -81,6 +83,22 @@ bool TestSkillDefinitionParity(FAutomationTestBase& Test, const USkillComponent&
 	Test.TestEqual(*FString::Printf(TEXT("%s Element"), *Expected.SkillId.ToString()), static_cast<int32>(Actual->Element), static_cast<int32>(Expected.Element));
 	return true;
 }
+
+FItemInstance MakeCombatPowerTestItem(EItemSlot Slot, EItemSet ItemSet, float Atk, float Def, float Hp)
+{
+	FItemInstance Item;
+	Item.ItemId = FName(*FString::Printf(TEXT("cp_%d"), static_cast<int32>(Slot)));
+	Item.Slot = Slot;
+	Item.Rarity = EItemRarity::Mythic;
+	Item.ItemSet = ItemSet;
+	Item.BonusAtk = Atk;
+	Item.BonusDef = Def;
+	Item.BonusHp = Hp;
+	Item.BonusCritRate = 0.02f;
+	Item.BonusAtkSpeed = 0.1f;
+	Item.BonusMagicAtk = 8.0f;
+	return Item;
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -139,6 +157,39 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Non crit leaves base damage unchanged"), FCombatFormulas::ApplyCrit(34.0f, false, 1.8f), 34.0f);
 	TestEqual(TEXT("Crit multiplies base damage"), FCombatFormulas::ApplyCrit(34.0f, true, 1.8f), 61.2f);
 	TestEqual(TEXT("Crit damage below one cannot reduce damage"), FCombatFormulas::ApplyCrit(34.0f, true, 0.5f), 34.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatPowerFormulaTest,
+	"IdleProject.Character.CombatPower.Formula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatPowerFormulaTest::RunTest(const FString& Parameters)
+{
+	FDerivedStats Stats;
+	Stats.Hp = 1234.0f;
+	Stats.PhysAtk = 100.0f;
+	Stats.MagicAtk = 50.0f;
+	Stats.PhysDef = 30.0f;
+	Stats.MagicDef = 20.0f;
+	Stats.AtkSpeed = 1.5f;
+	Stats.CritRate = 0.25f;
+	Stats.CritDmg = 1.8f;
+
+	TestEqual(TEXT("Weighted derived stats round to a stable int64 combat power"), FCombatPowerFormula::ComputeCombatPower(Stats), static_cast<int64>(978));
+	TestEqual(TEXT("Zero stats produce zero combat power"), FCombatPowerFormula::ComputeCombatPower(FDerivedStats()), static_cast<int64>(0));
+
+	Stats.Hp = -100.0f;
+	Stats.PhysAtk = -20.0f;
+	Stats.MagicAtk = -10.0f;
+	Stats.PhysDef = -5.0f;
+	Stats.MagicDef = -5.0f;
+	Stats.AtkSpeed = -1.0f;
+	Stats.CritRate = -0.2f;
+	Stats.CritDmg = -1.0f;
+	TestEqual(TEXT("Negative weighted total clamps to zero combat power"), FCombatPowerFormula::ComputeCombatPower(Stats), static_cast<int64>(0));
 
 	return true;
 }
@@ -1205,6 +1256,130 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Combat component exists"), Combat);
 	TestEqual(TEXT("Combat max HP uses refreshed derived stats"), Combat ? Combat->MaxHp : 0.0f, CurrentDerived.Hp);
 	TestEqual(TEXT("Combat magic attack uses refreshed derived stats"), Combat ? Combat->MagicAtk : 0.0f, CurrentDerived.MagicAtk);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterCombatPowerAccessorsTest,
+	"IdleProject.Character.CombatPower.Accessors",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterCombatPowerAccessorsTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+
+	const int64 ExpectedCombatPower = FCombatPowerFormula::ComputeCombatPower(Character->GetCurrentDerivedStats());
+	TestEqual(TEXT("GetCombatPower mirrors current derived stats formula"), Character->GetCombatPower(), ExpectedCombatPower);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterCombatPowerGrowthSourcesTest,
+	"IdleProject.Character.CombatPower.GrowthSources",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+	const int64 BaseCombatPower = Character->GetCombatPower();
+
+	GameInstance->GrantStatPoints(2);
+	TestTrue(TEXT("Allocated STR setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Str));
+	TestTrue(TEXT("Allocated DEX setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Dex));
+	Character->RefreshDerivedStats();
+	const int64 AllocatedCombatPower = Character->GetCombatPower();
+	TestTrue(TEXT("Stat allocation increases combat power through current derived stats"), AllocatedCombatPower > BaseCombatPower);
+
+	UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>();
+	TestNotNull(TEXT("Inventory component exists"), Inventory);
+	if (!Inventory)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	TestTrue(TEXT("Weapon item is accepted"), Inventory->AddItem(MakeCombatPowerTestItem(EItemSlot::Weapon, EItemSet::Warrior, 80.0f, 0.0f, 0.0f)));
+	TestTrue(TEXT("Helmet item is accepted"), Inventory->AddItem(MakeCombatPowerTestItem(EItemSlot::Helmet, EItemSet::Warrior, 0.0f, 20.0f, 100.0f)));
+	TestTrue(TEXT("Top item is accepted"), Inventory->AddItem(MakeCombatPowerTestItem(EItemSlot::Top, EItemSet::Warrior, 0.0f, 20.0f, 100.0f)));
+	TestTrue(TEXT("Gloves item is accepted"), Inventory->AddItem(MakeCombatPowerTestItem(EItemSlot::Gloves, EItemSet::Warrior, 40.0f, 0.0f, 0.0f)));
+	Character->RefreshDerivedStats();
+	const int64 EquippedCombatPower = Character->GetCombatPower();
+	TestTrue(TEXT("Equipment affixes and set bonuses increase combat power"), EquippedCombatPower > AllocatedCombatPower);
+
+	TestTrue(TEXT("Enhancing equipped weapon succeeds"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
+	Character->RefreshDerivedStats();
+	const int64 EnhancedCombatPower = Character->GetCombatPower();
+	TestTrue(TEXT("Enhancement increases combat power"), EnhancedCombatPower > EquippedCombatPower);
+
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+		GameInstance->MarkChapter1BossDefeated();
+		TestTrue(TEXT("Test setup rebirth succeeds"), GameInstance->Rebirth());
+	}
+	Character->RefreshDerivedStats();
+	const int64 RebirthCombatPower = Character->GetCombatPower();
+	TestTrue(TEXT("Rebirth bonus points increase combat power versus original level one baseline"), RebirthCombatPower > BaseCombatPower);
+
+	TestTrue(TEXT("Test setup transcend succeeds"), GameInstance->Transcend());
+	Character->RefreshDerivedStats();
+	const int64 TranscendedCombatPower = Character->GetCombatPower();
+	const float TranscendMultiplier = GameInstance->GetTranscendStatMultiplier();
+	FDerivedStats WithoutTranscend = Character->GetCurrentDerivedStats();
+	WithoutTranscend.Hp /= TranscendMultiplier;
+	WithoutTranscend.PhysAtk /= TranscendMultiplier;
+	WithoutTranscend.MagicAtk /= TranscendMultiplier;
+	WithoutTranscend.PhysDef /= TranscendMultiplier;
+	WithoutTranscend.MagicDef /= TranscendMultiplier;
+	TestTrue(TEXT("Transcend multiplier increases combat power over equivalent post-reset stats"), TranscendedCombatPower > FCombatPowerFormula::ComputeCombatPower(WithoutTranscend));
+	TestEqual(TEXT("Combat power remains formula over current derived stats"), TranscendedCombatPower, FCombatPowerFormula::ComputeCombatPower(Character->GetCurrentDerivedStats()));
 
 	World->DestroyWorld(false);
 	return true;

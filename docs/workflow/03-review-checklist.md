@@ -239,6 +239,18 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] Equipment set HUD uses UI localization keys instead of hard-coded
   display text.
 
+## PR #49 Character Checklist Addendum (Section 4)
+
+- [ ] `FCombatPowerFormula::ComputeCombatPower` maps final `FDerivedStats` to
+  an `int64` CP value using weighted attack, defense, HP, crit, and attack
+  speed terms, rounds the result, and clamps negative totals to zero.
+- [ ] `AIdleCharacter::GetCombatPower()` is `BlueprintPure` and delegates to
+  `ComputeCombatPower(GetCurrentDerivedStats())`.
+- [ ] UE Automation covers formula anchors, zero/negative clamp behavior,
+  character accessor parity, and monotonic CP increases from stat allocation,
+  equipment affix/set bonuses, enhancement, rebirth bonus points, and
+  transcend multiplier.
+
 ## PR #43 QA Checklist Addendum (Section 7)
 
 - [ ] QA scenario covers 2-piece active, 4-piece complete, under-threshold,
