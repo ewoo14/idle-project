@@ -14,9 +14,13 @@ When `UCombatComponent::TickStatuses` reaches each one-second tick before
 expiry
 Then the target takes magic damage for each due tick, the status remains active
 until `EndTime`, and no additional damage is applied after the status expires.
+If the 5Hz battle update reaches the component after more than one second has
+elapsed, all due one-second ticks before expiry are applied in the same status
+tick so delayed frames do not skip DoT damage.
 
 Automation: `client/Source/IdleProject/Tests/CombatTests.cpp`
-(`IdleProject.Combat.Status.DamageOverTime`)
+(`IdleProject.Combat.Status.DamageOverTime`,
+`IdleProject.Combat.Status.DamageOverTimeCatchesUp`)
 
 ## Scenario 2: Freeze Attack Speed Slow
 
@@ -24,9 +28,12 @@ Given a combat actor receives Freeze with positive duration and magnitude
 When statuses are ticked before expiry
 Then attack speed is reduced by the Freeze magnitude, `HasActiveStatus(Freeze)`
 returns true, and the original attack speed is restored after expiry.
+When Freeze is reapplied before expiry, the previous slow is removed before the
+new slow is applied, so the final expiry restores the original attack speed.
 
 Automation: `client/Source/IdleProject/Tests/CombatTests.cpp`
-(`IdleProject.Combat.Status.FreezeSlow`)
+(`IdleProject.Combat.Status.FreezeSlow`,
+`IdleProject.Combat.Status.FreezeReapplyRestoresAttackSpeed`)
 
 ## Scenario 3: Element Multiplier Boundaries
 
@@ -71,6 +78,9 @@ Automation: `client/Source/IdleProject/Tests/DamageFloatingTextHudTests.cpp`
   `ApplyStatus` path.
 - Freeze restores attack speed after expiry and does not permanently stack slow
   penalties.
+- Respawned monsters are spawned through `SpawnMonsterAt`, finish `BeginPlay`,
+  and restart `BattleAI`, so status ticks and HUD indicators use the same path
+  as initially spawned monsters.
 
 ## Evidence Required
 

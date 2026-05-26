@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCrit,
-  computeElementMultiplier,
   computeClassDamage,
   computeDamage,
+  computeElementMultiplier,
   computeMagicDamage,
   rollCrit,
 } from "./combat.js";

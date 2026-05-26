@@ -133,6 +133,32 @@ bool FCombatStatusDamageOverTimeTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusDamageOverTimeCatchesUpTest,
+	"IdleProject.Combat.Status.DamageOverTimeCatchesUp",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusDamageOverTimeCatchesUpTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	Combat->ApplyStatus(ESkillStatusEffect::Burn, 4.0f, 5.0f, 10.0f);
+	Combat->TickStatuses(12.6f);
+
+	TestEqual(TEXT("Delayed status ticking catches up all elapsed one-second ticks"), Combat->CurrentHp, 90.0f);
+	TestTrue(TEXT("Burn remains active until its end time"), Combat->HasActiveStatus(ESkillStatusEffect::Burn));
+
+	Combat->TickStatuses(14.2f);
+
+	TestEqual(TEXT("Catch-up never applies a tick at or beyond expiry"), Combat->CurrentHp, 85.0f);
+	TestFalse(TEXT("Burn is removed after expiry"), Combat->HasActiveStatus(ESkillStatusEffect::Burn));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatStatusFreezeSlowTest,
 	"IdleProject.Combat.Status.FreezeSlow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -152,6 +178,31 @@ bool FCombatStatusFreezeSlowTest::RunTest(const FString& Parameters)
 	Combat->TickStatuses(12.1f);
 	TestEqual(TEXT("Freeze slow is removed on expiry"), Combat->AtkSpeed, 2.0f);
 	TestFalse(TEXT("Expired freeze is removed"), Combat->HasActiveStatus(ESkillStatusEffect::Freeze));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusFreezeReapplyTest,
+	"IdleProject.Combat.Status.FreezeReapplyRestoresAttackSpeed",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusFreezeReapplyTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(100.0f, 10.0f, 0.0f, 2.0f);
+
+	Combat->ApplyStatus(ESkillStatusEffect::Freeze, 2.0f, 0.25f, 10.0f);
+	TestEqual(TEXT("Initial freeze slow applies once"), Combat->AtkSpeed, 1.5f);
+
+	Combat->ApplyStatus(ESkillStatusEffect::Freeze, 3.0f, 0.50f, 11.0f);
+	TestEqual(TEXT("Reapplied freeze restores previous slow before applying stronger slow"), Combat->AtkSpeed, 1.0f);
+
+	Combat->TickStatuses(14.1f);
+	TestEqual(TEXT("Reapplied freeze slow restores to base attack speed after expiry"), Combat->AtkSpeed, 2.0f);
+	TestFalse(TEXT("Reapplied freeze is removed after expiry"), Combat->HasActiveStatus(ESkillStatusEffect::Freeze));
 
 	return true;
 }

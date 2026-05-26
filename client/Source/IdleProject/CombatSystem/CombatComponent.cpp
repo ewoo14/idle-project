@@ -126,9 +126,10 @@ void UCombatComponent::TickStatuses(float Now)
 
 	for (FActiveSkillStatus& Status : ActiveStatuses)
 	{
-		if ((Status.Type == ESkillStatusEffect::Poison || Status.Type == ESkillStatusEffect::Burn) &&
+		while ((Status.Type == ESkillStatusEffect::Poison || Status.Type == ESkillStatusEffect::Burn) &&
 			Now >= Status.NextTickTime &&
-			Status.NextTickTime < Status.EndTime)
+			Status.NextTickTime < Status.EndTime &&
+			!IsDead())
 		{
 			TakeDamageTyped(Status.Magnitude, GetOwner(), false, EDamageKind::Magic);
 			Status.NextTickTime += 1.0f;
