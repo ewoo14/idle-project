@@ -22,3 +22,4 @@
 | M6 | [M6-thief-cleric-classes-v1.md](M6-thief-cleric-classes-v1.md) | Five-class skill definition parity, Thief/Cleric routing, Heal behavior, regression evidence |
 | M6 | [M6-status-elements-v1.md](M6-status-elements-v1.md) | Status effects, element multipliers, and HUD status indicator regression coverage |
 | M6 | [M6-item-affix-hud-v1.md](M6-item-affix-hud-v1.md) | Item affix HUD summary, Common zero-affix regression, equipment refresh, and CSV integrity |
+| M7 | [M7-character-stats-panel-v1.md](M7-character-stats-panel-v1.md) | Character stat info HUD, final primary/derived stat display, toggle behavior, and CSV integrity |

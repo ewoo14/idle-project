@@ -2,6 +2,7 @@
 
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
+#include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -90,6 +91,59 @@ bool FStatAllocationHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Negative available points clamp to zero"), Empty.AvailablePoints, 0);
 	TestFalse(TEXT("Reset is disabled when no stat points are allocated"), Empty.bCanReset);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStatInfoHudViewModelTest,
+	"IdleProject.UI.HUD.StatInfoPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStatInfoHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FPrimaryStats PrimaryStats(12.0f, 8.0f, 7.0f, 6.0f, 11.0f, 5.0f);
+	FDerivedStats DerivedStats;
+	DerivedStats.Hp = 234.4f;
+	DerivedStats.Mp = 88.0f;
+	DerivedStats.PhysAtk = 24.0f;
+	DerivedStats.MagicAtk = 17.0f;
+	DerivedStats.PhysDef = 16.0f;
+	DerivedStats.MagicDef = 9.0f;
+	DerivedStats.AtkSpeed = 1.25f;
+	DerivedStats.MoveSpeed = 610.0f;
+	DerivedStats.CritRate = 0.123f;
+	DerivedStats.CritDmg = 1.75f;
+	DerivedStats.Dodge = 0.087f;
+	DerivedStats.Accuracy = 0.955f;
+
+	const FIdleHUDStatInfoViewModel ViewModel = IdleProject::UI::BuildStatInfoViewModel(
+		PrimaryStats,
+		DerivedStats,
+		42,
+		EClassId::Mage,
+		3);
+
+	TestEqual(TEXT("Stat info title is localized"), ViewModel.Title.ToString(), FString(TEXT("Stat Info")));
+	TestEqual(TEXT("Header includes class, level, and rebirth count"), ViewModel.HeaderLabel.ToString(), FString(TEXT("Mage  Lv. 42  Rebirth 3")));
+	TestEqual(TEXT("Stat info exposes six primary rows"), ViewModel.PrimaryRows.Num(), 6);
+	TestEqual(TEXT("Primary INT maps to FPrimaryStats::Int_"), ViewModel.PrimaryRows[2].ValueLabel.ToString(), FString(TEXT("7")));
+	TestEqual(TEXT("Stat info exposes eleven derived rows"), ViewModel.DerivedRows.Num(), 11);
+	if (ViewModel.DerivedRows.Num() < 11)
+	{
+		IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+		return false;
+	}
+	TestEqual(TEXT("HP rounds to an integer"), ViewModel.DerivedRows[0].ValueLabel.ToString(), FString(TEXT("234")));
+	TestEqual(TEXT("MP rounds to an integer"), ViewModel.DerivedRows[1].ValueLabel.ToString(), FString(TEXT("88")));
+	TestEqual(TEXT("Attack speed formats as percent"), ViewModel.DerivedRows[6].ValueLabel.ToString(), FString(TEXT("125%")));
+	TestEqual(TEXT("Crit rate formats as percent"), ViewModel.DerivedRows[7].ValueLabel.ToString(), FString(TEXT("12%")));
+	TestEqual(TEXT("Crit damage formats as multiplier"), ViewModel.DerivedRows[8].ValueLabel.ToString(), FString(TEXT("x1.75")));
+	TestEqual(TEXT("Accuracy formats as percent"), ViewModel.DerivedRows[10].ValueLabel.ToString(), FString(TEXT("96%")));
+	TestEqual(TEXT("Toggle hitbox name is stable"), ViewModel.ToggleHitBoxName, FName(TEXT("StatInfoToggle")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 

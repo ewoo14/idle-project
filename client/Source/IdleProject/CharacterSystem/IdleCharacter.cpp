@@ -95,6 +95,12 @@ void AIdleCharacter::BeginPlay()
 	{
 		Inventory->OnEquippedChanged.AddDynamic(this, &AIdleCharacter::HandleEquippedChanged);
 	}
+	if (UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
+	{
+		Level = FMath::Max(1, IdleGameInstance->GetCharacterLevel());
+		IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleCharacter::HandleLevelUp);
+		IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleCharacter::HandleStatPointsChanged);
+	}
 	SetClassId(DefaultClassId);
 	LastObservedHp = Combat ? Combat->CurrentHp : 0.0f;
 
@@ -111,11 +117,6 @@ void AIdleCharacter::BeginPlay()
 		Combat->OnDeath.AddDynamic(this, &AIdleCharacter::HandleDeath);
 	}
 
-	if (UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
-	{
-		IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleCharacter::HandleLevelUp);
-		IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleCharacter::HandleStatPointsChanged);
-	}
 }
 
 void AIdleCharacter::Tick(float DeltaSeconds)
@@ -146,7 +147,9 @@ void AIdleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 void AIdleCharacter::RefreshDerivedStats()
 {
-	FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, Level);
+	const int32 EffectiveLevel = GetEffectiveLevel();
+	Level = EffectiveLevel;
+	FPrimaryStats Primary = FStatFormulas::DefaultPrimaryStats(DefaultClassId, EffectiveLevel);
 	const FDerivedStats EquipBonus = Inventory ? Inventory->ComputeEquipmentBonus() : FDerivedStats();
 	const UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>();
 	const int32 RebirthBonusPoints = IdleGameInstance ? IdleGameInstance->GetRebirthBonusPoints() : 0;
@@ -161,17 +164,20 @@ void AIdleCharacter::RefreshDerivedStats()
 		Primary.Luk += Allocated.Luk;
 	}
 
-	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, Level, EquipBonus, RebirthBonusPoints);
+	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, EffectiveLevel, EquipBonus, RebirthBonusPoints);
 	if (Skills)
 	{
 		Skills->ApplyPassivesToStats(Derived);
 	}
 
+	CachedPrimaryStats = Primary;
+	CachedDerivedStats = Derived;
+
 	UE_LOG(
 		LogTemp,
 		Display,
 		TEXT("[Inventory] Stats refreshed L%d ClassId=%d HP=%.1f ATK=%.1f DEF=%.1f EquipAtk=%.1f EquipDef=%.1f EquipHp=%.1f"),
-		Level,
+		EffectiveLevel,
 		static_cast<int32>(DefaultClassId),
 		Derived.Hp,
 		Derived.PhysAtk,
@@ -215,6 +221,21 @@ void AIdleCharacter::SetClassId(EClassId NewClassId)
 EClassId AIdleCharacter::GetClassId() const
 {
 	return DefaultClassId;
+}
+
+FPrimaryStats AIdleCharacter::GetCurrentPrimaryStats() const
+{
+	return CachedPrimaryStats;
+}
+
+FDerivedStats AIdleCharacter::GetCurrentDerivedStats() const
+{
+	return CachedDerivedStats;
+}
+
+int32 AIdleCharacter::GetCurrentLevel() const
+{
+	return GetEffectiveLevel();
 }
 
 void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)
@@ -514,4 +535,14 @@ void AIdleCharacter::ToggleQuestLog(const FInputActionValue& Value)
 	{
 		IdleHUD->ToggleQuestLog();
 	}
+}
+
+int32 AIdleCharacter::GetEffectiveLevel() const
+{
+	if (const UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
+	{
+		return FMath::Max(1, IdleGameInstance->GetCharacterLevel());
+	}
+
+	return FMath::Max(1, Level);
 }

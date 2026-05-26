@@ -45,6 +45,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Class")
 	EClassId GetClassId() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	FPrimaryStats GetCurrentPrimaryStats() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	FDerivedStats GetCurrentDerivedStats() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	int32 GetCurrentLevel() const;
+
 	UFUNCTION()
 	void HandleLevelUp(int32 NewLevel);
 
@@ -118,6 +127,12 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Idle")
 	int32 Level = 1;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Stats")
+	FPrimaryStats CachedPrimaryStats;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Stats")
+	FDerivedStats CachedDerivedStats;
+
 private:
 	UFUNCTION()
 	void HandleEquippedChanged(EItemSlot Slot);
@@ -142,6 +157,7 @@ private:
 	void Attack(const FInputActionValue& Value);
 	void ToggleMenu(const FInputActionValue& Value);
 	void ToggleQuestLog(const FInputActionValue& Value);
+	int32 GetEffectiveLevel() const;
 
 	float LastObservedHp = 0.0f;
 	EBattleState LastObservedBattleState;

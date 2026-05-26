@@ -258,6 +258,22 @@ struct IDLEPROJECT_API FIdleHUDStatPanelViewModel
 	TArray<FIdleHUDStatRowViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDStatInfoRowViewModel
+{
+	FText StatLabel;
+	FText ValueLabel;
+};
+
+struct IDLEPROJECT_API FIdleHUDStatInfoViewModel
+{
+	FText Title;
+	FText HeaderLabel;
+	FText ToggleLabel;
+	FName ToggleHitBoxName;
+	TArray<FIdleHUDStatInfoRowViewModel> PrimaryRows;
+	TArray<FIdleHUDStatInfoRowViewModel> DerivedRows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -280,6 +296,7 @@ IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorVie
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
+IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -363,6 +380,10 @@ private:
 	void DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float X, float Y, float Width, float Height);
 	void AllocateStatFromHitBox(FName BoxName);
 	void ResetStatAllocation();
+	void DrawStatInfoPanel();
+	void DrawStatInfoToggle(const FIdleHUDStatInfoViewModel& ViewModel, float X, float Y, float Scale);
+	void DrawStatInfoRow(const FIdleHUDStatInfoRowViewModel& Row, float X, float Y, float Width, float Height, const FLinearColor& AccentColor);
+	void ToggleStatInfoPanel();
 	void RankUpSkillFromHitBox(FName BoxName);
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();
@@ -407,4 +428,5 @@ private:
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
+	bool bStatInfoVisible = false;
 };
