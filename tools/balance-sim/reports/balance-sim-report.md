@@ -60,6 +60,24 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Rarity Enhancement Pressure
+
+- Rarity scales cost only; success rates, failure behavior, and stat payoff
+  stay unchanged.
+- Eight Legendary slots: 1,410,644.08 expected gold,
+  2.155h at sampled median Lv50 gold/hour.
+
+<!-- markdownlint-disable MD013 -->
+
+| Rarity | Multiplier | Minimum +0 to +5 gold | Expected +0 to +5 gold | Hours at median Lv50 gold/hour |
+| --- | ---: | ---: | ---: | ---: |
+| Common | 1 | 5500 | 11020.66 | 0.017h |
+| Rare | 4 | 22000 | 44082.63 | 0.067h |
+| Epic | 8 | 44000 | 88165.25 | 0.135h |
+| Legendary | 16 | 88000 | 176330.51 | 0.269h |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Formula Sources
 
 - server/src/core/formulas/level.ts

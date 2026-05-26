@@ -11,12 +11,12 @@
 
 namespace
 {
-FItemInstance MakeEnhanceTestItem(FName ItemId, EItemSlot Slot, int32 EnhanceLevel = 0)
+FItemInstance MakeEnhanceTestItem(FName ItemId, EItemSlot Slot, int32 EnhanceLevel = 0, EItemRarity Rarity = EItemRarity::Rare)
 {
 	FItemInstance Item;
 	Item.ItemId = ItemId;
 	Item.Slot = Slot;
-	Item.Rarity = EItemRarity::Rare;
+	Item.Rarity = Rarity;
 	Item.DisplayName = FText::FromName(ItemId);
 	Item.BonusAtk = 10.0f;
 	Item.EnhanceLevel = EnhanceLevel;
@@ -113,11 +113,30 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Insufficient gold spends nothing"), NoGold.GoldSpent, static_cast<int64>(0));
 	TestEqual(TEXT("Insufficient gold keeps level"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 0);
 
-	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(0));
+	UIdleGameInstance* CommonGameInstance = NewObject<UIdleGameInstance>();
+	CommonGameInstance->SetEnhanceRandomSeed(1);
+	UInventoryComponent* CommonInventory = NewObject<UInventoryComponent>();
+	CommonInventory->AddItem(MakeEnhanceTestItem(TEXT("common_sword"), EItemSlot::Weapon, 0, EItemRarity::Common));
+	CommonGameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(0));
+	const FEnhanceAttemptResult CommonAttempt = CommonGameInstance->TryEnhanceEquipped(EItemSlot::Weapon, CommonInventory);
+	TestTrue(TEXT("Common item keeps legacy single-argument cost gate"), CommonAttempt.bAttempted);
+	TestEqual(TEXT("Common item spends legacy level 0 cost once"), CommonAttempt.GoldSpent, FEnhanceFormula::GetEnhanceCost(0));
+	TestEqual(TEXT("Common item deducts only legacy level 0 cost"), CommonGameInstance->GetGold(), static_cast<int64>(0));
+
+	UIdleGameInstance* LegendaryGateGameInstance = NewObject<UIdleGameInstance>();
+	UInventoryComponent* LegendaryGateInventory = NewObject<UInventoryComponent>();
+	LegendaryGateInventory->AddItem(MakeEnhanceTestItem(TEXT("legendary_sword"), EItemSlot::Weapon, 0, EItemRarity::Legendary));
+	LegendaryGateGameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(0));
+	const FEnhanceAttemptResult LegendaryNoGold = LegendaryGateGameInstance->TryEnhanceEquipped(EItemSlot::Weapon, LegendaryGateInventory);
+	TestFalse(TEXT("Legendary item rejects Common-only gold budget"), LegendaryNoGold.bAttempted);
+	TestEqual(TEXT("Legendary item spends nothing below rarity-scaled cost"), LegendaryNoGold.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Legendary gold gate keeps balance unchanged"), LegendaryGateGameInstance->GetGold(), FEnhanceFormula::GetEnhanceCost(0));
+
+	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Rare));
 	const FEnhanceAttemptResult Success = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
 	TestTrue(TEXT("Enough gold attempts enhance"), Success.bAttempted);
 	TestTrue(TEXT("Seeded first enhance succeeds"), Success.bSuccess);
-	TestEqual(TEXT("Attempt spends level 0 cost once"), Success.GoldSpent, static_cast<int64>(100));
+	TestEqual(TEXT("Attempt spends rare level 0 cost once"), Success.GoldSpent, static_cast<int64>(400));
 	TestEqual(TEXT("Successful enhance returns new level"), Success.NewLevel, 1);
 	TestEqual(TEXT("Successful enhance mutates equipped item"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 1);
 	TestEqual(TEXT("Gold is deducted"), GameInstance->GetGold(), static_cast<int64>(0));
@@ -142,12 +161,12 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A deterministic failure seed is available"), FailingSeed != INDEX_NONE);
 
 	GameInstance->SetEnhanceRandomSeed(FailingSeed);
-	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1));
+	GameInstance->AddGold(FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1, EItemRarity::Rare));
 	const int64 GoldBeforeFailure = GameInstance->GetGold();
 	const FEnhanceAttemptResult Failure = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, FailInventory);
 	TestTrue(TEXT("Failed roll still attempts enhance"), Failure.bAttempted);
 	TestFalse(TEXT("Failed roll reports failure"), Failure.bSuccess);
-	TestEqual(TEXT("Failed roll spends exactly one attempt cost"), Failure.GoldSpent, FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1));
+	TestEqual(TEXT("Failed roll spends exactly one rarity-scaled attempt cost"), Failure.GoldSpent, FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1, EItemRarity::Rare));
 	TestEqual(TEXT("Failed roll deducts gold once"), GameInstance->GetGold(), GoldBeforeFailure - Failure.GoldSpent);
 	TestEqual(TEXT("Failed roll keeps current level"), Failure.NewLevel, FEnhanceFormula::MaxEnhanceLevel - 1);
 	TestEqual(TEXT("Failed roll does not mutate item level"), FailInventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel - 1);

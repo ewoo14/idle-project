@@ -3,8 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeDamage } from "../../server/src/core/formulas/combat.js";
 import {
+  type EnhanceItemRarity,
   getEnhanceCost,
   getEnhanceSuccessRate,
+  getRarityCostMultiplier,
   MAX_ENHANCE_LEVEL,
 } from "../../server/src/core/formulas/enhance.js";
 import {
@@ -129,7 +131,18 @@ export type EnhancementPressure = {
   expectedGoldCostToMax: number;
   medianGoldPerHourAtLevel50: number;
   expectedHoursAtMedianGoldPerHour: number;
+  rarityScenarios: EnhancementRarityScenario[];
+  legendaryEightSlotExpectedGoldCost: number;
+  legendaryEightSlotExpectedHoursAtMedianGoldPerHour: number;
   rows: EnhancementPressureRow[];
+};
+
+export type EnhancementRarityScenario = {
+  rarity: EnhanceItemRarity;
+  multiplier: number;
+  goldCostFloorToMax: number;
+  expectedGoldCostToMax: number;
+  expectedHoursAtMedianGoldPerHour: number;
 };
 
 const DEFAULT_RUNS = 1000;
@@ -143,6 +156,13 @@ const ACTIVE_EXP_TUNING = 5.5;
 const ACTIVE_GOLD_TUNING = 7.4;
 const SKILL_DPS_MULTIPLIER = 1.35;
 const BOSS_HP_MULTIPLIER = 0.012;
+const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
+  "Common",
+  "Rare",
+  "Epic",
+  "Legendary",
+];
+const EQUIPMENT_SLOT_COUNT = 8;
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -559,6 +579,16 @@ function buildEnhancementPressure(
     0.5,
   );
   const expectedGoldCostToMax = round(cumulativeExpectedGoldCost, 2);
+  const rarityScenarios = ENHANCEMENT_RARITY_SCENARIOS.map((rarity) =>
+    buildEnhancementRarityScenario(rarity, medianGoldPerHourAtLevel50),
+  );
+  const legendaryScenario = rarityScenarios.find(
+    (scenario) => scenario.rarity === "Legendary",
+  );
+  const legendaryEightSlotExpectedGoldCost = round(
+    (legendaryScenario?.expectedGoldCostToMax ?? 0) * EQUIPMENT_SLOT_COUNT,
+    2,
+  );
 
   return {
     maxLevel: MAX_ENHANCE_LEVEL,
@@ -569,7 +599,44 @@ function buildEnhancementPressure(
       expectedGoldCostToMax / Math.max(1, medianGoldPerHourAtLevel50),
       3,
     ),
+    rarityScenarios,
+    legendaryEightSlotExpectedGoldCost,
+    legendaryEightSlotExpectedHoursAtMedianGoldPerHour: round(
+      legendaryEightSlotExpectedGoldCost /
+        Math.max(1, medianGoldPerHourAtLevel50),
+      3,
+    ),
     rows,
+  };
+}
+
+function buildEnhancementRarityScenario(
+  rarity: EnhanceItemRarity,
+  medianGoldPerHourAtLevel50: number,
+): EnhancementRarityScenario {
+  let expectedGoldCostToMax = 0;
+  let goldCostFloorToMax = 0;
+  for (
+    let currentLevel = 0;
+    currentLevel < MAX_ENHANCE_LEVEL;
+    currentLevel += 1
+  ) {
+    const cost = getEnhanceCost(currentLevel, rarity);
+    const successRate = getEnhanceSuccessRate(currentLevel);
+    goldCostFloorToMax += cost;
+    expectedGoldCostToMax += successRate > 0 ? cost / successRate : 0;
+  }
+
+  const roundedExpectedGoldCostToMax = round(expectedGoldCostToMax, 2);
+  return {
+    rarity,
+    multiplier: getRarityCostMultiplier(rarity),
+    goldCostFloorToMax,
+    expectedGoldCostToMax: roundedExpectedGoldCostToMax,
+    expectedHoursAtMedianGoldPerHour: round(
+      roundedExpectedGoldCostToMax / Math.max(1, medianGoldPerHourAtLevel50),
+      3,
+    ),
   };
 }
 
@@ -689,11 +756,36 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "<!-- markdownlint-enable MD013 -->",
     "",
+    "## Rarity Enhancement Pressure",
+    "",
+    "- Rarity scales cost only; success rates, failure behavior, and stat payoff",
+    "  stay unchanged.",
+    `- Eight Legendary slots: ${formatNumber(report.model.enhancementPressure.legendaryEightSlotExpectedGoldCost)} expected gold,`,
+    `  ${report.model.enhancementPressure.legendaryEightSlotExpectedHoursAtMedianGoldPerHour}h at sampled median Lv50 gold/hour.`,
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Rarity | Multiplier | Minimum +0 to +5 gold | Expected +0 to +5 gold | Hours at median Lv50 gold/hour |",
+    "| --- | ---: | ---: | ---: | ---: |",
+    ...report.model.enhancementPressure.rarityScenarios.map(
+      (row) =>
+        `| ${row.rarity} | ${row.multiplier} | ${row.goldCostFloorToMax} | ${row.expectedGoldCostToMax} | ${row.expectedHoursAtMedianGoldPerHour}h |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
     "## Formula Sources",
     "",
     ...report.model.formulas.map((source) => `- ${source}`),
   ];
   return `${lines.join("\n")}\n`;
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+  }).format(value);
 }
 
 function randomClass(random: () => number): ClassId {

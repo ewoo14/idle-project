@@ -48,6 +48,11 @@ shared formula source, then reports minimum all-success gold cost, expected
 gold cost using `cost / successRate`, and expected hours at sampled median Lv50
 gold/hour.
 
+PR #39 extends that pressure check with rarity-scaled scenarios for Common,
+Rare, Epic, and Legendary. The report keeps the Common +0 to +5 detail table
+for PR #33 compatibility, then adds a rarity summary and an eight-slot
+Legendary estimate for high-rarity sink pressure.
+
 ## V1 Interpretation
 
 The V1 pass is a distribution check, not a curve rewrite. It validates the
@@ -82,6 +87,10 @@ Enhancement V1 pressure, using the current +0 to +5 formula:
 - minimum all-success cost: 5,500 gold
 - expected cost: 11,020.66 gold
 - expected cost at median sampled Lv50 gold/hour: 0.017h
+- Legendary expected cost: 176,330.51 gold, or 0.269h at the sampled median
+  Lv50 gold/hour
+- eight Legendary slots: 1,410,644.08 expected gold, or 2.155h at the sampled
+  median Lv50 gold/hour
 
-This makes enhancement a light early gold sink in the current model rather than
-a blocker for the first rebirth target.
+This keeps Common enhancement a light early gold sink in the current model
+while making high-rarity enhancement visible as midgame/endgame pressure.

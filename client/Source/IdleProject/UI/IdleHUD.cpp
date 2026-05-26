@@ -566,7 +566,7 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 
 		Row.EnhanceLevel = FMath::Clamp(Item->EnhanceLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
 		Row.bMaxLevel = Row.EnhanceLevel >= FEnhanceFormula::MaxEnhanceLevel;
-		Row.Cost = FEnhanceFormula::GetEnhanceCost(Row.EnhanceLevel);
+		Row.Cost = FEnhanceFormula::GetEnhanceCost(Row.EnhanceLevel, Item->Rarity);
 		Row.SuccessRate = FEnhanceFormula::GetEnhanceSuccessRate(Row.EnhanceLevel);
 		Row.bGoldEnough = Gold >= Row.Cost;
 		Row.bCanEnhance = !Row.bMaxLevel && Row.Cost > 0 && Row.bGoldEnough;

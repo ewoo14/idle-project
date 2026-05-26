@@ -139,6 +139,20 @@ bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Level 1 cost"), FEnhanceFormula::GetEnhanceCost(1), static_cast<int64>(400));
 	TestEqual(TEXT("Negative level uses level 0 cost"), FEnhanceFormula::GetEnhanceCost(-1), static_cast<int64>(100));
 	TestEqual(TEXT("Max level has no next enhance cost"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel), static_cast<int64>(0));
+	TestEqual(TEXT("None rarity has no enhance cost multiplier"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::None), static_cast<int64>(0));
+	TestEqual(TEXT("Common rarity keeps legacy cost multiplier"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Common), static_cast<int64>(1));
+	TestEqual(TEXT("Uncommon rarity doubles enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Uncommon), static_cast<int64>(2));
+	TestEqual(TEXT("Rare rarity quadruples enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Rare), static_cast<int64>(4));
+	TestEqual(TEXT("Epic rarity multiplies enhance cost by eight"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Epic), static_cast<int64>(8));
+	TestEqual(TEXT("Legendary rarity multiplies enhance cost by sixteen"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Legendary), static_cast<int64>(16));
+	TestEqual(TEXT("Common overload matches legacy single-argument cost"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Common), static_cast<int64>(400));
+	TestEqual(TEXT("Rare level 1 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Rare), static_cast<int64>(1600));
+	TestEqual(TEXT("Legendary level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Legendary), static_cast<int64>(1600));
+	TestEqual(TEXT("Max level rarity cost remains zero"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel, EItemRarity::Legendary), static_cast<int64>(0));
+	TestEqual(TEXT("Uncommon level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Uncommon), static_cast<int64>(5000));
+	TestEqual(TEXT("Rare level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Rare), static_cast<int64>(10000));
+	TestEqual(TEXT("Epic level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Epic), static_cast<int64>(20000));
+	TestEqual(TEXT("Legendary level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Legendary), static_cast<int64>(40000));
 
 	TestEqual(TEXT("Level 0 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(0), 0.95f);
 	TestEqual(TEXT("Level 4 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(4), 0.40f);
@@ -227,6 +241,8 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 {
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
 	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0));
+	Inventory->AddItem(MakeTestItem(TEXT("legendary_gloves"), EItemSlot::Gloves, EItemRarity::Legendary, 0.0f, 1.0f, 0.0f, 0));
+	Inventory->AddItem(MakeTestItem(TEXT("common_cloak"), EItemSlot::Cloak, EItemRarity::Common, 0.0f, 1.0f, 0.0f, 0));
 
 	const FIdleHUDEnhancePanelViewModel NoGold = IdleProject::UI::BuildEnhancePanelViewModel(
 		*Inventory,
@@ -235,7 +251,9 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 		false);
 	TestEqual(TEXT("Enhance panel exposes all equipment slots"), NoGold.Rows.Num(), 8);
 	TestEqual(TEXT("Weapon row uses current enhance level"), NoGold.Rows[0].EnhanceLevel, 0);
-	TestEqual(TEXT("Weapon row shows level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(100));
+	TestEqual(TEXT("Rare weapon row shows rarity-scaled level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(400));
+	TestEqual(TEXT("Legendary gloves row shows rarity-scaled level zero cost"), NoGold.Rows[5].Cost, static_cast<int64>(1600));
+	TestEqual(TEXT("Common cloak row preserves legacy level zero cost"), NoGold.Rows[6].Cost, static_cast<int64>(100));
 	TestFalse(TEXT("Weapon row is disabled without gold"), NoGold.Rows[0].bCanEnhance);
 	TestFalse(TEXT("Weapon row reports insufficient gold"), NoGold.Rows[0].bGoldEnough);
 	TestFalse(TEXT("Empty helmet row is not enhanceable"), NoGold.Rows[1].bCanEnhance);
@@ -243,7 +261,7 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 
 	const FIdleHUDEnhancePanelViewModel EnoughGold = IdleProject::UI::BuildEnhancePanelViewModel(
 		*Inventory,
-		FEnhanceFormula::GetEnhanceCost(0),
+		FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Rare),
 		FText::GetEmpty(),
 		false);
 	TestTrue(TEXT("Weapon row enables when equipped and gold is enough"), EnoughGold.Rows[0].bCanEnhance);

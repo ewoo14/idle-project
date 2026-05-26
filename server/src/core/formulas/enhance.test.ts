@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getEnhanceCost,
   getEnhanceSuccessRate,
+  getRarityCostMultiplier,
   MAX_ENHANCE_LEVEL,
   rollEnhanceSuccess,
 } from "./enhance.js";
@@ -25,6 +26,36 @@ describe("enhance formulas", () => {
 
   it("clamps negative levels to the level zero cost", () => {
     expect(getEnhanceCost(-1)).toBe(100);
+  });
+
+  it.each([
+    ["None", 0],
+    ["Common", 1],
+    ["Uncommon", 2],
+    ["Rare", 4],
+    ["Epic", 8],
+    ["Legendary", 16],
+  ] as const)("computes %s enhance cost multiplier", (rarity, expected) => {
+    expect(getRarityCostMultiplier(rarity)).toBe(expected);
+  });
+
+  it("applies rarity multiplier while keeping Common cost compatible", () => {
+    expect(getEnhanceCost(1, "Common")).toBe(400);
+    expect(getEnhanceCost(1, "Rare")).toBe(1600);
+    expect(getEnhanceCost(0, "Legendary")).toBe(1600);
+    expect(getEnhanceCost(MAX_ENHANCE_LEVEL, "Legendary")).toBe(0);
+  });
+
+  it.each([
+    ["Common", [100, 400, 900, 1600, 2500, 0]],
+    ["Uncommon", [200, 800, 1800, 3200, 5000, 0]],
+    ["Rare", [400, 1600, 3600, 6400, 10000, 0]],
+    ["Epic", [800, 3200, 7200, 12800, 20000, 0]],
+    ["Legendary", [1600, 6400, 14400, 25600, 40000, 0]],
+  ] as const)("matches the UE5 rarity-scaled cost table for %s", (rarity, expectedCosts) => {
+    for (const [currentLevel, expected] of expectedCosts.entries()) {
+      expect(getEnhanceCost(currentLevel, rarity)).toBe(expected);
+    }
   });
 
   it.each([
