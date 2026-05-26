@@ -28,6 +28,7 @@ void UIdleGameInstance::Init()
 	EnsureQuestService();
 	EnsurePetService();
 	EnsureSeasonService();
+	EnsureStageService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	LoadLanguage();
 	LoadLastSeenUnixSec();
@@ -51,6 +52,7 @@ void UIdleGameInstance::Shutdown()
 	QuestService = nullptr;
 	PetService = nullptr;
 	SeasonService = nullptr;
+	StageService = nullptr;
 	Super::Shutdown();
 }
 
@@ -121,6 +123,10 @@ bool UIdleGameInstance::Rebirth()
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	Gold = FMath::FloorToInt64(static_cast<double>(Gold) * 0.1);
 	bChapter1BossDefeated = false;
+	if (StageService)
+	{
+		StageService->InitializeDefaultStages();
+	}
 
 	OnGoldChanged.Broadcast(Gold);
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
@@ -131,6 +137,11 @@ bool UIdleGameInstance::Rebirth()
 void UIdleGameInstance::MarkChapter1BossDefeated()
 {
 	bChapter1BossDefeated = true;
+	EnsureStageService();
+	if (StageService)
+	{
+		StageService->MarkCurrentChapterBossDefeated();
+	}
 }
 
 FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
@@ -247,6 +258,12 @@ void UIdleGameInstance::InitializePetSeasonServicesForTests()
 	SeasonService->InitializeDefaultSeason();
 }
 
+void UIdleGameInstance::InitializeStageServiceForTests()
+{
+	StageService = NewObject<UStageService>(this);
+	StageService->InitializeDefaultStages();
+}
+
 bool UIdleGameInstance::EquipPet(const FString& PetId)
 {
 	EnsurePetService();
@@ -353,6 +370,15 @@ void UIdleGameInstance::EnsureSeasonService()
 	{
 		SeasonService = NewObject<USeasonService>(this);
 		SeasonService->InitializeDefaultSeason();
+	}
+}
+
+void UIdleGameInstance::EnsureStageService()
+{
+	if (!StageService)
+	{
+		StageService = NewObject<UStageService>(this);
+		StageService->InitializeDefaultStages();
 	}
 }
 

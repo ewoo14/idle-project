@@ -57,3 +57,12 @@
 
 ## 7. 후속
 - 다중 챕터 + 챕터 전환 연출, 스테이지 보상 상자/드롭 차등, 서버 권위 스테이지, 맵 배경/BGM(외부).
+---
+
+## 8. Codex character 구현 메모
+
+- `UStageService`와 `FStageFormula`를 `client/Source/IdleProject/GameCore/`에 추가했다.
+- `UIdleGameInstance`는 `StageService`를 생성/보유하고 테스트 초기화 및 챕터 1 보스 격파 연계를 제공한다.
+- `AIdleProjectGameModeBase::SpawnMonsterAt`은 현재 스테이지 정보로 몬스터 스탯 배율, 약점, 보스 여부를 설정한다.
+- `ScheduleRespawn`은 몬스터 사망 시 `StageService->RecordKill(bWasBoss)`와 기존 퀘스트 처치 훅을 함께 기록한다.
+- Automation: `IdleProject.GameCore.StageFormula.*`, `IdleProject.GameCore.StageService.*`, `IdleProject.GameCore.IdleGameInstance.StageServiceHooks`.

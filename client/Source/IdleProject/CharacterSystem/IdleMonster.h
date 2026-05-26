@@ -34,6 +34,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
 	ESkillElement GetWeakElement() const { return WeakElement; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetStageStatMultiplier(float InStageStatMultiplier);
+
 	float GetConfiguredMaxHp() const;
 	float GetConfiguredAttack() const;
 
@@ -64,6 +67,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	ESkillElement WeakElement = ESkillElement::Fire;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float StageStatMultiplier = 1.0f;
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);

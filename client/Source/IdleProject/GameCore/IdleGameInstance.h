@@ -6,6 +6,7 @@
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
 #include "GameCore/SeasonService.h"
+#include "GameCore/StageService.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
@@ -38,6 +39,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	USeasonService* GetSeasonService() const { return SeasonService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UStageService* GetStageService() const { return StageService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -122,6 +126,8 @@ public:
 
 	void InitializePetSeasonServicesForTests();
 
+	void InitializeStageServiceForTests();
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool EquipPet(const FString& PetId);
 
@@ -168,6 +174,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USeasonService> SeasonService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UStageService> StageService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -203,6 +212,7 @@ private:
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();
+	void EnsureStageService();
 	void LoadLanguage();
 	void SaveLanguage() const;
 	void LoadLastSeenUnixSec();

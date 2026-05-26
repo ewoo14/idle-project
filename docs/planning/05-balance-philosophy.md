@@ -508,3 +508,22 @@ Automation coverage:
   the effective damage coefficient in `TickSkills`/damage application.
 - `IdleProject.Character.LevelUp.GrantsSkillPoint` verifies the character
   level-up handler grants one skill point.
+---
+
+## PR #31 스테이지 진행 V1 수치
+
+챕터 1은 V1 기준 5개 스테이지로 고정한다. 전역 스테이지 인덱스는
+`(chapter - 1) * 5 + (stage - 1)`이며, 몬스터 HP/ATK와 보상 배율은
+`1.0 + globalStageIndex * 0.15`를 사용한다. 1-1은 1.00배, 1-5는 1.60배다.
+
+| 스테이지 | 처치 목표 | 보스 | 약점 |
+| --- | ---: | --- | --- |
+| 1-1 | 5 | 아니오 | None |
+| 1-2 | 8 | 아니오 | None |
+| 1-3 | 12 | 아니오 | Ice |
+| 1-4 | 16 | 아니오 | Holy |
+| 1-5 | 1 | 예 | Fire |
+
+1-5 보스 처치 시 `MarkChapter1BossDefeated()`와 연계해 환생 조건의
+"챕터 1 보스 격파" 플래그를 세운다. V1은 다음 챕터 전환 없이 1-5 클리어
+상태를 유지한다.

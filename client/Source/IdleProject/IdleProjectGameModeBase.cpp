@@ -12,6 +12,9 @@
 #include "Engine/SkyLight.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
+#include "GameCore/IdleGameInstance.h"
+#include "GameCore/StageFormula.h"
+#include "GameCore/StageService.h"
 #include "TimerManager.h"
 #include "UI/IdleHUD.h"
 #include "UObject/ConstructorHelpers.h"
@@ -135,7 +138,14 @@ AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocat
 		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 	if (Monster)
 	{
-		Monster->SetBoss(bSpawnBoss);
+		const UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>();
+		const UStageService* StageService = GameInstance ? GameInstance->GetStageService() : nullptr;
+		const FStageInfo StageInfo = StageService ? StageService->GetCurrentStageInfo() : FStageInfo();
+		const bool bEffectiveBoss = bSpawnBoss || StageInfo.bBossStage;
+
+		Monster->SetBoss(bEffectiveBoss);
+		Monster->SetStageStatMultiplier(FStageFormula::ComputeMonsterStatMultiplier(StageInfo.GlobalStageIndex));
+		Monster->SetWeakElement(StageInfo.WeakElement);
 		Monster->FinishSpawning(FTransform(FRotator::ZeroRotator, SpawnLocation));
 		if (Monster->GetCombat())
 		{
@@ -155,10 +165,26 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 
 	const FVector RespawnLocation = DyingActor->GetActorLocation();
 	const AIdleMonster* DyingMonster = Cast<AIdleMonster>(DyingActor);
-	const bool bRespawnBoss = DyingMonster && DyingMonster->IsBoss();
-	FTimerHandle RespawnTimerHandle;
-	World->GetTimerManager().SetTimer(RespawnTimerHandle, FTimerDelegate::CreateWeakLambda(this, [this, RespawnLocation, bRespawnBoss]()
+	const bool bWasBoss = DyingMonster && DyingMonster->IsBoss();
+
+	if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
 	{
-		SpawnMonsterAt(RespawnLocation, bRespawnBoss);
+		bool bClearedChapterBoss = false;
+		if (UStageService* StageService = GameInstance->GetStageService())
+		{
+			StageService->RecordKill(bWasBoss);
+			bClearedChapterBoss = StageService->HasClearedCurrentChapterBoss();
+		}
+		GameInstance->RecordMonsterKilled();
+		if (bWasBoss && bClearedChapterBoss)
+		{
+			GameInstance->MarkChapter1BossDefeated();
+		}
+	}
+
+	FTimerHandle RespawnTimerHandle;
+	World->GetTimerManager().SetTimer(RespawnTimerHandle, FTimerDelegate::CreateWeakLambda(this, [this, RespawnLocation]()
+	{
+		SpawnMonsterAt(RespawnLocation, false);
 	}), MonsterRespawnDelay, false);
 }

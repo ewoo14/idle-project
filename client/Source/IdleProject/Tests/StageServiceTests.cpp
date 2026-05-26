@@ -1,0 +1,162 @@
+#include "Misc/AutomationTest.h"
+
+#include "CharacterSystem/IdleMonster.h"
+#include "CombatSystem/StatusElementTypes.h"
+#include "GameCore/IdleGameInstance.h"
+#include "GameCore/StageFormula.h"
+#include "GameCore/StageService.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleMonsterStageScalingTest,
+	"IdleProject.Combat.Monster.StageScaling",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleMonsterStageScalingTest::RunTest(const FString& Parameters)
+{
+	AIdleMonster* Monster = NewObject<AIdleMonster>();
+	TestNotNull(TEXT("Monster is created"), Monster);
+	if (!Monster)
+	{
+		return false;
+	}
+
+	Monster->SetBoss(false);
+	Monster->SetStageStatMultiplier(1.6f);
+	Monster->SetWeakElement(ESkillElement::Fire);
+
+	TestEqual(TEXT("Normal monster HP uses stage multiplier"), Monster->GetConfiguredMaxHp(), 80.0f);
+	TestEqual(TEXT("Normal monster attack uses stage multiplier"), Monster->GetConfiguredAttack(), 12.8f);
+	TestEqual(TEXT("Stage weak element overrides default monster weakness"), Monster->GetWeakElement(), ESkillElement::Fire);
+
+	Monster->SetBoss(true);
+	Monster->SetStageStatMultiplier(1.15f);
+	Monster->SetWeakElement(ESkillElement::Ice);
+
+	TestEqual(TEXT("Boss monster HP uses stage multiplier"), Monster->GetConfiguredMaxHp(), 575.0f);
+	TestEqual(TEXT("Boss monster attack uses stage multiplier"), Monster->GetConfiguredAttack(), 27.6f);
+	TestEqual(TEXT("Stage weak element can override boss default weakness"), Monster->GetWeakElement(), ESkillElement::Ice);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageFormulaScalingTest,
+	"IdleProject.GameCore.StageFormula.ScalingAndWeakElements",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageFormulaScalingTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Stage 1-1 has no stat scaling"), FStageFormula::ComputeMonsterStatMultiplier(0), 1.0f);
+	TestEqual(TEXT("Stage 1-2 scales stats by one step"), FStageFormula::ComputeMonsterStatMultiplier(1), 1.15f);
+	TestEqual(TEXT("Stage 1-5 scales stats by four steps"), FStageFormula::ComputeMonsterStatMultiplier(4), 1.6f);
+
+	TestEqual(TEXT("Stage 1-1 reward multiplier starts at one"), FStageFormula::ComputeRewardMultiplier(0), 1.0f);
+	TestEqual(TEXT("Stage 1-5 reward multiplier mirrors stat scaling"), FStageFormula::ComputeRewardMultiplier(4), 1.6f);
+
+	TestFalse(TEXT("Stage 1-4 is not a boss stage"), FStageFormula::IsBossStage(1, 4, 5));
+	TestTrue(TEXT("Stage 1-5 is a boss stage"), FStageFormula::IsBossStage(1, 5, 5));
+
+	TestEqual(TEXT("Stage 1-1 has no weakness"), FStageFormula::GetStageWeakElement(0), ESkillElement::None);
+	TestEqual(TEXT("Stage 1-2 has no weakness"), FStageFormula::GetStageWeakElement(1), ESkillElement::None);
+	TestEqual(TEXT("Stage 1-3 is weak to ice"), FStageFormula::GetStageWeakElement(2), ESkillElement::Ice);
+	TestEqual(TEXT("Stage 1-4 is weak to holy"), FStageFormula::GetStageWeakElement(3), ESkillElement::Holy);
+	TestEqual(TEXT("Stage 1-5 is weak to fire"), FStageFormula::GetStageWeakElement(4), ESkillElement::Fire);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageServiceProgressionTest,
+	"IdleProject.GameCore.StageService.Progression",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageServiceProgressionTest::RunTest(const FString& Parameters)
+{
+	UStageService* Stages = NewObject<UStageService>();
+	Stages->InitializeDefaultStages();
+
+	TestEqual(TEXT("Initial chapter is one"), Stages->GetCurrentChapter(), 1);
+	TestEqual(TEXT("Initial stage is one"), Stages->GetCurrentStage(), 1);
+	TestEqual(TEXT("Initial global stage index is zero"), Stages->GetGlobalStageIndex(), 0);
+	TestEqual(TEXT("Initial kills to advance mirrors stage one"), Stages->GetKillsToAdvance(), 5);
+	TestEqual(TEXT("Initial kill progress is zero"), Stages->GetKillsThisStage(), 0);
+
+	Stages->RecordKill(false);
+	TestEqual(TEXT("Normal kill increments current stage progress"), Stages->GetKillsThisStage(), 1);
+	TestEqual(TEXT("One kill does not advance stage one"), Stages->GetCurrentStage(), 1);
+
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		Stages->RecordKill(false);
+	}
+
+	TestEqual(TEXT("Fifth stage-one kill advances to stage two"), Stages->GetCurrentStage(), 2);
+	TestEqual(TEXT("Kill progress resets after stage advance"), Stages->GetKillsThisStage(), 0);
+	TestEqual(TEXT("Global stage index advances"), Stages->GetGlobalStageIndex(), 1);
+
+	FStageInfo StageTwoInfo = Stages->GetCurrentStageInfo();
+	TestEqual(TEXT("Stage info reports chapter"), StageTwoInfo.Chapter, 1);
+	TestEqual(TEXT("Stage info reports stage"), StageTwoInfo.Stage, 2);
+	TestFalse(TEXT("Stage two is not boss"), StageTwoInfo.bBossStage);
+	TestEqual(TEXT("Stage two has no weakness"), StageTwoInfo.WeakElement, ESkillElement::None);
+	TestEqual(TEXT("Stage two reports progress target"), StageTwoInfo.KillsToAdvance, 8);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageServiceBossCompletionTest,
+	"IdleProject.GameCore.StageService.BossCompletion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageServiceBossCompletionTest::RunTest(const FString& Parameters)
+{
+	UStageService* Stages = NewObject<UStageService>();
+	Stages->InitializeDefaultStages();
+
+	while (Stages->GetCurrentStage() < 5)
+	{
+		Stages->RecordKill(false);
+	}
+
+	TestEqual(TEXT("Stage service reaches boss stage"), Stages->GetCurrentStage(), 5);
+	TestTrue(TEXT("Current stage info flags boss stage"), Stages->GetCurrentStageInfo().bBossStage);
+	TestEqual(TEXT("Boss stage uses one required boss kill"), Stages->GetKillsToAdvance(), 1);
+
+	Stages->RecordKill(false);
+	TestEqual(TEXT("Normal kill does not clear boss stage"), Stages->GetCurrentStage(), 5);
+	TestEqual(TEXT("Normal kill does not increment boss progress"), Stages->GetKillsThisStage(), 0);
+
+	Stages->RecordKill(true);
+	TestEqual(TEXT("Boss kill completes V1 stage progression without exceeding stage five"), Stages->GetCurrentStage(), 5);
+	TestEqual(TEXT("Boss kill progress is retained at clear target"), Stages->GetKillsThisStage(), 1);
+	TestTrue(TEXT("V1 final boss clear is recorded"), Stages->HasClearedCurrentChapterBoss());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceStageServiceHooksTest,
+	"IdleProject.GameCore.IdleGameInstance.StageServiceHooks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceStageServiceHooksTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeStageServiceForTests();
+
+	UStageService* Stages = GameInstance->GetStageService();
+	TestNotNull(TEXT("Game instance creates stage service for tests"), Stages);
+	TestEqual(TEXT("Stage service starts at global index zero"), Stages->GetGlobalStageIndex(), 0);
+
+	GameInstance->MarkChapter1BossDefeated();
+
+	TestTrue(TEXT("Game instance stores chapter one boss defeat"), GameInstance->HasDefeatedChapter1Boss());
+	TestTrue(TEXT("Boss defeat also marks stage service final boss clear"), Stages->HasClearedCurrentChapterBoss());
+
+	return true;
+}
+
+#endif
