@@ -202,6 +202,27 @@ struct IDLEPROJECT_API FIdleHUDEnhancePanelViewModel
 	TArray<FIdleHUDEnhanceSlotViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDStatRowViewModel
+{
+	EPrimaryStat Stat = EPrimaryStat::Str;
+	FText StatLabel;
+	FText ValueLabel;
+	int32 BaseValue = 0;
+	int32 AllocatedValue = 0;
+	int32 TotalValue = 0;
+	bool bCanAllocate = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDStatPanelViewModel
+{
+	FText Title;
+	FText AvailableLabel;
+	FText ResetLabel;
+	int32 AvailablePoints = 0;
+	bool bCanReset = false;
+	TArray<FIdleHUDStatRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -216,6 +237,7 @@ IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArra
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
+IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -254,6 +276,9 @@ protected:
 	UFUNCTION()
 	void HandleEnhanceResult(const FEnhanceAttemptResult& Result);
 
+	UFUNCTION()
+	void HandleStatPointsChanged();
+
 private:
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
@@ -271,6 +296,10 @@ private:
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
+	void DrawStatAllocationPanel();
+	void DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float X, float Y, float Width, float Height);
+	void AllocateStatFromHitBox(FName BoxName);
+	void ResetStatAllocation();
 	void RankUpSkillFromHitBox(FName BoxName);
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();

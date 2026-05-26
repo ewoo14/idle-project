@@ -25,6 +25,8 @@ const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
+const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
+const FName StatResetHitBoxName(TEXT("StatReset"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
@@ -208,6 +210,53 @@ FName MakeSkillRankHitBoxName(FName SkillId)
 FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
 {
 	return FName(*(EnhanceSlotHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
+{
+	return FName(*(StatAllocationHitBoxPrefix + FString::FromInt(static_cast<int32>(Stat))));
+}
+
+const TCHAR* PrimaryStatToLabel(EPrimaryStat Stat)
+{
+	switch (Stat)
+	{
+	case EPrimaryStat::Str:
+		return TEXT("STR");
+	case EPrimaryStat::Dex:
+		return TEXT("DEX");
+	case EPrimaryStat::Int:
+		return TEXT("INT");
+	case EPrimaryStat::Wis:
+		return TEXT("WIS");
+	case EPrimaryStat::Con:
+		return TEXT("CON");
+	case EPrimaryStat::Luk:
+		return TEXT("LUK");
+	default:
+		return TEXT("-");
+	}
+}
+
+float GetPrimaryStatValue(const FPrimaryStats& Stats, EPrimaryStat Stat)
+{
+	switch (Stat)
+	{
+	case EPrimaryStat::Str:
+		return Stats.Str;
+	case EPrimaryStat::Dex:
+		return Stats.Dex;
+	case EPrimaryStat::Int:
+		return Stats.Int_;
+	case EPrimaryStat::Wis:
+		return Stats.Wis;
+	case EPrimaryStat::Con:
+		return Stats.Con;
+	case EPrimaryStat::Luk:
+		return Stats.Luk;
+	default:
+		return 0.0f;
+	}
 }
 
 const EItemSlot* GetEnhanceSlotOrder()
@@ -420,6 +469,48 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_READY"));
 		}
 
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
+FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints)
+{
+	FIdleHUDStatPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("STAT_PANEL_TITLE"));
+	ViewModel.AvailablePoints = FMath::Max(0, AvailablePoints);
+	ViewModel.AvailableLabel = FormatLocalizedUI(TEXT("STAT_AVAILABLE_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Points"), FText::AsNumber(ViewModel.AvailablePoints));
+	});
+	ViewModel.ResetLabel = IdleProject::Localization::UI(TEXT("STAT_RESET"));
+
+	const EPrimaryStat StatOrder[] = {
+		EPrimaryStat::Str,
+		EPrimaryStat::Dex,
+		EPrimaryStat::Int,
+		EPrimaryStat::Wis,
+		EPrimaryStat::Con,
+		EPrimaryStat::Luk
+	};
+
+	for (const EPrimaryStat Stat : StatOrder)
+	{
+		FIdleHUDStatRowViewModel Row;
+		Row.Stat = Stat;
+		Row.StatLabel = FText::FromString(PrimaryStatToLabel(Stat));
+		Row.BaseValue = FMath::RoundToInt(GetPrimaryStatValue(BaseStats, Stat));
+		Row.AllocatedValue = FMath::Max(0, FMath::RoundToInt(GetPrimaryStatValue(AllocatedStats, Stat)));
+		Row.TotalValue = Row.BaseValue + Row.AllocatedValue;
+		Row.bCanAllocate = ViewModel.AvailablePoints > 0;
+		Row.ValueLabel = FormatLocalizedUI(TEXT("STAT_VALUE_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Total"), FText::AsNumber(Row.TotalValue));
+			Args.Add(TEXT("Allocated"), FText::AsNumber(Row.AllocatedValue));
+		});
+
+		ViewModel.bCanReset = ViewModel.bCanReset || Row.AllocatedValue > 0;
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -722,6 +813,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnExpChanged.AddDynamic(this, &AIdleHUD::HandleExpChanged);
 	IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleHUD::HandleLevelUp);
 	IdleGameInstance->OnEnhanceResult.AddDynamic(this, &AIdleHUD::HandleEnhanceResult);
+	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
@@ -754,6 +846,11 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	UnbindPlayerCombat();
 
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
+	}
+
 	if (GEngine && GEngine->GameViewport && RootWidget)
 	{
 		GEngine->GameViewport->RemoveViewportWidgetContent(RootWidget.ToSharedRef());
@@ -780,6 +877,7 @@ void AIdleHUD::DrawHUD()
 
 	DrawStageIndicator();
 	DrawRebirthPanel();
+	DrawStatAllocationPanel();
 	DrawEnhancePanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
@@ -823,6 +921,16 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(EnhanceSlotHitBoxPrefix))
 	{
 		TryEnhanceFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(StatAllocationHitBoxPrefix))
+	{
+		AllocateStatFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == StatResetHitBoxName)
+	{
+		ResetStatAllocation();
 		return;
 	}
 	if (BoxName == RebirthHitBoxName)
@@ -930,6 +1038,11 @@ void AIdleHUD::HandleEnhanceResult(const FEnhanceAttemptResult& Result)
 		});
 	}
 
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::HandleStatPointsChanged()
+{
 	RefreshMouseInteraction();
 }
 
@@ -1311,6 +1424,129 @@ void AIdleHUD::TryEnhanceFromHitBox(FName BoxName)
 
 	IdleGameInstance->TryEnhanceEquipped(static_cast<EItemSlot>(SlotValue), PlayerInventory);
 	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawStatAllocationPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!IdleGameInstance || !IdleCharacter)
+	{
+		return;
+	}
+
+	const FPrimaryStats BaseStats = FStatFormulas::DefaultPrimaryStats(IdleCharacter->GetClassId(), IdleGameInstance->GetCharacterLevel());
+	const FIdleHUDStatPanelViewModel ViewModel = BuildStatPanelViewModel(
+		BaseStats,
+		IdleGameInstance->GetAllocatedPrimaryStats(),
+		IdleGameInstance->GetAvailableStatPoints());
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 300.0f * Scale;
+	const float HeaderHeight = 46.0f * Scale;
+	const float RowHeight = 30.0f * Scale;
+	const float RowGap = 5.0f * Scale;
+	const float Padding = 12.0f * Scale;
+	const float FooterHeight = 36.0f * Scale;
+	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + FooterHeight + Padding;
+	const float X = Canvas->SizeX - 700.0f * Scale;
+	const float Y = 92.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.AvailableLabel.ToString(), ViewModel.AvailablePoints > 0 ? Theme::AccentGold : Theme::TextMuted, X + PanelWidth - 118.0f * Scale, Y + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDStatRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawStatAllocationRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	const float ButtonWidth = 82.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + PanelHeight - Padding - ButtonHeight;
+	DrawRect(ViewModel.bCanReset ? Theme::AccentRed.CopyWithNewOpacity(0.86f) : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ResetLabel.ToString(), ViewModel.bCanReset ? Theme::TextPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	if (ViewModel.bCanReset)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), StatResetHitBoxName, true, 88);
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 30.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(Row.AllocatedValue > 0 ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.42f), X, Y, 4.0f * Scale, Height);
+	DrawText(Row.StatLabel.ToString(), Row.AllocatedValue > 0 ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.ValueLabel.ToString(), Theme::TextMuted, X + 58.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+
+	const float ButtonSize = 22.0f * Scale;
+	const float ButtonX = X + Width - ButtonSize - 7.0f * Scale;
+	const float ButtonY = Y + 4.0f * Scale;
+	DrawRect(Row.bCanAllocate ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonSize, ButtonSize);
+	DrawText(TEXT("+"), Row.bCanAllocate ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 6.0f * Scale, ButtonY + 2.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
+	if (Row.bCanAllocate)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), MakeStatAllocationHitBoxName(Row.Stat), true, 88);
+	}
+}
+
+void AIdleHUD::AllocateStatFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawStat = BoxName.ToString();
+	RawStat.RightChopInline(StatAllocationHitBoxPrefix.Len());
+	const int32 StatValue = FCString::Atoi(*RawStat);
+	if (StatValue < static_cast<int32>(EPrimaryStat::Str) || StatValue > static_cast<int32>(EPrimaryStat::Luk))
+	{
+		return;
+	}
+
+	IdleGameInstance->AllocateStatPoint(static_cast<EPrimaryStat>(StatValue));
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ResetStatAllocation()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->ResetStatPoints();
+	}
 	RefreshMouseInteraction();
 }
 
