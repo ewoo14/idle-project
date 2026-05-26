@@ -24,12 +24,17 @@ Automation: `IdleProject.Combat.Skills.RankPoints`
 ## Scenario 3: Rank Affects Damage And Cooldown
 
 Given `heavy_strike` has `baseDamageCoeff=2.5` and `baseCooldown=4.0s`
+When it is rank 0
+Then the effective damage coefficient is 2.5 and the effective cooldown is
+4.0s.
+
 When it reaches rank 5
 Then the effective damage coefficient is 3.75 and the effective cooldown is
 3.0s, matching +50% damage coefficient and -25% cooldown.
 
 When it reaches rank 20
-Then the effective cooldown is floored at 0.1s.
+Then the effective damage coefficient is 7.5 and the effective cooldown is
+floored at 0.1s.
 
 When it reaches rank 50
 Then the effective damage coefficient is 15.0, matching a 6.0x multiplier,

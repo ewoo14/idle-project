@@ -601,6 +601,9 @@ bool FSkillRankEffectiveValuesTest::RunTest(const FString& Parameters)
 	Skills->LoadDefaultWarriorSkills();
 
 	const FName HeavyStrike(TEXT("heavy_strike"));
+	TestEqual(TEXT("Rank zero damage coeff uses base value"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 2.5f);
+	TestEqual(TEXT("Rank zero cooldown uses base value"), Skills->GetEffectiveCooldown(HeavyStrike), 4.0f);
+
 	Skills->GrantSkillPoint(2);
 	Skills->RankUpSkill(HeavyStrike);
 	Skills->RankUpSkill(HeavyStrike);
@@ -627,6 +630,7 @@ bool FSkillRankEffectiveValuesTest::RunTest(const FString& Parameters)
 	}
 
 	TestEqual(TEXT("Rank twenty cooldown floors at point one seconds"), Skills->GetEffectiveCooldown(HeavyStrike), 0.1f);
+	TestEqual(TEXT("Rank twenty damage coeff triples base"), Skills->GetEffectiveDamageCoeff(HeavyStrike), 7.5f);
 
 	Skills->GrantSkillPoint(30);
 	for (int32 Index = 0; Index < 30; ++Index)
