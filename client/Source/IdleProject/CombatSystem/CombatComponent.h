@@ -101,6 +101,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat|Status")
 	bool HasActiveStatus(ESkillStatusEffect Type) const;
 
+	const TArray<FActiveSkillStatus>& GetActiveStatuses() const { return ActiveStatuses; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat")
 	bool IsDead() const;
 

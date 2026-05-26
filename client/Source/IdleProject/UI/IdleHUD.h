@@ -150,6 +150,15 @@ struct IDLEPROJECT_API FIdleHUDFloatingDamageViewModel
 	float TextScale = 1.0f;
 };
 
+struct IDLEPROJECT_API FIdleHUDStatusIndicatorViewModel
+{
+	ESkillStatusEffect Type = ESkillStatusEffect::None;
+	FString Label;
+	FLinearColor Color = FLinearColor::White;
+	float RemainingSeconds = 0.0f;
+	float Size = 0.0f;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -161,6 +170,7 @@ IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectio
 IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent);
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
+IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -224,6 +234,7 @@ private:
 	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimSeasonTierFromHitBox(FName BoxName);
 	void DrawFloatingDamageTexts(float Now);
+	void DrawStatusIndicators(float Now);
 	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)
