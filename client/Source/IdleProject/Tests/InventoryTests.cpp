@@ -471,6 +471,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 {
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
 	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0));
 	Inventory->AddItem(MakeTestItem(TEXT("legendary_gloves"), EItemSlot::Gloves, EItemRarity::Legendary, 0.0f, 1.0f, 0.0f, 0));
@@ -484,6 +486,8 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Enhance panel exposes all equipment slots"), NoGold.Rows.Num(), 8);
 	TestEqual(TEXT("Weapon row uses current enhance level"), NoGold.Rows[0].EnhanceLevel, 0);
 	TestEqual(TEXT("Rare weapon row shows rarity-scaled level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(400));
+	TestEqual(TEXT("Weapon row level label shows +N / 50 without a plus on the cap"), NoGold.Rows[0].LevelLabel.ToString(), FString(TEXT("+0 / 50")));
+	TestEqual(TEXT("Weapon row success label shows integer percent"), NoGold.Rows[0].SuccessRateLabel.ToString(), FString(TEXT("Success 95%")));
 	TestEqual(TEXT("Legendary gloves row shows rarity-scaled level zero cost"), NoGold.Rows[5].Cost, static_cast<int64>(1600));
 	TestEqual(TEXT("Common cloak row preserves legacy level zero cost"), NoGold.Rows[6].Cost, static_cast<int64>(100));
 	TestFalse(TEXT("Weapon row is disabled without gold"), NoGold.Rows[0].bCanEnhance);
@@ -508,7 +512,12 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Max level row reports max state"), MaxLevel.Rows[0].bMaxLevel);
 	TestFalse(TEXT("Max level row is disabled"), MaxLevel.Rows[0].bCanEnhance);
 	TestEqual(TEXT("Max level row has zero next cost"), MaxLevel.Rows[0].Cost, static_cast<int64>(0));
+	TestEqual(TEXT("Max level row shows +50 / 50 level label"), MaxLevel.Rows[0].LevelLabel.ToString(), FString(TEXT("+50 / 50")));
+	TestEqual(TEXT("Max level row shows localized max status"), MaxLevel.Rows[0].StatusLabel.ToString(), FString(TEXT("MAX")));
+	TestEqual(TEXT("Max level row shows max instead of next cost"), MaxLevel.Rows[0].CostLabel.ToString(), FString(TEXT("MAX")));
+	TestEqual(TEXT("Max level row shows max instead of success percent"), MaxLevel.Rows[0].SuccessRateLabel.ToString(), FString(TEXT("MAX")));
 
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 

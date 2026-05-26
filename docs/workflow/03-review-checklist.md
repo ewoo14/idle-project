@@ -126,6 +126,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +50 pressure
   and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.
 
+## PR #44 Design Checklist Addendum (Section 1)
+
+- [ ] Enhancement HUD rows display levels as `+N / 50`, with no hard-coded
+  `+5` or `+MaxLevel` cap text.
+- [ ] +50 rows use localized `MAX`/maximum copy for status, cost, and success
+  fields instead of the empty-slot dash placeholder.
+- [ ] Enhancement panel placement keeps the right-side 526px baseline,
+  360-460px width clamp, and Canvas-height 1.0-2.0 scale for
+  1080p/1440p/4K overlap checks.
+- [ ] `ENHANCE_LEVEL_FORMAT`, `ENHANCE_SUCCESS_FORMAT`, and
+  `ENHANCE_STATUS_MAX` remain present in both ko/en UI CSV files and pass
+  `IdleProject.Localization.CsvIntegrity`.
+
 ## PR #44 Character Checklist Addendum (Section 4)
 
 - [ ] `FEnhanceFormula::MaxEnhanceLevel` and `FItemInstance.EnhanceLevel`
