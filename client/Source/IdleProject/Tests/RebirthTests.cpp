@@ -4,8 +4,27 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/RebirthFormula.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRebirthFormulaRewardTest,
+	"IdleProject.GameCore.Rebirth.FormulaReward",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRebirthFormulaRewardTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("First rebirth at level 100 keeps legacy five point reward"), FRebirthFormula::GetRebirthPointsReward(0, 100), static_cast<int32>(5));
+	TestEqual(TEXT("Fifth rebirth at level 100 adds count scaling"), FRebirthFormula::GetRebirthPointsReward(4, 100), static_cast<int32>(13));
+	TestEqual(TEXT("First rebirth at level 150 adds level scaling"), FRebirthFormula::GetRebirthPointsReward(0, 150), static_cast<int32>(10));
+	TestEqual(TEXT("Fifth rebirth at level 150 combines count and level scaling"), FRebirthFormula::GetRebirthPointsReward(4, 150), static_cast<int32>(18));
+	TestEqual(TEXT("Level 109 keeps the level 100 reward floor"), FRebirthFormula::GetRebirthPointsReward(0, 109), static_cast<int32>(5));
+	TestEqual(TEXT("Level 110 adds the first level bonus point"), FRebirthFormula::GetRebirthPointsReward(0, 110), static_cast<int32>(6));
+	TestEqual(TEXT("Negative inputs clamp to first level 100 reward"), FRebirthFormula::GetRebirthPointsReward(-1, 1), static_cast<int32>(5));
+
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleGameInstanceStatAllocationTest,
@@ -108,6 +127,7 @@ bool FIdleGameInstanceRebirthResetTest::RunTest(const FString& Parameters)
 	GameInstance->AddExp(FLevelFormulas::CumulativeExp(100) + 99);
 	GameInstance->MarkChapter1BossDefeated();
 
+	TestEqual(TEXT("Preview mirrors first rebirth reward before reset"), GameInstance->PreviewRebirthReward(), static_cast<int32>(5));
 	TestTrue(TEXT("Rebirth succeeds when gate is met"), GameInstance->Rebirth());
 	TestEqual(TEXT("Rebirth count increments"), GameInstance->GetRebirthCount(), static_cast<int32>(1));
 	TestEqual(TEXT("Rebirth bonus points increase by five"), GameInstance->GetRebirthBonusPoints(), static_cast<int32>(5));
@@ -117,6 +137,41 @@ bool FIdleGameInstanceRebirthResetTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Exp resets to zero"), GameInstance->GetCurrentExp(), static_cast<int64>(0));
 	TestEqual(TEXT("Gold keeps ten percent rounded down"), GameInstance->GetGold(), static_cast<int64>(123));
 	TestFalse(TEXT("Chapter boss gate resets after rebirth"), GameInstance->HasDefeatedChapter1Boss());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceRebirthScalingRewardTest,
+	"IdleProject.GameCore.Rebirth.ScalingReward",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceRebirthScalingRewardTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		return false;
+	}
+
+	int32 ExpectedTotalBonusPoints = 0;
+	const int32 RebirthLevels[] = { 100, 100, 100, 100, 150 };
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(RebirthLevels); ++Index)
+	{
+		GameInstance->AddExp(FLevelFormulas::CumulativeExp(RebirthLevels[Index]));
+		GameInstance->MarkChapter1BossDefeated();
+
+		const int32 ExpectedReward = FRebirthFormula::GetRebirthPointsReward(Index, RebirthLevels[Index]);
+		TestEqual(TEXT("Preview uses current count and level before rebirth"), GameInstance->PreviewRebirthReward(), ExpectedReward);
+
+		TestTrue(TEXT("Rebirth succeeds for scaling setup"), GameInstance->Rebirth());
+		ExpectedTotalBonusPoints += ExpectedReward;
+		TestEqual(TEXT("Rebirth bonus points add scaled reward exactly once"), GameInstance->GetRebirthBonusPoints(), ExpectedTotalBonusPoints);
+	}
+
+	TestEqual(TEXT("Five rebirths are recorded"), GameInstance->GetRebirthCount(), static_cast<int32>(5));
+	TestEqual(TEXT("Total bonus includes scaled fifth level 150 reward"), ExpectedTotalBonusPoints, static_cast<int32>(5 + 7 + 9 + 11 + 18));
 
 	return true;
 }
