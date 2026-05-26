@@ -17,6 +17,11 @@ describe("stage formulas", () => {
     { globalStageIndex: 2, expectedMultiplier: 1.2999999523162842 },
     { globalStageIndex: 3, expectedMultiplier: 1.4500000476837158 },
     { globalStageIndex: 4, expectedMultiplier: 1.600000023841858 },
+    { globalStageIndex: 5, expectedMultiplier: 1.75 },
+    { globalStageIndex: 6, expectedMultiplier: 1.9000000953674316 },
+    { globalStageIndex: 7, expectedMultiplier: 2.0500001907348633 },
+    { globalStageIndex: 8, expectedMultiplier: 2.200000047683716 },
+    { globalStageIndex: 9, expectedMultiplier: 2.3499999046325684 },
   ])("mirrors client monster stat multiplier for global stage index $globalStageIndex", ({
     globalStageIndex,
     expectedMultiplier,
@@ -37,6 +42,8 @@ describe("stage formulas", () => {
   it.each([
     { chapter: 1, stage: 5, stagesPerChapter: 5, expectedBoss: true },
     { chapter: 1, stage: 4, stagesPerChapter: 5, expectedBoss: false },
+    { chapter: 2, stage: 5, stagesPerChapter: 5, expectedBoss: true },
+    { chapter: 2, stage: 4, stagesPerChapter: 5, expectedBoss: false },
     { chapter: 0, stage: 5, stagesPerChapter: 5, expectedBoss: false },
     { chapter: 1, stage: 5, stagesPerChapter: 0, expectedBoss: false },
   ])("mirrors client boss stage predicate for chapter $chapter stage $stage", ({
@@ -55,6 +62,10 @@ describe("stage formulas", () => {
     { globalStageIndex: 3, expectedWeakElement: "Holy" },
     { globalStageIndex: 4, expectedWeakElement: "Fire" },
     { globalStageIndex: 5, expectedWeakElement: "None" },
+    { globalStageIndex: 6, expectedWeakElement: "Lightning" },
+    { globalStageIndex: 7, expectedWeakElement: "Ice" },
+    { globalStageIndex: 8, expectedWeakElement: "Fire" },
+    { globalStageIndex: 9, expectedWeakElement: "Holy" },
   ] satisfies Array<{
     globalStageIndex: number;
     expectedWeakElement: SkillElement;

@@ -24,8 +24,7 @@ const killsToAdvanceByStage = new Map([
   [5, 1],
 ]);
 
-function defineChapter1Stage(stage: number): StageDefinition {
-  const chapter = 1;
+function defineChapterStage(chapter: number, stage: number): StageDefinition {
   const globalStageIndex = computeGlobalStageIndex(
     chapter,
     stage,
@@ -41,6 +40,14 @@ function defineChapter1Stage(stage: number): StageDefinition {
   };
 }
 
+function defineChapter1Stage(stage: number): StageDefinition {
+  return defineChapterStage(1, stage);
+}
+
+function defineChapter2Stage(stage: number): StageDefinition {
+  return defineChapterStage(2, stage);
+}
+
 export const CHAPTER_1_STAGE_DEFINITIONS: StageDefinition[] = [
   defineChapter1Stage(1),
   defineChapter1Stage(2),
@@ -49,10 +56,26 @@ export const CHAPTER_1_STAGE_DEFINITIONS: StageDefinition[] = [
   defineChapter1Stage(5),
 ];
 
+export const CHAPTER_2_STAGE_DEFINITIONS: StageDefinition[] = [
+  defineChapter2Stage(1),
+  defineChapter2Stage(2),
+  defineChapter2Stage(3),
+  defineChapter2Stage(4),
+  defineChapter2Stage(5),
+];
+
 export function getChapter1StageDefinition(
   stage: number,
 ): StageDefinition | undefined {
   return CHAPTER_1_STAGE_DEFINITIONS.find(
+    (definition) => definition.stage === stage,
+  );
+}
+
+export function getChapter2StageDefinition(
+  stage: number,
+): StageDefinition | undefined {
+  return CHAPTER_2_STAGE_DEFINITIONS.find(
     (definition) => definition.stage === stage,
   );
 }
