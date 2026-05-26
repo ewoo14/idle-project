@@ -1,4 +1,5 @@
 export * from "./combat.js";
+export * from "./enhance.js";
 export * from "./equipment.js";
 export * from "./level.js";
 export * from "./offline.js";
