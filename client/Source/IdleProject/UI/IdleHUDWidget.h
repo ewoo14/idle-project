@@ -17,7 +17,7 @@ public:
 	void UpdateExp(int64 Current, int64 Next);
 	void UpdateGold(int64 Amount);
 	void UpdateLevel(int32 Level);
-	void UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary);
+	void UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary, FLinearColor WeaponRarityColor);
 
 private:
 	TSharedPtr<STextBlock> HpText;
