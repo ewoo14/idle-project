@@ -131,6 +131,18 @@ V1 기준 마법사는 "최고 AoE DPS 후보"지만 방어 버프 수치와 평
 `USkillComponent::LoadDefault*Skills`의 DefinitionParity 테스트가 같은
 값을 검증한다.
 
+PR #29 extends this parity rule to all five V1 classes. Warrior, Mage, Archer,
+Thief, and Cleric each own exactly seven skill definitions, for 35 total
+definitions across server TypeScript and client `USkillComponent` automation.
+The parity guard checks `id`, `classId`, `type`, `effectType`, cooldown,
+coefficients, buff fields, and ultimate gauge gain fields.
+
+Heal is a Cleric-only V1 effect type. `heal` restores
+`round(MaxHp * 0.20)` on a 6 second cooldown, while `sanctuary` spends ultimate
+gauge and restores `round(MaxHp * 0.40)`. Heal effects must clamp at `MaxHp`,
+must not damage the selected target, and must remain budgeted as recovery
+rather than DPS when comparing the five class kits.
+
 ---
 
 ### 3.5 Combat Class Differential V1 Anchors

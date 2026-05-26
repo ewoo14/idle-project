@@ -505,6 +505,14 @@ bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
 {
 	USkillComponent* Skills = NewObject<USkillComponent>();
 
+	Skills->LoadDefaultWarriorSkills();
+	TestEqual(TEXT("Warrior has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Warrior has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Warrior has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Warrior has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Warrior loads heavy strike"), HasSkill(*Skills, TEXT("heavy_strike")));
+	TestTrue(TEXT("Warrior loads berserker fury"), HasSkill(*Skills, TEXT("berserkers_fury")));
+
 	Skills->LoadDefaultMageSkills();
 	TestEqual(TEXT("Mage has seven skills"), Skills->Skills.Num(), 7);
 	TestEqual(TEXT("Mage has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
@@ -559,6 +567,25 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 {
 	USkillComponent* Skills = NewObject<USkillComponent>();
+	int32 TotalCheckedSkills = 0;
+
+	Skills->LoadDefaultWarriorSkills();
+	const TArray<FExpectedSkillDefinition> WarriorSkills = {
+		{TEXT("heavy_strike"), EClassId::Warrior, ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.5f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("whirlwind"), EClassId::Warrior, ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("shield_up"), EClassId::Warrior, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f, 0.0f, 0.0f},
+		{TEXT("charge"), EClassId::Warrior, ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("weapon_mastery"), EClassId::Warrior, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("toughness"), EClassId::Warrior, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("berserkers_fury"), EClassId::Warrior, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f},
+	};
+
+	TestEqual(TEXT("Warrior DefinitionParity covers seven skills"), Skills->Skills.Num(), WarriorSkills.Num());
+	TotalCheckedSkills += WarriorSkills.Num();
+	for (const FExpectedSkillDefinition& Expected : WarriorSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
 
 	Skills->LoadDefaultMageSkills();
 	const TArray<FExpectedSkillDefinition> MageSkills = {
@@ -571,6 +598,8 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("arcane_overload"), EClassId::Mage, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f},
 	};
 
+	TestEqual(TEXT("Mage DefinitionParity covers seven skills"), Skills->Skills.Num(), MageSkills.Num());
+	TotalCheckedSkills += MageSkills.Num();
 	for (const FExpectedSkillDefinition& Expected : MageSkills)
 	{
 		TestSkillDefinitionParity(*this, *Skills, Expected);
@@ -587,6 +616,8 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("eagle_eye"), EClassId::Archer, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f},
 	};
 
+	TestEqual(TEXT("Archer DefinitionParity covers seven skills"), Skills->Skills.Num(), ArcherSkills.Num());
+	TotalCheckedSkills += ArcherSkills.Num();
 	for (const FExpectedSkillDefinition& Expected : ArcherSkills)
 	{
 		TestSkillDefinitionParity(*this, *Skills, Expected);
@@ -603,6 +634,8 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("assassinate"), EClassId::Thief, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.3f, 0.25f, 4.0f, 11.0f, 1.0f},
 	};
 
+	TestEqual(TEXT("Thief DefinitionParity covers seven skills"), Skills->Skills.Num(), ThiefSkills.Num());
+	TotalCheckedSkills += ThiefSkills.Num();
 	for (const FExpectedSkillDefinition& Expected : ThiefSkills)
 	{
 		TestSkillDefinitionParity(*this, *Skills, Expected);
@@ -619,10 +652,15 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("sanctuary"), EClassId::Cleric, ESkillType::Ultimate, ESkillEffectType::Heal, 0.0f, 0.0f, 0.4f, 0.0f, 6.0f, 6.0f},
 	};
 
+	TestEqual(TEXT("Cleric DefinitionParity covers seven skills"), Skills->Skills.Num(), ClericSkills.Num());
+	TotalCheckedSkills += ClericSkills.Num();
 	for (const FExpectedSkillDefinition& Expected : ClericSkills)
 	{
 		TestSkillDefinitionParity(*this, *Skills, Expected);
 	}
+
+	TestEqual(TEXT("DefinitionParity covers five classes times seven skills"), TotalCheckedSkills, 35);
+	TestTrue(TEXT("Cleric DefinitionParity includes Heal effect"), HasSkill(*Skills, TEXT("heal")));
 
 	return true;
 }

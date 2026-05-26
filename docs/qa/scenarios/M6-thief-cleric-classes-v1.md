@@ -1,16 +1,34 @@
 # M6 Thief / Cleric Classes V1 QA
 
-PR #29 adds the client-side Thief and Cleric class skill sets and the new Heal
-effect. Backend SkillDB parity and class-selection UI expansion may be handled
-by their owning slices; this scenario records the character/combat evidence.
+PR #29 adds Thief and Cleric class skill sets and the new Heal effect. This
+scenario records server/client definition parity, character routing, combat
+behavior, and regression evidence.
 
 ## Skill Loading
 
 Given a `USkillComponent`
-When `LoadDefaultThiefSkills()` and `LoadDefaultClericSkills()` are called
-Then each class exposes exactly 7 skills: 4 active, 2 passive, 1 ultimate.
+When `LoadDefaultWarriorSkills()`, `LoadDefaultMageSkills()`,
+`LoadDefaultArcherSkills()`, `LoadDefaultThiefSkills()`, and
+`LoadDefaultClericSkills()` are called
+Then each class exposes exactly 7 skills: 4 active, 2 passive, 1 ultimate, for
+35 total V1 skill definitions.
 
 Automation: `IdleProject.Combat.Skills.ClassDefaults`
+
+## Definition Parity
+
+Given server `server/src/core/data/skills.ts` and client `USkillComponent`
+definitions
+When the parity tests inspect Warrior, Mage, Archer, Thief, and Cleric
+Then all 35 definitions match on `id`, `classId`, `type`, `effectType`,
+cooldown, coefficient, buff, and ultimate gauge fields.
+
+Given the Cleric definitions
+When the parity tests inspect `heal` and `sanctuary`
+Then both definitions use the `heal` effect type.
+
+Automation: `server/src/core/data/skills.test.ts`,
+`IdleProject.Combat.Skills.DefinitionParity`
 
 ## ClassId Routing
 
@@ -26,6 +44,10 @@ Automation: `IdleProject.Combat.Skills.ClassDefaults`
 Given a Cleric owner at 50% HP
 When the `heal` skill resolves
 Then HP increases by `round(MaxHp * 0.20)` and does not exceed `MaxHp`.
+
+Given a Cleric owner near full HP
+When the `heal` skill resolves
+Then the restored HP is clamped to `MaxHp`.
 
 Given a selected target
 When the Heal skill resolves

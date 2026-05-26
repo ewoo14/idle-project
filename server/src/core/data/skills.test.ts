@@ -4,47 +4,111 @@ import {
   clericSkillDefinitions,
   getSkillDefinitionsForClass,
   mageSkillDefinitions,
+  type SkillDefinition,
   thiefSkillDefinitions,
   warriorSkillDefinitions,
 } from "./skills.js";
 
-describe("warriorSkillDefinitions", () => {
-  it("mirrors the seven V1 warrior skills with server-readable fields", () => {
-    expect(warriorSkillDefinitions).toHaveLength(7);
-    expect(warriorSkillDefinitions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          skillId: "heavy_strike",
-          classId: 1,
-          type: "active",
-          cooldown: 4,
-          damageCoeff: 2.5,
-        }),
-        expect.objectContaining({
-          skillId: "whirlwind",
-          classId: 1,
-          type: "active",
-          effectType: "damage_aoe",
-          cooldown: 8,
-          damageCoeff: 1.8,
-        }),
-        expect.objectContaining({
-          skillId: "berserkers_fury",
-          classId: 1,
-          type: "ultimate",
-          damageCoeff: 6,
-          gaugeGainOnHit: 8,
-          gaugeGainOnTakeDamage: 5,
-        }),
-      ]),
-    );
-  });
-});
-
-describe("mageSkillDefinitions", () => {
-  it("mirrors the seven V1 mage skills with server-readable fields", () => {
-    expect(mageSkillDefinitions).toHaveLength(7);
-    expect(mageSkillDefinitions).toEqual([
+const expectedSkillDefinitionsByClass = new Map<number, SkillDefinition[]>([
+  [
+    1,
+    [
+      {
+        skillId: "heavy_strike",
+        classId: 1,
+        displayName: "강타",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 4,
+        damageCoeff: 2.5,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "whirlwind",
+        classId: 1,
+        displayName: "회전베기",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 8,
+        damageCoeff: 1.8,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "shield_up",
+        classId: 1,
+        displayName: "방패 올리기",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 12,
+        damageCoeff: 0,
+        buffMagnitude: 0.5,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "charge",
+        classId: 1,
+        displayName: "돌진",
+        type: "active",
+        effectType: "dash_damage",
+        cooldown: 10,
+        damageCoeff: 2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "weapon_mastery",
+        classId: 1,
+        displayName: "무기 숙련",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "toughness",
+        classId: 1,
+        displayName: "강인함",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "berserkers_fury",
+        classId: 1,
+        displayName: "광전사의 분노",
+        type: "ultimate",
+        effectType: "damage_single",
+        cooldown: 0,
+        damageCoeff: 6,
+        buffMagnitude: 0.3,
+        buffDuration: 4,
+        gaugeGainOnHit: 8,
+        gaugeGainOnTakeDamage: 5,
+      },
+    ],
+  ],
+  [
+    2,
+    [
       {
         skillId: "arcane_bolt",
         classId: 2,
@@ -136,14 +200,11 @@ describe("mageSkillDefinitions", () => {
         gaugeGainOnHit: 9,
         gaugeGainOnTakeDamage: 3,
       },
-    ]);
-  });
-});
-
-describe("archerSkillDefinitions", () => {
-  it("mirrors the seven V1 archer skills with server-readable fields", () => {
-    expect(archerSkillDefinitions).toHaveLength(7);
-    expect(archerSkillDefinitions).toEqual([
+    ],
+  ],
+  [
+    3,
+    [
       {
         skillId: "precision_shot",
         classId: 3,
@@ -235,14 +296,11 @@ describe("archerSkillDefinitions", () => {
         gaugeGainOnHit: 10,
         gaugeGainOnTakeDamage: 2,
       },
-    ]);
-  });
-});
-
-describe("thiefSkillDefinitions", () => {
-  it("mirrors the seven V1 thief skills with server-readable fields", () => {
-    expect(thiefSkillDefinitions).toHaveLength(7);
-    expect(thiefSkillDefinitions).toEqual([
+    ],
+  ],
+  [
+    4,
+    [
       {
         skillId: "shadow_stab",
         classId: 4,
@@ -334,14 +392,11 @@ describe("thiefSkillDefinitions", () => {
         gaugeGainOnHit: 11,
         gaugeGainOnTakeDamage: 1,
       },
-    ]);
-  });
-});
-
-describe("clericSkillDefinitions", () => {
-  it("mirrors the seven V1 cleric skills including heal effects", () => {
-    expect(clericSkillDefinitions).toHaveLength(7);
-    expect(clericSkillDefinitions).toEqual([
+    ],
+  ],
+  [
+    5,
+    [
       {
         skillId: "holy_smite",
         classId: 5,
@@ -433,7 +488,52 @@ describe("clericSkillDefinitions", () => {
         gaugeGainOnHit: 6,
         gaugeGainOnTakeDamage: 6,
       },
-    ]);
+    ],
+  ],
+]);
+
+describe("warriorSkillDefinitions", () => {
+  it("mirrors the seven V1 warrior skills with server-readable fields", () => {
+    expect(warriorSkillDefinitions).toHaveLength(7);
+    expect(warriorSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(1),
+    );
+  });
+});
+
+describe("mageSkillDefinitions", () => {
+  it("mirrors the seven V1 mage skills with server-readable fields", () => {
+    expect(mageSkillDefinitions).toHaveLength(7);
+    expect(mageSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(2),
+    );
+  });
+});
+
+describe("archerSkillDefinitions", () => {
+  it("mirrors the seven V1 archer skills with server-readable fields", () => {
+    expect(archerSkillDefinitions).toHaveLength(7);
+    expect(archerSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(3),
+    );
+  });
+});
+
+describe("thiefSkillDefinitions", () => {
+  it("mirrors the seven V1 thief skills with server-readable fields", () => {
+    expect(thiefSkillDefinitions).toHaveLength(7);
+    expect(thiefSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(4),
+    );
+  });
+});
+
+describe("clericSkillDefinitions", () => {
+  it("mirrors the seven V1 cleric skills including heal effects", () => {
+    expect(clericSkillDefinitions).toHaveLength(7);
+    expect(clericSkillDefinitions).toEqual(
+      expectedSkillDefinitionsByClass.get(5),
+    );
   });
 });
 
@@ -464,5 +564,11 @@ describe("skill definition parity by class", () => {
     expect(new Set(allSkills.map((skill) => skill.effectType))).toContain(
       "heal",
     );
+  });
+
+  it("keeps every class definition in exact parity with the V1 balance table", () => {
+    for (const [classId, expectedSkills] of expectedSkillDefinitionsByClass) {
+      expect(getSkillDefinitionsForClass(classId)).toEqual(expectedSkills);
+    }
   });
 });
