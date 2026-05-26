@@ -6,6 +6,7 @@
 #include "CombatSystem/BattleAIComponent.h"
 #include "CombatSystem/CombatComponent.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/RewardFormula.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ItemSystem/EquipmentDrop.h"
 #include "ItemSystem/ItemFactory.h"
@@ -93,6 +94,11 @@ void AIdleMonster::SetStageStatMultiplier(float InStageStatMultiplier)
 	StageStatMultiplier = FMath::Max(0.01f, InStageStatMultiplier);
 }
 
+void AIdleMonster::SetStageGlobalIndex(int32 InStageGlobalIndex)
+{
+	StageGlobalIndex = FMath::Max(0, InStageGlobalIndex);
+}
+
 float AIdleMonster::GetConfiguredMaxHp() const
 {
 	return (bIsBoss ? BossMaxHp : NormalMaxHp) * StageStatMultiplier;
@@ -117,7 +123,7 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	UIdleGameInstance* GameInstance = Cast<UIdleGameInstance>(UGameplayStatics::GetGameInstance(World));
 	if (GameInstance)
 	{
-		const int64 ExpReward = 12;
+		const int64 ExpReward = FRewardFormula::ComputeKillExp(12, StageGlobalIndex, bIsBoss);
 		GameInstance->AddExp(ExpReward);
 	}
 
@@ -126,14 +132,14 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	AGoldDrop* GoldDrop = World->SpawnActor<AGoldDrop>(AGoldDrop::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
 	if (GoldDrop)
 	{
-		const int64 BaseGoldAmount = static_cast<int64>(10 + FMath::RandRange(0, 5));
+		const int64 BaseGoldAmount = FRewardFormula::ComputeKillGold(static_cast<int64>(10 + FMath::RandRange(0, 5)), StageGlobalIndex, bIsBoss);
 		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(BaseGoldAmount) : BaseGoldAmount;
 	}
 
 	const float DropChance = GameInstance ? GameInstance->ApplyEquippedPetDropBonusChance(0.05f) : 0.05f;
 	if (FMath::FRand() < DropChance)
 	{
-		const FItemInstance DropItem = FItemFactory::RandomDropFromMonster(1);
+		const FItemInstance DropItem = FItemFactory::RandomDropFromMonster(FRewardFormula::GetMonsterLevelForStage(StageGlobalIndex));
 		if (DropItem.Rarity != EItemRarity::None)
 		{
 			AEquipmentDrop* EquipmentDrop = World->SpawnActor<AEquipmentDrop>(

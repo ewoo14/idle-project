@@ -37,6 +37,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
 	void SetStageStatMultiplier(float InStageStatMultiplier);
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetStageGlobalIndex(int32 InStageGlobalIndex);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
+	int32 GetStageGlobalIndex() const { return StageGlobalIndex; }
+
 	float GetConfiguredMaxHp() const;
 	float GetConfiguredAttack() const;
 
@@ -70,6 +76,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	float StageStatMultiplier = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	int32 StageGlobalIndex = 0;
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);

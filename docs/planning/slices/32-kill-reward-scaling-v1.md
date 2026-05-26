@@ -54,3 +54,10 @@
 
 ## 7. 후속
 - 드롭 테이블 스테이지별 차등 풀, 보상 팝업/연출, 서버 권위 보상 정산, 챕터2+ 보상 곡선.
+
+## 8. Codex character result
+- Added `FRewardFormula` in `client/Source/IdleProject/GameCore/` with kill EXP, kill gold, and monster-level scaling.
+- `AIdleMonster` stores spawn-time `StageGlobalIndex`; death rewards now use the stored index and boss bonus while keeping pet gold/drop bonus order.
+- `AIdleProjectGameModeBase::SpawnMonsterAt` passes `StageInfo.GlobalStageIndex` into spawned monsters.
+- Automation added: `IdleProject.GameCore.RewardFormula.KillRewardScaling`, `IdleProject.GameCore.RewardFormula.MonsterLevelForStage`, `IdleProject.Combat.Monster.RewardStageContext`.
+- Verification: `Build.bat IdleProjectEditor Win64 Development` succeeded; `Automation RunTests IdleProject` completed with exit code 0.
