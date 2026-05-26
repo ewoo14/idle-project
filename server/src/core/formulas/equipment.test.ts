@@ -17,18 +17,25 @@ const rareWeapon: ItemInstance = {
   enhanceLevel: 0,
 };
 
+const zeroEquipmentBonus = {
+  bonusAtk: 0,
+  bonusDef: 0,
+  bonusHp: 0,
+  critRate: 0,
+  atkSpeed: 0,
+  magicAtk: 0,
+  magicDef: 0,
+  critDmg: 0,
+};
+
 const clientServerEquipmentAnchors = [
   {
     name: "rare weapon base",
     item: rareWeapon,
     clientPowerScore: 15,
     clientBonus: {
+      ...zeroEquipmentBonus,
       bonusAtk: 15,
-      bonusDef: 0,
-      bonusHp: 0,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     },
   },
   {
@@ -36,12 +43,8 @@ const clientServerEquipmentAnchors = [
     item: { ...rareWeapon, enhanceLevel: 2 },
     clientPowerScore: 18,
     clientBonus: {
+      ...zeroEquipmentBonus,
       bonusAtk: 18,
-      bonusDef: 0,
-      bonusHp: 0,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     },
   },
   {
@@ -57,12 +60,9 @@ const clientServerEquipmentAnchors = [
     } satisfies ItemInstance,
     clientPowerScore: 15,
     clientBonus: {
-      bonusAtk: 0,
+      ...zeroEquipmentBonus,
       bonusDef: 9,
       bonusHp: 60,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     },
   },
   {
@@ -78,12 +78,9 @@ const clientServerEquipmentAnchors = [
     } satisfies ItemInstance,
     clientPowerScore: 11,
     clientBonus: {
+      ...zeroEquipmentBonus,
       bonusAtk: 5.5,
       bonusDef: 5.5,
-      bonusHp: 0,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     },
   },
   {
@@ -102,9 +99,8 @@ const clientServerEquipmentAnchors = [
     } satisfies ItemInstance,
     clientPowerScore: 54,
     clientBonus: {
+      ...zeroEquipmentBonus,
       bonusAtk: 12,
-      bonusDef: 0,
-      bonusHp: 0,
       critRate: 0.024,
       atkSpeed: 0.12,
       magicAtk: 6,
@@ -123,12 +119,9 @@ const clientServerEquipmentAnchors = [
     } satisfies ItemInstance,
     clientPowerScore: 3,
     clientBonus: {
-      bonusAtk: 0,
+      ...zeroEquipmentBonus,
       bonusDef: 2,
       bonusHp: 10,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     },
   },
 ];
@@ -176,34 +169,21 @@ describe("equipment formulas", () => {
         },
       ]),
     ).toEqual({
+      ...zeroEquipmentBonus,
       bonusAtk: 16.5,
       bonusDef: 12,
       bonusHp: 60,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     });
   });
 
   it("returns zero bonuses for an empty inventory", () => {
-    expect(computeInventoryBonus([])).toEqual({
-      bonusAtk: 0,
-      bonusDef: 0,
-      bonusHp: 0,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
-    });
+    expect(computeInventoryBonus([])).toEqual(zeroEquipmentBonus);
   });
 
   it("keeps affix defaults at zero for legacy equipment", () => {
     expect(computeInventoryBonus([rareWeapon])).toEqual({
+      ...zeroEquipmentBonus,
       bonusAtk: 15,
-      bonusDef: 0,
-      bonusHp: 0,
-      critRate: 0,
-      atkSpeed: 0,
-      magicAtk: 0,
     });
   });
 
@@ -219,12 +199,55 @@ describe("equipment formulas", () => {
         },
       ]),
     ).toEqual({
+      ...zeroEquipmentBonus,
       bonusAtk: 18,
-      bonusDef: 0,
-      bonusHp: 0,
       critRate: 0.036,
       atkSpeed: 0.144,
       magicAtk: 24,
+    });
+  });
+
+  it("adds flat set bonuses after per-item equipment bonuses", () => {
+    expect(
+      computeInventoryBonus([
+        { ...rareWeapon, itemSet: "Warrior", slot: 1 },
+        {
+          itemId: "warrior_helmet",
+          slot: 2,
+          rarity: 3,
+          itemSet: "Warrior",
+          bonusAtk: 0,
+          bonusDef: 5,
+          bonusHp: 10,
+          enhanceLevel: 0,
+        },
+        {
+          itemId: "warrior_top",
+          slot: 3,
+          rarity: 3,
+          itemSet: "Warrior",
+          bonusAtk: 0,
+          bonusDef: 5,
+          bonusHp: 10,
+          enhanceLevel: 0,
+        },
+        {
+          itemId: "warrior_bottom",
+          slot: 4,
+          rarity: 3,
+          itemSet: "Warrior",
+          bonusAtk: 0,
+          bonusDef: 5,
+          bonusHp: 10,
+          enhanceLevel: 0,
+        },
+      ]),
+    ).toEqual({
+      ...zeroEquipmentBonus,
+      bonusAtk: 85,
+      bonusDef: 15,
+      bonusHp: 30,
+      critRate: 0.05,
     });
   });
 
