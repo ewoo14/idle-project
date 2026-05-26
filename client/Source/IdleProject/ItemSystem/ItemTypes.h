@@ -23,7 +23,9 @@ enum class EItemRarity : uint8
 	None = 0 UMETA(Hidden),
 	Common = 1 UMETA(DisplayName = "Common"),
 	Uncommon = 2 UMETA(DisplayName = "Uncommon"),
-	Rare = 3 UMETA(DisplayName = "Rare")
+	Rare = 3 UMETA(DisplayName = "Rare"),
+	Epic = 4 UMETA(DisplayName = "Epic"),
+	Legendary = 5 UMETA(DisplayName = "Legendary")
 };
 
 /** 장비 1개의 런타임 인스턴스입니다. */

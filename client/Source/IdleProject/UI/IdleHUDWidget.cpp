@@ -44,6 +44,14 @@ FSlateColor ResolveEquipmentColor(const FText& WeaponName)
 	using namespace IdleProject::UI;
 
 	const FString Text = WeaponName.ToString();
+	if (Text.Contains(TEXT("Legendary")))
+	{
+		return Theme::RarityLegendary;
+	}
+	if (Text.Contains(TEXT("Epic")))
+	{
+		return Theme::RarityEpic;
+	}
 	if (Text.Contains(TEXT("Rare")))
 	{
 		return Theme::RarityRare;

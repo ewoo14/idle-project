@@ -46,6 +46,10 @@ FString RarityToString(EItemRarity Rarity)
 		return TEXT("Uncommon");
 	case EItemRarity::Rare:
 		return TEXT("Rare");
+	case EItemRarity::Epic:
+		return TEXT("Epic");
+	case EItemRarity::Legendary:
+		return TEXT("Legendary");
 	case EItemRarity::Common:
 		return TEXT("Common");
 	case EItemRarity::None:

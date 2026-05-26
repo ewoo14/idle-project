@@ -524,6 +524,43 @@ Sensitivity notes:
 
 ---
 
+## PR #36 Loot Depth V1
+
+Client drop rarity now affects generated equipment stats through
+`FDropFormula::GetRarityStatMultiplier`:
+
+| Rarity | Stat multiplier |
+| --- | ---: |
+| None | 0.0 |
+| Common | 1.0 |
+| Uncommon | 1.3 |
+| Rare | 1.7 |
+| Epic | 2.3 |
+| Legendary | 3.2 |
+
+`FDropFormula::RollRarityForLevel` keeps early drops Common-heavy while moving
+some Common weight into Rare, Epic, and Legendary as monster level approaches
+100. The current level 1 distribution is equivalent to the legacy baseline:
+2% none, 70% common, 20% uncommon, and 8% rare. At level 100 the intended
+distribution is 2% none, 50% common, 20% uncommon, 20% rare, 6% epic, and 2%
+legendary.
+
+`FDropFormula::ComputeItemBonus` preserves the existing slot split: weapons put
+100% of the scaled bonus into ATK, armor slots put 70% into DEF and 300% into
+HP, and accessories split 50% ATK, 30% DEF, and 200% HP. PowerScore remains the
+existing `(ATK + DEF + HP / 10) * (1 + EnhanceLevel * 0.1)` formula, so rarity
+improves auto-equip decisions through the generated stat bonuses rather than a
+separate score override.
+
+Automation coverage:
+
+- `IdleProject.Inventory.DropFormula.RarityMultiplier`
+- `IdleProject.Inventory.DropFormula.LevelRarityTrend`
+- `IdleProject.Inventory.DropFormula.ComputeItemBonus`
+- `IdleProject.Inventory.ItemFactory.HighLevelExpandedRarity`
+
+---
+
 ## PR #27 Skill Rank Points V1 Anchors
 
 Skill rank points are a client-combat V1 progression layer, separate from stat
