@@ -3,6 +3,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeDamage } from "../../server/src/core/formulas/combat.js";
 import {
+  getEnhanceCost,
+  getEnhanceSuccessRate,
+  MAX_ENHANCE_LEVEL,
+} from "../../server/src/core/formulas/enhance.js";
+import {
   cumulativeExp,
   expToNext,
 } from "../../server/src/core/formulas/level.js";
@@ -90,6 +95,7 @@ export type BalanceReport = {
       bossIncluded: boolean;
       formulas: string[];
       rewardScaling: StageRewardComparison[];
+      enhancementPressure: EnhancementPressure;
     };
     distribution: SimulationDistribution;
     evaluation: BalanceEvaluation;
@@ -105,6 +111,25 @@ export type StageRewardComparison = {
   normalGold: string;
   bossExp: number;
   bossGold: string;
+};
+
+export type EnhancementPressureRow = {
+  currentLevel: number;
+  nextLevel: number;
+  cost: number;
+  successRate: number;
+  expectedAttempts: number;
+  expectedGoldCost: number;
+  cumulativeExpectedGoldCost: number;
+};
+
+export type EnhancementPressure = {
+  maxLevel: number;
+  goldCostFloorToMax: number;
+  expectedGoldCostToMax: number;
+  medianGoldPerHourAtLevel50: number;
+  expectedHoursAtMedianGoldPerHour: number;
+  rows: EnhancementPressureRow[];
 };
 
 const DEFAULT_RUNS = 1000;
@@ -181,8 +206,10 @@ export function buildBalanceReport(
         "server/src/core/formulas/offline.ts",
         "server/src/core/formulas/reward.ts",
         "server/src/core/formulas/stage.ts",
+        "server/src/core/formulas/enhance.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
+      enhancementPressure: buildEnhancementPressure(distribution.samples),
     },
     distribution,
     evaluation,
@@ -504,6 +531,48 @@ function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
   );
 }
 
+function buildEnhancementPressure(
+  samples: SimulationSample[],
+): EnhancementPressure {
+  let cumulativeExpectedGoldCost = 0;
+  const rows = Array.from({ length: MAX_ENHANCE_LEVEL }, (_, currentLevel) => {
+    const cost = getEnhanceCost(currentLevel);
+    const successRate = getEnhanceSuccessRate(currentLevel);
+    const expectedAttempts = successRate > 0 ? 1 / successRate : 0;
+    const expectedGoldCost = cost * expectedAttempts;
+    cumulativeExpectedGoldCost += expectedGoldCost;
+    return {
+      currentLevel,
+      nextLevel: currentLevel + 1,
+      cost,
+      successRate,
+      expectedAttempts: round(expectedAttempts, 3),
+      expectedGoldCost: round(expectedGoldCost, 2),
+      cumulativeExpectedGoldCost: round(cumulativeExpectedGoldCost, 2),
+    };
+  });
+  const goldCostFloorToMax = rows.reduce((sum, row) => sum + row.cost, 0);
+  const medianGoldPerHourAtLevel50 = percentile(
+    samples
+      .map((sample) => sample.goldPerHourAtLevel50)
+      .sort((left, right) => left - right),
+    0.5,
+  );
+  const expectedGoldCostToMax = round(cumulativeExpectedGoldCost, 2);
+
+  return {
+    maxLevel: MAX_ENHANCE_LEVEL,
+    goldCostFloorToMax,
+    expectedGoldCostToMax,
+    medianGoldPerHourAtLevel50,
+    expectedHoursAtMedianGoldPerHour: round(
+      expectedGoldCostToMax / Math.max(1, medianGoldPerHourAtLevel50),
+      3,
+    ),
+    rows,
+  };
+}
+
 function summarizeSamples(
   samples: SimulationSample[],
   targetLevel: number,
@@ -593,6 +662,29 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.rewardScaling.map(
       (row) =>
         `| ${row.stage} | ${row.globalStageIndex} | ${row.monsterHpMultiplier} | ${row.rewardMultiplier} | ${row.normalExp} | ${row.normalGold} | ${row.bossExp} | ${row.bossGold} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Enhancement Spend Pressure",
+    "",
+    `- Max level: +${report.model.enhancementPressure.maxLevel}`,
+    `- Minimum +0 to +5 gold cost: ${report.model.enhancementPressure.goldCostFloorToMax}`,
+    `- Expected +0 to +5 gold cost: ${report.model.enhancementPressure.expectedGoldCostToMax}`,
+    `- Median sampled Lv50 gold/hour: ${report.model.enhancementPressure.medianGoldPerHourAtLevel50}`,
+    `- Expected +0 to +5 cost at median Lv50 gold/hour: ${report.model.enhancementPressure.expectedHoursAtMedianGoldPerHour}h`,
+    "- Failure consumes gold only; no downgrade or destruction is modeled in V1.",
+    "- V1 enhancement is a light early sink, not a Lv50 progression blocker;",
+    "  use this report as a pressure baseline before raising costs or adding",
+    "  material sinks.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Current | Next | Cost | Success | Expected attempts | Expected gold | Cumulative expected gold |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.enhancementPressure.rows.map(
+      (row) =>
+        `| +${row.currentLevel} | +${row.nextLevel} | ${row.cost} | ${Math.round(row.successRate * 100)}% | ${row.expectedAttempts} | ${row.expectedGoldCost} | ${row.cumulativeExpectedGoldCost} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

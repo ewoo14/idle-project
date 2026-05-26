@@ -1,5 +1,7 @@
 #include "ItemSystem/InventoryComponent.h"
 
+#include "ItemSystem/EnhanceFormula.h"
+
 UInventoryComponent::UInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -92,4 +94,29 @@ const FItemInstance* UInventoryComponent::GetEquippedItem(EItemSlot Slot) const
 		return nullptr;
 	}
 	return &Items[*Index];
+}
+
+bool UInventoryComponent::EnhanceEquippedItem(EItemSlot Slot)
+{
+	const int32* Index = EquippedIndex.Find(Slot);
+	if (!Index || !Items.IsValidIndex(*Index))
+	{
+		return false;
+	}
+
+	FItemInstance& Item = Items[*Index];
+	if (Item.EnhanceLevel >= FEnhanceFormula::MaxEnhanceLevel)
+	{
+		return false;
+	}
+
+	Item.EnhanceLevel = FMath::Clamp(Item.EnhanceLevel + 1, 0, FEnhanceFormula::MaxEnhanceLevel);
+	OnEquippedChanged.Broadcast(Slot);
+	return true;
+}
+
+int32 UInventoryComponent::GetEquippedEnhanceLevel(EItemSlot Slot) const
+{
+	const FItemInstance* Item = GetEquippedItem(Slot);
+	return Item ? Item->EnhanceLevel : INDEX_NONE;
 }

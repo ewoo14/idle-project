@@ -31,6 +31,7 @@ the rule source:
 - `server/src/core/formulas/offline.ts`
 - `server/src/core/formulas/reward.ts`
 - `server/src/core/formulas/stage.ts`
+- `server/src/core/formulas/enhance.ts`
 
 Each run samples class, active play share, equipment multiplier, quest EXP
 variance, and offline efficiency. The summary reports p10, median, p90, and
@@ -40,6 +41,12 @@ PR #32 adds kill reward scaling to the model. Active kill EXP and gold now call
 `computeKillExp` / `computeKillGold`, and the same global stage index ramp
 drives monster HP and kill rewards. The Chapter 1 comparison table in the
 generated report is the review artifact for reward-vs-HP scaling.
+
+PR #33 adds enhancement spend pressure to the report. The simulator reads
+`MAX_ENHANCE_LEVEL`, `getEnhanceCost`, and `getEnhanceSuccessRate` from the
+shared formula source, then reports minimum all-success gold cost, expected
+gold cost using `cost / successRate`, and expected hours at sampled median Lv50
+gold/hour.
 
 ## V1 Interpretation
 
@@ -69,3 +76,12 @@ BossBonus remains 8x and the stage reward multiplier remains
 `1 + globalStageIndex * 0.15`. The sensitivity recommendation is to monitor
 enhancement gold pressure in the next balance slice before changing combat or
 EXP coefficients.
+
+Enhancement V1 pressure, using the current +0 to +5 formula:
+
+- minimum all-success cost: 5,500 gold
+- expected cost: 11,020.66 gold
+- expected cost at median sampled Lv50 gold/hour: 0.017h
+
+This makes enhancement a light early gold sink in the current model rather than
+a blocker for the first rebirth target.

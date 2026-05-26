@@ -10,6 +10,7 @@
 #include "EngineUtils.h"
 #include "GameCore/IdleGameInstance.h"
 #include "Internationalization/IdleLocalization.h"
+#include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
@@ -23,6 +24,7 @@ const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
+const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
@@ -77,6 +79,23 @@ FText FormatLocalizedUI(const TCHAR* Key, TFunctionRef<void(FFormatNamedArgument
 	FFormatNamedArguments Args;
 	BuildArgs(Args);
 	return IdleProject::Localization::UI(Key, Args);
+}
+
+FText FormatLocalizedUIWithInt64(const TCHAR* Key, const TCHAR* ArgName, int64 Value)
+{
+	return FormatLocalizedUI(Key, [ArgName, Value](FFormatNamedArguments& Args)
+	{
+		Args.Add(ArgName, FText::FromString(FormatIntegerWithCommas(Value)));
+	});
+}
+
+FText FormatPercentLabel(const TCHAR* Key, float Rate)
+{
+	const int32 Percent = FMath::RoundToInt(FMath::Clamp(Rate, 0.0f, 1.0f) * 100.0f);
+	return FormatLocalizedUI(Key, [Percent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
 }
 
 FText QuestTypeToLabel(EQuestType Type)
@@ -186,6 +205,57 @@ FName MakeSkillRankHitBoxName(FName SkillId)
 	return FName(*(SkillRankHitBoxPrefix + SkillId.ToString()));
 }
 
+FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
+{
+	return FName(*(EnhanceSlotHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+const EItemSlot* GetEnhanceSlotOrder()
+{
+	static const EItemSlot Slots[] = {
+		EItemSlot::Weapon,
+		EItemSlot::Helmet,
+		EItemSlot::Top,
+		EItemSlot::Bottom,
+		EItemSlot::Shoes,
+		EItemSlot::Gloves,
+		EItemSlot::Cloak,
+		EItemSlot::Accessory
+	};
+	return Slots;
+}
+
+int32 GetEnhanceSlotCount()
+{
+	return 8;
+}
+
+const TCHAR* SlotToLocalizationKey(EItemSlot Slot)
+{
+	switch (Slot)
+	{
+	case EItemSlot::Weapon:
+		return TEXT("ENHANCE_SLOT_WEAPON");
+	case EItemSlot::Helmet:
+		return TEXT("ENHANCE_SLOT_HELMET");
+	case EItemSlot::Top:
+		return TEXT("ENHANCE_SLOT_TOP");
+	case EItemSlot::Bottom:
+		return TEXT("ENHANCE_SLOT_BOTTOM");
+	case EItemSlot::Shoes:
+		return TEXT("ENHANCE_SLOT_SHOES");
+	case EItemSlot::Gloves:
+		return TEXT("ENHANCE_SLOT_GLOVES");
+	case EItemSlot::Cloak:
+		return TEXT("ENHANCE_SLOT_CLOAK");
+	case EItemSlot::Accessory:
+		return TEXT("ENHANCE_SLOT_ACCESSORY");
+	case EItemSlot::None:
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
 bool TryBuildStatusIndicator(ESkillStatusEffect Type, const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale, FIdleHUDStatusIndicatorViewModel& OutIndicator)
 {
 	const FActiveSkillStatus* Status = Statuses.FindByPredicate([Type, Now](const FActiveSkillStatus& Candidate)
@@ -284,6 +354,75 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 	ViewModel.BossBadgeLabel = StageInfo.bBossStage ? IdleProject::Localization::UI(TEXT("STAGE_BOSS_BADGE")) : FText::GetEmpty();
 	ViewModel.BorderColor = StageInfo.bBossStage ? Theme::AccentGold : Theme::AccentBlue;
 	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
+	return ViewModel;
+}
+
+FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess)
+{
+	FIdleHUDEnhancePanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("ENHANCE_PANEL_TITLE"));
+	ViewModel.GoldLabel = FormatLocalizedUIWithInt64(TEXT("HUD_GOLD_FORMAT"), TEXT("Amount"), Gold);
+	ViewModel.FeedbackLabel = MoveTemp(FeedbackLabel);
+	ViewModel.bFeedbackSuccess = bFeedbackSuccess;
+
+	const EItemSlot* Slots = GetEnhanceSlotOrder();
+	for (int32 Index = 0; Index < GetEnhanceSlotCount(); ++Index)
+	{
+		const EItemSlot Slot = Slots[Index];
+		const FItemInstance* Item = Inventory.GetEquippedItem(Slot);
+
+		FIdleHUDEnhanceSlotViewModel Row;
+		Row.Slot = Slot;
+		Row.SlotLabel = IdleProject::Localization::UI(SlotToLocalizationKey(Slot));
+		Row.ItemName = Item ? Item->DisplayName : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+		Row.RarityLabel = Item ? FText::FromString(RarityToString(Item->Rarity)) : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+		Row.bEquipped = Item != nullptr;
+		Row.ButtonLabel = IdleProject::Localization::UI(TEXT("ACTION_ENHANCE"));
+
+		if (!Item)
+		{
+			Row.LevelLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.CostLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.SuccessRateLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_EMPTY"));
+			ViewModel.Rows.Add(Row);
+			continue;
+		}
+
+		Row.EnhanceLevel = FMath::Clamp(Item->EnhanceLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
+		Row.bMaxLevel = Row.EnhanceLevel >= FEnhanceFormula::MaxEnhanceLevel;
+		Row.Cost = FEnhanceFormula::GetEnhanceCost(Row.EnhanceLevel);
+		Row.SuccessRate = FEnhanceFormula::GetEnhanceSuccessRate(Row.EnhanceLevel);
+		Row.bGoldEnough = Gold >= Row.Cost;
+		Row.bCanEnhance = !Row.bMaxLevel && Row.Cost > 0 && Row.bGoldEnough;
+		Row.LevelLabel = FormatLocalizedUI(TEXT("ENHANCE_LEVEL_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(Row.EnhanceLevel));
+			Args.Add(TEXT("MaxLevel"), FText::AsNumber(FEnhanceFormula::MaxEnhanceLevel));
+		});
+		Row.CostLabel = Row.bMaxLevel
+			? IdleProject::Localization::UI(TEXT("NONE_DASH"))
+			: FormatLocalizedUIWithInt64(TEXT("ENHANCE_COST_FORMAT"), TEXT("Cost"), Row.Cost);
+		Row.SuccessRateLabel = Row.bMaxLevel
+			? IdleProject::Localization::UI(TEXT("NONE_DASH"))
+			: FormatPercentLabel(TEXT("ENHANCE_SUCCESS_FORMAT"), Row.SuccessRate);
+
+		if (Row.bMaxLevel)
+		{
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_MAX"));
+		}
+		else if (!Row.bGoldEnough)
+		{
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_NEED_GOLD"));
+		}
+		else
+		{
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_READY"));
+		}
+
+		ViewModel.Rows.Add(Row);
+	}
+
 	return ViewModel;
 }
 
@@ -582,6 +721,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnGoldChanged.AddDynamic(this, &AIdleHUD::HandleGoldChanged);
 	IdleGameInstance->OnExpChanged.AddDynamic(this, &AIdleHUD::HandleExpChanged);
 	IdleGameInstance->OnLevelUp.AddDynamic(this, &AIdleHUD::HandleLevelUp);
+	IdleGameInstance->OnEnhanceResult.AddDynamic(this, &AIdleHUD::HandleEnhanceResult);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
@@ -640,6 +780,7 @@ void AIdleHUD::DrawHUD()
 
 	DrawStageIndicator();
 	DrawRebirthPanel();
+	DrawEnhancePanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
 	DrawSeasonPassPanel();
@@ -677,6 +818,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(SkillRankHitBoxPrefix))
 	{
 		RankUpSkillFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(EnhanceSlotHitBoxPrefix))
+	{
+		TryEnhanceFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName == RebirthHitBoxName)
@@ -757,6 +903,34 @@ void AIdleHUD::HandleDamageReceived(AActor* DamagedActor, float Amount, bool bWa
 void AIdleHUD::HandleEquippedChanged(EItemSlot Slot)
 {
 	RefreshEquipmentSummary();
+}
+
+void AIdleHUD::HandleEnhanceResult(const FEnhanceAttemptResult& Result)
+{
+	bEnhanceFeedbackSuccess = Result.bAttempted && Result.bSuccess;
+	if (!Result.bAttempted)
+	{
+		EnhanceFeedbackLabel = IdleProject::Localization::UI(TEXT("ENHANCE_FEEDBACK_BLOCKED"));
+		return;
+	}
+
+	if (Result.bSuccess)
+	{
+		EnhanceFeedbackLabel = FormatLocalizedUI(TEXT("ENHANCE_FEEDBACK_SUCCESS_FORMAT"), [&Result](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(Result.NewLevel));
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Result.GoldSpent)));
+		});
+	}
+	else
+	{
+		EnhanceFeedbackLabel = FormatLocalizedUI(TEXT("ENHANCE_FEEDBACK_FAIL_FORMAT"), [&Result](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Result.GoldSpent)));
+		});
+	}
+
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::BindPlayerCombat()
@@ -1023,6 +1197,121 @@ void AIdleHUD::DrawStageIndicator()
 	const float BarWidth = PanelWidth - Padding * 2.0f;
 	DrawRect(BgPrimary.CopyWithNewOpacity(0.94f), BarX, BarY, BarWidth, BarHeight);
 	DrawRect(ViewModel.BorderColor, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
+}
+
+void AIdleHUD::DrawEnhancePanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	const FIdleHUDEnhancePanelViewModel ViewModel = BuildEnhancePanelViewModel(
+		*PlayerInventory,
+		IdleGameInstance->GetGold(),
+		EnhanceFeedbackLabel,
+		bEnhanceFeedbackSuccess);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.25f, 360.0f * Scale, 460.0f * Scale);
+	const float HeaderHeight = 52.0f * Scale;
+	const float RowHeight = 40.0f * Scale;
+	const float RowGap = 6.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float FeedbackHeight = ViewModel.FeedbackLabel.IsEmpty() ? 0.0f : 24.0f * Scale;
+	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 526.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.GoldLabel.ToString(), Theme::AccentGold, X + PanelWidth - 114.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDEnhanceSlotViewModel& Row : ViewModel.Rows)
+	{
+		DrawEnhanceSlotRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	if (!ViewModel.FeedbackLabel.IsEmpty())
+	{
+		const FLinearColor FeedbackColor = ViewModel.bFeedbackSuccess ? Theme::AccentGold : Theme::AccentRed;
+		DrawText(ViewModel.FeedbackLabel.ToString(), FeedbackColor, X + Padding, RowY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 40.0f;
+	const FLinearColor StateColor = Row.bCanEnhance
+		? Theme::AccentGold
+		: (Row.bEquipped ? Theme::AccentBlue.CopyWithNewOpacity(0.72f) : Theme::TextMuted.CopyWithNewOpacity(0.46f));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Row.SlotLabel.ToString(), Row.bCanEnhance ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.ItemName.ToString(), Row.bEquipped ? Theme::TextPrimary : Theme::TextMuted, X + 78.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.LevelLabel.ToString(), Row.bMaxLevel ? Theme::AccentGold : Theme::TextMuted, X + 10.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.CostLabel.ToString(), Row.bGoldEnough || Row.bMaxLevel ? Theme::TextMuted : Theme::AccentRed, X + 84.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.SuccessRateLabel.ToString(), Row.bCanEnhance ? Theme::AccentBlue : Theme::TextMuted, X + 156.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+
+	const float ButtonWidth = 72.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 7.0f * Scale;
+	DrawRect(Row.bCanEnhance ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.bCanEnhance ? Row.ButtonLabel.ToString() : Row.StatusLabel.ToString(), Row.bCanEnhance ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	if (Row.bCanEnhance)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeEnhanceSlotHitBoxName(Row.Slot), true, 86);
+	}
+}
+
+void AIdleHUD::TryEnhanceFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	FString RawSlot = BoxName.ToString();
+	RawSlot.RightChopInline(EnhanceSlotHitBoxPrefix.Len());
+	const int32 SlotValue = FCString::Atoi(*RawSlot);
+	if (SlotValue < static_cast<int32>(EItemSlot::Weapon) || SlotValue > static_cast<int32>(EItemSlot::Accessory))
+	{
+		return;
+	}
+
+	IdleGameInstance->TryEnhanceEquipped(static_cast<EItemSlot>(SlotValue), PlayerInventory);
+	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
@@ -1723,7 +2012,7 @@ void AIdleHUD::RefreshMouseInteraction()
 	}
 
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || OfflineRewardModal.bVisible || bRebirthReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

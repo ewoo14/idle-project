@@ -93,3 +93,16 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   reward multiplier, normal rewards, and 8x boss rewards.
 - [ ] Simulator imports `reward.ts` and `stage.ts` rather than duplicating
   kill reward or stage multiplier constants.
+
+## PR #33 Balance Checklist Addendum (Section 5)
+
+- [ ] Balance report includes enhancement spend pressure for +0 through +5:
+  minimum all-success cost, expected cost using `cost / successRate`, and
+  expected hours against sampled median Lv50 gold/hour.
+- [ ] Simulator imports `server/src/core/formulas/enhance.ts` rather than
+  duplicating enhancement cost, success rate, or max-level constants.
+- [ ] `docs/planning/05-balance-philosophy.md` documents MaxLevel 5, the
+  `100 * (CurrentLevel + 1)^2` cost curve, success rates, no downgrade or
+  destruction on failure, and the `1 + EnhanceLevel * 0.1` stat payoff.
+- [ ] Reward-vs-HP parity remains documented for Stage 1-1 through 1-5, with
+  the 8x boss reward bonus reviewed separately from normal farming.

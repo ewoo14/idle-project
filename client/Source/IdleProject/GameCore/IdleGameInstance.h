@@ -7,13 +7,35 @@
 #include "GameCore/QuestService.h"
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
+#include "ItemSystem/ItemTypes.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
+class UInventoryComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
+
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FEnhanceAttemptResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	bool bAttempted = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	bool bSuccess = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	int64 GoldSpent = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	int32 NewLevel = INDEX_NONE;
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnhanceResult, const FEnhanceAttemptResult&, Result);
 
 /**
  * 게임 전역 서비스 컨테이너입니다.
@@ -54,6 +76,13 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddGold(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
+	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot);
+
+	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, UInventoryComponent* Inventory);
+
+	void SetEnhanceRandomSeed(int32 Seed);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddExp(int64 Amount);
@@ -161,6 +190,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Progression")
 	FOnLevelUp OnLevelUp;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Enhance")
+	FOnEnhanceResult OnEnhanceResult;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
@@ -208,7 +240,10 @@ private:
 	UPROPERTY()
 	int64 LastSeenUnixSec = 0;
 
+	FRandomStream EnhanceRandomStream;
+
 	static int64 GetCurrentUnixSeconds();
+	UInventoryComponent* FindPlayerInventory() const;
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();

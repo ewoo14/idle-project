@@ -1,7 +1,11 @@
 #include "GameCore/IdleGameInstance.h"
 
 #include "CharacterSystem/LevelFormulas.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "Internationalization/IdleLocalization.h"
+#include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/InventoryComponent.h"
 #include "NetworkClient/ApiClient.h"
 
 void UIdleGameInstance::Init()
@@ -30,6 +34,7 @@ void UIdleGameInstance::Init()
 	EnsureSeasonService();
 	EnsureStageService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
+	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	LoadLanguage();
 	LoadLastSeenUnixSec();
 
@@ -65,13 +70,63 @@ void UIdleGameInstance::SetLanguage(const FString& InLanguage)
 
 void UIdleGameInstance::AddGold(int64 Amount)
 {
-	if (Amount <= 0)
+	if (Amount == 0)
 	{
 		return;
 	}
 
-	Gold += Amount;
+	Gold = FMath::Max<int64>(0, Gold + Amount);
 	OnGoldChanged.Broadcast(Gold);
+}
+
+FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot)
+{
+	return TryEnhanceEquipped(Slot, FindPlayerInventory());
+}
+
+FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInventoryComponent* Inventory)
+{
+	FEnhanceAttemptResult Result;
+	if (!Inventory || Slot == EItemSlot::None)
+	{
+		OnEnhanceResult.Broadcast(Result);
+		return Result;
+	}
+
+	const int32 CurrentLevel = Inventory->GetEquippedEnhanceLevel(Slot);
+	Result.NewLevel = CurrentLevel;
+	if (CurrentLevel == INDEX_NONE || CurrentLevel >= FEnhanceFormula::MaxEnhanceLevel)
+	{
+		OnEnhanceResult.Broadcast(Result);
+		return Result;
+	}
+
+	const int64 Cost = FEnhanceFormula::GetEnhanceCost(CurrentLevel);
+	if (Cost <= 0 || Gold < Cost)
+	{
+		OnEnhanceResult.Broadcast(Result);
+		return Result;
+	}
+
+	AddGold(-Cost);
+	Result.bAttempted = true;
+	Result.GoldSpent = Cost;
+
+	const float SuccessRate = FEnhanceFormula::GetEnhanceSuccessRate(CurrentLevel);
+	if (FEnhanceFormula::RollEnhanceSuccess(SuccessRate, EnhanceRandomStream) && Inventory->EnhanceEquippedItem(Slot))
+	{
+		Result.bSuccess = true;
+		Result.NewLevel = CurrentLevel + 1;
+	}
+
+	RecordGearEnhanced();
+	OnEnhanceResult.Broadcast(Result);
+	return Result;
+}
+
+void UIdleGameInstance::SetEnhanceRandomSeed(int32 Seed)
+{
+	EnhanceRandomStream.Initialize(Seed);
 }
 
 void UIdleGameInstance::AddExp(int64 Amount)
@@ -344,6 +399,14 @@ FSeasonClaimResult UIdleGameInstance::ClaimSeasonReward(int32 Tier)
 int64 UIdleGameInstance::GetCurrentUnixSeconds()
 {
 	return FDateTime::UtcNow().ToUnixTimestamp();
+}
+
+UInventoryComponent* UIdleGameInstance::FindPlayerInventory() const
+{
+	const UWorld* World = GetWorld();
+	APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+	APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+	return Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr;
 }
 
 void UIdleGameInstance::EnsureQuestService()

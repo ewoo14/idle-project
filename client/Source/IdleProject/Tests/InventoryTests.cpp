@@ -1,8 +1,10 @@
 #include "Misc/AutomationTest.h"
 
+#include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ItemTypes.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -21,6 +23,32 @@ FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, flo
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhanceFormulaCurveTest,
+	"IdleProject.Inventory.EnhanceFormula.Curve",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Max enhance level matches item clamp"), FEnhanceFormula::MaxEnhanceLevel, 5);
+	TestEqual(TEXT("Level 0 cost"), FEnhanceFormula::GetEnhanceCost(0), static_cast<int64>(100));
+	TestEqual(TEXT("Level 1 cost"), FEnhanceFormula::GetEnhanceCost(1), static_cast<int64>(400));
+	TestEqual(TEXT("Negative level uses level 0 cost"), FEnhanceFormula::GetEnhanceCost(-1), static_cast<int64>(100));
+	TestEqual(TEXT("Max level has no next enhance cost"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel), static_cast<int64>(0));
+
+	TestEqual(TEXT("Level 0 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(0), 0.95f);
+	TestEqual(TEXT("Level 4 success rate"), FEnhanceFormula::GetEnhanceSuccessRate(4), 0.40f);
+	TestEqual(TEXT("Max level success rate"), FEnhanceFormula::GetEnhanceSuccessRate(FEnhanceFormula::MaxEnhanceLevel), 0.0f);
+
+	FRandomStream AlwaysSucceeds(123);
+	TestTrue(TEXT("Success rate 1 always succeeds"), FEnhanceFormula::RollEnhanceSuccess(1.0f, AlwaysSucceeds));
+
+	FRandomStream AlwaysFails(123);
+	TestFalse(TEXT("Success rate 0 always fails"), FEnhanceFormula::RollEnhanceSuccess(0.0f, AlwaysFails));
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -55,6 +83,79 @@ bool FInventoryAutoEquipBetterWeaponTest::RunTest(const FString& Parameters)
 	{
 		TestEqual(TEXT("더 강한 무기로 교체"), Equipped->ItemId, FName(TEXT("uncommon_sword")));
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEnhanceEquippedItemTest,
+	"IdleProject.Inventory.EnhanceEquippedItem.SuccessAndMaxGuard",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEnhanceEquippedItemTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0));
+
+	TestEqual(TEXT("Initial enhance level"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 0);
+	TestTrue(TEXT("Enhance equipped weapon succeeds below max"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
+	TestEqual(TEXT("Enhance level increments"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 1);
+
+	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Enhanced item increases equipment attack bonus"), Bonus.PhysAtk, 11.0f);
+
+	for (int32 Attempt = 1; Attempt < FEnhanceFormula::MaxEnhanceLevel; ++Attempt)
+	{
+		Inventory->EnhanceEquippedItem(EItemSlot::Weapon);
+	}
+
+	TestEqual(TEXT("Enhance level reaches max"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel);
+	TestFalse(TEXT("Enhance fails at max level"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
+	TestFalse(TEXT("Enhance fails when slot is empty"), Inventory->EnhanceEquippedItem(EItemSlot::Helmet));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhancePanelViewModelStateTest,
+	"IdleProject.UI.HUD.EnhancePanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0));
+
+	const FIdleHUDEnhancePanelViewModel NoGold = IdleProject::UI::BuildEnhancePanelViewModel(
+		*Inventory,
+		0,
+		FText::GetEmpty(),
+		false);
+	TestEqual(TEXT("Enhance panel exposes all equipment slots"), NoGold.Rows.Num(), 8);
+	TestEqual(TEXT("Weapon row uses current enhance level"), NoGold.Rows[0].EnhanceLevel, 0);
+	TestEqual(TEXT("Weapon row shows level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(100));
+	TestFalse(TEXT("Weapon row is disabled without gold"), NoGold.Rows[0].bCanEnhance);
+	TestFalse(TEXT("Weapon row reports insufficient gold"), NoGold.Rows[0].bGoldEnough);
+	TestFalse(TEXT("Empty helmet row is not enhanceable"), NoGold.Rows[1].bCanEnhance);
+	TestFalse(TEXT("Empty helmet row reports no equipment"), NoGold.Rows[1].bEquipped);
+
+	const FIdleHUDEnhancePanelViewModel EnoughGold = IdleProject::UI::BuildEnhancePanelViewModel(
+		*Inventory,
+		FEnhanceFormula::GetEnhanceCost(0),
+		FText::GetEmpty(),
+		false);
+	TestTrue(TEXT("Weapon row enables when equipped and gold is enough"), EnoughGold.Rows[0].bCanEnhance);
+
+	UInventoryComponent* MaxInventory = NewObject<UInventoryComponent>();
+	MaxInventory->AddItem(MakeTestItem(TEXT("max_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, FEnhanceFormula::MaxEnhanceLevel));
+	const FIdleHUDEnhancePanelViewModel MaxLevel = IdleProject::UI::BuildEnhancePanelViewModel(
+		*MaxInventory,
+		100000,
+		FText::GetEmpty(),
+		false);
+	TestTrue(TEXT("Max level row reports max state"), MaxLevel.Rows[0].bMaxLevel);
+	TestFalse(TEXT("Max level row is disabled"), MaxLevel.Rows[0].bCanEnhance);
+	TestEqual(TEXT("Max level row has zero next cost"), MaxLevel.Rows[0].Cost, static_cast<int64>(0));
 
 	return true;
 }

@@ -43,6 +43,9 @@ describe("balance simulator", () => {
     const report = buildBalanceReport(distribution);
 
     expect(report.json.distribution.summary).toEqual(distribution.summary);
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/enhance.ts",
+    );
     expect(report.markdown).toContain("# Balance Simulator V1");
     expect(report.markdown).toContain("median");
     expect(report.markdown).toContain("Sensitivity");
@@ -82,6 +85,39 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("Boss bonus: 8x");
     expect(report.markdown).toContain(
       "| 1-1 | 0 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
+    );
+  });
+
+  it("reports enhancement spend pressure against sampled gold income", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.enhancementPressure.maxLevel).toBe(5);
+    expect(report.json.model.enhancementPressure.goldCostFloorToMax).toBe(5500);
+    expect(
+      report.json.model.enhancementPressure.expectedGoldCostToMax,
+    ).toBeCloseTo(11020.66, 2);
+    expect(
+      report.json.model.enhancementPressure.rows.map((row) => ({
+        currentLevel: row.currentLevel,
+        cost: row.cost,
+        successRate: row.successRate,
+      })),
+    ).toEqual([
+      { currentLevel: 0, cost: 100, successRate: 0.95 },
+      { currentLevel: 1, cost: 400, successRate: 0.85 },
+      { currentLevel: 2, cost: 900, successRate: 0.7 },
+      { currentLevel: 3, cost: 1600, successRate: 0.55 },
+      { currentLevel: 4, cost: 2500, successRate: 0.4 },
+    ]);
+    expect(
+      report.json.model.enhancementPressure.expectedHoursAtMedianGoldPerHour,
+    ).toBeGreaterThan(0);
+    expect(report.markdown).toContain("## Enhancement Spend Pressure");
+    expect(report.markdown).toContain("Expected +0 to +5 gold cost");
+    expect(report.markdown).toContain("11020.66");
+    expect(report.markdown).toContain(
+      "V1 enhancement is a light early sink, not a Lv50 progression blocker",
     );
   });
 });

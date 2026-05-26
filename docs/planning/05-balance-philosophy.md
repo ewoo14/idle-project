@@ -446,6 +446,25 @@ do not raise the `level.ts` exponent toward 1.85-2.0 yet; keep the current curve
 and re-run the simulator after the next equipment, enhancement, or monster-data
 change.
 
+## PR #33 Equipment Enhancement V1
+
+Client V1 uses a conservative gold sink for the existing `EnhanceLevel` 0..5
+equipment multiplier.
+
+| Current level | Cost | Success rate |
+| ---: | ---: | ---: |
+| 0 | 100 | 95% |
+| 1 | 400 | 85% |
+| 2 | 900 | 70% |
+| 3 | 1600 | 55% |
+| 4 | 2500 | 40% |
+| 5 | 0 | 0% |
+
+The cost formula is `100 * (CurrentLevel + 1)^2` before max level. Failure
+does not destroy or downgrade equipment in V1; it consumes the attempt cost and
+records enhancement quest progress. The stat payoff remains the existing
+`1 + EnhanceLevel * 0.1` equipment bonus multiplier.
+
 Sensitivity notes:
 
 - EXP curve: current curve is acceptable for the first rebirth target.
@@ -453,6 +472,19 @@ Sensitivity notes:
   available.
 - Offline efficiency: current sampled 70-80% band keeps idle progress below
   active play while staying relevant.
+- Simulator pressure check: the deterministic 1000-run balance report imports
+  `server/src/core/formulas/enhance.ts` and models +0 to +5 enhancement spend.
+  The minimum all-success cost is 5,500 gold, while expected cost using
+  `cost / successRate` is 11,020.66 gold. Against the sampled median Lv50
+  active/idle blended gold rate, a single +0 to +5 path is only about 0.017h
+  of income. Treat this as a baseline pressure check, not evidence that V1 is
+  a meaningful midgame sink. V1 deliberately avoids blocking first rebirth;
+  later slices should raise pressure through higher-level cost bands, material
+  requirements, or repeated-slot enhancement demand after real gold telemetry.
+- Reward parity check: PR #32 reward scaling remains aligned with monster HP
+  scaling because both use `1 + globalStageIndex * 0.15`. Chapter 1 normal
+  reward-per-HP pressure stays stable across 1-1 to 1-5; the 8x boss reward
+  bonus remains the intentional stage-cap spike.
 
 ---
 

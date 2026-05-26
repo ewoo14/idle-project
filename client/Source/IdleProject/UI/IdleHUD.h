@@ -4,6 +4,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CombatSystem/CombatComponent.h"
 #include "GameFramework/HUD.h"
+#include "GameCore/IdleGameInstance.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -172,6 +173,35 @@ struct IDLEPROJECT_API FIdleHUDStageViewModel
 	bool bBossStage = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDEnhanceSlotViewModel
+{
+	EItemSlot Slot = EItemSlot::None;
+	FText SlotLabel;
+	FText ItemName;
+	FText RarityLabel;
+	FText LevelLabel;
+	FText CostLabel;
+	FText SuccessRateLabel;
+	FText StatusLabel;
+	FText ButtonLabel;
+	int32 EnhanceLevel = INDEX_NONE;
+	int64 Cost = 0;
+	float SuccessRate = 0.0f;
+	bool bEquipped = false;
+	bool bCanEnhance = false;
+	bool bMaxLevel = false;
+	bool bGoldEnough = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDEnhancePanelViewModel
+{
+	FText Title;
+	FText GoldLabel;
+	FText FeedbackLabel;
+	bool bFeedbackSuccess = false;
+	TArray<FIdleHUDEnhanceSlotViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -185,6 +215,7 @@ IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FP
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
+IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -220,6 +251,9 @@ protected:
 	UFUNCTION()
 	void HandleEquippedChanged(EItemSlot Slot);
 
+	UFUNCTION()
+	void HandleEnhanceResult(const FEnhanceAttemptResult& Result);
+
 private:
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
@@ -234,6 +268,9 @@ private:
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
 	void DrawStageIndicator();
+	void DrawEnhancePanel();
+	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
+	void TryEnhanceFromHitBox(FName BoxName);
 	void RankUpSkillFromHitBox(FName BoxName);
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();
@@ -266,6 +303,8 @@ private:
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
+	FText EnhanceFeedbackLabel;
+	bool bEnhanceFeedbackSuccess = false;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
 	FDelegateHandle AnyDamageReceivedHandle;
 	bool bQuestLogVisible = false;
