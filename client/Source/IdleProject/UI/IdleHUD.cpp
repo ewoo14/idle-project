@@ -91,6 +91,33 @@ FText FormatPercentLabel(const TCHAR* Key, float Rate)
 	});
 }
 
+FText FormatAffixRateLabel(const TCHAR* Key, float Rate)
+{
+	const int32 Percent = FMath::RoundToInt(FMath::Max(0.0f, Rate) * 100.0f);
+	return FormatLocalizedUI(Key, [Percent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
+}
+
+FText FormatAffixFloatLabel(const TCHAR* Key, float Value)
+{
+	const FString FormattedValue = FString::Printf(TEXT("%.2f"), FMath::Max(0.0f, Value));
+	return FormatLocalizedUI(Key, [&FormattedValue](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Value"), FText::FromString(FormattedValue));
+	});
+}
+
+FText FormatAffixFlatLabel(const TCHAR* Key, float Value)
+{
+	const int32 RoundedValue = FMath::RoundToInt(FMath::Max(0.0f, Value));
+	return FormatLocalizedUI(Key, [RoundedValue](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Value"), FText::AsNumber(RoundedValue));
+	});
+}
+
 FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 Value)
 {
 	return FormatLocalizedUI(Key, [ArgName, Value](FFormatNamedArguments& Args)
@@ -418,6 +445,27 @@ FLinearColor IdleProject::UI::RarityToColor(EItemRarity Rarity)
 	default:
 		return TextMuted;
 	}
+}
+
+FText IdleProject::UI::BuildAffixSummary(const FItemInstance& Item)
+{
+	TArray<FString> Parts;
+	if (Item.BonusCritRate > 0.0f)
+	{
+		Parts.Add(FormatAffixRateLabel(TEXT("AFFIX_CRIT_RATE_FORMAT"), Item.BonusCritRate).ToString());
+	}
+	if (Item.BonusAtkSpeed > 0.0f)
+	{
+		Parts.Add(FormatAffixFloatLabel(TEXT("AFFIX_ATK_SPEED_FORMAT"), Item.BonusAtkSpeed).ToString());
+	}
+	if (Item.BonusMagicAtk > 0.0f)
+	{
+		Parts.Add(FormatAffixFlatLabel(TEXT("AFFIX_MAGIC_ATK_FORMAT"), Item.BonusMagicAtk).ToString());
+	}
+
+	return Parts.IsEmpty()
+		? FText::GetEmpty()
+		: FText::FromString(FString::Join(Parts, TEXT(" / ")));
 }
 
 TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now)
@@ -1409,6 +1457,11 @@ void AIdleHUD::RefreshEquipmentSummary()
 			Args.Add(TEXT("Rarity"), IdleProject::UI::RarityToLabel(Weapon->Rarity));
 			Args.Add(TEXT("Attack"), FText::AsNumber(FMath::RoundToInt(Weapon->BonusAtk)));
 		});
+		const FText AffixSummary = IdleProject::UI::BuildAffixSummary(*Weapon);
+		if (!AffixSummary.IsEmpty())
+		{
+			WeaponLine = FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponLine, AffixSummary);
+		}
 		WeaponColor = IdleProject::UI::RarityToColor(Weapon->Rarity);
 	}
 

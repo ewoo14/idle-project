@@ -79,6 +79,22 @@ bool FStatFormulasDerivedTest::RunTest(const FString& Parameters)
 	const FDerivedStats ClampedLowCrit = FStatFormulas::DeriveStats(WarriorLevel1, 1, EquipmentBonus);
 	TestEqual(TEXT("CritDmg lower clamp"), ClampedLowCrit.CritDmg, 1.0f);
 
+	FDerivedStats AffixBonus;
+	AffixBonus.CritRate = 0.02f;
+	AffixBonus.AtkSpeed = 0.10f;
+	AffixBonus.MagicAtk = 5.0f;
+	const FDerivedStats AffixDerived = FStatFormulas::DeriveStats(WarriorLevel1, 1, AffixBonus);
+	TestEqual(TEXT("Equipment crit affix increases final crit rate"), AffixDerived.CritRate, 0.028f);
+	TestEqual(TEXT("Equipment attack speed affix increases final attack speed"), AffixDerived.AtkSpeed, 1.1f);
+	TestEqual(TEXT("Equipment magic attack affix increases final magic attack"), AffixDerived.MagicAtk, 13.0f);
+
+	FDerivedStats OversizedAffixBonus;
+	OversizedAffixBonus.CritRate = 3.0f;
+	OversizedAffixBonus.AtkSpeed = 9.0f;
+	const FDerivedStats ClampedAffixDerived = FStatFormulas::DeriveStats(WarriorLevel1, 1, OversizedAffixBonus);
+	TestEqual(TEXT("Equipment crit affix keeps final crit clamp"), ClampedAffixDerived.CritRate, 1.0f);
+	TestEqual(TEXT("Equipment attack speed affix keeps final attack speed clamp"), ClampedAffixDerived.AtkSpeed, 3.0f);
+
 	return true;
 }
 

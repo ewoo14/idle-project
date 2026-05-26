@@ -125,3 +125,15 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   slot while Common remains compatible with the PR #33 cost curve.
 - [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +5 pressure
   and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.
+
+## PR #40 Character Checklist Addendum (Section 4)
+
+- [ ] `FItemInstance` keeps affix defaults at zero for legacy item regression.
+- [ ] `FDropFormula::RollAffixes` uses injected `FRandomStream` and enforces
+  Common 0, Uncommon/Rare 1, Epic 2, Legendary 2-3 affixes.
+- [ ] `UInventoryComponent::ComputeEquipmentBonus` applies enhanced affix
+  bonuses to CritRate, AtkSpeed, and MagicAtk.
+- [ ] `FItemPowerScore::Compute` includes CritRate, AtkSpeed, and MagicAtk
+  weights while zero-affix items keep the previous score.
+- [ ] UE Automation covers affix rolls, equipment bonus propagation, derived
+  stat propagation, PowerScore weighting, and zero-affix regression.

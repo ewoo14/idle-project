@@ -22,13 +22,27 @@ const clientServerEquipmentAnchors = [
     name: "rare weapon base",
     item: rareWeapon,
     clientPowerScore: 15,
-    clientBonus: { bonusAtk: 15, bonusDef: 0, bonusHp: 0 },
+    clientBonus: {
+      bonusAtk: 15,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    },
   },
   {
     name: "enhanced weapon",
     item: { ...rareWeapon, enhanceLevel: 2 },
     clientPowerScore: 18,
-    clientBonus: { bonusAtk: 18, bonusDef: 0, bonusHp: 0 },
+    clientBonus: {
+      bonusAtk: 18,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    },
   },
   {
     name: "helmet def and hp",
@@ -42,7 +56,14 @@ const clientServerEquipmentAnchors = [
       enhanceLevel: 0,
     } satisfies ItemInstance,
     clientPowerScore: 15,
-    clientBonus: { bonusAtk: 0, bonusDef: 9, bonusHp: 60 },
+    clientBonus: {
+      bonusAtk: 0,
+      bonusDef: 9,
+      bonusHp: 60,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    },
   },
   {
     name: "enhanced accessory mixed stats",
@@ -56,7 +77,38 @@ const clientServerEquipmentAnchors = [
       enhanceLevel: 1,
     } satisfies ItemInstance,
     clientPowerScore: 11,
-    clientBonus: { bonusAtk: 5.5, bonusDef: 5.5, bonusHp: 0 },
+    clientBonus: {
+      bonusAtk: 5.5,
+      bonusDef: 5.5,
+      bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    },
+  },
+  {
+    name: "enhanced affix weapon",
+    item: {
+      itemId: "rare_affix_weapon",
+      slot: 1,
+      rarity: 3,
+      bonusAtk: 10,
+      bonusDef: 0,
+      bonusHp: 0,
+      bonusCritRate: 0.02,
+      bonusAtkSpeed: 0.1,
+      bonusMagicAtk: 5,
+      enhanceLevel: 2,
+    } satisfies ItemInstance,
+    clientPowerScore: 54,
+    clientBonus: {
+      bonusAtk: 12,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0.024,
+      atkSpeed: 0.12,
+      magicAtk: 6,
+    },
   },
   {
     name: "empty top low stats",
@@ -70,7 +122,14 @@ const clientServerEquipmentAnchors = [
       enhanceLevel: 0,
     } satisfies ItemInstance,
     clientPowerScore: 3,
-    clientBonus: { bonusAtk: 0, bonusDef: 2, bonusHp: 10 },
+    clientBonus: {
+      bonusAtk: 0,
+      bonusDef: 2,
+      bonusHp: 10,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    },
   },
 ];
 
@@ -120,6 +179,9 @@ describe("equipment formulas", () => {
       bonusAtk: 16.5,
       bonusDef: 12,
       bonusHp: 60,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
   });
 
@@ -128,7 +190,53 @@ describe("equipment formulas", () => {
       bonusAtk: 0,
       bonusDef: 0,
       bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
+  });
+
+  it("keeps affix defaults at zero for legacy equipment", () => {
+    expect(computeInventoryBonus([rareWeapon])).toEqual({
+      bonusAtk: 15,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    });
+  });
+
+  it("applies the enhance multiplier to affix equipment bonuses", () => {
+    expect(
+      computeInventoryBonus([
+        {
+          ...rareWeapon,
+          bonusCritRate: 0.03,
+          bonusAtkSpeed: 0.12,
+          bonusMagicAtk: 20,
+          enhanceLevel: 2,
+        },
+      ]),
+    ).toEqual({
+      bonusAtk: 18,
+      bonusDef: 0,
+      bonusHp: 0,
+      critRate: 0.036,
+      atkSpeed: 0.144,
+      magicAtk: 24,
+    });
+  });
+
+  it("includes weighted affixes in power score before enhance multiplier", () => {
+    expect(
+      computeItemPowerScore({
+        ...rareWeapon,
+        bonusCritRate: 0.02,
+        bonusAtkSpeed: 0.09,
+        bonusMagicAtk: 10,
+      }),
+    ).toBe(54);
   });
 
   it("keeps slot and rarity values aligned to PR 9 enum ranges", () => {
