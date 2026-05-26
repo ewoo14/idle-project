@@ -59,19 +59,15 @@ export function rollRarityForLevel(
   const epicChance = toClientFloat(toClientFloat(0.06) * levelScale);
   const legendaryChance = toClientFloat(toClientFloat(0.015) * levelScale);
   const mythicChance = toClientFloat(toClientFloat(0.005) * levelScale);
-  const commonChance = toClientFloat(
-    Math.max(
-      0,
-      toClientFloat(
-        toClientFloat(
-          toClientFloat(toClientFloat(1 - noneChance) - uncommonChance) -
-            rareChance,
-        ) - epicChance,
-      ) - legendaryChance - mythicChance,
-    ),
-  );
+  let commonChance = toClientFloat(1 - noneChance);
+  commonChance = toClientFloat(commonChance - uncommonChance);
+  commonChance = toClientFloat(commonChance - rareChance);
+  commonChance = toClientFloat(commonChance - epicChance);
+  commonChance = toClientFloat(commonChance - legendaryChance);
+  commonChance = toClientFloat(commonChance - mythicChance);
+  commonChance = toClientFloat(Math.max(0, commonChance));
 
-  const roll = rng();
+  const roll = toClientFloat(rng());
   if (roll < noneChance) {
     return "None";
   }

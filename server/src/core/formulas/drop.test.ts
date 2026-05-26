@@ -8,6 +8,48 @@ import {
 } from "./drop.js";
 
 describe("drop formulas", () => {
+  function clientFloatThresholds(level: number) {
+    const safeLevel = Math.max(level, 1);
+    const levelScale = Math.fround(
+      Math.min(Math.max(Math.fround(Math.fround(safeLevel - 1) / 99), 0), 1),
+    );
+
+    const noneChance = Math.fround(0.02);
+    const uncommonChance = Math.fround(0.2);
+    const rareChance = Math.fround(
+      Math.fround(0.08) + Math.fround(Math.fround(0.12) * levelScale),
+    );
+    const epicChance = Math.fround(Math.fround(0.06) * levelScale);
+    const legendaryChance = Math.fround(Math.fround(0.015) * levelScale);
+    const mythicChance = Math.fround(Math.fround(0.005) * levelScale);
+    let commonChance = Math.fround(1 - noneChance);
+    commonChance = Math.fround(commonChance - uncommonChance);
+    commonChance = Math.fround(commonChance - rareChance);
+    commonChance = Math.fround(commonChance - epicChance);
+    commonChance = Math.fround(commonChance - legendaryChance);
+    commonChance = Math.fround(commonChance - mythicChance);
+    commonChance = Math.fround(Math.max(0, commonChance));
+
+    let threshold = Math.fround(noneChance + commonChance);
+    const commonThreshold = threshold;
+    threshold = Math.fround(threshold + uncommonChance);
+    const uncommonThreshold = threshold;
+    threshold = Math.fround(threshold + rareChance);
+    const rareThreshold = threshold;
+    threshold = Math.fround(threshold + epicChance);
+    const epicThreshold = threshold;
+    threshold = Math.fround(threshold + legendaryChance);
+
+    return {
+      commonThreshold,
+      uncommonThreshold,
+      rareThreshold,
+      epicThreshold,
+      legendaryThreshold: threshold,
+      mythicChance,
+    };
+  }
+
   it("keeps rarity stat multipliers aligned with FDropFormula", () => {
     expect(getRarityStatMultiplier("None")).toBe(0);
     expect(getRarityStatMultiplier("Common")).toBe(1);
@@ -41,6 +83,21 @@ describe("drop formulas", () => {
     expect(rollRarityForLevel(100, () => 0.980_001)).toBe("Legendary");
     expect(rollRarityForLevel(100, () => 0.994_999)).toBe("Legendary");
     expect(rollRarityForLevel(100, () => 0.995_001)).toBe("Mythic");
+  });
+
+  it("keeps Mythic boundary aligned with client float arithmetic", () => {
+    const thresholds = clientFloatThresholds(56);
+    expect(thresholds.mythicChance).toBeGreaterThan(0);
+
+    const rollJustInsideClientLegendary =
+      thresholds.legendaryThreshold - 0.000_000_05;
+
+    expect(rollRarityForLevel(56, () => rollJustInsideClientLegendary)).toBe(
+      "Legendary",
+    );
+    expect(rollRarityForLevel(56, () => thresholds.legendaryThreshold)).toBe(
+      "Mythic",
+    );
   });
 
   it("clamps level below 1 to the level 1 rarity table", () => {

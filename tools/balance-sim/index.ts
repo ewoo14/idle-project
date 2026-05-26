@@ -652,8 +652,7 @@ function buildEnhancementPressure(
     ),
     mythicEightSlotExpectedGoldCost,
     mythicEightSlotExpectedHoursAtMedianGoldPerHour: round(
-      mythicEightSlotExpectedGoldCost /
-        Math.max(1, medianGoldPerHourAtLevel50),
+      mythicEightSlotExpectedGoldCost / Math.max(1, medianGoldPerHourAtLevel50),
       3,
     ),
     rows,
