@@ -5,4 +5,5 @@ export * from "./level.js";
 export * from "./offline.js";
 export * from "./reward.js";
 export * from "./stage.js";
+export * from "./statPoints.js";
 export * from "./stats.js";
