@@ -117,6 +117,57 @@ bool FCombatDamageReceivedEventTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatAnyDamageReceivedEventTest,
+	"IdleProject.Combat.Component.AnyDamageReceivedEvent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatAnyDamageReceivedEventTest::RunTest(const FString& Parameters)
+{
+	AActor* FirstOwner = NewObject<AActor>();
+	UCombatComponent* FirstCombat = NewObject<UCombatComponent>(FirstOwner);
+	FirstOwner->AddInstanceComponent(FirstCombat);
+	FirstCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* RespawnedOwner = NewObject<AActor>();
+	UCombatComponent* RespawnedCombat = NewObject<UCombatComponent>(RespawnedOwner);
+	RespawnedOwner->AddInstanceComponent(RespawnedCombat);
+	RespawnedCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* LastDamagedActor = nullptr;
+	float LastAmount = 0.0f;
+	bool bLastWasCrit = false;
+	EDamageKind LastKind = EDamageKind::Physical;
+	int32 EventCount = 0;
+
+	const FDelegateHandle Handle = UCombatComponent::OnAnyDamageReceived.AddLambda(
+		[&LastDamagedActor, &LastAmount, &bLastWasCrit, &LastKind, &EventCount](
+			AActor* DamagedActor,
+			float Amount,
+			bool bWasCrit,
+			EDamageKind Kind)
+		{
+			LastDamagedActor = DamagedActor;
+			LastAmount = Amount;
+			bLastWasCrit = bWasCrit;
+			LastKind = Kind;
+			++EventCount;
+		});
+
+	FirstCombat->TakeDamageTyped(12.0f, FirstOwner, false, EDamageKind::Physical);
+	RespawnedCombat->TakeDamageTyped(34.0f, FirstOwner, true, EDamageKind::Magic);
+
+	UCombatComponent::OnAnyDamageReceived.Remove(Handle);
+
+	TestEqual(TEXT("Global damage event captures both original and respawned targets"), EventCount, 2);
+	TestEqual(TEXT("Global damage event reports latest damaged actor"), LastDamagedActor, RespawnedOwner);
+	TestEqual(TEXT("Global damage event reports amount"), LastAmount, 34.0f);
+	TestTrue(TEXT("Global damage event reports crit flag"), bLastWasCrit);
+	TestEqual(TEXT("Global damage event reports damage kind"), static_cast<int32>(LastKind), static_cast<int32>(EDamageKind::Magic));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatClassDamageTest,
 	"IdleProject.Combat.Formulas.ClassDamage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

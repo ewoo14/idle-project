@@ -463,6 +463,11 @@ void AIdleHUD::PostInitializeComponents()
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
 	RootWidget->UpdateLevel(IdleGameInstance->GetCharacterLevel());
 
+	if (!AnyDamageReceivedHandle.IsValid())
+	{
+		AnyDamageReceivedHandle = UCombatComponent::OnAnyDamageReceived.AddUObject(this, &AIdleHUD::HandleDamageReceived);
+	}
+
 	BindPlayerCombat();
 	BindPlayerInventory();
 }
@@ -477,6 +482,12 @@ void AIdleHUD::BeginPlay()
 
 void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (AnyDamageReceivedHandle.IsValid())
+	{
+		UCombatComponent::OnAnyDamageReceived.Remove(AnyDamageReceivedHandle);
+		AnyDamageReceivedHandle.Reset();
+	}
+
 	UnbindPlayerCombat();
 
 	if (GEngine && GEngine->GameViewport && RootWidget)
@@ -600,22 +611,16 @@ void AIdleHUD::HandleHpChanged(float NewHp)
 	}
 }
 
-void AIdleHUD::HandleDamageReceived(float Amount, bool bWasCrit, EDamageKind Kind)
+void AIdleHUD::HandleDamageReceived(AActor* DamagedActor, float Amount, bool bWasCrit, EDamageKind Kind)
 {
 	const UWorld* World = GetWorld();
-	if (!World || !PlayerCombat)
-	{
-		return;
-	}
-
-	const AActor* CombatOwner = PlayerCombat->GetOwner();
-	if (!CombatOwner)
+	if (!World || !DamagedActor)
 	{
 		return;
 	}
 
 	FIdleHUDFloatingDamageEntry Entry;
-	Entry.WorldLocation = CombatOwner->GetActorLocation() + FVector(0.0f, 0.0f, FloatingDamageHeadOffsetZ);
+	Entry.WorldLocation = DamagedActor->GetActorLocation() + FVector(0.0f, 0.0f, FloatingDamageHeadOffsetZ);
 	Entry.Amount = Amount;
 	Entry.bWasCrit = bWasCrit;
 	Entry.Kind = Kind;
@@ -651,7 +656,6 @@ void AIdleHUD::BindPlayerCombat()
 
 	PlayerCombatPawn = Pawn;
 	PlayerCombat->OnHpChanged.AddDynamic(this, &AIdleHUD::HandleHpChanged);
-	PlayerCombat->OnDamageReceived.AddDynamic(this, &AIdleHUD::HandleDamageReceived);
 	if (RootWidget)
 	{
 		RootWidget->UpdateHp(PlayerCombat->CurrentHp, PlayerCombat->MaxHp);
@@ -663,7 +667,6 @@ void AIdleHUD::UnbindPlayerCombat()
 	if (PlayerCombat)
 	{
 		PlayerCombat->OnHpChanged.RemoveDynamic(this, &AIdleHUD::HandleHpChanged);
-		PlayerCombat->OnDamageReceived.RemoveDynamic(this, &AIdleHUD::HandleDamageReceived);
 	}
 
 	PlayerCombat = nullptr;

@@ -15,6 +15,7 @@ enum class EDamageKind : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDamageReceived, float, Amount, bool, bWasCrit, EDamageKind, Kind);
+DECLARE_MULTICAST_DELEGATE_FourParams(FOnAnyDamageReceived, AActor* /* DamagedActor */, float /* Amount */, bool /* bWasCrit */, EDamageKind /* Kind */);
 
 /** 캐릭터와 몬스터가 공유하는 HP/공격력 기반 전투 상태 컴포넌트입니다. */
 UCLASS(ClassGroup = (Idle), meta = (BlueprintSpawnableComponent))
@@ -63,6 +64,8 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Combat")
 	FOnDamageReceived OnDamageReceived;
+
+	static FOnAnyDamageReceived OnAnyDamageReceived;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Combat")
 	void TakeDamage(float Damage, AActor* Instigator);

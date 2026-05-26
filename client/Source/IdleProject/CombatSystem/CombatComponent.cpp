@@ -3,6 +3,8 @@
 #include "CombatSystem/CombatFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 
+FOnAnyDamageReceived UCombatComponent::OnAnyDamageReceived;
+
 UCombatComponent::UCombatComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -61,6 +63,7 @@ void UCombatComponent::TakeDamageTyped(float Damage, AActor* Instigator, bool bW
 	if (AppliedDamage > 0.0f)
 	{
 		OnDamageReceived.Broadcast(AppliedDamage, bWasCrit, Kind);
+		OnAnyDamageReceived.Broadcast(GetOwner(), AppliedDamage, bWasCrit, Kind);
 
 		if (USkillComponent* Skills = GetOwner() ? GetOwner()->FindComponentByClass<USkillComponent>() : nullptr)
 		{

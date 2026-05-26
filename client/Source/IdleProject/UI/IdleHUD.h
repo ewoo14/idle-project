@@ -191,8 +191,7 @@ protected:
 	UFUNCTION()
 	void HandleHpChanged(float NewHp);
 
-	UFUNCTION()
-	void HandleDamageReceived(float Amount, bool bWasCrit, EDamageKind Kind);
+	void HandleDamageReceived(AActor* DamagedActor, float Amount, bool bWasCrit, EDamageKind Kind);
 
 	UFUNCTION()
 	void HandleEquippedChanged(EItemSlot Slot);
@@ -242,5 +241,6 @@ private:
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
+	FDelegateHandle AnyDamageReceivedHandle;
 	bool bQuestLogVisible = false;
 };
