@@ -15,3 +15,4 @@
 | M5 | [M5-combat-class-diff-v1.md](M5-combat-class-diff-v1.md) | Mage magic damage, Archer crit damage, server/client formula parity, regression evidence |
 | M5 | [M5-mage-archer-classes-v1.md](M5-mage-archer-classes-v1.md) | Mage/Archer class skill parity, class loading, story branch localization, balance guardrails |
 | M5 | [M5-pets-season-pass-v1.md](M5-pets-season-pass-v1.md) | 펫 장착 보너스 parity, 시즌 토큰 진행, 티어 수령, edge/regression 증거 |
+| M6 | [M6-damage-floating-text-v1.md](M6-damage-floating-text-v1.md) | Damage floating text event metadata, HUD lifecycle/style, respawn regression coverage |

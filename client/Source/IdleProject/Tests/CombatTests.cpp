@@ -6,6 +6,7 @@
 #include "CombatSystem/SkillComponent.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "Components/SceneComponent.h"
+#include "DamageReceivedTestReceiver.h"
 #include "Engine/World.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "Internationalization/IdleLocalization.h"
@@ -93,6 +94,80 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatDamageReceivedEventTest,
+	"IdleProject.Combat.Component.DamageReceivedEvent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatDamageReceivedEventTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+	UDamageReceivedTestReceiver* Receiver = NewObject<UDamageReceivedTestReceiver>();
+	Combat->OnDamageReceived.AddDynamic(Receiver, &UDamageReceivedTestReceiver::Capture);
+
+	Combat->TakeDamageTyped(25.0f, Owner, true, EDamageKind::Magic);
+
+	TestEqual(TEXT("Damage event amount matches final damage"), Receiver->LastAmount, 25.0f);
+	TestTrue(TEXT("Damage event captures crit flag"), Receiver->bLastWasCrit);
+	TestEqual(TEXT("Damage event captures damage kind"), static_cast<int32>(Receiver->LastKind), static_cast<int32>(EDamageKind::Magic));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatAnyDamageReceivedEventTest,
+	"IdleProject.Combat.Component.AnyDamageReceivedEvent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatAnyDamageReceivedEventTest::RunTest(const FString& Parameters)
+{
+	AActor* FirstOwner = NewObject<AActor>();
+	UCombatComponent* FirstCombat = NewObject<UCombatComponent>(FirstOwner);
+	FirstOwner->AddInstanceComponent(FirstCombat);
+	FirstCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* RespawnedOwner = NewObject<AActor>();
+	UCombatComponent* RespawnedCombat = NewObject<UCombatComponent>(RespawnedOwner);
+	RespawnedOwner->AddInstanceComponent(RespawnedCombat);
+	RespawnedCombat->InitializeCombat(100.0f, 10.0f, 0.0f, 1.0f);
+
+	AActor* LastDamagedActor = nullptr;
+	float LastAmount = 0.0f;
+	bool bLastWasCrit = false;
+	EDamageKind LastKind = EDamageKind::Physical;
+	int32 EventCount = 0;
+
+	const FDelegateHandle Handle = UCombatComponent::OnAnyDamageReceived.AddLambda(
+		[&LastDamagedActor, &LastAmount, &bLastWasCrit, &LastKind, &EventCount](
+			AActor* DamagedActor,
+			float Amount,
+			bool bWasCrit,
+			EDamageKind Kind)
+		{
+			LastDamagedActor = DamagedActor;
+			LastAmount = Amount;
+			bLastWasCrit = bWasCrit;
+			LastKind = Kind;
+			++EventCount;
+		});
+
+	FirstCombat->TakeDamageTyped(12.0f, FirstOwner, false, EDamageKind::Physical);
+	RespawnedCombat->TakeDamageTyped(34.0f, FirstOwner, true, EDamageKind::Magic);
+
+	UCombatComponent::OnAnyDamageReceived.Remove(Handle);
+
+	TestEqual(TEXT("Global damage event captures both original and respawned targets"), EventCount, 2);
+	TestEqual(TEXT("Global damage event reports latest damaged actor"), LastDamagedActor, RespawnedOwner);
+	TestEqual(TEXT("Global damage event reports amount"), LastAmount, 34.0f);
+	TestTrue(TEXT("Global damage event reports crit flag"), bLastWasCrit);
+	TestEqual(TEXT("Global damage event reports damage kind"), static_cast<int32>(LastKind), static_cast<int32>(EDamageKind::Magic));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCombatClassDamageTest,
 	"IdleProject.Combat.Formulas.ClassDamage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -156,6 +231,8 @@ bool FSkillMagicDamageTest::RunTest(const FString& Parameters)
 
 	OwnerCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f, 80.0f, 0.0f, 0.0f, 1.5f);
 	TargetCombat->InitializeCombat(1000.0f, 10.0f, 10.0f, 1.0f, 0.0f, 30.0f, 0.0f, 1.5f);
+	UDamageReceivedTestReceiver* Receiver = NewObject<UDamageReceivedTestReceiver>();
+	TargetCombat->OnDamageReceived.AddDynamic(Receiver, &UDamageReceivedTestReceiver::Capture);
 	Skills->LoadDefaultMageSkills();
 
 	Skills->MarkSkillCast(TEXT("chain_lightning"), 10.0f);
@@ -164,6 +241,9 @@ bool FSkillMagicDamageTest::RunTest(const FString& Parameters)
 	Skills->TickSkills(12.0f, Target, TArray<AActor*>());
 
 	TestEqual(TEXT("Arcane bolt uses MagicAtk vs MagicDef"), TargetCombat->CurrentHp, 1000.0f - 174.0f);
+	TestEqual(TEXT("Magic skill broadcasts final damage amount"), Receiver->LastAmount, 174.0f);
+	TestFalse(TEXT("Magic skill broadcasts non-crit flag"), Receiver->bLastWasCrit);
+	TestEqual(TEXT("Magic skill broadcasts magic damage kind"), static_cast<int32>(Receiver->LastKind), static_cast<int32>(EDamageKind::Magic));
 
 	return true;
 }
@@ -187,6 +267,8 @@ bool FSkillCritDamageTest::RunTest(const FString& Parameters)
 
 	OwnerCombat->InitializeCombat(1000.0f, 40.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 2.0f);
 	TargetCombat->InitializeCombat(1000.0f, 10.0f, 10.0f, 1.0f);
+	UDamageReceivedTestReceiver* Receiver = NewObject<UDamageReceivedTestReceiver>();
+	TargetCombat->OnDamageReceived.AddDynamic(Receiver, &UDamageReceivedTestReceiver::Capture);
 	Skills->LoadDefaultArcherSkills();
 
 	Skills->MarkSkillCast(TEXT("arrow_rain"), 10.0f);
@@ -195,6 +277,9 @@ bool FSkillCritDamageTest::RunTest(const FString& Parameters)
 	Skills->TickSkills(12.0f, Target, TArray<AActor*>());
 
 	TestEqual(TEXT("Precision shot applies guaranteed crit after physical mitigation"), TargetCombat->CurrentHp, 1000.0f - 164.0f);
+	TestEqual(TEXT("Physical skill broadcasts crit damage amount"), Receiver->LastAmount, 164.0f);
+	TestTrue(TEXT("Physical skill broadcasts crit flag"), Receiver->bLastWasCrit);
+	TestEqual(TEXT("Physical skill broadcasts physical damage kind"), static_cast<int32>(Receiver->LastKind), static_cast<int32>(EDamageKind::Physical));
 
 	return true;
 }

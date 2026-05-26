@@ -7,6 +7,16 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeath, AActor*, DyingActor);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnHpChanged, float, NewHp);
 
+UENUM(BlueprintType)
+enum class EDamageKind : uint8
+{
+	Physical = 0 UMETA(DisplayName = "Physical"),
+	Magic = 1 UMETA(DisplayName = "Magic")
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDamageReceived, float, Amount, bool, bWasCrit, EDamageKind, Kind);
+DECLARE_MULTICAST_DELEGATE_FourParams(FOnAnyDamageReceived, AActor* /* DamagedActor */, float /* Amount */, bool /* bWasCrit */, EDamageKind /* Kind */);
+
 /** 캐릭터와 몬스터가 공유하는 HP/공격력 기반 전투 상태 컴포넌트입니다. */
 UCLASS(ClassGroup = (Idle), meta = (BlueprintSpawnableComponent))
 class IDLEPROJECT_API UCombatComponent : public UActorComponent
@@ -52,8 +62,16 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Combat")
 	FOnHpChanged OnHpChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Combat")
+	FOnDamageReceived OnDamageReceived;
+
+	static FOnAnyDamageReceived OnAnyDamageReceived;
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Combat")
 	void TakeDamage(float Damage, AActor* Instigator);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Combat")
+	void TakeDamageTyped(float Damage, AActor* Instigator, bool bWasCrit, EDamageKind Kind);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat")
 	bool IsDead() const;

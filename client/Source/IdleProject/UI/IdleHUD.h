@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
+#include "CombatSystem/CombatComponent.h"
 #include "GameFramework/HUD.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
@@ -11,7 +12,6 @@
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
-class UCombatComponent;
 class AIdleCharacter;
 class UInventoryComponent;
 class USkillComponent;
@@ -132,6 +132,24 @@ struct IDLEPROJECT_API FIdleHUDSeasonPassViewModel
 	TArray<FIdleHUDSeasonTierRowViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDFloatingDamageEntry
+{
+	FVector WorldLocation = FVector::ZeroVector;
+	float Amount = 0.0f;
+	bool bWasCrit = false;
+	EDamageKind Kind = EDamageKind::Physical;
+	float StartTime = 0.0f;
+};
+
+struct IDLEPROJECT_API FIdleHUDFloatingDamageViewModel
+{
+	bool bVisible = false;
+	FString Label;
+	FVector2D ScreenPosition = FVector2D::ZeroVector;
+	FLinearColor Color = FLinearColor::White;
+	float TextScale = 1.0f;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
@@ -142,6 +160,7 @@ IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth,
 IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
 IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent);
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
+IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -172,11 +191,14 @@ protected:
 	UFUNCTION()
 	void HandleHpChanged(float NewHp);
 
+	void HandleDamageReceived(AActor* DamagedActor, float Amount, bool bWasCrit, EDamageKind Kind);
+
 	UFUNCTION()
 	void HandleEquippedChanged(EItemSlot Slot);
 
 private:
 	void BindPlayerCombat();
+	void UnbindPlayerCombat();
 	void BindPlayerInventory();
 	void RefreshEquipmentSummary();
 	AIdleCharacter* ResolvePlayerCharacter() const;
@@ -201,6 +223,7 @@ private:
 	void DrawSeasonPassPanel();
 	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimSeasonTierFromHitBox(FName BoxName);
+	void DrawFloatingDamageTexts(float Now);
 	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)
@@ -210,9 +233,14 @@ private:
 	TObjectPtr<UCombatComponent> PlayerCombat;
 
 	UPROPERTY(Transient)
+	TObjectPtr<APawn> PlayerCombatPawn;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UInventoryComponent> PlayerInventory;
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
+	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
+	FDelegateHandle AnyDamageReceivedHandle;
 	bool bQuestLogVisible = false;
 };

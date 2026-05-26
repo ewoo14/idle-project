@@ -24,6 +24,9 @@ const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
+constexpr float FloatingDamageLifetimeSeconds = 1.0f;
+constexpr float FloatingDamageRisePixels = 32.0f;
+constexpr float FloatingDamageHeadOffsetZ = 120.0f;
 
 FString RarityToString(EItemRarity Rarity)
 {
@@ -395,6 +398,47 @@ FIdleHUDSeasonPassViewModel IdleProject::UI::BuildSeasonPassViewModel(const TArr
 	return ViewModel;
 }
 
+FIdleHUDFloatingDamageViewModel IdleProject::UI::BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale)
+{
+	using namespace IdleProject::UI;
+
+	FIdleHUDFloatingDamageViewModel ViewModel;
+	const float Age = Now - Entry.StartTime;
+	if (Age < 0.0f || Age > FloatingDamageLifetimeSeconds)
+	{
+		return ViewModel;
+	}
+
+	const float Progress = FMath::Clamp(Age / FloatingDamageLifetimeSeconds, 0.0f, 1.0f);
+	const int64 RoundedAmount = FMath::Max<int64>(0, FMath::RoundToInt64(Entry.Amount));
+	ViewModel.bVisible = true;
+	ViewModel.Label = FormatIntegerWithCommas(RoundedAmount);
+	if (Entry.bWasCrit)
+	{
+		ViewModel.Label += TEXT("!");
+	}
+
+	if (Entry.bWasCrit)
+	{
+		ViewModel.Color = Theme::AccentGold;
+		ViewModel.TextScale = 1.25f * HudScale;
+	}
+	else if (Entry.Kind == EDamageKind::Magic)
+	{
+		ViewModel.Color = Theme::AccentBlue;
+		ViewModel.TextScale = 1.0f * HudScale;
+	}
+	else
+	{
+		ViewModel.Color = Theme::TextPrimary;
+		ViewModel.TextScale = 1.0f * HudScale;
+	}
+
+	ViewModel.Color.A = 1.0f - Progress;
+	ViewModel.ScreenPosition = ProjectedScreenPosition + FVector2D(0.0f, -FloatingDamageRisePixels * HudScale * Progress);
+	return ViewModel;
+}
+
 void AIdleHUD::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
@@ -419,6 +463,11 @@ void AIdleHUD::PostInitializeComponents()
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
 	RootWidget->UpdateLevel(IdleGameInstance->GetCharacterLevel());
 
+	if (!AnyDamageReceivedHandle.IsValid())
+	{
+		AnyDamageReceivedHandle = UCombatComponent::OnAnyDamageReceived.AddUObject(this, &AIdleHUD::HandleDamageReceived);
+	}
+
 	BindPlayerCombat();
 	BindPlayerInventory();
 }
@@ -433,13 +482,20 @@ void AIdleHUD::BeginPlay()
 
 void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (AnyDamageReceivedHandle.IsValid())
+	{
+		UCombatComponent::OnAnyDamageReceived.Remove(AnyDamageReceivedHandle);
+		AnyDamageReceivedHandle.Reset();
+	}
+
+	UnbindPlayerCombat();
+
 	if (GEngine && GEngine->GameViewport && RootWidget)
 	{
 		GEngine->GameViewport->RemoveViewportWidgetContent(RootWidget.ToSharedRef());
 	}
 
 	RootWidget.Reset();
-	PlayerCombat = nullptr;
 	PlayerInventory = nullptr;
 
 	Super::EndPlay(EndPlayReason);
@@ -450,6 +506,8 @@ void AIdleHUD::DrawHUD()
 	Super::DrawHUD();
 
 	const UWorld* World = GetWorld();
+	BindPlayerCombat();
+
 	const USkillComponent* PlayerSkills = ResolvePlayerSkills();
 	if (World && PlayerSkills)
 	{
@@ -462,6 +520,10 @@ void AIdleHUD::DrawHUD()
 	DrawSeasonPassPanel();
 	DrawQuestLog();
 	DrawOfflineRewardModal();
+	if (World)
+	{
+		DrawFloatingDamageTexts(World->GetTimeSeconds());
+	}
 }
 
 void AIdleHUD::NotifyHitBoxClick(FName BoxName)
@@ -549,6 +611,23 @@ void AIdleHUD::HandleHpChanged(float NewHp)
 	}
 }
 
+void AIdleHUD::HandleDamageReceived(AActor* DamagedActor, float Amount, bool bWasCrit, EDamageKind Kind)
+{
+	const UWorld* World = GetWorld();
+	if (!World || !DamagedActor)
+	{
+		return;
+	}
+
+	FIdleHUDFloatingDamageEntry Entry;
+	Entry.WorldLocation = DamagedActor->GetActorLocation() + FVector(0.0f, 0.0f, FloatingDamageHeadOffsetZ);
+	Entry.Amount = Amount;
+	Entry.bWasCrit = bWasCrit;
+	Entry.Kind = Kind;
+	Entry.StartTime = World->GetTimeSeconds();
+	FloatingDamageEntries.Add(Entry);
+}
+
 void AIdleHUD::HandleEquippedChanged(EItemSlot Slot)
 {
 	RefreshEquipmentSummary();
@@ -556,28 +635,42 @@ void AIdleHUD::HandleEquippedChanged(EItemSlot Slot)
 
 void AIdleHUD::BindPlayerCombat()
 {
-	if (PlayerCombat)
-	{
-		return;
-	}
-
 	APawn* Pawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
 	if (!Pawn)
 	{
+		UnbindPlayerCombat();
 		return;
 	}
 
+	if (PlayerCombat && PlayerCombatPawn == Pawn)
+	{
+		return;
+	}
+
+	UnbindPlayerCombat();
 	PlayerCombat = Pawn->FindComponentByClass<UCombatComponent>();
 	if (!PlayerCombat)
 	{
 		return;
 	}
 
+	PlayerCombatPawn = Pawn;
 	PlayerCombat->OnHpChanged.AddDynamic(this, &AIdleHUD::HandleHpChanged);
 	if (RootWidget)
 	{
 		RootWidget->UpdateHp(PlayerCombat->CurrentHp, PlayerCombat->MaxHp);
 	}
+}
+
+void AIdleHUD::UnbindPlayerCombat()
+{
+	if (PlayerCombat)
+	{
+		PlayerCombat->OnHpChanged.RemoveDynamic(this, &AIdleHUD::HandleHpChanged);
+	}
+
+	PlayerCombat = nullptr;
+	PlayerCombatPawn = nullptr;
 }
 
 void AIdleHUD::BindPlayerInventory()
@@ -1337,6 +1430,50 @@ void AIdleHUD::ClaimSeasonTierFromHitBox(FName BoxName)
 		IdleGameInstance->ClaimSeasonReward(Tier);
 	}
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawFloatingDamageTexts(float Now)
+{
+	if (!Canvas || !PlayerOwner)
+	{
+		return;
+	}
+
+	const float HudScale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	for (int32 Index = FloatingDamageEntries.Num() - 1; Index >= 0; --Index)
+	{
+		const FIdleHUDFloatingDamageEntry& Entry = FloatingDamageEntries[Index];
+		FVector2D ScreenPosition;
+		if (!PlayerOwner->ProjectWorldLocationToScreen(Entry.WorldLocation, ScreenPosition))
+		{
+			FloatingDamageEntries.RemoveAtSwap(Index);
+			continue;
+		}
+
+		const FIdleHUDFloatingDamageViewModel ViewModel = IdleProject::UI::BuildFloatingDamageViewModel(Entry, Now, ScreenPosition, HudScale);
+		if (!ViewModel.bVisible)
+		{
+			FloatingDamageEntries.RemoveAtSwap(Index);
+			continue;
+		}
+
+		UFont* Font = Entry.bWasCrit && GEngine ? GEngine->GetMediumFont() : (GEngine ? GEngine->GetSmallFont() : nullptr);
+		const float ShadowOffset = 2.0f * HudScale;
+		DrawText(
+			ViewModel.Label,
+			FLinearColor(0.0f, 0.0f, 0.0f, ViewModel.Color.A * 0.55f),
+			ViewModel.ScreenPosition.X + ShadowOffset,
+			ViewModel.ScreenPosition.Y + ShadowOffset,
+			Font,
+			ViewModel.TextScale);
+		DrawText(
+			ViewModel.Label,
+			ViewModel.Color,
+			ViewModel.ScreenPosition.X,
+			ViewModel.ScreenPosition.Y,
+			Font,
+			ViewModel.TextScale);
+	}
 }
 
 void AIdleHUD::RefreshMouseInteraction()
