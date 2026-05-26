@@ -835,11 +835,15 @@ bool FClassSelectionHudDisplayModelTest::RunTest(const FString& Parameters)
 {
 	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = IdleProject::UI::BuildClassSelectionOptions(EClassId::Mage);
 
-	TestEqual(TEXT("Class selector exposes three V1 classes"), Options.Num(), 3);
+	TestEqual(TEXT("Class selector exposes five V1 classes"), Options.Num(), 5);
 	TestEqual(TEXT("First class is warrior"), static_cast<int32>(Options[0].ClassId), static_cast<int32>(EClassId::Warrior));
 	TestEqual(TEXT("Warrior summary highlights STR and CON"), Options[0].StatSummary.ToString(), FString(TEXT("STR/CON")));
-	TestEqual(TEXT("Mage summary highlights INT"), Options[1].StatSummary.ToString(), FString(TEXT("INT")));
-	TestEqual(TEXT("Archer summary highlights DEX"), Options[2].StatSummary.ToString(), FString(TEXT("DEX")));
+	TestEqual(TEXT("Mage summary highlights INT and WIS"), Options[1].StatSummary.ToString(), FString(TEXT("INT/WIS")));
+	TestEqual(TEXT("Archer summary highlights DEX and LUK"), Options[2].StatSummary.ToString(), FString(TEXT("DEX/LUK")));
+	TestEqual(TEXT("Fourth class is thief"), static_cast<int32>(Options[3].ClassId), static_cast<int32>(EClassId::Thief));
+	TestEqual(TEXT("Thief summary highlights DEX and LUK"), Options[3].StatSummary.ToString(), FString(TEXT("DEX/LUK")));
+	TestEqual(TEXT("Fifth class is cleric"), static_cast<int32>(Options[4].ClassId), static_cast<int32>(EClassId::Cleric));
+	TestEqual(TEXT("Cleric summary highlights WIS and INT"), Options[4].StatSummary.ToString(), FString(TEXT("WIS/INT")));
 	TestTrue(TEXT("Current class is marked selected"), Options[1].bSelected);
 	TestFalse(TEXT("Other classes are not selected"), Options[0].bSelected);
 
@@ -870,12 +874,12 @@ bool FIdleCharacterClassSelectionTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	Character->SetClassId(EClassId::Archer);
+	Character->SetClassId(EClassId::Cleric);
 	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
 
-	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Archer));
+	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Cleric));
 	TestNotNull(TEXT("Skill component exists"), Skills);
-	TestTrue(TEXT("Archer skill set is loaded"), Skills && HasSkill(*Skills, TEXT("precision_shot")));
+	TestTrue(TEXT("Cleric skill set is loaded"), Skills && HasSkill(*Skills, TEXT("heal")));
 	TestFalse(TEXT("Warrior skill set is replaced"), Skills && HasSkill(*Skills, TEXT("heavy_strike")));
 
 	World->DestroyWorld(false);
