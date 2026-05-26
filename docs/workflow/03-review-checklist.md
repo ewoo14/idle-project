@@ -137,3 +137,14 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   weights while zero-affix items keep the previous score.
 - [ ] UE Automation covers affix rolls, equipment bonus propagation, derived
   stat propagation, PowerScore weighting, and zero-affix regression.
+
+## PR #41 Character Checklist Addendum (Section 4)
+
+- [ ] `AIdleCharacter::RefreshDerivedStats()` caches the same final primary and
+  derived stats used to initialize combat.
+- [ ] `GetCurrentPrimaryStats()`, `GetCurrentDerivedStats()`, and
+  `GetCurrentLevel()` are `BlueprintPure` and do not recompute formulas.
+- [ ] Cached derived stats include equipment, allocated stat points, rebirth
+  bonus points, and skill passive effects.
+- [ ] UE Automation covers getter values after refresh and combat stat
+  initialization parity.

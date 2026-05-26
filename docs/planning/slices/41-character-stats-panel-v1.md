@@ -44,3 +44,14 @@
 
 ## 7. 후속
 - 스탯 툴팁/설명, 장착 전후 비교, DPS 추정, 스탯별 기여 분해.
+
+## 8. Codex Character Notes (2026-05-26)
+
+- Added `AIdleCharacter` cached stat accessors for UI: `GetCurrentPrimaryStats()`, `GetCurrentDerivedStats()`, and `GetCurrentLevel()`.
+- `RefreshDerivedStats()` now stores the final primary stats and post-passive derived stats before initializing `UCombatComponent`, so UI reads the same values used by combat.
+- Automation added: `IdleProject.Character.Stats.CurrentStatsAccessors`.
+- Verification:
+  - RED: `Build.bat IdleProjectEditor Win64 Development` failed before implementation because `AIdleCharacter` did not expose the new getters.
+  - GREEN: `Build.bat IdleProjectEditor Win64 Development` exited 0.
+  - GREEN: `UnrealEditor-Cmd.exe ... -ExecCmds="Automation RunTests IdleProject.Character.Stats.CurrentStatsAccessors; Quit"` exited 0.
+  - GREEN: `UnrealEditor-Cmd.exe ... -ExecCmds="Automation RunTests IdleProject; Quit"` found 104 tests and exited 0.

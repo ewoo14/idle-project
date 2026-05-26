@@ -167,6 +167,9 @@ void AIdleCharacter::RefreshDerivedStats()
 		Skills->ApplyPassivesToStats(Derived);
 	}
 
+	CachedPrimaryStats = Primary;
+	CachedDerivedStats = Derived;
+
 	UE_LOG(
 		LogTemp,
 		Display,
@@ -215,6 +218,21 @@ void AIdleCharacter::SetClassId(EClassId NewClassId)
 EClassId AIdleCharacter::GetClassId() const
 {
 	return DefaultClassId;
+}
+
+FPrimaryStats AIdleCharacter::GetCurrentPrimaryStats() const
+{
+	return CachedPrimaryStats;
+}
+
+FDerivedStats AIdleCharacter::GetCurrentDerivedStats() const
+{
+	return CachedDerivedStats;
+}
+
+int32 AIdleCharacter::GetCurrentLevel() const
+{
+	return Level;
 }
 
 void AIdleCharacter::HandleEquippedChanged(EItemSlot Slot)

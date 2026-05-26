@@ -1112,6 +1112,58 @@ bool FIdleCharacterClassSelectionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterCurrentStatsAccessorsTest,
+	"IdleProject.Character.Stats.CurrentStatsAccessors",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Mage);
+	Character->HandleLevelUp(10);
+
+	const FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Mage, 10);
+	FDerivedStats ExpectedDerived = FStatFormulas::DeriveStats(ExpectedPrimary, 10);
+	const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	if (Skills)
+	{
+		Skills->ApplyPassivesToStats(ExpectedDerived);
+	}
+	const FPrimaryStats CurrentPrimary = Character->GetCurrentPrimaryStats();
+	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
+	const UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>();
+
+	TestEqual(TEXT("Current level exposes clamped character level"), Character->GetCurrentLevel(), 10);
+	TestNotNull(TEXT("Skill component exists"), Skills);
+	TestEqual(TEXT("Current primary STR mirrors refreshed stats"), CurrentPrimary.Str, ExpectedPrimary.Str);
+	TestEqual(TEXT("Current primary INT mirrors refreshed stats"), CurrentPrimary.Int_, ExpectedPrimary.Int_);
+	TestEqual(TEXT("Current derived HP mirrors refreshed stats"), CurrentDerived.Hp, ExpectedDerived.Hp);
+	TestEqual(TEXT("Current derived magic attack mirrors refreshed stats"), CurrentDerived.MagicAtk, ExpectedDerived.MagicAtk);
+	TestNotNull(TEXT("Combat component exists"), Combat);
+	TestEqual(TEXT("Combat max HP uses refreshed derived stats"), Combat ? Combat->MaxHp : 0.0f, CurrentDerived.Hp);
+	TestEqual(TEXT("Combat magic attack uses refreshed derived stats"), Combat ? Combat->MagicAtk : 0.0f, CurrentDerived.MagicAtk);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSkillAoeTargetsTest,
 	"IdleProject.Combat.Skills.AoeTargets",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

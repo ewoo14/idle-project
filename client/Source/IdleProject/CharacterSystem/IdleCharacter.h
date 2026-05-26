@@ -45,6 +45,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Class")
 	EClassId GetClassId() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	FPrimaryStats GetCurrentPrimaryStats() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	FDerivedStats GetCurrentDerivedStats() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	int32 GetCurrentLevel() const;
+
 	UFUNCTION()
 	void HandleLevelUp(int32 NewLevel);
 
@@ -117,6 +126,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Idle")
 	int32 Level = 1;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Stats")
+	FPrimaryStats CachedPrimaryStats;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Stats")
+	FDerivedStats CachedDerivedStats;
 
 private:
 	UFUNCTION()
