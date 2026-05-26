@@ -59,8 +59,24 @@ struct IDLEPROJECT_API FShopPurchaseResult
 	FText ItemName;
 };
 
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FPetFeedResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Pet")
+	bool bFed = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Pet")
+	int64 GoldSpent = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Pet")
+	int32 NewLevel = 0;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnhanceResult, const FEnhanceAttemptResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnShopPurchase, const FShopPurchaseResult&, Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPetFed, const FPetFeedResult&, Result);
 
 /**
  * 게임 전역 서비스 컨테이너입니다.
@@ -205,6 +221,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool EquipPet(const FString& PetId);
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	FPetFeedResult TryFeedPet(const FString& PetId);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	float GetEquippedPetGoldBonusPercent() const;
 
@@ -243,6 +262,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Shop")
 	FOnShopPurchase OnShopPurchase;
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Pet")
+	FOnPetFed OnPetFed;
 
 private:
 	UPROPERTY(Transient)

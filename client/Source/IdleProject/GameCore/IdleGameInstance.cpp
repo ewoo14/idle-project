@@ -1,6 +1,7 @@
 #include "GameCore/IdleGameInstance.h"
 
 #include "CharacterSystem/LevelFormulas.h"
+#include "GameCore/PetLevelFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -451,6 +452,56 @@ bool UIdleGameInstance::EquipPet(const FString& PetId)
 		ApiClient->EquipPet(PetId);
 	}
 	return true;
+}
+
+FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
+{
+	EnsurePetService();
+	FPetFeedResult Result;
+	if (!PetService)
+	{
+		OnPetFed.Broadcast(Result);
+		return Result;
+	}
+
+	bool bKnownPet = false;
+	for (const FPetDefinition& Definition : PetService->GetPetDefinitions())
+	{
+		if (Definition.PetId == PetId)
+		{
+			bKnownPet = true;
+			break;
+		}
+	}
+
+	const int32 CurrentLevel = PetService->GetPetLevel(PetId);
+	Result.NewLevel = CurrentLevel;
+	if (!bKnownPet || CurrentLevel >= FPetLevelFormula::MaxPetLevel)
+	{
+		OnPetFed.Broadcast(Result);
+		return Result;
+	}
+
+	const int64 Cost = FPetLevelFormula::GetFeedCost(CurrentLevel);
+	if (Cost <= 0 || Gold < Cost)
+	{
+		OnPetFed.Broadcast(Result);
+		return Result;
+	}
+
+	AddGold(-Cost);
+	if (!PetService->FeedPet(PetId))
+	{
+		AddGold(Cost);
+		OnPetFed.Broadcast(Result);
+		return Result;
+	}
+
+	Result.bFed = true;
+	Result.GoldSpent = Cost;
+	Result.NewLevel = CurrentLevel + 1;
+	OnPetFed.Broadcast(Result);
+	return Result;
 }
 
 float UIdleGameInstance::GetEquippedPetGoldBonusPercent() const

@@ -1,5 +1,7 @@
 #include "GameCore/PetService.h"
 
+#include "GameCore/PetLevelFormula.h"
+
 void UPetService::InitializeDefaultPets()
 {
 	BuildDefaultDefinitions();
@@ -7,6 +9,7 @@ void UPetService::InitializeDefaultPets()
 	for (const FPetDefinition& Definition : Definitions)
 	{
 		OwnedPetIds.Add(Definition.PetId);
+		PetLevels.FindOrAdd(Definition.PetId, 0);
 	}
 
 	if (EquippedPetId.IsEmpty() && Definitions.Num() > 0)
@@ -26,16 +29,43 @@ bool UPetService::EquipPet(const FString& PetId)
 	return true;
 }
 
+int32 UPetService::GetPetLevel(const FString& PetId) const
+{
+	const int32* Level = PetLevels.Find(PetId);
+	return Level ? *Level : 0;
+}
+
+bool UPetService::FeedPet(const FString& PetId)
+{
+	if (!OwnedPetIds.Contains(PetId) || !DefinitionById.Contains(PetId))
+	{
+		return false;
+	}
+
+	int32& Level = PetLevels.FindOrAdd(PetId, 0);
+	if (Level >= FPetLevelFormula::MaxPetLevel)
+	{
+		return false;
+	}
+
+	++Level;
+	return true;
+}
+
 float UPetService::GetEquippedPetGoldBonusPercent() const
 {
 	const FPetDefinition* Pet = GetEquippedPetDefinition();
-	return Pet && Pet->BonusType == EPetBonusType::Gold ? Pet->BonusPercent : 0.0f;
+	return Pet && Pet->BonusType == EPetBonusType::Gold
+		? Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId))
+		: 0.0f;
 }
 
 float UPetService::GetEquippedPetDropBonusPercent() const
 {
 	const FPetDefinition* Pet = GetEquippedPetDefinition();
-	return Pet && Pet->BonusType == EPetBonusType::Drop ? Pet->BonusPercent : 0.0f;
+	return Pet && Pet->BonusType == EPetBonusType::Drop
+		? Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId))
+		: 0.0f;
 }
 
 int64 UPetService::ApplyGoldBonus(int64 BaseAmount) const

@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/PetLevelFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/SeasonService.h"
 #include "UI/IdleHUD.h"
@@ -52,6 +53,92 @@ bool FPetServiceEquipBonusTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Drop chance applies percent as multiplier"), Pets->ApplyDropBonusChance(0.05f), 0.0575f);
 
 	TestFalse(TEXT("Unknown pet cannot be equipped"), Pets->EquipPet(TEXT("slime")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetLevelFormulaTest,
+	"IdleProject.GameCore.PetLevelFormula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetLevelFormulaTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Level zero feed cost uses first quadratic step"), FPetLevelFormula::GetFeedCost(0), static_cast<int64>(500));
+	TestEqual(TEXT("Level one feed cost uses second quadratic step"), FPetLevelFormula::GetFeedCost(1), static_cast<int64>(2000));
+	TestEqual(TEXT("Negative level is clamped to level zero cost"), FPetLevelFormula::GetFeedCost(-1), static_cast<int64>(500));
+	TestEqual(TEXT("Max level has no feed cost"), FPetLevelFormula::GetFeedCost(FPetLevelFormula::MaxPetLevel), static_cast<int64>(0));
+	TestEqual(TEXT("Above max level has no feed cost"), FPetLevelFormula::GetFeedCost(FPetLevelFormula::MaxPetLevel + 1), static_cast<int64>(0));
+
+	TestEqual(TEXT("Level zero keeps base bonus"), FPetLevelFormula::GetBonusMultiplier(0), 1.0f);
+	TestEqual(TEXT("Level five grants 1.5x bonus"), FPetLevelFormula::GetBonusMultiplier(5), 1.5f);
+	TestEqual(TEXT("Level ten grants 2.0x bonus"), FPetLevelFormula::GetBonusMultiplier(10), 2.0f);
+	TestEqual(TEXT("Negative level keeps base bonus"), FPetLevelFormula::GetBonusMultiplier(-1), 1.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetServiceGrowthTest,
+	"IdleProject.GameCore.PetService.Growth",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetServiceGrowthTest::RunTest(const FString& Parameters)
+{
+	UPetService* Pets = NewObject<UPetService>();
+	Pets->InitializeDefaultPets();
+
+	TestEqual(TEXT("Known pet starts at level zero"), Pets->GetPetLevel(TEXT("dog")), 0);
+	TestEqual(TEXT("Unknown pet reports level zero"), Pets->GetPetLevel(TEXT("slime")), 0);
+	TestTrue(TEXT("Owned pet can be fed"), Pets->FeedPet(TEXT("dog")));
+	TestEqual(TEXT("Fed pet gains one level"), Pets->GetPetLevel(TEXT("dog")), 1);
+	TestEqual(TEXT("Level one dog scales 20 percent gold bonus to 22 percent"), Pets->GetEquippedPetGoldBonusPercent(), 22.0f);
+	TestEqual(TEXT("Level one dog gold bonus applies scaled percent"), Pets->ApplyGoldBonus(100), static_cast<int64>(122));
+
+	TestTrue(TEXT("Owned bird can be equipped"), Pets->EquipPet(TEXT("bird")));
+	TestTrue(TEXT("Bird can be fed"), Pets->FeedPet(TEXT("bird")));
+	TestEqual(TEXT("Level one bird scales 15 percent drop bonus to 16.5 percent"), Pets->GetEquippedPetDropBonusPercent(), 16.5f);
+	TestEqual(TEXT("Level one bird drop bonus applies scaled percent"), Pets->ApplyDropBonusChance(0.1f), 0.1165f);
+
+	TestFalse(TEXT("Unknown pet cannot be fed"), Pets->FeedPet(TEXT("slime")));
+	for (int32 FeedCount = Pets->GetPetLevel(TEXT("dog")); FeedCount < FPetLevelFormula::MaxPetLevel; ++FeedCount)
+	{
+		TestTrue(TEXT("Dog can be fed until max level"), Pets->FeedPet(TEXT("dog")));
+	}
+	TestEqual(TEXT("Dog reaches max pet level"), Pets->GetPetLevel(TEXT("dog")), FPetLevelFormula::MaxPetLevel);
+	TestFalse(TEXT("Max level pet cannot be fed again"), Pets->FeedPet(TEXT("dog")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstancePetFeedTest,
+	"IdleProject.GameCore.IdleGameInstance.PetFeed",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstancePetFeedTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializePetSeasonServicesForTests();
+
+	FPetFeedResult NoGoldResult = GameInstance->TryFeedPet(TEXT("dog"));
+	TestFalse(TEXT("Insufficient gold does not feed pet"), NoGoldResult.bFed);
+	TestEqual(TEXT("Insufficient gold spends nothing"), NoGoldResult.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Insufficient gold leaves level zero"), NoGoldResult.NewLevel, 0);
+	TestEqual(TEXT("Insufficient gold leaves balance unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	GameInstance->AddGold(FPetLevelFormula::GetFeedCost(0));
+	FPetFeedResult FedResult = GameInstance->TryFeedPet(TEXT("dog"));
+	TestTrue(TEXT("Enough gold feeds pet"), FedResult.bFed);
+	TestEqual(TEXT("Feed result reports spent gold"), FedResult.GoldSpent, static_cast<int64>(500));
+	TestEqual(TEXT("Feed result reports new level"), FedResult.NewLevel, 1);
+	TestEqual(TEXT("Feed spends gold exactly once"), GameInstance->GetGold(), static_cast<int64>(0));
+	TestEqual(TEXT("GameInstance exposes scaled pet bonus after feed"), GameInstance->GetEquippedPetGoldBonusPercent(), 22.0f);
+	TestEqual(TEXT("GameInstance applies scaled pet gold bonus"), GameInstance->ApplyEquippedPetGoldBonus(100), static_cast<int64>(122));
+
+	FPetFeedResult UnknownResult = GameInstance->TryFeedPet(TEXT("slime"));
+	TestFalse(TEXT("Unknown pet cannot be fed"), UnknownResult.bFed);
+	TestEqual(TEXT("Unknown pet reports zero level"), UnknownResult.NewLevel, 0);
 
 	return true;
 }

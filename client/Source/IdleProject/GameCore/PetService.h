@@ -49,6 +49,12 @@ public:
 	const FString& GetEquippedPetId() const { return EquippedPetId; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	int32 GetPetLevel(const FString& PetId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool FeedPet(const FString& PetId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	float GetEquippedPetGoldBonusPercent() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
@@ -64,6 +70,7 @@ private:
 	TArray<FPetDefinition> Definitions;
 	TMap<FString, FPetDefinition> DefinitionById;
 	TSet<FString> OwnedPetIds;
+	TMap<FString, int32> PetLevels;
 	FString EquippedPetId;
 
 	void BuildDefaultDefinitions();
