@@ -112,19 +112,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FRebirthHudViewModelTest::RunTest(const FString& Parameters)
 {
-	const FIdleHUDRebirthViewModel LockedViewModel = IdleProject::UI::BuildRebirthViewModel(false, false, 80, 2, 10);
+	const FIdleHUDRebirthViewModel LockedViewModel = IdleProject::UI::BuildRebirthViewModel(false, false, 80, 2, 10, 9);
 	TestEqual(TEXT("Panel title uses approved Korean copy"), LockedViewModel.Title.ToString(), FString(TEXT("환생")));
 	TestEqual(TEXT("Locked status explains rebirth is unavailable"), LockedViewModel.StatusLabel.ToString(), FString(TEXT("환생 조건 미달")));
 	TestEqual(TEXT("Boss gate uses approved copy"), LockedViewModel.BossLabel.ToString(), FString(TEXT("보스 격파 필요")));
 	TestEqual(TEXT("Level gate shows current progress"), LockedViewModel.LevelLabel.ToString(), FString(TEXT("레벨 80 / 100")));
 	TestFalse(TEXT("Locked state disables rebirth button"), LockedViewModel.bCanRebirth);
 
-	const FIdleHUDRebirthViewModel ReadyViewModel = IdleProject::UI::BuildRebirthViewModel(true, true, 100, 2, 10);
+	const FIdleHUDRebirthViewModel ReadyViewModel = IdleProject::UI::BuildRebirthViewModel(true, true, 150, 4, 26, 18);
 	TestEqual(TEXT("Ready status uses approved Korean copy"), ReadyViewModel.StatusLabel.ToString(), FString(TEXT("환생 가능")));
 	TestEqual(TEXT("Boss defeated state uses approved copy"), ReadyViewModel.BossLabel.ToString(), FString(TEXT("보스 격파 완료")));
-	TestEqual(TEXT("Current count is exposed"), ReadyViewModel.CountLabel.ToString(), FString(TEXT("환생 2회")));
-	TestEqual(TEXT("Permanent bonus uses approved copy"), ReadyViewModel.BonusLabel.ToString(), FString(TEXT("영구 보너스 10 포인트")));
-	TestEqual(TEXT("Next bonus explains fixed reward"), ReadyViewModel.NextBonusLabel.ToString(), FString(TEXT("환생 진행 시 +5 포인트")));
+	TestEqual(TEXT("Current count is exposed"), ReadyViewModel.CountLabel.ToString(), FString(TEXT("환생 4회")));
+	TestEqual(TEXT("Permanent bonus uses approved copy"), ReadyViewModel.BonusLabel.ToString(), FString(TEXT("영구 보너스 26 포인트")));
+	TestEqual(TEXT("Preview reward uses game instance reward"), ReadyViewModel.NextBonusLabel.ToString(), FString(TEXT("이번 환생 보상 +18 포인트")));
 	TestEqual(TEXT("Button uses approved Korean copy"), ReadyViewModel.ButtonLabel.ToString(), FString(TEXT("환생 진행")));
 	TestTrue(TEXT("Ready state enables rebirth button"), ReadyViewModel.bCanRebirth);
 

@@ -37,7 +37,6 @@ const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
 constexpr int32 RebirthRequiredLevel = 100;
-constexpr int32 RebirthBonusPointsPerRun = 5;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
 constexpr float FloatingDamageRisePixels = 32.0f;
 constexpr float FloatingDamageHeadOffsetZ = 120.0f;
@@ -1064,12 +1063,13 @@ FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<F
 	return ViewModel;
 }
 
-FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints)
+FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints, int32 PreviewRebirthReward)
 {
 	FIdleHUDRebirthViewModel ViewModel;
 	const int32 SafeLevel = FMath::Max(1, CharacterLevel);
 	const int32 SafeRebirthCount = FMath::Max(0, RebirthCount);
 	const int32 SafeBonusPoints = FMath::Max(0, RebirthBonusPoints);
+	const int32 SafePreviewReward = FMath::Max(0, PreviewRebirthReward);
 
 	ViewModel.bCanRebirth = bCanRebirth;
 	ViewModel.bBossDefeated = bBossDefeated;
@@ -1091,9 +1091,9 @@ FIdleHUDRebirthViewModel IdleProject::UI::BuildRebirthViewModel(bool bCanRebirth
 	{
 		Args.Add(TEXT("Points"), FText::AsNumber(SafeBonusPoints));
 	});
-	ViewModel.NextBonusLabel = FormatLocalizedUI(TEXT("REBIRTH_NEXT_BONUS_FORMAT"), [](FFormatNamedArguments& Args)
+	ViewModel.NextBonusLabel = FormatLocalizedUI(TEXT("REBIRTH_PREVIEW_REWARD_FORMAT"), [SafePreviewReward](FFormatNamedArguments& Args)
 	{
-		Args.Add(TEXT("Points"), FText::AsNumber(RebirthBonusPointsPerRun));
+		Args.Add(TEXT("Points"), FText::AsNumber(SafePreviewReward));
 	});
 	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("REBIRTH_BUTTON"));
 	return ViewModel;
@@ -2871,7 +2871,8 @@ void AIdleHUD::DrawRebirthPanel()
 		IdleGameInstance->HasDefeatedChapter1Boss(),
 		IdleGameInstance->GetCharacterLevel(),
 		IdleGameInstance->GetRebirthCount(),
-		IdleGameInstance->GetRebirthBonusPoints());
+		IdleGameInstance->GetRebirthBonusPoints(),
+		IdleGameInstance->PreviewRebirthReward());
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 320.0f * Scale, 440.0f * Scale);
