@@ -27,19 +27,19 @@ float FCombatFormulas::ComputeDamage(const FDerivedStats& AttackerStats, EClassI
 
 float FCombatFormulas::ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float PhysDef, float MagicDef)
 {
-	return ClassId == EClassId::Mage
+	return (ClassId == EClassId::Mage || ClassId == EClassId::Cleric)
 		? ComputeMagicDamage(AttackerStats.MagicAtk, MagicDef)
 		: ComputeDamage(AttackerStats.PhysAtk, PhysDef);
 }
 
 float FCombatFormulas::ComputeAttackPower(const FDerivedStats& AttackerStats, EClassId ClassId)
 {
-	if (ClassId == EClassId::Mage)
+	if (ClassId == EClassId::Mage || ClassId == EClassId::Cleric)
 	{
 		return AttackerStats.MagicAtk;
 	}
 
-	if (ClassId == EClassId::Archer)
+	if (ClassId == EClassId::Archer || ClassId == EClassId::Thief)
 	{
 		return AttackerStats.PhysAtk;
 	}

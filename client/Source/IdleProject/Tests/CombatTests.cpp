@@ -186,6 +186,16 @@ bool FCombatClassDamageTest::RunTest(const FString& Parameters)
 	ArcherStats.CritDmg = 1.8f;
 	TestEqual(TEXT("Archer damage uses physical attack and physical defense"), FCombatFormulas::ComputeDamage(ArcherStats, EClassId::Archer, 10.0f, 80.0f), 34.0f);
 
+	FDerivedStats ThiefStats;
+	ThiefStats.PhysAtk = 40.0f;
+	ThiefStats.MagicAtk = 12.0f;
+	TestEqual(TEXT("Thief damage uses physical attack and physical defense"), FCombatFormulas::ComputeDamage(ThiefStats, EClassId::Thief, 10.0f, 80.0f), 34.0f);
+
+	FDerivedStats ClericStats;
+	ClericStats.PhysAtk = 12.0f;
+	ClericStats.MagicAtk = 40.0f;
+	TestEqual(TEXT("Cleric damage uses magic attack and magic defense"), FCombatFormulas::ComputeDamage(ClericStats, EClassId::Cleric, 80.0f, 10.0f), 34.0f);
+
 	FDerivedStats WarriorStats;
 	WarriorStats.PhysAtk = 40.0f;
 	WarriorStats.MagicAtk = 80.0f;
@@ -511,12 +521,32 @@ bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Archer loads precision shot"), HasSkill(*Skills, TEXT("precision_shot")));
 	TestTrue(TEXT("Archer loads arrow_rain"), HasSkill(*Skills, TEXT("arrow_rain")));
 
+	Skills->LoadDefaultThiefSkills();
+	TestEqual(TEXT("Thief has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Thief has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Thief has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Thief has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Thief loads shadow stab"), HasSkill(*Skills, TEXT("shadow_stab")));
+	TestTrue(TEXT("Thief loads smoke_bomb"), HasSkill(*Skills, TEXT("smoke_bomb")));
+
+	Skills->LoadDefaultClericSkills();
+	TestEqual(TEXT("Cleric has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Cleric has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Cleric has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Cleric has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Cleric loads holy smite"), HasSkill(*Skills, TEXT("holy_smite")));
+	TestTrue(TEXT("Cleric loads heal"), HasSkill(*Skills, TEXT("heal")));
+
 	Skills->LoadSkillsForClass(EClassId::Warrior);
 	TestTrue(TEXT("Class loader selects warrior skills"), HasSkill(*Skills, TEXT("heavy_strike")));
 	Skills->LoadSkillsForClass(EClassId::Mage);
 	TestTrue(TEXT("Class loader selects mage skills"), HasSkill(*Skills, TEXT("arcane_bolt")));
 	Skills->LoadSkillsForClass(EClassId::Archer);
 	TestTrue(TEXT("Class loader selects archer skills"), HasSkill(*Skills, TEXT("precision_shot")));
+	Skills->LoadSkillsForClass(EClassId::Thief);
+	TestTrue(TEXT("Class loader selects thief skills"), HasSkill(*Skills, TEXT("shadow_stab")));
+	Skills->LoadSkillsForClass(EClassId::Cleric);
+	TestTrue(TEXT("Class loader selects cleric skills"), HasSkill(*Skills, TEXT("holy_smite")));
 
 	return true;
 }
@@ -558,6 +588,38 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 	};
 
 	for (const FExpectedSkillDefinition& Expected : ArcherSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultThiefSkills();
+	const TArray<FExpectedSkillDefinition> ThiefSkills = {
+		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("smoke_bomb"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("evasion_stance"), EClassId::Thief, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
+		{TEXT("backstab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("nimble_hands"), EClassId::Thief, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.0f},
+		{TEXT("lucky_instinct"), EClassId::Thief, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f, 0.0f, 0.0f},
+		{TEXT("assassinate"), EClassId::Thief, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.3f, 0.25f, 4.0f, 11.0f, 1.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : ThiefSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultClericSkills();
+	const TArray<FExpectedSkillDefinition> ClericSkills = {
+		{TEXT("holy_smite"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+		{TEXT("heal"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::Heal, 6.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("blessing"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.15f, 4.0f, 0.0f, 0.0f},
+		{TEXT("purify"), EClassId::Cleric, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.25f, 4.0f, 0.0f, 0.0f},
+		{TEXT("wisdom_training"), EClassId::Cleric, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f, 0.0f, 0.0f},
+		{TEXT("divine_vitality"), EClassId::Cleric, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("sanctuary"), EClassId::Cleric, ESkillType::Ultimate, ESkillEffectType::Heal, 0.0f, 0.0f, 0.4f, 0.0f, 6.0f, 6.0f},
+	};
+
+	for (const FExpectedSkillDefinition& Expected : ClericSkills)
 	{
 		TestSkillDefinitionParity(*this, *Skills, Expected);
 	}
@@ -623,10 +685,68 @@ bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
 	Skills->LoadDefaultArcherSkills();
 	Stats = FDerivedStats();
 	Stats.CritRate = 0.10f;
+	Stats.Dodge = 0.10f;
 	Stats.AtkSpeed = 1.0f;
 	Skills->ApplyPassivesToStats(Stats);
 	TestEqual(TEXT("Archer critical eye grants five percentage points crit"), Stats.CritRate, 0.15f);
 	TestEqual(TEXT("Archer quick draw grants 10 percent attack speed"), Stats.AtkSpeed, 1.1f);
+
+	Skills->LoadDefaultThiefSkills();
+	Stats = FDerivedStats();
+	Stats.CritRate = 0.10f;
+	Stats.Dodge = 0.10f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Thief nimble hands grants five percentage points dodge"), Stats.Dodge, 0.15f);
+	TestEqual(TEXT("Thief lucky instinct grants five percentage points crit"), Stats.CritRate, 0.15f);
+
+	Skills->LoadDefaultClericSkills();
+	Stats = FDerivedStats();
+	Stats.Hp = 1000.0f;
+	Stats.MagicAtk = 200.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Cleric divine vitality grants 20 percent max HP"), Stats.Hp, 1200.0f);
+	TestEqual(TEXT("Cleric wisdom training grants 10 percent magic attack"), Stats.MagicAtk, 220.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillHealEffectTest,
+	"IdleProject.Combat.Skills.HealEffect",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillHealEffectTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AActor* Target = NewObject<AActor>();
+	UCombatComponent* TargetCombat = NewObject<UCombatComponent>(Target);
+	Target->AddInstanceComponent(TargetCombat);
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 20.0f, 1.0f, 120.0f, 30.0f, 0.0f, 1.5f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+	OwnerCombat->TakeDamage(500.0f, Target);
+	Skills->LoadDefaultClericSkills();
+
+	Skills->MarkSkillCast(TEXT("holy_smite"), 10.0f);
+	Skills->MarkSkillCast(TEXT("blessing"), 10.0f);
+	Skills->MarkSkillCast(TEXT("purify"), 10.0f);
+
+	TArray<AActor*> AoeTargets;
+	Skills->TickSkills(11.0f, Target, AoeTargets);
+
+	TestEqual(TEXT("Heal restores 20 percent of MaxHp"), OwnerCombat->CurrentHp, 700.0f);
+	TestEqual(TEXT("Heal does not damage the selected target"), TargetCombat->CurrentHp, TargetCombat->MaxHp);
+
+	OwnerCombat->CurrentHp = 950.0f;
+	Skills->MarkSkillCast(TEXT("heal"), 10.0f);
+	Skills->TickSkills(17.0f, Target, AoeTargets);
+
+	TestEqual(TEXT("Heal clamps to MaxHp"), OwnerCombat->CurrentHp, OwnerCombat->MaxHp);
 
 	return true;
 }

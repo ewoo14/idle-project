@@ -183,6 +183,37 @@ Automation coverage:
 
 ---
 
+### 3.6 Thief / Cleric Class V1 Anchors
+
+PR #29 completes the five-class V1 client skill set. Thief uses the existing
+physical path with DEX/LUK identity: direct physical skills, one AoE, one
+dash-style back attack, passive dodge, passive crit, and an attack-speed ultimate
+buff. Cleric uses the magic path with WIS/INT identity: a magic damage skill,
+self heal, attack-speed blessing, defense purification, WIS-driven magic attack
+passive, max-HP passive, and a heal ultimate.
+
+Client skill values are mirrored in `client/Content/Data/SkillDB.csv` and
+`USkillComponent::LoadDefault*Skills`.
+
+| Class | Anchor | Value |
+| --- | --- | ---: |
+| Thief passive dodge | `nimble_hands` adds flat Dodge | +0.05 |
+| Thief passive crit | `lucky_instinct` adds flat CritRate | +0.05 |
+| Thief ultimate | `assassinate` damage coefficient | 5.3 |
+| Cleric heal | `heal` restores MaxHp ratio | 0.20 |
+| Cleric ultimate heal | `sanctuary` restores MaxHp ratio | 0.40 |
+| Cleric passive HP | `divine_vitality` multiplies max HP | 1.20 |
+
+Routing guardrails:
+
+- Cleric damage skills use `MagicAtk` vs `MagicDef`, matching Mage mitigation.
+- Thief damage skills use `Atk` vs `Def`, matching Warrior/Archer mitigation.
+- Heal never enters the damage path and clamps at `MaxHp`.
+- Server SkillDB parity remains a backend handoff item unless that slice owns
+  `server/src/core/data/skills.ts`.
+
+---
+
 ## 4. 환생 (Rebirth) 경제
 
 ### 4.1 환생 1회 보상

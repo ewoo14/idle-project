@@ -84,6 +84,22 @@ describe("combat formulas", () => {
       magicDef: 80,
       expectedDamage: 34,
     },
+    {
+      classId: 4,
+      label: "Thief",
+      stats: { physAtk: 40, magicAtk: 12 },
+      physDef: 10,
+      magicDef: 80,
+      expectedDamage: 34,
+    },
+    {
+      classId: 5,
+      label: "Cleric",
+      stats: { physAtk: 12, magicAtk: 40 },
+      physDef: 80,
+      magicDef: 10,
+      expectedDamage: 34,
+    },
   ])("$label class damage matches client CombatFormulas anchor", ({
     classId,
     stats,
