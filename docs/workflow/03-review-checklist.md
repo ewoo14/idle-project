@@ -177,3 +177,15 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] UE Automation covers set roll behavior, 2-piece/4-piece thresholds,
   equipment bonus propagation, derived stat propagation, under-threshold
   regression, and PowerScore regression.
+
+## PR #43 Designer Checklist Addendum (Section 1)
+
+- [ ] Equipment set HUD shows active set name, 2/4-piece tier, active bonus,
+  and next threshold without overlap at 1080p, 1440p, and 4K.
+- [ ] Equipment set HUD uses UI localization keys instead of hard-coded
+  display text.
+
+## PR #43 QA Checklist Addendum (Section 7)
+
+- [ ] QA scenario covers 2-piece active, 4-piece complete, under-threshold,
+  None-set regression, and ko/en CSV integrity in Given / When / Then format.

@@ -166,11 +166,14 @@ void SIdleHUDWidget::UpdateLevel(int32 Level)
 	}
 }
 
-void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary, FLinearColor WeaponRarityColor)
+void SIdleHUDWidget::UpdateEquipment(const FText& WeaponName, const FText& ArmorSummary, const FText& SetSummary, FLinearColor WeaponRarityColor)
 {
 	if (EquipmentText)
 	{
-		EquipmentText->SetText(FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponName, ArmorSummary));
+		const FText EquipmentLabel = SetSummary.IsEmpty()
+			? FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponName, ArmorSummary)
+			: FText::Format(FText::FromString(TEXT("{0}\n{1}\n{2}")), WeaponName, ArmorSummary, SetSummary);
+		EquipmentText->SetText(EquipmentLabel);
 		EquipmentText->SetColorAndOpacity(WeaponRarityColor);
 	}
 }

@@ -16,6 +16,7 @@
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
@@ -408,6 +409,88 @@ const TCHAR* ClassToLocalizationKey(EClassId ClassId)
 	}
 }
 
+const TCHAR* ItemSetToLocalizationKey(EItemSet ItemSet)
+{
+	switch (ItemSet)
+	{
+	case EItemSet::Warrior:
+		return TEXT("ITEM_SET_WARRIOR");
+	case EItemSet::Guardian:
+		return TEXT("ITEM_SET_GUARDIAN");
+	case EItemSet::Arcane:
+		return TEXT("ITEM_SET_ARCANE");
+	case EItemSet::None:
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+void AddSetBonusPart(TArray<FString>& Parts, const TCHAR* LabelKey, float Value)
+{
+	if (Value <= 0.0f)
+	{
+		return;
+	}
+
+	Parts.Add(FormatLocalizedUI(TEXT("SET_BONUS_FLAT_FORMAT"), [LabelKey, Value](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Stat"), IdleProject::Localization::UI(LabelKey));
+		Args.Add(TEXT("Value"), FText::AsNumber(FMath::RoundToInt(Value)));
+	}).ToString());
+}
+
+void AddSetBonusPercentPart(TArray<FString>& Parts, const TCHAR* LabelKey, float Rate)
+{
+	if (Rate <= 0.0f)
+	{
+		return;
+	}
+
+	Parts.Add(FormatLocalizedUI(TEXT("SET_BONUS_PERCENT_FORMAT"), [LabelKey, Rate](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Stat"), IdleProject::Localization::UI(LabelKey));
+		Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(Rate * 100.0f)));
+	}).ToString());
+}
+
+FText BuildSetBonusLabel(EItemSet ItemSet, int32 PieceCount)
+{
+	if (PieceCount < FSetBonusFormula::GetSetPieceThreshold(0))
+	{
+		return IdleProject::Localization::UI(TEXT("SET_BONUS_INACTIVE"));
+	}
+
+	TArray<FItemInstance> Items;
+	for (int32 Index = 0; Index < PieceCount; ++Index)
+	{
+		FItemInstance Item;
+		Item.ItemId = FName(*(FString(TEXT("set_piece_")) + FString::FromInt(Index)));
+		Item.Slot = static_cast<EItemSlot>(static_cast<int32>(EItemSlot::Weapon) + FMath::Clamp(Index, 0, 7));
+		Item.Rarity = EItemRarity::Rare;
+		Item.ItemSet = ItemSet;
+		Items.Add(Item);
+	}
+
+	const FDerivedStats Bonus = FSetBonusFormula::ComputeSetBonus(Items);
+	TArray<FString> Parts;
+	AddSetBonusPart(Parts, TEXT("STAT_INFO_HP"), Bonus.Hp);
+	AddSetBonusPart(Parts, TEXT("STAT_INFO_PHYS_ATK"), Bonus.PhysAtk);
+	AddSetBonusPart(Parts, TEXT("STAT_INFO_MAGIC_ATK"), Bonus.MagicAtk);
+	AddSetBonusPart(Parts, TEXT("STAT_INFO_PHYS_DEF"), Bonus.PhysDef);
+	AddSetBonusPart(Parts, TEXT("STAT_INFO_MAGIC_DEF"), Bonus.MagicDef);
+	AddSetBonusPercentPart(Parts, TEXT("STAT_INFO_ATK_SPEED"), Bonus.AtkSpeed);
+	AddSetBonusPercentPart(Parts, TEXT("STAT_INFO_CRIT_RATE"), Bonus.CritRate);
+	AddSetBonusPercentPart(Parts, TEXT("STAT_INFO_CRIT_DMG"), Bonus.CritDmg);
+
+	const FString BonusText = Parts.IsEmpty()
+		? IdleProject::Localization::UI(TEXT("NONE_DASH")).ToString()
+		: FString::Join(Parts, TEXT(" / "));
+	return FormatLocalizedUI(TEXT("SET_BONUS_SUMMARY_FORMAT"), [&BonusText](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Bonus"), FText::FromString(BonusText));
+	});
+}
+
 const EItemSlot* GetEnhanceSlotOrder()
 {
 	static const EItemSlot Slots[] = {
@@ -536,6 +619,74 @@ FText IdleProject::UI::BuildAffixSummary(const FItemInstance& Item)
 	return Parts.IsEmpty()
 		? FText::GetEmpty()
 		: FText::FromString(FString::Join(Parts, TEXT(" / ")));
+}
+
+FIdleHUDSetSummaryViewModel IdleProject::UI::BuildSetSummaryViewModel(const TArray<FItemInstance>& EquippedItems)
+{
+	FIdleHUDSetSummaryViewModel ViewModel;
+
+	TMap<EItemSet, int32> PieceCounts;
+	for (const FItemInstance& Item : EquippedItems)
+	{
+		if (Item.ItemSet == EItemSet::None || Item.Slot == EItemSlot::None || Item.Rarity == EItemRarity::None)
+		{
+			continue;
+		}
+		PieceCounts.FindOrAdd(Item.ItemSet) += 1;
+	}
+
+	const EItemSet SetOrder[] = {
+		EItemSet::Warrior,
+		EItemSet::Guardian,
+		EItemSet::Arcane
+	};
+
+	for (const EItemSet ItemSet : SetOrder)
+	{
+		const int32* CountPtr = PieceCounts.Find(ItemSet);
+		if (!CountPtr || *CountPtr <= 0)
+		{
+			continue;
+		}
+
+		FIdleHUDSetSummaryRowViewModel Row;
+		Row.ItemSet = ItemSet;
+		Row.PieceCount = FMath::Clamp(*CountPtr, 0, FSetBonusFormula::GetSetPieceThreshold(1));
+		Row.SetLabel = IdleProject::Localization::UI(ItemSetToLocalizationKey(ItemSet));
+		Row.bTwoPieceActive = Row.PieceCount >= FSetBonusFormula::GetSetPieceThreshold(0);
+		Row.bFourPieceActive = Row.PieceCount >= FSetBonusFormula::GetSetPieceThreshold(1);
+		Row.TierLabel = Row.bFourPieceActive
+			? IdleProject::Localization::UI(TEXT("SET_TIER_FOUR_ACTIVE"))
+			: (Row.bTwoPieceActive ? IdleProject::Localization::UI(TEXT("SET_TIER_TWO_ACTIVE")) : IdleProject::Localization::UI(TEXT("SET_TIER_INACTIVE")));
+
+		if (Row.bFourPieceActive)
+		{
+			Row.NextTierLabel = IdleProject::Localization::UI(TEXT("SET_NEXT_COMPLETE"));
+		}
+		else
+		{
+			const int32 NextThreshold = Row.bTwoPieceActive
+				? FSetBonusFormula::GetSetPieceThreshold(1)
+				: FSetBonusFormula::GetSetPieceThreshold(0);
+			const int32 Needed = FMath::Max(0, NextThreshold - Row.PieceCount);
+			Row.NextTierLabel = FormatLocalizedUI(TEXT("SET_NEXT_TIER_FORMAT"), [NextThreshold, Needed](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Piece"), FText::AsNumber(NextThreshold));
+				Args.Add(TEXT("Needed"), FText::AsNumber(Needed));
+			});
+		}
+
+		Row.BonusLabel = BuildSetBonusLabel(ItemSet, Row.PieceCount);
+		Row.SummaryLabel = FormatLocalizedUI(TEXT("SET_SUMMARY_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("SetName"), Row.SetLabel);
+			Args.Add(TEXT("Count"), FText::AsNumber(Row.PieceCount));
+			Args.Add(TEXT("Tier"), Row.TierLabel);
+		});
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
 }
 
 TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now)
@@ -1622,8 +1773,10 @@ void AIdleHUD::RefreshEquipmentSummary()
 
 	FText WeaponLine = IdleProject::Localization::UI(TEXT("HUD_NO_WEAPON"));
 	FLinearColor WeaponColor = IdleProject::UI::Theme::TextMuted;
+	TArray<FItemInstance> EquippedItems;
 	if (const FItemInstance* Weapon = PlayerInventory->GetEquippedItem(EItemSlot::Weapon))
 	{
+		EquippedItems.Add(*Weapon);
 		WeaponLine = FormatLocalizedUI(TEXT("HUD_WEAPON_FORMAT"), [Weapon](FFormatNamedArguments& Args)
 		{
 			Args.Add(TEXT("Name"), Weapon->DisplayName);
@@ -1656,6 +1809,7 @@ void AIdleHUD::RefreshEquipmentSummary()
 	{
 		if (const FItemInstance* Item = PlayerInventory->GetEquippedItem(Slot))
 		{
+			EquippedItems.Add(*Item);
 			++EquippedArmorCount;
 			BonusDef += Item->BonusDef;
 			BonusHp += Item->BonusHp;
@@ -1669,7 +1823,18 @@ void AIdleHUD::RefreshEquipmentSummary()
 		Args.Add(TEXT("Hp"), FText::AsNumber(FMath::RoundToInt(BonusHp)));
 	});
 
-	RootWidget->UpdateEquipment(WeaponLine, ArmorLine, WeaponColor);
+	TArray<FString> SetLines;
+	const FIdleHUDSetSummaryViewModel SetViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
+	for (const FIdleHUDSetSummaryRowViewModel& Row : SetViewModel.Rows)
+	{
+		SetLines.Add(Row.SummaryLabel.ToString());
+		SetLines.Add(FString::Printf(TEXT("%s / %s"), *Row.BonusLabel.ToString(), *Row.NextTierLabel.ToString()));
+	}
+	const FText SetLine = SetLines.IsEmpty()
+		? FText::GetEmpty()
+		: FText::FromString(FString::Join(SetLines, TEXT("\n")));
+
+	RootWidget->UpdateEquipment(WeaponLine, ArmorLine, SetLine, WeaponColor);
 }
 
 USkillComponent* AIdleHUD::ResolvePlayerSkills() const

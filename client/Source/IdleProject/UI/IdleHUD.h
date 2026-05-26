@@ -281,11 +281,30 @@ struct IDLEPROJECT_API FIdleHUDStatInfoViewModel
 	TArray<FIdleHUDStatInfoRowViewModel> DerivedRows;
 };
 
+struct IDLEPROJECT_API FIdleHUDSetSummaryRowViewModel
+{
+	EItemSet ItemSet = EItemSet::None;
+	FText SetLabel;
+	FText TierLabel;
+	FText SummaryLabel;
+	FText BonusLabel;
+	FText NextTierLabel;
+	int32 PieceCount = 0;
+	bool bTwoPieceActive = false;
+	bool bFourPieceActive = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDSetSummaryViewModel
+{
+	TArray<FIdleHUDSetSummaryRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
 IDLEPROJECT_API FLinearColor RarityToColor(EItemRarity Rarity);
 IDLEPROJECT_API FText BuildAffixSummary(const FItemInstance& Item);
+IDLEPROJECT_API FIdleHUDSetSummaryViewModel BuildSetSummaryViewModel(const TArray<FItemInstance>& EquippedItems);
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDStageViewModel BuildStageViewModel(const FStageInfo& StageInfo);

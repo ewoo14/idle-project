@@ -496,6 +496,51 @@ bool FEquipmentAffixHudSummaryTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEquipmentSetHudSummaryTest,
+	"IdleProject.UI.HUD.EquipmentSetSummary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEquipmentSetHudSummaryTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	TArray<FItemInstance> EquippedItems;
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	EquippedItems.Add(MakeTestItem(TEXT("common_shoes"), EItemSlot::Shoes, EItemRarity::Common, 0.0f, 2.0f, 5.0f));
+
+	const FIdleHUDSetSummaryViewModel ViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
+	TestEqual(TEXT("Only non-empty item sets are summarized"), ViewModel.Rows.Num(), 1);
+	TestEqual(TEXT("Warrior row counts three pieces toward four-piece cap"), ViewModel.Rows[0].PieceCount, 3);
+	TestEqual(TEXT("Warrior row exposes current tier label"), ViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("2-piece active")));
+	TestEqual(TEXT("Warrior row exposes next tier label"), ViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Next 4-piece: 1 more")));
+	TestEqual(TEXT("Warrior row summarizes active set bonus"), ViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: PATK +20")));
+	TestEqual(TEXT("Warrior row summary is compact for equipment HUD"), ViewModel.Rows[0].SummaryLabel.ToString(), FString(TEXT("Warrior Set 3/4 (2-piece active)")));
+
+	EquippedItems.Add(MakeTestItem(TEXT("warrior_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Warrior));
+	const FIdleHUDSetSummaryViewModel FourPieceViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
+	TestEqual(TEXT("Four-piece row exposes four-piece tier label"), FourPieceViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("4-piece active")));
+	TestEqual(TEXT("Four-piece row reports complete state"), FourPieceViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Set complete")));
+	TestEqual(TEXT("Four-piece row summarizes cumulative set bonus"), FourPieceViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: PATK +70 / Crit +5%")));
+
+	TArray<FItemInstance> UnderThresholdItems;
+	UnderThresholdItems.Add(MakeTestItem(TEXT("guardian_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 5.0f, 10.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Guardian));
+	const FIdleHUDSetSummaryViewModel UnderThresholdViewModel = IdleProject::UI::BuildSetSummaryViewModel(UnderThresholdItems);
+	TestEqual(TEXT("Under-threshold row exposes inactive tier"), UnderThresholdViewModel.Rows[0].TierLabel.ToString(), FString(TEXT("No set bonus")));
+	TestEqual(TEXT("Under-threshold row points to two-piece"), UnderThresholdViewModel.Rows[0].NextTierLabel.ToString(), FString(TEXT("Next 2-piece: 1 more")));
+	TestEqual(TEXT("Under-threshold row has no active bonus"), UnderThresholdViewModel.Rows[0].BonusLabel.ToString(), FString(TEXT("Bonus: -")));
+
+	TArray<FItemInstance> NoSetItems;
+	NoSetItems.Add(MakeTestItem(TEXT("plain_sword"), EItemSlot::Weapon, EItemRarity::Common, 10.0f, 0.0f, 0.0f));
+	const FIdleHUDSetSummaryViewModel NoSetViewModel = IdleProject::UI::BuildSetSummaryViewModel(NoSetItems);
+	TestEqual(TEXT("No-set equipment does not create a set row"), NoSetViewModel.Rows.Num(), 0);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FShopPanelViewModelStateTest,
 	"IdleProject.UI.HUD.ShopPanelViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
