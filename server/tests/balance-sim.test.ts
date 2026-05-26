@@ -80,5 +80,8 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("## Reward Scaling");
     expect(report.markdown).toContain("1-5");
     expect(report.markdown).toContain("Boss bonus: 8x");
+    expect(report.markdown).toContain(
+      "| 1-1 | 0 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
+    );
   });
 });

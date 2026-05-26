@@ -551,11 +551,11 @@ Chapter 1 uses global stage indexes 0 through 4:
 
 | Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1-1 | 0 | 1.00 | 1.00 | 12 | 8 | 96 | 64 |
-| 1-2 | 1 | 1.15 | 1.15 | 14 | 9 | 110 | 74 |
-| 1-3 | 2 | 1.30 | 1.30 | 16 | 10 | 125 | 83 |
-| 1-4 | 3 | 1.45 | 1.45 | 17 | 12 | 139 | 93 |
-| 1-5 | 4 | 1.60 | 1.60 | 19 | 13 | 154 | 102 |
+| 1-1 | 0 | 1.00 | 1.00 | 12 | 10-15 | 96 | 80-120 |
+| 1-2 | 1 | 1.15 | 1.15 | 14 | 11-17 | 110 | 92-138 |
+| 1-3 | 2 | 1.30 | 1.30 | 16 | 13-19 | 125 | 104-156 |
+| 1-4 | 3 | 1.45 | 1.45 | 17 | 15-22 | 139 | 116-174 |
+| 1-5 | 4 | 1.60 | 1.60 | 19 | 16-24 | 154 | 128-192 |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -563,6 +563,11 @@ Because HP and normal rewards share the same `1 + idx * 0.15` ramp, normal
 reward-per-HP pressure stays stable across 1-1 to 1-5. The 8x boss bonus is the
 intentional spike for stage cap clears and should be reviewed separately from
 normal farm pacing.
+
+Gold ranges mirror the current client drop baseline, `10 + RandRange(0, 5)`,
+before pet gold bonuses are applied. Equipment drop level remains
+`1 + globalStageIndex`, so stage 1-1 drops level 1 items and stage 1-5 drops
+level 5 items.
 
 PR #32 simulator result, seed `23`, 1000 runs:
 

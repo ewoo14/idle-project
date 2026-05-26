@@ -61,3 +61,15 @@
 - `AIdleProjectGameModeBase::SpawnMonsterAt` passes `StageInfo.GlobalStageIndex` into spawned monsters.
 - Automation added: `IdleProject.GameCore.RewardFormula.KillRewardScaling`, `IdleProject.GameCore.RewardFormula.MonsterLevelForStage`, `IdleProject.Combat.Monster.RewardStageContext`.
 - Verification: `Build.bat IdleProjectEditor Win64 Development` succeeded; `Automation RunTests IdleProject` completed with exit code 0.
+
+## 9. Codex TM fix result
+
+- Server `computeMonsterStatMultiplier` now mirrors UE `float` arithmetic before
+  reward rounding, covering half-boundary parity such as stage 1-2
+  `baseGold=10`.
+- Stage 1-1 keeps the current client baselines: 12 EXP,
+  `10 + RandRange(0, 5)` gold before pet gold bonus, and equipment drop level 1.
+- Balance report tables now show normal and boss gold as ranges derived from
+  `10-15` base gold, with BossBonus fixed at 8x.
+- QA scenario coverage added under
+  `docs/qa/scenarios/M6-kill-reward-scaling-v1.md`.

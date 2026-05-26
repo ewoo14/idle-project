@@ -102,9 +102,9 @@ export type StageRewardComparison = {
   monsterHpMultiplier: number;
   rewardMultiplier: number;
   normalExp: number;
-  normalGold: number;
+  normalGold: string;
   bossExp: number;
-  bossGold: number;
+  bossGold: string;
 };
 
 const DEFAULT_RUNS = 1000;
@@ -467,13 +467,26 @@ function baseKillGold(level: number): number {
 }
 
 function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
+  const baseGoldMin = 10;
+  const baseGoldMax = 15;
   return Array.from(
     { length: DEFAULT_STAGES_PER_CHAPTER },
     (_, stageOffset) => {
       const globalStageIndex =
         (chapter - 1) * DEFAULT_STAGES_PER_CHAPTER + stageOffset;
       const baseExp = baseKillExp(1);
-      const baseGold = baseKillGold(1);
+      const normalGoldMin = computeKillGold(
+        baseGoldMin,
+        globalStageIndex,
+        false,
+      );
+      const normalGoldMax = computeKillGold(
+        baseGoldMax,
+        globalStageIndex,
+        false,
+      );
+      const bossGoldMin = computeKillGold(baseGoldMin, globalStageIndex, true);
+      const bossGoldMax = computeKillGold(baseGoldMax, globalStageIndex, true);
       return {
         stage: `${chapter}-${stageOffset + 1}`,
         globalStageIndex,
@@ -483,9 +496,9 @@ function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
         ),
         rewardMultiplier: round(computeRewardMultiplier(globalStageIndex), 3),
         normalExp: computeKillExp(baseExp, globalStageIndex, false),
-        normalGold: computeKillGold(baseGold, globalStageIndex, false),
+        normalGold: `${normalGoldMin}-${normalGoldMax}`,
         bossExp: computeKillExp(baseExp, globalStageIndex, true),
-        bossGold: computeKillGold(baseGold, globalStageIndex, true),
+        bossGold: `${bossGoldMin}-${bossGoldMax}`,
       };
     },
   );

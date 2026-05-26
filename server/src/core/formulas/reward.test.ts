@@ -22,6 +22,19 @@ describe("reward formulas", () => {
     );
   });
 
+  it("matches the client float rounding at reward half boundaries", () => {
+    expect(computeKillGold(10, 1, false)).toBe(11);
+    expect(computeKillGold(15, 2, false)).toBe(19);
+    expect(computeKillGold(10, 1, true)).toBe(92);
+  });
+
+  it("keeps current monster kill reward baselines at stage 1-1", () => {
+    expect(computeKillExp(12, 0, false)).toBe(12);
+    expect(computeKillGold(10, 0, false)).toBe(10);
+    expect(computeKillGold(15, 0, false)).toBe(15);
+    expect(getMonsterLevelForStage(0)).toBe(1);
+  });
+
   it("applies the client boss reward bonus after stage scaling", () => {
     expect(BOSS_REWARD_BONUS).toBe(8);
     expect(computeKillExp(12, 0, true)).toBe(96);
