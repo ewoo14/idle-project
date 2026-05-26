@@ -552,6 +552,14 @@ existing `(ATK + DEF + HP / 10) * (1 + EnhanceLevel * 0.1)` formula, so rarity
 improves auto-equip decisions through the generated stat bonuses rather than a
 separate score override.
 
+Server parity mirror:
+
+- `server/src/core/formulas/drop.ts` mirrors rarity multipliers, level-scaled
+  rarity rolls, and slot-based item bonus generation.
+- `server/src/core/formulas/drop.test.ts` locks level 1 and level 100 rarity
+  anchors plus weapon, armor, and accessory bonus anchors against
+  `FDropFormula`.
+
 Automation coverage:
 
 - `IdleProject.Inventory.DropFormula.RarityMultiplier`
