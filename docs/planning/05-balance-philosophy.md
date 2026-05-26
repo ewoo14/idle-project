@@ -541,11 +541,12 @@ Client drop rarity now affects generated equipment stats through
 | Legendary | 3.2 |
 
 `FDropFormula::RollRarityForLevel` keeps early drops Common-heavy while moving
-some Common weight into Rare, Epic, and Legendary as monster level approaches
+some Common weight into Rare, Epic, Legendary, and Mythic as monster level approaches
 100. The current level 1 distribution is equivalent to the legacy baseline:
 2% none, 70% common, 20% uncommon, and 8% rare. At level 100 the intended
-distribution is 2% none, 50% common, 20% uncommon, 20% rare, 6% epic, and 2%
-legendary.
+distribution is 2% none, 50% common, 20% uncommon, 20% rare, 6% epic, 1.5%
+legendary, and 0.5% Mythic. Mythic is unavailable at level 1 because its chance
+is `0.005 * LevelScale`.
 
 `FDropFormula::ComputeItemBonus` preserves the existing slot split: weapons put
 100% of the scaled bonus into ATK, armor slots put 70% into DEF and 300% into
@@ -558,11 +559,14 @@ Parity anchors:
 
 - Lv1 Common with variance `1.0` keeps the legacy base bonus: weapon ATK `1.0`,
   armor DEF `0.7` / HP `3.0`, accessory ATK `0.5` / DEF `0.3` / HP `2.0`.
-- Lv100 variance `1.0` produces base bonuses of Rare `170`, Epic `230`, and
-  Legendary `320` before slot split.
+- Lv100 variance `1.0` produces base bonuses of Rare `170`, Epic `230`,
+  Legendary `320`, and Mythic `450` before slot split.
 - Enhancement remains a separate #33/#44 multiplier. A Legendary Lv100 weapon
   at +50 has PowerScore `round(320 * 6.0) = 1920`; rarity does not bypass the
   existing `EnhanceLevel` formula.
+- A Mythic Lv100 weapon at +50 has PowerScore `round(450 * 6.0) = 2700`; this
+  extends the named item ceiling while keeping infinite growth on stage level
+  and enhancement.
 - Server `drop.ts` intentionally uses `Math.fround` at the same public formula
   boundaries as client `float` arithmetic so parity tests can compare exact
   generated bonus values, not just rounded display numbers.
@@ -579,6 +583,7 @@ Automation coverage:
 
 - `IdleProject.Inventory.DropFormula.RarityMultiplier`
 - `IdleProject.Inventory.DropFormula.LevelRarityTrend`
+- `IdleProject.Inventory.Rarity.MythicHudMapping`
 - `IdleProject.Inventory.DropFormula.ComputeItemBonus`
 - `IdleProject.Inventory.ItemFactory.HighLevelExpandedRarity`
 
@@ -792,9 +797,9 @@ The design intent is to keep Common enhancement as the low-friction early-game
 path while making high-rarity gear a deliberate gold sink. The single-argument
 client/server helper remains Common-compatible so existing Common anchors keep
 their PR #33 values. Equipped-item enhancement and the HUD panel must pass the
-actual equipped rarity. A Rare +0 attempt costs 400 gold, and a Legendary +0
-attempt costs 1,600 gold; max-level items still cost 0. PR #44 updates the
-success-rate curve and max level, while failure behavior and the
+actual equipped rarity. A Rare +0 attempt costs 400 gold, a Legendary +0
+attempt costs 1,600 gold, and a Mythic +0 attempt costs 3,200 gold; max-level
+items still cost 0. PR #44 updates the success-rate curve and max level, while failure behavior and the
 `1 + EnhanceLevel * 0.1` stat payoff remain intact.
 
 Side effects to monitor:
@@ -811,8 +816,10 @@ Pressure check using the PR #44 expected Common +0 to +50 cost of
 22,717,602.91 gold: a single Legendary item costs 363,481,646.52 expected gold,
 and eight Legendary slots cost 2,907,853,172.16 expected gold. Against the
 sampled PR #33 median Lv50 blended income of 654,689 gold/hour, that full
-Legendary pass is about 4441.579h of income. Common early enhancement still
-starts at the PR #33 cost curve while high-rarity enhancement becomes an
+Legendary pass is about 4441.579h of income. A Mythic pass doubles that pressure
+to 726,963,278.80 expected gold per item and 5,815,706,230.40 expected gold for
+eight slots, about 8883.159h at the same income anchor. Common early enhancement
+still starts at the PR #33 cost curve while high-rarity enhancement becomes an
 open-ended midgame/endgame sink alongside the repeatable shop roll outlet from
 PR #38.
 
@@ -824,6 +831,7 @@ The balance simulator reports these rarity scenarios:
 | Rare | 4 | 17,170,000 | 90,870,411.63 |
 | Epic | 8 | 34,340,000 | 181,740,823.26 |
 | Legendary | 16 | 68,680,000 | 363,481,646.52 |
+| Mythic | 32 | 137,360,000 | 726,963,278.80 |
 
 ## PR #40 Item Affix V1
 
@@ -842,6 +850,7 @@ Affix count by rarity:
 | Rare | 1 |
 | Epic | 2 |
 | Legendary | 2-3 |
+| Mythic | 3 |
 
 V1 affix types:
 
@@ -908,10 +917,11 @@ behavior:
 | Rare | Warrior, Guardian, or Arcane |
 | Epic | Warrior, Guardian, or Arcane |
 | Legendary | Warrior, Guardian, or Arcane |
+| Mythic | Warrior, Guardian, or Arcane |
 
 Eligible rarities pick one of the three V1 sets with the injected RNG. This
 creates a clear early rule: Common equipment preserves legacy behavior, while
-Uncommon and above can contribute to set goals without changing stat rolls,
+Uncommon and above, including Mythic, can contribute to set goals without changing stat rolls,
 affixes, enhancement cost, or PowerScore.
 
 Build impact is intentionally moderate. Warrior and Arcane push attack lanes

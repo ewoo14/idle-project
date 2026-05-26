@@ -7,8 +7,8 @@ import { computeSetBonus } from "./setBonus.js";
 export type ItemSlot = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 // 0=None, 1=Weapon, 2=Helmet, 3=Top, 4=Bottom, 5=Shoes, 6=Gloves, 7=Cloak, 8=Accessory
 
-export type ItemRarity = 0 | 1 | 2 | 3 | 4 | 5 | "None";
-// 0/"None"=None, 1=Common, 2=Uncommon, 3=Rare, 4=Epic, 5=Legendary
+export type ItemRarity = 0 | 1 | 2 | 3 | 4 | 5 | 6 | "None";
+// 0/"None"=None, 1=Common, 2=Uncommon, 3=Rare, 4=Epic, 5=Legendary, 6=Mythic
 
 export type ItemSet =
   | 0

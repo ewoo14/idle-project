@@ -165,6 +165,8 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 		return TEXT("RARITY_EPIC");
 	case EItemRarity::Legendary:
 		return TEXT("RARITY_LEGENDARY");
+	case EItemRarity::Mythic:
+		return TEXT("RARITY_MYTHIC");
 	case EItemRarity::None:
 	default:
 		return TEXT("RARITY_NONE");
@@ -594,6 +596,8 @@ FLinearColor IdleProject::UI::RarityToColor(EItemRarity Rarity)
 		return RarityEpic;
 	case EItemRarity::Legendary:
 		return RarityLegendary;
+	case EItemRarity::Mythic:
+		return RarityMythicStart;
 	case EItemRarity::None:
 	default:
 		return TextMuted;

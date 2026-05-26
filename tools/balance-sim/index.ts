@@ -140,6 +140,8 @@ export type EnhancementPressure = {
   rarityScenarios: EnhancementRarityScenario[];
   legendaryEightSlotExpectedGoldCost: number;
   legendaryEightSlotExpectedHoursAtMedianGoldPerHour: number;
+  mythicEightSlotExpectedGoldCost: number;
+  mythicEightSlotExpectedHoursAtMedianGoldPerHour: number;
   rows: EnhancementPressureRow[];
 };
 
@@ -191,6 +193,7 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Rare",
   "Epic",
   "Legendary",
+  "Mythic",
 ];
 const EQUIPMENT_SLOT_COUNT = 8;
 const DOG_GOLD_BONUS_PERCENT = 20;
@@ -623,6 +626,13 @@ function buildEnhancementPressure(
     (legendaryScenario?.expectedGoldCostToMax ?? 0) * EQUIPMENT_SLOT_COUNT,
     2,
   );
+  const mythicScenario = rarityScenarios.find(
+    (scenario) => scenario.rarity === "Mythic",
+  );
+  const mythicEightSlotExpectedGoldCost = round(
+    (mythicScenario?.expectedGoldCostToMax ?? 0) * EQUIPMENT_SLOT_COUNT,
+    2,
+  );
 
   return {
     maxLevel: MAX_ENHANCE_LEVEL,
@@ -638,6 +648,11 @@ function buildEnhancementPressure(
     legendaryEightSlotExpectedHoursAtMedianGoldPerHour: round(
       legendaryEightSlotExpectedGoldCost /
         Math.max(1, medianGoldPerHourAtLevel50),
+      3,
+    ),
+    mythicEightSlotExpectedGoldCost,
+    mythicEightSlotExpectedHoursAtMedianGoldPerHour: round(
+      mythicEightSlotExpectedGoldCost / Math.max(1, medianGoldPerHourAtLevel50),
       3,
     ),
     rows,
@@ -870,6 +885,8 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "  stay unchanged.",
     `- Eight Legendary slots: ${formatNumber(report.model.enhancementPressure.legendaryEightSlotExpectedGoldCost)} expected gold,`,
     `  ${report.model.enhancementPressure.legendaryEightSlotExpectedHoursAtMedianGoldPerHour}h at sampled median Lv50 gold/hour.`,
+    `- Eight Mythic slots: ${formatNumber(report.model.enhancementPressure.mythicEightSlotExpectedGoldCost)} expected gold,`,
+    `  ${report.model.enhancementPressure.mythicEightSlotExpectedHoursAtMedianGoldPerHour}h at sampled median Lv50 gold/hour.`,
     "",
     "<!-- markdownlint-disable MD013 -->",
     "",

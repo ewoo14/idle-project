@@ -6,7 +6,8 @@ export type EnhanceItemRarity =
   | "Uncommon"
   | "Rare"
   | "Epic"
-  | "Legendary";
+  | "Legendary"
+  | "Mythic";
 
 const BASE_ENHANCE_COST = 100;
 const MAX_ENHANCE_SUCCESS_RATE = 0.95;
@@ -25,6 +26,8 @@ export function getRarityCostMultiplier(rarity: EnhanceItemRarity): number {
       return 8;
     case "Legendary":
       return 16;
+    case "Mythic":
+      return 32;
     case "None":
       return 0;
   }

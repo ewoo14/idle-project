@@ -111,6 +111,8 @@
   stay unchanged.
 - Eight Legendary slots: 2,907,853,115.20 expected gold,
   4441.579h at sampled median Lv50 gold/hour.
+- Eight Mythic slots: 5,815,706,230.40 expected gold,
+  8883.159h at sampled median Lv50 gold/hour.
 
 <!-- markdownlint-disable MD013 -->
 
@@ -120,6 +122,7 @@
 | Rare | 4 | 17170000 | 90870409.85 | 138.799h |
 | Epic | 8 | 34340000 | 181740819.7 | 277.599h |
 | Legendary | 16 | 68680000 | 363481639.4 | 555.197h |
+| Mythic | 32 | 137360000 | 726963278.8 | 1110.395h |
 
 <!-- markdownlint-enable MD013 -->
 
