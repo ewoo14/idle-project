@@ -175,17 +175,11 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 
 	if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
 	{
-		bool bClearedChapterBoss = false;
 		if (UStageService* StageService = GameInstance->GetStageService())
 		{
 			StageService->RecordKill(bWasBoss);
-			bClearedChapterBoss = StageService->HasClearedCurrentChapterBoss();
 		}
 		GameInstance->RecordMonsterKilled();
-		if (bWasBoss && bClearedChapterBoss)
-		{
-			GameInstance->MarkChapter1BossDefeated();
-		}
 	}
 
 	FTimerHandle RespawnTimerHandle;

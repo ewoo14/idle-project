@@ -33,6 +33,7 @@ struct FStageInfo
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStageChanged, FStageInfo, NewStageInfo);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnChapterBossDefeated, int32, ClearedChapter);
 
 UCLASS(BlueprintType)
 class IDLEPROJECT_API UStageService : public UObject
@@ -41,6 +42,7 @@ class IDLEPROJECT_API UStageService : public UObject
 
 public:
 	static constexpr int32 StagesPerChapter = 5;
+	static constexpr int32 TotalChapters = 2;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void InitializeDefaultStages();
@@ -73,10 +75,19 @@ public:
 	FStageInfo GetCurrentStageInfo() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
-	bool HasClearedCurrentChapterBoss() const { return bCurrentChapterBossCleared; }
+	bool HasClearedCurrentChapterBoss() const { return HasClearedChapterBoss(CurrentChapter); }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
+	bool HasClearedChapterBoss(int32 Chapter) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
+	int32 GetHighestClearedChapter() const { return HighestClearedChapter; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Stage")
 	FOnStageChanged OnStageChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Stage")
+	FOnChapterBossDefeated OnChapterBossDefeated;
 
 private:
 	UPROPERTY()
@@ -89,5 +100,8 @@ private:
 	int32 KillsThisStage = 0;
 
 	UPROPERTY()
-	bool bCurrentChapterBossCleared = false;
+	bool bFinalChapterCleared = false;
+
+	UPROPERTY()
+	int32 HighestClearedChapter = 0;
 };

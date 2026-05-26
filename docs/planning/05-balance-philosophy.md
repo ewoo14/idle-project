@@ -652,8 +652,20 @@ Automation coverage:
 | 1-5 | 1 | 예 | Fire |
 
 1-5 보스 처치 시 `MarkChapter1BossDefeated()`와 연계해 환생 조건의
-"챕터 1 보스 격파" 플래그를 세운다. V1은 다음 챕터 전환 없이 1-5 클리어
-상태를 유지한다.
+"챕터 1 보스 격파" 플래그를 세운 뒤 2-1로 전환한다. 최종 챕터 보스는
+현재 최종 스테이지에 머무르며 추가 처치를 무시한다.
+
+PR #37 Chapter 2는 같은 처치 목표와 같은 전역 인덱스 공식을 사용한다.
+서버 `stages.ts`와 클라이언트 `FStageFormula::GetStageWeakElement()`는
+2-1~2-5를 전역 인덱스 5~9로 맞춘다.
+
+| 스테이지 | idx | 처치 목표 | 보스 | 약점 |
+| --- | ---: | ---: | --- | --- |
+| 2-1 | 5 | 5 | 아니오 | None |
+| 2-2 | 6 | 8 | 아니오 | Lightning |
+| 2-3 | 7 | 12 | 아니오 | Ice |
+| 2-4 | 8 | 16 | 아니오 | Fire |
+| 2-5 | 9 | 1 | 예 | Holy |
 <!-- markdownlint-disable MD003 MD026 -->
 
 ---
@@ -683,15 +695,25 @@ Chapter 1 uses global stage indexes 0 through 4:
 | 1-4 | 3 | 1.45 | 1.45 | 17 | 15-22 | 139 | 116-174 |
 | 1-5 | 4 | 1.60 | 1.60 | 19 | 16-24 | 154 | 128-192 |
 
+Chapter 2 continues the same ramp at global stage indexes 5 through 9:
+
+| Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2-1 | 5 | 1.75 | 1.75 | 21 | 18-26 | 168 | 140-210 |
+| 2-2 | 6 | 1.90 | 1.90 | 23 | 19-29 | 182 | 152-228 |
+| 2-3 | 7 | 2.05 | 2.05 | 25 | 21-31 | 197 | 164-246 |
+| 2-4 | 8 | 2.20 | 2.20 | 26 | 22-33 | 211 | 176-264 |
+| 2-5 | 9 | 2.35 | 2.35 | 28 | 24-35 | 226 | 188-282 |
+
 Because HP and normal rewards share the same `1 + idx * 0.15` ramp, normal
-reward-per-HP pressure stays stable across 1-1 to 1-5. The 8x boss bonus is the
+reward-per-HP pressure stays stable across 1-1 to 2-5. The 8x boss bonus is the
 intentional spike for stage cap clears and should be reviewed separately from
 normal farm pacing.
 
 Gold ranges mirror the current client drop baseline, `10 + RandRange(0, 5)`,
 before pet gold bonuses are applied. Equipment drop level remains
-`1 + globalStageIndex`, so stage 1-1 drops level 1 items and stage 1-5 drops
-level 5 items.
+`1 + globalStageIndex`, so stage 1-1 drops level 1 items and stage 2-5 drops
+level 10 items.
 
 PR #32 simulator result, seed `23`, 1000 runs:
 

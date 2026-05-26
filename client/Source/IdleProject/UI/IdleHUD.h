@@ -166,6 +166,7 @@ struct IDLEPROJECT_API FIdleHUDStatusIndicatorViewModel
 struct IDLEPROJECT_API FIdleHUDStageViewModel
 {
 	FText TitleLabel;
+	FText ChapterLabel;
 	FText ProgressLabel;
 	FText BossBadgeLabel;
 	FText WeaknessLabel;
@@ -247,6 +248,8 @@ IDLEPROJECT_API FLinearColor RarityToColor(EItemRarity Rarity);
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDStageViewModel BuildStageViewModel(const FStageInfo& StageInfo);
+IDLEPROJECT_API FText BuildChapterEntryFeedbackLabel(int32 Chapter);
+IDLEPROJECT_API FText BuildChapterClearFeedbackLabel(int32 Chapter);
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
@@ -302,7 +305,15 @@ protected:
 	UFUNCTION()
 	void HandleBossSpecialAttack(AActor* Boss);
 
+	UFUNCTION()
+	void HandleStageChanged(FStageInfo NewStageInfo);
+
+	UFUNCTION()
+	void HandleChapterBossDefeated(int32 ClearedChapter);
+
 private:
+	void BindStageService();
+	void UnbindStageService();
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
 	void BindPlayerInventory();
@@ -366,6 +377,9 @@ private:
 	FDelegateHandle AnyDamageReceivedHandle;
 	TWeakObjectPtr<UBattleAIComponent> BoundBossBattleAI;
 	TWeakObjectPtr<AActor> BossSpecialAttackActor;
+	TWeakObjectPtr<UStageService> BoundStageService;
+	FText StageFeedbackLabel;
 	float BossSpecialAttackStartTime = -1000.0f;
+	float StageFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 };

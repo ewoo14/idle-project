@@ -37,6 +37,7 @@ constexpr float FloatingDamageRisePixels = 32.0f;
 constexpr float FloatingDamageHeadOffsetZ = 120.0f;
 constexpr float StatusIndicatorHeadOffsetZ = 152.0f;
 constexpr float BossSpecialWarningDurationSeconds = 1.6f;
+constexpr float StageFeedbackDurationSeconds = 2.2f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -172,6 +173,8 @@ FText StageWeakElementToLabel(ESkillElement Element)
 		return IdleProject::Localization::UI(TEXT("ELEMENT_FIRE"));
 	case ESkillElement::Ice:
 		return IdleProject::Localization::UI(TEXT("ELEMENT_ICE"));
+	case ESkillElement::Lightning:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_LIGHTNING"));
 	case ESkillElement::Holy:
 		return IdleProject::Localization::UI(TEXT("ELEMENT_HOLY"));
 	case ESkillElement::None:
@@ -190,6 +193,8 @@ FLinearColor StageWeakElementToColor(ESkillElement Element)
 		return AccentRed;
 	case ESkillElement::Ice:
 		return AccentBlue;
+	case ESkillElement::Lightning:
+		return Warn;
 	case ESkillElement::Holy:
 		return AccentGold;
 	case ESkillElement::None:
@@ -443,6 +448,10 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 	const int32 SafeTarget = FMath::Max(0, StageInfo.KillsToAdvance);
 
 	ViewModel.TitleLabel = IdleProject::Localization::UI(TEXT("STAGE_INDICATOR_TITLE"));
+	ViewModel.ChapterLabel = FormatLocalizedUI(TEXT("STAGE_CHAPTER_FORMAT"), [SafeChapter](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Chapter"), FText::AsNumber(SafeChapter));
+	});
 	ViewModel.ProgressLabel = FormatLocalizedUI(TEXT("STAGE_PROGRESS_FORMAT"), [SafeChapter, SafeStage, SafeCurrent, SafeTarget](FFormatNamedArguments& Args)
 	{
 		Args.Add(TEXT("Chapter"), FText::AsNumber(SafeChapter));
@@ -462,6 +471,24 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 	ViewModel.BorderColor = StageInfo.bBossStage ? Theme::AccentGold : Theme::AccentBlue;
 	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
 	return ViewModel;
+}
+
+FText IdleProject::UI::BuildChapterEntryFeedbackLabel(int32 Chapter)
+{
+	const int32 SafeChapter = FMath::Max(1, Chapter);
+	return FormatLocalizedUI(TEXT("STAGE_CHAPTER_ENTRY_FORMAT"), [SafeChapter](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Chapter"), FText::AsNumber(SafeChapter));
+	});
+}
+
+FText IdleProject::UI::BuildChapterClearFeedbackLabel(int32 Chapter)
+{
+	const int32 SafeChapter = FMath::Max(1, Chapter);
+	return FormatLocalizedUI(TEXT("STAGE_CHAPTER_CLEAR_FORMAT"), [SafeChapter](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Chapter"), FText::AsNumber(SafeChapter));
+	});
 }
 
 FIdleHUDBossViewModel IdleProject::UI::BuildBossViewModel(float CurrentHp, float MaxHp)
@@ -911,6 +938,7 @@ void AIdleHUD::PostInitializeComponents()
 
 	BindPlayerCombat();
 	BindPlayerInventory();
+	BindStageService();
 }
 
 void AIdleHUD::BeginPlay()
@@ -918,6 +946,7 @@ void AIdleHUD::BeginPlay()
 	Super::BeginPlay();
 	BindPlayerCombat();
 	BindPlayerInventory();
+	BindStageService();
 	PreviewOfflineRewardModal();
 }
 
@@ -931,6 +960,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	UnbindPlayerCombat();
 	UnbindBossSpecialAttack();
+	UnbindStageService();
 
 	if (IdleGameInstance)
 	{
@@ -944,6 +974,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	RootWidget.Reset();
 	PlayerInventory = nullptr;
+	BoundStageService.Reset();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -1144,6 +1175,62 @@ void AIdleHUD::HandleBossSpecialAttack(AActor* Boss)
 
 	BossSpecialAttackActor = Boss;
 	BossSpecialAttackStartTime = World->GetTimeSeconds();
+}
+
+void AIdleHUD::HandleStageChanged(FStageInfo NewStageInfo)
+{
+	if (NewStageInfo.Chapter > 1 && NewStageInfo.Stage == 1 && NewStageInfo.KillsThisStage == 0)
+	{
+		StageFeedbackLabel = IdleProject::UI::BuildChapterEntryFeedbackLabel(NewStageInfo.Chapter);
+		if (const UWorld* World = GetWorld())
+		{
+			StageFeedbackStartTime = World->GetTimeSeconds();
+		}
+	}
+}
+
+void AIdleHUD::HandleChapterBossDefeated(int32 ClearedChapter)
+{
+	StageFeedbackLabel = IdleProject::UI::BuildChapterClearFeedbackLabel(ClearedChapter);
+	if (const UWorld* World = GetWorld())
+	{
+		StageFeedbackStartTime = World->GetTimeSeconds();
+	}
+}
+
+void AIdleHUD::BindStageService()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+
+	UStageService* StageService = IdleGameInstance ? IdleGameInstance->GetStageService() : nullptr;
+	if (!StageService)
+	{
+		UnbindStageService();
+		return;
+	}
+
+	if (BoundStageService.Get() == StageService)
+	{
+		return;
+	}
+
+	UnbindStageService();
+	BoundStageService = StageService;
+	StageService->OnStageChanged.AddUniqueDynamic(this, &AIdleHUD::HandleStageChanged);
+	StageService->OnChapterBossDefeated.AddUniqueDynamic(this, &AIdleHUD::HandleChapterBossDefeated);
+}
+
+void AIdleHUD::UnbindStageService()
+{
+	if (UStageService* StageService = BoundStageService.Get())
+	{
+		StageService->OnStageChanged.RemoveDynamic(this, &AIdleHUD::HandleStageChanged);
+		StageService->OnChapterBossDefeated.RemoveDynamic(this, &AIdleHUD::HandleChapterBossDefeated);
+	}
+	BoundStageService.Reset();
 }
 
 void AIdleHUD::BindPlayerCombat()
@@ -1427,6 +1514,7 @@ void AIdleHUD::DrawStageIndicator()
 	{
 		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
 	}
+	BindStageService();
 
 	const UStageService* StageService = IdleGameInstance ? IdleGameInstance->GetStageService() : nullptr;
 	if (!StageService)
@@ -1451,6 +1539,7 @@ void AIdleHUD::DrawStageIndicator()
 	DrawRect(ViewModel.BorderColor, X + PanelWidth - Border, Y, Border, PanelHeight);
 
 	DrawText(ViewModel.TitleLabel.ToString(), TextMuted, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.ChapterLabel.ToString(), AccentGold, X + 82.0f * Scale, Y + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 	DrawText(ViewModel.ProgressLabel.ToString(), TextPrimary, X + Padding, Y + 31.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 	DrawText(ViewModel.WeaknessLabel.ToString(), ViewModel.WeaknessColor, X + PanelWidth - 118.0f * Scale, Y + 15.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 	if (ViewModel.bBossStage)
@@ -1468,6 +1557,22 @@ void AIdleHUD::DrawStageIndicator()
 	const float BarWidth = PanelWidth - Padding * 2.0f;
 	DrawRect(BgPrimary.CopyWithNewOpacity(0.94f), BarX, BarY, BarWidth, BarHeight);
 	DrawRect(ViewModel.BorderColor, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
+
+	const UWorld* World = GetWorld();
+	if (!StageFeedbackLabel.IsEmpty() && World)
+	{
+		const float Elapsed = World->GetTimeSeconds() - StageFeedbackStartTime;
+		if (Elapsed <= StageFeedbackDurationSeconds)
+		{
+			const float Alpha = FMath::Clamp(1.0f - (Elapsed / StageFeedbackDurationSeconds), 0.0f, 1.0f);
+			const float FeedbackWidth = 220.0f * Scale;
+			const float FeedbackHeight = 30.0f * Scale;
+			const float FeedbackX = (Canvas->SizeX - FeedbackWidth) * 0.5f;
+			const float FeedbackY = Y + PanelHeight + 8.0f * Scale;
+			DrawRect(BgPrimary.CopyWithNewOpacity(0.72f * Alpha), FeedbackX, FeedbackY, FeedbackWidth, FeedbackHeight);
+			DrawText(StageFeedbackLabel.ToString(), AccentGold.CopyWithNewOpacity(Alpha), FeedbackX + 18.0f * Scale, FeedbackY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+		}
+	}
 }
 
 void AIdleHUD::DrawBossBar()
