@@ -15,6 +15,8 @@
 
 class UIdleGameInstance;
 class AIdleCharacter;
+class AIdleMonster;
+class UBattleAIComponent;
 class UInventoryComponent;
 class USkillComponent;
 class SIdleHUDWidget;
@@ -173,6 +175,18 @@ struct IDLEPROJECT_API FIdleHUDStageViewModel
 	bool bBossStage = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDBossViewModel
+{
+	bool bVisible = false;
+	FText TitleLabel;
+	FText HpLabel;
+	FText PhaseLabel;
+	FLinearColor PhaseColor = FLinearColor::White;
+	float HpRatio = 0.0f;
+	float HpPercent = 0.0f;
+	int32 Phase = 1;
+};
+
 struct IDLEPROJECT_API FIdleHUDEnhanceSlotViewModel
 {
 	EItemSlot Slot = EItemSlot::None;
@@ -236,6 +250,7 @@ IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth,
 IDLEPROJECT_API TArray<FIdleHUDClassSelectionOptionViewModel> BuildClassSelectionOptions(EClassId CurrentClassId);
 IDLEPROJECT_API FIdleHUDPetPanelViewModel BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent);
 IDLEPROJECT_API FIdleHUDSeasonPassViewModel BuildSeasonPassViewModel(const TArray<FSeasonTierDefinition>& Tiers, int32 SeasonTokens, int32 ReachedTier, TFunctionRef<bool(int32)> IsTierClaimed);
+IDLEPROJECT_API FIdleHUDBossViewModel BuildBossViewModel(float CurrentHp, float MaxHp);
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
@@ -281,12 +296,18 @@ protected:
 	UFUNCTION()
 	void HandleStatPointsChanged();
 
+	UFUNCTION()
+	void HandleBossSpecialAttack(AActor* Boss);
+
 private:
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
 	void BindPlayerInventory();
+	void BindBossSpecialAttack(AIdleMonster* Boss);
+	void UnbindBossSpecialAttack();
 	void RefreshEquipmentSummary();
 	AIdleCharacter* ResolvePlayerCharacter() const;
+	AIdleMonster* ResolveVisibleBoss() const;
 	USkillComponent* ResolvePlayerSkills() const;
 	void DrawClassSelectionPanel();
 	void DrawClassSelectionOption(const FIdleHUDClassSelectionOptionViewModel& Option, float X, float Y, float Width, float Height);
@@ -295,6 +316,8 @@ private:
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
 	void DrawStageIndicator();
+	void DrawBossBar();
+	void DrawBossSpecialWarning(float Now);
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
@@ -338,5 +361,8 @@ private:
 	bool bEnhanceFeedbackSuccess = false;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
 	FDelegateHandle AnyDamageReceivedHandle;
+	TWeakObjectPtr<UBattleAIComponent> BoundBossBattleAI;
+	TWeakObjectPtr<AActor> BossSpecialAttackActor;
+	float BossSpecialAttackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 };
