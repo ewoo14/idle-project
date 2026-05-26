@@ -127,6 +127,40 @@ FText SeasonRewardToLabel(ESeasonRewardType Type, int64 Amount)
 	}
 }
 
+FText StageWeakElementToLabel(ESkillElement Element)
+{
+	switch (Element)
+	{
+	case ESkillElement::Fire:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_FIRE"));
+	case ESkillElement::Ice:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_ICE"));
+	case ESkillElement::Holy:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_HOLY"));
+	case ESkillElement::None:
+	default:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_NONE"));
+	}
+}
+
+FLinearColor StageWeakElementToColor(ESkillElement Element)
+{
+	using namespace IdleProject::UI::Theme;
+
+	switch (Element)
+	{
+	case ESkillElement::Fire:
+		return AccentRed;
+	case ESkillElement::Ice:
+		return AccentBlue;
+	case ESkillElement::Holy:
+		return AccentGold;
+	case ESkillElement::None:
+	default:
+		return TextMuted;
+	}
+}
+
 FName MakeQuestClaimHitBoxName(const FString& QuestId)
 {
 	return FName(*(QuestClaimHitBoxPrefix + QuestId));
@@ -221,6 +255,36 @@ FIdleHUDUltimateViewModel IdleProject::UI::BuildUltimateViewModel(const USkillCo
 	Ultimate.GaugeRatio = Ultimate.GaugePercent / 100.0f;
 	Ultimate.bReady = SkillComponent.IsUltimateReady();
 	return Ultimate;
+}
+
+FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& StageInfo)
+{
+	FIdleHUDStageViewModel ViewModel;
+	const int32 SafeChapter = FMath::Max(1, StageInfo.Chapter);
+	const int32 SafeStage = FMath::Max(1, StageInfo.Stage);
+	const int32 SafeCurrent = FMath::Max(0, StageInfo.KillsThisStage);
+	const int32 SafeTarget = FMath::Max(0, StageInfo.KillsToAdvance);
+
+	ViewModel.TitleLabel = IdleProject::Localization::UI(TEXT("STAGE_INDICATOR_TITLE"));
+	ViewModel.ProgressLabel = FormatLocalizedUI(TEXT("STAGE_PROGRESS_FORMAT"), [SafeChapter, SafeStage, SafeCurrent, SafeTarget](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Chapter"), FText::AsNumber(SafeChapter));
+		Args.Add(TEXT("Stage"), FText::AsNumber(SafeStage));
+		Args.Add(TEXT("Current"), FText::AsNumber(SafeCurrent));
+		Args.Add(TEXT("Target"), FText::AsNumber(SafeTarget));
+	});
+	ViewModel.WeaknessLabel = FormatLocalizedUI(TEXT("STAGE_WEAKNESS_FORMAT"), [&StageInfo](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Element"), StageWeakElementToLabel(StageInfo.WeakElement));
+	});
+	ViewModel.ProgressRatio = SafeTarget > 0
+		? FMath::Clamp(static_cast<float>(SafeCurrent) / static_cast<float>(SafeTarget), 0.0f, 1.0f)
+		: 0.0f;
+	ViewModel.bBossStage = StageInfo.bBossStage;
+	ViewModel.BossBadgeLabel = StageInfo.bBossStage ? IdleProject::Localization::UI(TEXT("STAGE_BOSS_BADGE")) : FText::GetEmpty();
+	ViewModel.BorderColor = StageInfo.bBossStage ? Theme::AccentGold : Theme::AccentBlue;
+	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
+	return ViewModel;
 }
 
 FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
@@ -574,6 +638,7 @@ void AIdleHUD::DrawHUD()
 		DrawSkillHud(*PlayerSkills, World->GetTimeSeconds());
 	}
 
+	DrawStageIndicator();
 	DrawRebirthPanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
@@ -902,6 +967,62 @@ void AIdleHUD::SelectClassFromHitBox(FName BoxName)
 	}
 
 	IdleCharacter->SetClassId(static_cast<EClassId>(ClassIdValue));
+}
+
+void AIdleHUD::DrawStageIndicator()
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+
+	const UStageService* StageService = IdleGameInstance ? IdleGameInstance->GetStageService() : nullptr;
+	if (!StageService)
+	{
+		return;
+	}
+
+	const FIdleHUDStageViewModel ViewModel = BuildStageViewModel(StageService->GetCurrentStageInfo());
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.26f, 360.0f * Scale, 560.0f * Scale);
+	const float PanelHeight = 76.0f * Scale;
+	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
+	const float Y = 24.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const float BarHeight = 6.0f * Scale;
+
+	DrawRect(BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(ViewModel.BorderColor, X, Y, PanelWidth, Border);
+	DrawRect(ViewModel.BorderColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(ViewModel.BorderColor, X, Y, Border, PanelHeight);
+	DrawRect(ViewModel.BorderColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.TitleLabel.ToString(), TextMuted, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.ProgressLabel.ToString(), TextPrimary, X + Padding, Y + 31.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.WeaknessLabel.ToString(), ViewModel.WeaknessColor, X + PanelWidth - 118.0f * Scale, Y + 15.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	if (ViewModel.bBossStage)
+	{
+		const float BadgeWidth = 58.0f * Scale;
+		const float BadgeHeight = 22.0f * Scale;
+		const float BadgeX = X + PanelWidth - Padding - BadgeWidth;
+		const float BadgeY = Y + 42.0f * Scale;
+		DrawRect(AccentGold, BadgeX, BadgeY, BadgeWidth, BadgeHeight);
+		DrawText(ViewModel.BossBadgeLabel.ToString(), BgPrimary, BadgeX + 13.0f * Scale, BadgeY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	}
+
+	const float BarX = X + Padding;
+	const float BarY = Y + PanelHeight - Padding - BarHeight;
+	const float BarWidth = PanelWidth - Padding * 2.0f;
+	DrawRect(BgPrimary.CopyWithNewOpacity(0.94f), BarX, BarY, BarWidth, BarHeight);
+	DrawRect(ViewModel.BorderColor, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
 }
 
 void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)

@@ -88,14 +88,19 @@ void AIdleMonster::SetBoss(bool bInBoss)
 	}
 }
 
+void AIdleMonster::SetStageStatMultiplier(float InStageStatMultiplier)
+{
+	StageStatMultiplier = FMath::Max(0.01f, InStageStatMultiplier);
+}
+
 float AIdleMonster::GetConfiguredMaxHp() const
 {
-	return bIsBoss ? BossMaxHp : NormalMaxHp;
+	return (bIsBoss ? BossMaxHp : NormalMaxHp) * StageStatMultiplier;
 }
 
 float AIdleMonster::GetConfiguredAttack() const
 {
-	return bIsBoss ? BossAttack : NormalAttack;
+	return (bIsBoss ? BossAttack : NormalAttack) * StageStatMultiplier;
 }
 
 void AIdleMonster::HandleDeath(AActor* DyingActor)
@@ -114,11 +119,6 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	{
 		const int64 ExpReward = 12;
 		GameInstance->AddExp(ExpReward);
-		GameInstance->RecordMonsterKilled();
-		if (bIsBoss)
-		{
-			GameInstance->MarkChapter1BossDefeated();
-		}
 	}
 
 	FActorSpawnParameters SpawnParameters;

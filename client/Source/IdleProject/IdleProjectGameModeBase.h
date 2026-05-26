@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameCore/StageService.h"
 #include "IdleProjectGameModeBase.generated.h"
 
 class AIdleMonster;
@@ -19,6 +20,8 @@ public:
 	AIdleProjectGameModeBase();
 
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
+
+	static bool ShouldSpawnMonsterAsBoss(bool bRequestedBoss, bool bHasStageService, const FStageInfo& StageInfo);
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Battle")
