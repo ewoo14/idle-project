@@ -11,6 +11,7 @@ export * from "./equipment.js";
 export * from "./level.js";
 export * from "./offline.js";
 export * from "./petLevel.js";
+export * from "./rebirth.js";
 export * from "./reward.js";
 export {
   computeSetBonus,
