@@ -81,8 +81,21 @@ describe("enhance formulas", () => {
     expect(getEnhanceSuccessRate(currentLevel)).toBeCloseTo(expected, 6);
   });
 
+  it.each([
+    0, 1, 4, 10, 25, 40, 49, 50,
+  ])("returns UE5 float parity success rate for current level %i", (currentLevel) => {
+    const expected =
+      currentLevel >= MAX_ENHANCE_LEVEL
+        ? 0
+        : Math.fround(
+            Math.max(0.05, Math.min(0.95, 0.95 - currentLevel * 0.018)),
+          );
+
+    expect(getEnhanceSuccessRate(currentLevel)).toBe(expected);
+  });
+
   it("clamps negative levels to the level zero success rate", () => {
-    expect(getEnhanceSuccessRate(-1)).toBe(0.95);
+    expect(getEnhanceSuccessRate(-1)).toBe(Math.fround(0.95));
   });
 
   it("always fails at rate zero and succeeds at rate one", () => {

@@ -55,12 +55,14 @@ export function getEnhanceSuccessRate(currentLevel: number): number {
     0,
     Math.min(currentLevel, MAX_ENHANCE_LEVEL - 1),
   );
-  return Math.max(
-    MIN_ENHANCE_SUCCESS_RATE,
-    Math.min(
-      MAX_ENHANCE_SUCCESS_RATE,
-      MAX_ENHANCE_SUCCESS_RATE -
-        clampedLevel * ENHANCE_SUCCESS_RATE_DECAY_PER_LEVEL,
+  return Math.fround(
+    Math.max(
+      MIN_ENHANCE_SUCCESS_RATE,
+      Math.min(
+        MAX_ENHANCE_SUCCESS_RATE,
+        MAX_ENHANCE_SUCCESS_RATE -
+          clampedLevel * ENHANCE_SUCCESS_RATE_DECAY_PER_LEVEL,
+      ),
     ),
   );
 }

@@ -98,7 +98,7 @@ describe("balance simulator", () => {
     );
     expect(
       report.json.model.enhancementPressure.expectedGoldCostToMax,
-    ).toBeCloseTo(22717602.91, 2);
+    ).toBeCloseTo(22717602.46, 2);
     expect(
       report.json.model.enhancementPressure.rows.slice(0, 5).map((row) => ({
         currentLevel: row.currentLevel,
@@ -144,41 +144,41 @@ describe("balance simulator", () => {
       {
         rarity: "Common",
         multiplier: 1,
-        expectedGoldCostToMax: 22717602.91,
+        expectedGoldCostToMax: 22717602.46,
         expectedHoursAtMedianGoldPerHour: 34.7,
       },
       {
         rarity: "Rare",
         multiplier: 4,
-        expectedGoldCostToMax: 90870411.63,
+        expectedGoldCostToMax: 90870409.85,
         expectedHoursAtMedianGoldPerHour: 138.799,
       },
       {
         rarity: "Epic",
         multiplier: 8,
-        expectedGoldCostToMax: 181740823.26,
+        expectedGoldCostToMax: 181740819.7,
         expectedHoursAtMedianGoldPerHour: 277.599,
       },
       {
         rarity: "Legendary",
         multiplier: 16,
-        expectedGoldCostToMax: 363481646.52,
+        expectedGoldCostToMax: 363481639.4,
         expectedHoursAtMedianGoldPerHour: 555.197,
       },
     ]);
     expect(
       report.json.model.enhancementPressure.legendaryEightSlotExpectedGoldCost,
-    ).toBeCloseTo(2907853172.16, 2);
+    ).toBeCloseTo(2907853115.2, 2);
     expect(
       report.json.model.enhancementPressure
         .legendaryEightSlotExpectedHoursAtMedianGoldPerHour,
     ).toBe(4441.579);
     expect(report.markdown).toContain("## Rarity Enhancement Pressure");
     expect(report.markdown).toContain(
-      "| Legendary | 16 | 68680000 | 363481646.52 | 555.197h |",
+      "| Legendary | 16 | 68680000 | 363481639.4 | 555.197h |",
     );
     expect(report.markdown).toContain(
-      "Eight Legendary slots: 2,907,853,172.16 expected gold",
+      "Eight Legendary slots: 2,907,853,115.20 expected gold",
     );
     expect(report.markdown).toContain(
       "4441.579h at sampled median Lv50 gold/hour",
