@@ -133,6 +133,56 @@ V1 기준 마법사는 "최고 AoE DPS 후보"지만 방어 버프 수치와 평
 
 ---
 
+### 3.5 Combat Class Differential V1 Anchors
+
+PR #26 keeps the physical mitigation curve unchanged and adds class-specific
+inputs before mitigation:
+
+```text
+physicalDamage = max(Atk * 0.05, Atk - Def * 0.6)
+magicDamage = max(MagicAtk * 0.05, MagicAtk - MagicDef * 0.6)
+critRate = clamp(LUK * 0.002 + equipmentCritRate + passiveCritRate, 0, 1)
+critDmg = clamp(1.5 + LUK * 0.001 + equipmentCritDmg, 1, 3)
+finalDamage = baseDamage * (isCrit ? critDmg : 1)
+expectedDamage = baseDamage * (1 + critRate * (critDmg - 1))
+```
+
+Server `computeClassDamage` mirrors client
+`FCombatFormulas::ComputeDamage(FDerivedStats, EClassId, PhysDef, MagicDef)`:
+Mage uses `MagicAtk` vs `MagicDef`; Warrior and Archer use `PhysAtk` vs
+`PhysDef`. Basic attacks remain physical for every class. Mage damage skills use
+the magic path; non-Mage damage skills use the physical path. All damage skills
+apply the same crit helper after mitigation.
+
+| Anchor | Inputs | Base damage | Crit expectation |
+| --- | --- | ---: | ---: |
+| Warrior physical | `PhysAtk=40`, `PhysDef=10` | 34.0 | unchanged unless crit stats are present |
+| Mage spell | `MagicAtk=40`, `MagicDef=10` | 34.0 | same crit helper after magic mitigation |
+| Archer physical | `PhysAtk=40`, `PhysDef=10`, `CritRate=0.25`, `CritDmg=1.8` | 34.0 | 40.8 expected average |
+| Guaranteed crit | `baseDamage=34`, `CritRate=1.0`, `CritDmg=1.8` | 34.0 | 61.2 |
+
+DPS review guardrails:
+
+- Mage should gain practical AoE/elemental value from `MagicAtk` without making
+  `MagicDef` irrelevant; single-target magic anchors should stay close to
+  physical anchors at equal offensive/defensive ratings.
+- Archer may exceed Warrior single-target expected DPS through crit, but only by
+  the expected-value curve above. If `CritRate` and `AtkSpeed` buffs stack past
+  the Warrior baseline by more than 25% in simulator output, review coefficients
+  before shipping.
+- Warrior remains the stable physical baseline; defense and survival buffs are
+  compared against this row before any class-wide nerf.
+
+Automation coverage:
+
+- `server/src/core/formulas/combat.test.ts` verifies physical, magic, crit, and
+  class-damage parity anchors.
+- `client/Source/IdleProject/Tests/CombatTests.cpp` verifies
+  `ComputeMagicDamage`, `ApplyCrit`, class damage routing, skill magic damage,
+  skill crit damage, and `InitializeCombat` extended stats.
+
+---
+
 ## 4. 환생 (Rebirth) 경제
 
 ### 4.1 환생 1회 보상

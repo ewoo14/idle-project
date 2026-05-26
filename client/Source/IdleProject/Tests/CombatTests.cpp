@@ -87,6 +87,7 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Full crit rate always crits"), FCombatFormulas::RollCrit(1.0f, AlwaysCritStream));
 	TestEqual(TEXT("Non crit leaves base damage unchanged"), FCombatFormulas::ApplyCrit(34.0f, false, 1.8f), 34.0f);
 	TestEqual(TEXT("Crit multiplies base damage"), FCombatFormulas::ApplyCrit(34.0f, true, 1.8f), 61.2f);
+	TestEqual(TEXT("Crit damage below one cannot reduce damage"), FCombatFormulas::ApplyCrit(34.0f, true, 0.5f), 34.0f);
 
 	return true;
 }

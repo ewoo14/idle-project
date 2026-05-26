@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCrit,
+  computeClassDamage,
   computeDamage,
   computeMagicDamage,
   rollCrit,
 } from "./combat.js";
+import type { DerivedStats } from "./stats.js";
 
 const clientServerDamageAnchors = [
   { atk: 100, def: 20, clientResult: 88 },
@@ -41,6 +43,7 @@ describe("combat formulas", () => {
   it("applies critical multiplier only when the roll crits", () => {
     expect(applyCrit(34, false, 1.8)).toBe(34);
     expect(applyCrit(34, true, 1.8)).toBe(61.2);
+    expect(applyCrit(34, true, 0.5)).toBe(34);
   });
 
   it("rolls deterministic critical boundaries", () => {
@@ -48,9 +51,48 @@ describe("combat formulas", () => {
 
     expect(rollCrit(0, rng)).toBe(false);
     expect(rollCrit(1, rng)).toBe(true);
+    expect(rollCrit(-0.1, () => 0)).toBe(false);
+    expect(rollCrit(1.2, () => 0.999)).toBe(true);
   });
 
   it("computes magic damage with the same curve using MagicAtk vs MagicDef", () => {
     expect(computeMagicDamage(80, 20)).toBe(68);
+  });
+
+  it.each([
+    {
+      classId: 1,
+      label: "Warrior",
+      stats: { physAtk: 40, magicAtk: 80 },
+      physDef: 10,
+      magicDef: 80,
+      expectedDamage: 34,
+    },
+    {
+      classId: 2,
+      label: "Mage",
+      stats: { physAtk: 12, magicAtk: 40 },
+      physDef: 20,
+      magicDef: 10,
+      expectedDamage: 34,
+    },
+    {
+      classId: 3,
+      label: "Archer",
+      stats: { physAtk: 40, magicAtk: 12 },
+      physDef: 10,
+      magicDef: 80,
+      expectedDamage: 34,
+    },
+  ])("$label class damage matches client CombatFormulas anchor", ({
+    classId,
+    stats,
+    physDef,
+    magicDef,
+    expectedDamage,
+  }) => {
+    expect(
+      computeClassDamage(stats as DerivedStats, classId, physDef, magicDef),
+    ).toBe(expectedDamage);
   });
 });

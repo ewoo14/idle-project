@@ -1,3 +1,5 @@
+import type { DerivedStats } from "./stats.js";
+
 /**
  * 데미지 계산 - UE5 client CombatFormulas C++ 미러.
  * 최소 보장: ATK x 0.05 (방어가 압도해도 1 이상)
@@ -8,6 +10,17 @@ export function computeDamage(atk: number, def: number): number {
 
 export function computeMagicDamage(magicAtk: number, magicDef: number): number {
   return computeDamage(magicAtk, magicDef);
+}
+
+export function computeClassDamage(
+  attackerStats: Pick<DerivedStats, "physAtk" | "magicAtk">,
+  classId: number,
+  physDef: number,
+  magicDef = physDef,
+): number {
+  return classId === 2
+    ? computeMagicDamage(attackerStats.magicAtk, magicDef)
+    : computeDamage(attackerStats.physAtk, physDef);
 }
 
 export function rollCrit(
