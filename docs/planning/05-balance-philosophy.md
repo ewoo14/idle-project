@@ -394,6 +394,22 @@ Rules:
   `effectiveCooldown = max(0.1, baseCooldown * (1 - rank * 0.05))` for skills
   with positive base cooldown. Zero-cooldown skills stay zero.
 
+Worked examples:
+
+| Rank | Damage multiplier | Cooldown multiplier |
+| ---: | ---: | ---: |
+| 0 | 1.00x | 1.00x |
+| 1 | 1.10x | 0.95x |
+| 2 | 1.20x | 0.90x |
+| 3 | 1.30x | 0.85x |
+| 4 | 1.40x | 0.80x |
+| 5 | 1.50x | 0.75x |
+
+For `heavy_strike` (`baseDamageCoeff=2.5`, `baseCooldown=4.0s`), rank 5
+therefore resolves to `effectiveDamageCoeff=3.75` and
+`effectiveCooldown=3.0s`. This is the V1 cap: +50% damage coefficient and -25%
+cooldown from five level-up skill points spent into one skill.
+
 V1 policy:
 
 - Class switching keeps the global point/rank state in memory. A rank only
