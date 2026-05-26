@@ -8,6 +8,7 @@
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
 #include "GameCore/SeasonService.h"
+#include "GameCore/StageService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleHUD.generated.h"
 
@@ -159,10 +160,23 @@ struct IDLEPROJECT_API FIdleHUDStatusIndicatorViewModel
 	float Size = 0.0f;
 };
 
+struct IDLEPROJECT_API FIdleHUDStageViewModel
+{
+	FText TitleLabel;
+	FText ProgressLabel;
+	FText BossBadgeLabel;
+	FText WeaknessLabel;
+	FLinearColor BorderColor = FLinearColor::White;
+	FLinearColor WeaknessColor = FLinearColor::White;
+	float ProgressRatio = 0.0f;
+	bool bBossStage = false;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
+IDLEPROJECT_API FIdleHUDStageViewModel BuildStageViewModel(const FStageInfo& StageInfo);
 IDLEPROJECT_API FIdleHUDOfflineRewardViewModel BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward);
 IDLEPROJECT_API FIdleHUDQuestLogViewModel BuildQuestLogViewModel(const TArray<FQuestState>& QuestStates);
 IDLEPROJECT_API FIdleHUDRebirthViewModel BuildRebirthViewModel(bool bCanRebirth, bool bBossDefeated, int32 CharacterLevel, int32 RebirthCount, int32 RebirthBonusPoints);
@@ -219,6 +233,7 @@ private:
 	void DrawSkillHud(const USkillComponent& SkillComponent, float Now);
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
+	void DrawStageIndicator();
 	void RankUpSkillFromHitBox(FName BoxName);
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();

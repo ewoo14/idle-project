@@ -1,10 +1,57 @@
 #include "Misc/AutomationTest.h"
 
 #include "CombatSystem/CombatComponent.h"
+#include "GameCore/StageService.h"
+#include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
 #include "UI/UIThemeTokens.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageIndicatorHudViewModelTest,
+	"IdleProject.UI.HUD.StageIndicatorViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageIndicatorHudViewModelTest::RunTest(const FString& Parameters)
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	FStageInfo NormalStage;
+	NormalStage.Chapter = 1;
+	NormalStage.Stage = 3;
+	NormalStage.KillsThisStage = 7;
+	NormalStage.KillsToAdvance = 10;
+	NormalStage.bBossStage = false;
+	NormalStage.WeakElement = ESkillElement::Ice;
+
+	const FIdleHUDStageViewModel NormalView = BuildStageViewModel(NormalStage);
+	TestEqual(TEXT("Stage title is localized"), NormalView.TitleLabel.ToString(), FString(TEXT("Stage")));
+	TestEqual(TEXT("Stage progress includes chapter, stage, and kills"), NormalView.ProgressLabel.ToString(), FString(TEXT("Stage 1-3 • 7/10")));
+	TestEqual(TEXT("Normal stage omits boss badge"), NormalView.BossBadgeLabel.ToString(), FString());
+	TestEqual(TEXT("Weak element is localized"), NormalView.WeaknessLabel.ToString(), FString(TEXT("Weak: Ice")));
+	TestEqual(TEXT("Progress ratio is clamped from kills"), NormalView.ProgressRatio, 0.7f);
+	TestFalse(TEXT("Normal stage is not highlighted as boss"), NormalView.bBossStage);
+	TestEqual(TEXT("Weakness uses ice blue token"), NormalView.WeaknessColor.B, AccentBlue.B);
+
+	FStageInfo BossStage = NormalStage;
+	BossStage.Stage = 5;
+	BossStage.KillsThisStage = 0;
+	BossStage.KillsToAdvance = 1;
+	BossStage.bBossStage = true;
+	BossStage.WeakElement = ESkillElement::Fire;
+
+	const FIdleHUDStageViewModel BossView = BuildStageViewModel(BossStage);
+	TestEqual(TEXT("Boss stage badge is localized"), BossView.BossBadgeLabel.ToString(), FString(TEXT("Boss")));
+	TestEqual(TEXT("Boss stage uses gold border color"), BossView.BorderColor.R, AccentGold.R);
+	TestEqual(TEXT("Fire weakness uses danger token"), BossView.WeaknessColor.R, AccentRed.R);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDamageFloatingTextHudViewModelTest,
