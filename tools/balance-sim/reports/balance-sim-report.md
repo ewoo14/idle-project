@@ -36,6 +36,27 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Enhancement Spend Pressure
+
+- Max level: +5
+- Minimum +0 to +5 gold cost: 5500
+- Expected +0 to +5 gold cost: 11020.66
+- Median sampled Lv50 gold/hour: 654689
+- Expected +0 to +5 cost at median Lv50 gold/hour: 0.017h
+- Failure consumes gold only; no downgrade or destruction is modeled in V1.
+
+<!-- markdownlint-disable MD013 -->
+
+| Current | Next | Cost | Success | Expected attempts | Expected gold | Cumulative expected gold |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| +0 | +1 | 100 | 95% | 1.053 | 105.26 | 105.26 |
+| +1 | +2 | 400 | 85% | 1.176 | 470.59 | 575.85 |
+| +2 | +3 | 900 | 70% | 1.429 | 1285.71 | 1861.57 |
+| +3 | +4 | 1600 | 55% | 1.818 | 2909.09 | 4770.66 |
+| +4 | +5 | 2500 | 40% | 2.5 | 6250 | 11020.66 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Formula Sources
 
 - server/src/core/formulas/level.ts
@@ -44,3 +65,4 @@
 - server/src/core/formulas/offline.ts
 - server/src/core/formulas/reward.ts
 - server/src/core/formulas/stage.ts
+- server/src/core/formulas/enhance.ts

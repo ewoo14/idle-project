@@ -472,6 +472,17 @@ Sensitivity notes:
   available.
 - Offline efficiency: current sampled 70-80% band keeps idle progress below
   active play while staying relevant.
+- Simulator pressure check: the deterministic 1000-run balance report imports
+  `server/src/core/formulas/enhance.ts` and models +0 to +5 enhancement spend.
+  The minimum all-success cost is 5,500 gold, while expected cost using
+  `cost / successRate` is 11,020.66 gold. Against the sampled median Lv50
+  active/idle blended gold rate, a single +0 to +5 path is about 0.017h of
+  income, so V1 enhancement is a light early sink rather than a first-rebirth
+  blocker.
+- Reward parity check: PR #32 reward scaling remains aligned with monster HP
+  scaling because both use `1 + globalStageIndex * 0.15`. Chapter 1 normal
+  reward-per-HP pressure stays stable across 1-1 to 1-5; the 8x boss reward
+  bonus remains the intentional stage-cap spike.
 
 ---
 
