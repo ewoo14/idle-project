@@ -50,6 +50,8 @@ FString GetRarityAdjective(EItemRarity Rarity)
 		return TEXT("Epic");
 	case EItemRarity::Legendary:
 		return TEXT("Legendary");
+	case EItemRarity::None:
+		return TEXT("Item");
 	case EItemRarity::Common:
 	default:
 		return TEXT("거친");

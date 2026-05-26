@@ -98,6 +98,15 @@ bool FDropFormulaComputeItemBonusTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Epic accessory defense split"), EpicAccessory.BonusDef, 6.9f);
 	TestEqual(TEXT("Epic accessory HP split"), EpicAccessory.BonusHp, 46.0f);
 
+	const FItemInstance CommonWeapon = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, 1, EItemRarity::Common, 1.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base attack"), CommonWeapon.BonusAtk, 1.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base defense"), CommonWeapon.BonusDef, 0.0f);
+	TestEqual(TEXT("Level 1 Common keeps legacy base HP"), CommonWeapon.BonusHp, 0.0f);
+
+	const FItemInstance RareArmor = FDropFormula::ComputeItemBonus(EItemSlot::Helmet, 10, EItemRarity::Rare, 2.0f);
+	TestEqual(TEXT("Rare armor defense uses float slot split"), RareArmor.BonusDef, 23.8f);
+	TestEqual(TEXT("Rare armor HP uses float slot split"), RareArmor.BonusHp, 102.0f);
+
 	return true;
 }
 

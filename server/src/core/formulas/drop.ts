@@ -16,17 +16,17 @@ const toClientFloat = Math.fround;
 export function getRarityStatMultiplier(rarity: ItemRarity): number {
   switch (rarity) {
     case "Common":
-      return 1;
+      return toClientFloat(1);
     case "Uncommon":
-      return 1.3;
+      return toClientFloat(1.3);
     case "Rare":
-      return 1.7;
+      return toClientFloat(1.7);
     case "Epic":
-      return 2.3;
+      return toClientFloat(2.3);
     case "Legendary":
-      return 3.2;
+      return toClientFloat(3.2);
     case "None":
-      return 0;
+      return toClientFloat(0);
   }
 }
 
@@ -88,8 +88,11 @@ export function computeItemBonus(
   variance: number,
 ): EquipmentBonus {
   const safeLevel = Math.max(level, 1);
-  const safeVariance = Math.max(variance, 0);
-  const baseBonus = safeLevel * safeVariance * getRarityStatMultiplier(rarity);
+  const safeVariance = toClientFloat(Math.max(variance, 0));
+  const baseBonus = toClientFloat(
+    toClientFloat(toClientFloat(safeLevel) * safeVariance) *
+      getRarityStatMultiplier(rarity),
+  );
 
   if (slot === 1) {
     return {
@@ -101,17 +104,17 @@ export function computeItemBonus(
 
   if (slot === 8) {
     return {
-      bonusAtk: baseBonus * 0.5,
-      bonusDef: baseBonus * 0.3,
-      bonusHp: baseBonus * 2,
+      bonusAtk: toClientFloat(baseBonus * toClientFloat(0.5)),
+      bonusDef: toClientFloat(baseBonus * toClientFloat(0.3)),
+      bonusHp: toClientFloat(baseBonus * toClientFloat(2)),
     };
   }
 
   if (ARMOR_SLOTS.has(slot)) {
     return {
       bonusAtk: 0,
-      bonusDef: baseBonus * 0.7,
-      bonusHp: baseBonus * 3,
+      bonusDef: toClientFloat(baseBonus * toClientFloat(0.7)),
+      bonusHp: toClientFloat(baseBonus * toClientFloat(3)),
     };
   }
 

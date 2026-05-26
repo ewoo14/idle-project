@@ -552,6 +552,19 @@ existing `(ATK + DEF + HP / 10) * (1 + EnhanceLevel * 0.1)` formula, so rarity
 improves auto-equip decisions through the generated stat bonuses rather than a
 separate score override.
 
+Parity anchors:
+
+- Lv1 Common with variance `1.0` keeps the legacy base bonus: weapon ATK `1.0`,
+  armor DEF `0.7` / HP `3.0`, accessory ATK `0.5` / DEF `0.3` / HP `2.0`.
+- Lv100 variance `1.0` produces base bonuses of Rare `170`, Epic `230`, and
+  Legendary `320` before slot split.
+- Enhancement remains a separate #33 multiplier. A Legendary Lv100 weapon at
+  +5 has PowerScore `round(320 * 1.5) = 480`; rarity does not bypass the
+  existing `EnhanceLevel` formula.
+- Server `drop.ts` intentionally uses `Math.fround` at the same public formula
+  boundaries as client `float` arithmetic so parity tests can compare exact
+  generated bonus values, not just rounded display numbers.
+
 Server parity mirror:
 
 - `server/src/core/formulas/drop.ts` mirrors rarity multipliers, level-scaled

@@ -124,6 +124,8 @@ FLinearColor AEquipmentDrop::GetRarityColor() const
 		return RarityEpic;
 	case EItemRarity::Legendary:
 		return RarityLegendary;
+	case EItemRarity::None:
+		return TextMuted;
 	case EItemRarity::Common:
 	default:
 		return RarityCommon;
