@@ -230,6 +230,11 @@ void AIdleCharacter::HandleDeath(AActor* DyingActor)
 
 void AIdleCharacter::HandleLevelUp(int32 NewLevel)
 {
+	if (Skills)
+	{
+		Skills->GrantSkillPoint(1);
+	}
+
 	if (Facial)
 	{
 		Facial->SetExpression(EFacialExpression::LevelUp, 1.5f);

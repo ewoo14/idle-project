@@ -23,7 +23,11 @@ struct IDLEPROJECT_API FIdleHUDSkillSlotViewModel
 	FText DisplayName;
 	float CooldownRatio = 0.0f;
 	float CooldownRemaining = 0.0f;
+	int32 AvailableSkillPoints = 0;
+	int32 Rank = 0;
+	int32 MaxRank = 0;
 	bool bReady = true;
+	bool bCanRankUp = false;
 };
 
 struct IDLEPROJECT_API FIdleHUDUltimateViewModel
@@ -183,6 +187,7 @@ private:
 	void DrawSkillHud(const USkillComponent& SkillComponent, float Now);
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
+	void RankUpSkillFromHitBox(FName BoxName);
 	void PreviewOfflineRewardModal();
 	void ClaimOfflineRewardModal();
 	void DrawOfflineRewardModal();

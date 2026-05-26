@@ -74,6 +74,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Skill")
 	TArray<FSkillDefinition> Skills;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Idle|Skill|Rank", meta = (ClampMin = "1"))
+	int32 MaxRank = 5;
+
 	/** 전사 기본 스킬 7종을 정적 정의에서 다시 로드하고 런타임 상태를 초기화합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadDefaultWarriorSkills();
@@ -102,6 +105,27 @@ public:
 	/** HUD 표시용 남은 쿨다운 비율(0~1)을 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill")
 	float GetCooldownRatio(FName SkillId, float Now) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill|Rank")
+	void GrantSkillPoint(int32 Amount);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
+	int32 GetSkillPoints() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
+	int32 GetSkillRank(FName SkillId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
+	bool CanRankUp(FName SkillId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill|Rank")
+	bool RankUpSkill(FName SkillId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
+	float GetEffectiveDamageCoeff(FName SkillId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
+	float GetEffectiveCooldown(FName SkillId) const;
 
 	/** 테스트/스킬 실행에서 마지막 발동 시간을 기록합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
@@ -135,6 +159,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill")
 	TMap<FName, float> LastCastTimeBySkill;
+
+	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill|Rank")
+	TMap<FName, int32> SkillRanks;
+
+	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill|Rank")
+	int32 SkillPoints = 0;
 
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill")
 	float CurrentGauge = 0.0f;

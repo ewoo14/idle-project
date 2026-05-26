@@ -34,10 +34,22 @@
 - When Vitest loads `warriorSkillDefinitions`.
 - Then all 7 warrior skills have stable `skillId`, `classId`, `type`, `effectType`, cooldown, coefficient, buff, and gauge fields for cross-reference.
 
+## Scenario 7: Skill Rank Points
+- Given a warrior has 2 skill points and `heavy_strike` starts at rank 0.
+- When `heavy_strike` is ranked up twice.
+- Then 2 points are spent, rank becomes 2, damage coefficient becomes 3.0, and cooldown becomes 3.6s.
+
+## Scenario 8: Rank Boundaries And Level-Up Grant
+- Given a skill component has no points.
+- When an unknown skill is ranked up or a loaded skill is already rank 5.
+- Then rank-up is rejected.
+- When `AIdleCharacter::HandleLevelUp` runs.
+- Then the attached skill component gains exactly 1 skill point.
+
 ## Regression Levels
 - Smoke: run HUD model, cooldown, and SkillDB mirror tests.
 - Functional: run all `IdleProject.Combat.Skills`, `IdleProject.Combat.BattleAI.AoeTargetGathering`, and server Vitest.
-- Edge: include gauge clamp/reset, 0 cooldown passive/ultimate rows, dead target exclusion, owner exclusion, far target exclusion, and 2D distance checks.
+- Edge: include gauge clamp/reset, 0 cooldown passive/ultimate rows, missing skill rank-up, max rank, no-point rank-up, dead target exclusion, owner exclusion, far target exclusion, and 2D distance checks.
 
 ## Reproduction Evidence
 - UE command: `UnrealEditor-Cmd.exe client/IdleProject.uproject -unattended -nop4 -nosplash -NullRHI -ExecCmds="Automation RunTests IdleProject;Quit"`
