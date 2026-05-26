@@ -583,6 +583,9 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 
 	USkillComponent* Skills = NewObject<USkillComponent>();
 	Skills->LoadDefaultWarriorSkills();
+	Skills->GrantSkillPoint(1);
+	Skills->RankUpSkill(TEXT("heavy_strike"));
+	Skills->GrantSkillPoint(1);
 
 	constexpr float CastTime = 10.0f;
 	constexpr float Now = 12.0f;
@@ -593,9 +596,14 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 4);
 	TestEqual(TEXT("First active skill keeps localized display name"), Slots[0].DisplayName.ToString(), FString(TEXT("강타")));
-	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, 0.5f);
-	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, 2.0f);
+	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, Skills->GetCooldownRatio(TEXT("heavy_strike"), Now));
+	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, Skills->GetCooldownRemaining(TEXT("heavy_strike"), Now));
 	TestFalse(TEXT("Cooling skill is not ready"), Slots[0].bReady);
+	TestEqual(TEXT("Skill point balance is exposed per slot"), Slots[0].AvailableSkillPoints, static_cast<int32>(1));
+	TestEqual(TEXT("Current skill rank is exposed"), Slots[0].Rank, static_cast<int32>(1));
+	TestEqual(TEXT("Max skill rank is exposed"), Slots[0].MaxRank, static_cast<int32>(5));
+	TestTrue(TEXT("Rank-up availability is exposed"), Slots[0].bCanRankUp);
+	TestEqual(TEXT("Unranked active skill still shows zero rank"), Slots[1].Rank, static_cast<int32>(0));
 
 	const FIdleHUDUltimateViewModel Ultimate = IdleProject::UI::BuildUltimateViewModel(*Skills);
 	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);

@@ -21,6 +21,7 @@ const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
+const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr int32 RebirthBonusPointsPerRun = 5;
 
@@ -140,6 +141,11 @@ FName MakeSeasonClaimHitBoxName(int32 Tier)
 {
 	return FName(*(SeasonClaimHitBoxPrefix + FString::FromInt(Tier)));
 }
+
+FName MakeSkillRankHitBoxName(FName SkillId)
+{
+	return FName(*(SkillRankHitBoxPrefix + SkillId.ToString()));
+}
 }
 
 TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now)
@@ -157,7 +163,11 @@ TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(con
 		Slot.DisplayName = Skill.DisplayName;
 		Slot.CooldownRatio = SkillComponent.GetCooldownRatio(Skill.SkillId, Now);
 		Slot.CooldownRemaining = SkillComponent.GetCooldownRemaining(Skill.SkillId, Now);
+		Slot.AvailableSkillPoints = SkillComponent.GetSkillPoints();
+		Slot.Rank = SkillComponent.GetSkillRank(Skill.SkillId);
+		Slot.MaxRank = SkillComponent.MaxRank;
 		Slot.bReady = Slot.CooldownRemaining <= 0.0f;
+		Slot.bCanRankUp = SkillComponent.CanRankUp(Skill.SkillId);
 		Slots.Add(Slot);
 	}
 
@@ -476,6 +486,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		ClaimSeasonTierFromHitBox(BoxName);
 		return;
 	}
+	if (BoxName.ToString().StartsWith(SkillRankHitBoxPrefix))
+	{
+		RankUpSkillFromHitBox(BoxName);
+		return;
+	}
 	if (BoxName == RebirthHitBoxName)
 	{
 		TryRebirth();
@@ -737,6 +752,8 @@ void AIdleHUD::SelectClassFromHitBox(FName BoxName)
 
 void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
 {
+	using namespace IdleProject::UI;
+
 	if (!Canvas)
 	{
 		return;
@@ -749,12 +766,13 @@ void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
 	}
 
 	const float HudScale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float SlotWidth = 148.0f * HudScale;
-	const float SlotHeight = 48.0f * HudScale;
+	const float SlotWidth = 160.0f * HudScale;
+	const float SlotHeight = 60.0f * HudScale;
 	const float SlotGap = 10.0f * HudScale;
 	const float TotalWidth = Slots.Num() * SlotWidth + (Slots.Num() - 1) * SlotGap;
 	const float StartX = FMath::Max(24.0f * HudScale, (Canvas->SizeX - TotalWidth) * 0.5f);
 	const float SlotY = FMath::Max(96.0f * HudScale, Canvas->SizeY - 116.0f * HudScale);
+	const int32 AvailableSkillPoints = Slots[0].AvailableSkillPoints;
 
 	for (int32 Index = 0; Index < Slots.Num(); ++Index)
 	{
@@ -767,13 +785,19 @@ void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
 		SlotY - 34.0f * HudScale,
 		TotalWidth,
 		22.0f * HudScale);
+
+	const FString PointsLabel = FormatLocalizedUI(TEXT("SKILL_POINTS_FORMAT"), [AvailableSkillPoints](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Points"), FText::AsNumber(AvailableSkillPoints));
+	}).ToString();
+	DrawText(PointsLabel, AvailableSkillPoints > 0 ? Theme::AccentGold : Theme::TextMuted, StartX + TotalWidth - 136.0f * HudScale, SlotY - 62.0f * HudScale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.88f * HudScale);
 }
 
 void AIdleHUD::DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height)
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 48.0f;
+	const float Scale = Height / 60.0f;
 	const FLinearColor PanelColor = Theme::BgPanel.CopyWithNewOpacity(0.86f);
 	const FLinearColor BorderColor = Slot.bReady ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.70f);
 	const FLinearColor FillColor = Slot.bReady ? Theme::AccentGold : Theme::AccentBlue;
@@ -798,6 +822,13 @@ void AIdleHUD::DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotI
 	DrawText(KeyLabel, Theme::TextMuted, X + 8.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
 	DrawText(Slot.DisplayName.ToString(), Theme::TextPrimary, X + 28.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.90f * Scale);
 
+	const FString RankLabel = FormatLocalizedUI(TEXT("SKILL_RANK_FORMAT"), [&Slot](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Rank"), FText::AsNumber(Slot.Rank));
+		Args.Add(TEXT("MaxRank"), FText::AsNumber(Slot.MaxRank));
+	}).ToString();
+	DrawText(RankLabel, Slot.bCanRankUp ? Theme::AccentGold : Theme::TextMuted, X + 96.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+
 	const FString StatusLabel = Slot.bReady
 		? IdleProject::Localization::UI(TEXT("SKILL_READY")).ToString()
 		: FormatLocalizedUI(TEXT("SKILL_COOLDOWN_FORMAT"), [&Slot](FFormatNamedArguments& Args)
@@ -805,6 +836,16 @@ void AIdleHUD::DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotI
 			Args.Add(TEXT("Seconds"), FText::AsNumber(Slot.CooldownRemaining));
 		}).ToString();
 	DrawText(StatusLabel, Slot.bReady ? Theme::AccentGold : Theme::TextMuted, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+
+	const float ButtonSize = 24.0f * Scale;
+	const float ButtonX = X + Width - ButtonSize - 8.0f * Scale;
+	const float ButtonY = Y + 6.0f * Scale;
+	DrawRect(Slot.bCanRankUp ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonSize, ButtonSize);
+	DrawText(TEXT("+"), Slot.bCanRankUp ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 7.0f * Scale, ButtonY + 1.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
+	if (Slot.bCanRankUp)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), MakeSkillRankHitBoxName(Slot.SkillId), true, 88);
+	}
 }
 
 void AIdleHUD::DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height)
@@ -823,6 +864,23 @@ void AIdleHUD::DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, floa
 			Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(Ultimate.GaugePercent)));
 		}).ToString();
 	DrawText(GaugeLabel, Ultimate.bReady ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+}
+
+void AIdleHUD::RankUpSkillFromHitBox(FName BoxName)
+{
+	USkillComponent* PlayerSkills = ResolvePlayerSkills();
+	if (!PlayerSkills)
+	{
+		return;
+	}
+
+	FString SkillId = BoxName.ToString();
+	SkillId.RightChopInline(SkillRankHitBoxPrefix.Len());
+	if (!SkillId.IsEmpty())
+	{
+		PlayerSkills->RankUpSkill(FName(*SkillId));
+	}
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::PreviewOfflineRewardModal()
