@@ -262,12 +262,12 @@ bool UIdleGameInstance::Rebirth()
 
 void UIdleGameInstance::MarkChapter1BossDefeated()
 {
-	bChapter1BossDefeated = true;
-	EnsureStageService();
-	if (StageService)
+	if (bChapter1BossDefeated)
 	{
-		StageService->MarkCurrentChapterBossDefeated();
+		return;
 	}
+
+	bChapter1BossDefeated = true;
 }
 
 FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
@@ -388,6 +388,7 @@ void UIdleGameInstance::InitializeStageServiceForTests()
 {
 	StageService = NewObject<UStageService>(this);
 	StageService->InitializeDefaultStages();
+	StageService->OnChapterBossDefeated.AddUniqueDynamic(this, &UIdleGameInstance::HandleChapterBossDefeated);
 }
 
 bool UIdleGameInstance::EquipPet(const FString& PetId)
@@ -513,6 +514,16 @@ void UIdleGameInstance::EnsureStageService()
 	{
 		StageService = NewObject<UStageService>(this);
 		StageService->InitializeDefaultStages();
+	}
+
+	StageService->OnChapterBossDefeated.AddUniqueDynamic(this, &UIdleGameInstance::HandleChapterBossDefeated);
+}
+
+void UIdleGameInstance::HandleChapterBossDefeated(int32 ClearedChapter)
+{
+	if (ClearedChapter == 1)
+	{
+		MarkChapter1BossDefeated();
 	}
 }
 

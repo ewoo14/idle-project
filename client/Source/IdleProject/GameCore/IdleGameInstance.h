@@ -275,6 +275,8 @@ private:
 	void EnsurePetService();
 	void EnsureSeasonService();
 	void EnsureStageService();
+	UFUNCTION()
+	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();
 	void SaveLanguage() const;
 	void LoadLastSeenUnixSec();
