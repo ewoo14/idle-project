@@ -21,3 +21,4 @@
 | M6 | [M6-kill-reward-scaling-v1.md](M6-kill-reward-scaling-v1.md) | Kill EXP/gold stage scaling, boss reward bonus, drop level, and reward parity regression coverage |
 | M6 | [M6-thief-cleric-classes-v1.md](M6-thief-cleric-classes-v1.md) | Five-class skill definition parity, Thief/Cleric routing, Heal behavior, regression evidence |
 | M6 | [M6-status-elements-v1.md](M6-status-elements-v1.md) | Status effects, element multipliers, and HUD status indicator regression coverage |
+| M6 | [M6-item-affix-hud-v1.md](M6-item-affix-hud-v1.md) | Item affix HUD summary, Common zero-affix regression, equipment refresh, and CSV integrity |

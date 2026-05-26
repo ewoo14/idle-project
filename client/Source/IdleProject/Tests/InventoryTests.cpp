@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 
+#include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -339,6 +340,34 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Max level row is disabled"), MaxLevel.Rows[0].bCanEnhance);
 	TestEqual(TEXT("Max level row has zero next cost"), MaxLevel.Rows[0].Cost, static_cast<int64>(0));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEquipmentAffixHudSummaryTest,
+	"IdleProject.UI.HUD.EquipmentAffixSummary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEquipmentAffixHudSummaryTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FItemInstance PlainItem = MakeTestItem(TEXT("plain_sword"), EItemSlot::Weapon, EItemRarity::Common, 10.0f, 0.0f, 0.0f);
+	TestTrue(TEXT("Zero affixes produce an empty summary"), IdleProject::UI::BuildAffixSummary(PlainItem).IsEmpty());
+
+	const FItemInstance PartialAffixItem = MakeTestItem(TEXT("partial_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 0, 0.03f, 0.0f, 12.0f);
+	TestEqual(
+		TEXT("Only positive affixes are shown"),
+		IdleProject::UI::BuildAffixSummary(PartialAffixItem).ToString(),
+		FString(TEXT("Crit +3% / MATK +12")));
+
+	const FItemInstance FullAffixItem = MakeTestItem(TEXT("full_sword"), EItemSlot::Weapon, EItemRarity::Legendary, 10.0f, 0.0f, 0.0f, 0, 0.03f, 0.10f, 12.0f);
+	TestEqual(
+		TEXT("Affix summary uses stable crit speed magic order"),
+		IdleProject::UI::BuildAffixSummary(FullAffixItem).ToString(),
+		FString(TEXT("Crit +3% / ASPD +0.10 / MATK +12")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
