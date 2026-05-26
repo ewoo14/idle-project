@@ -49,9 +49,9 @@ gold cost using `cost / successRate`, and expected hours at sampled median Lv50
 gold/hour.
 
 PR #39 extends that pressure check with rarity-scaled scenarios for Common,
-Rare, Epic, and Legendary. PR #44 expands the detail table to +0 through +50,
-then keeps the rarity summary and eight-slot Legendary estimate for high-rarity
-long-tail sink pressure.
+Rare, Epic, and Legendary. PR #44 expands the detail table to +0 through +50.
+PR #45 adds Mythic to the rarity summary and keeps eight-slot Legendary/Mythic
+estimates for high-rarity long-tail sink pressure.
 
 PR #42 adds pet feed pressure. The simulator imports `petLevel.ts`, reports the
 Lv0 to Lv10 feed-cost path, and compares the dog gold-bonus payback against the
@@ -91,9 +91,13 @@ Enhancement V1 pressure, using the current +0 to +50 formula:
 - minimum all-success cost: 4,292,500 gold
 - expected cost: 22,717,602.91 gold
 - expected cost at median sampled Lv50 gold/hour: 34.7h
-- Legendary expected cost: 363,481,646.52 gold, or 555.197h at the sampled median
+- Legendary expected cost: 363,481,639.40 gold, or 555.197h at the sampled median
   Lv50 gold/hour
-- eight Legendary slots: 2,907,853,172.16 expected gold, or 4441.579h at the sampled
+- eight Legendary slots: 2,907,853,115.20 expected gold, or 4441.579h at the sampled
+  median Lv50 gold/hour
+- Mythic expected cost: 726,963,278.80 gold, or 1110.395h at the sampled median
+  Lv50 gold/hour
+- eight Mythic slots: 5,815,706,230.40 expected gold, or 8883.159h at the sampled
   median Lv50 gold/hour
 
 This makes Common enhancement a long-tail gold sink in the current model while

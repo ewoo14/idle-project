@@ -25,7 +25,8 @@ enum class EItemRarity : uint8
 	Uncommon = 2 UMETA(DisplayName = "Uncommon"),
 	Rare = 3 UMETA(DisplayName = "Rare"),
 	Epic = 4 UMETA(DisplayName = "Epic"),
-	Legendary = 5 UMETA(DisplayName = "Legendary")
+	Legendary = 5 UMETA(DisplayName = "Legendary"),
+	Mythic = 6 UMETA(DisplayName = "Mythic")
 };
 
 UENUM(BlueprintType)

@@ -129,7 +129,7 @@ describe("balance simulator", () => {
     );
   });
 
-  it("reports rarity-scaled enhancement pressure and eight-slot Legendary cost", () => {
+  it("reports rarity-scaled enhancement pressure and eight-slot high-rarity costs", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);
 
@@ -165,6 +165,12 @@ describe("balance simulator", () => {
         expectedGoldCostToMax: 363481639.4,
         expectedHoursAtMedianGoldPerHour: 555.197,
       },
+      {
+        rarity: "Mythic",
+        multiplier: 32,
+        expectedGoldCostToMax: 726963278.8,
+        expectedHoursAtMedianGoldPerHour: 1110.395,
+      },
     ]);
     expect(
       report.json.model.enhancementPressure.legendaryEightSlotExpectedGoldCost,
@@ -173,6 +179,13 @@ describe("balance simulator", () => {
       report.json.model.enhancementPressure
         .legendaryEightSlotExpectedHoursAtMedianGoldPerHour,
     ).toBe(4441.579);
+    expect(
+      report.json.model.enhancementPressure.mythicEightSlotExpectedGoldCost,
+    ).toBeCloseTo(5815706230.4, 2);
+    expect(
+      report.json.model.enhancementPressure
+        .mythicEightSlotExpectedHoursAtMedianGoldPerHour,
+    ).toBe(8883.159);
     expect(report.markdown).toContain("## Rarity Enhancement Pressure");
     expect(report.markdown).toContain(
       "| Legendary | 16 | 68680000 | 363481639.4 | 555.197h |",
@@ -182,6 +195,12 @@ describe("balance simulator", () => {
     );
     expect(report.markdown).toContain(
       "4441.579h at sampled median Lv50 gold/hour",
+    );
+    expect(report.markdown).toContain(
+      "| Mythic | 32 | 137360000 | 726963278.8 | 1110.395h |",
+    );
+    expect(report.markdown).toContain(
+      "Eight Mythic slots: 5,815,706,230.40 expected gold",
     );
   });
 

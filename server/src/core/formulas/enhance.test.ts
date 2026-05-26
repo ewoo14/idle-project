@@ -37,6 +37,7 @@ describe("enhance formulas", () => {
     ["Rare", 4],
     ["Epic", 8],
     ["Legendary", 16],
+    ["Mythic", 32],
   ] as const)("computes %s enhance cost multiplier", (rarity, expected) => {
     expect(getRarityCostMultiplier(rarity)).toBe(expected);
   });
@@ -45,6 +46,7 @@ describe("enhance formulas", () => {
     expect(getEnhanceCost(1, "Common")).toBe(400);
     expect(getEnhanceCost(1, "Rare")).toBe(1600);
     expect(getEnhanceCost(0, "Legendary")).toBe(1600);
+    expect(getEnhanceCost(0, "Mythic")).toBe(3200);
     expect(getEnhanceCost(MAX_ENHANCE_LEVEL, "Legendary")).toBe(0);
   });
 
@@ -54,6 +56,7 @@ describe("enhance formulas", () => {
     ["Rare", [400, 1600, 3600, 6400, 10000, 0]],
     ["Epic", [800, 3200, 7200, 12800, 20000, 0]],
     ["Legendary", [1600, 6400, 14400, 25600, 40000, 0]],
+    ["Mythic", [3200, 12800, 28800, 51200, 80000, 0]],
   ] as const)("keeps the old +0 to +4 rarity-scaled cost table for %s", (rarity, expectedCosts) => {
     for (const [currentLevel, expected] of expectedCosts.entries()) {
       const level =

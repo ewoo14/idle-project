@@ -20,6 +20,8 @@ int32 GetAffixCount(EItemRarity Rarity, FRandomStream& Rng)
 		return 2;
 	case EItemRarity::Legendary:
 		return Rng.GetFraction() < 0.5f ? 2 : 3;
+	case EItemRarity::Mythic:
+		return 3;
 	case EItemRarity::None:
 	case EItemRarity::Common:
 	default:
@@ -51,6 +53,8 @@ float FDropFormula::GetRarityStatMultiplier(EItemRarity Rarity)
 		return 2.3f;
 	case EItemRarity::Legendary:
 		return 3.2f;
+	case EItemRarity::Mythic:
+		return 4.5f;
 	case EItemRarity::None:
 	default:
 		return 0.0f;
@@ -66,8 +70,9 @@ EItemRarity FDropFormula::RollRarityForLevel(int32 Level, FRandomStream& Rng)
 	const float UncommonChance = 0.20f;
 	const float RareChance = 0.08f + 0.12f * LevelScale;
 	const float EpicChance = 0.06f * LevelScale;
-	const float LegendaryChance = 0.02f * LevelScale;
-	const float CommonChance = FMath::Max(0.0f, 1.0f - NoneChance - UncommonChance - RareChance - EpicChance - LegendaryChance);
+	const float LegendaryChance = 0.015f * LevelScale;
+	const float MythicChance = 0.005f * LevelScale;
+	const float CommonChance = FMath::Max(0.0f, 1.0f - NoneChance - UncommonChance - RareChance - EpicChance - LegendaryChance - MythicChance);
 
 	const float Roll = Rng.GetFraction();
 	if (Roll < NoneChance)
@@ -90,7 +95,11 @@ EItemRarity FDropFormula::RollRarityForLevel(int32 Level, FRandomStream& Rng)
 	{
 		return EItemRarity::Epic;
 	}
-	return EItemRarity::Legendary;
+	if (Roll < NoneChance + CommonChance + UncommonChance + RareChance + EpicChance + LegendaryChance)
+	{
+		return EItemRarity::Legendary;
+	}
+	return EItemRarity::Mythic;
 }
 
 EItemSet FDropFormula::RollItemSet(EItemRarity Rarity, FRandomStream& Rng)

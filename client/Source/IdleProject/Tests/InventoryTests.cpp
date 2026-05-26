@@ -9,6 +9,7 @@
 #include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
+#include "UI/UIThemeTokens.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -57,6 +58,9 @@ void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, co
 	case EItemRarity::Legendary:
 		Test.TestTrue(FString::Printf(TEXT("%s Legendary has two or three affixes"), Context), AffixCount >= 2 && AffixCount <= 3);
 		break;
+	case EItemRarity::Mythic:
+		Test.TestEqual(FString::Printf(TEXT("%s Mythic has three affixes"), Context), AffixCount, 3);
+		break;
 	case EItemRarity::None:
 	default:
 		Test.TestEqual(FString::Printf(TEXT("%s None has no affixes"), Context), AffixCount, 0);
@@ -94,6 +98,8 @@ bool FDropFormulaRarityMultiplierTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rare stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Rare), 1.7f);
 	TestEqual(TEXT("Epic stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Epic), 2.3f);
 	TestEqual(TEXT("Legendary stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Legendary), 3.2f);
+	TestEqual(TEXT("Mythic stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Mythic), 4.5f);
+	TestTrue(TEXT("Mythic stat multiplier exceeds Legendary"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Mythic) > FDropFormula::GetRarityStatMultiplier(EItemRarity::Legendary));
 
 	return true;
 }
@@ -105,18 +111,25 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FDropFormulaLevelRarityTrendTest::RunTest(const FString& Parameters)
 {
-	constexpr int32 SampleCount = 2000;
+	constexpr int32 SampleCount = 10000;
 	int32 LowRareOrBetter = 0;
 	int32 HighRareOrBetter = 0;
 	int32 HighEpicOrBetter = 0;
+	int32 LowMythic = 0;
+	int32 HighMythic = 0;
 
 	FRandomStream LowLevelRng(3601);
 	FRandomStream HighLevelRng(3601);
 	for (int32 Index = 0; Index < SampleCount; ++Index)
 	{
-		if (FDropFormula::RollRarityForLevel(1, LowLevelRng) >= EItemRarity::Rare)
+		const EItemRarity LowRarity = FDropFormula::RollRarityForLevel(1, LowLevelRng);
+		if (LowRarity >= EItemRarity::Rare)
 		{
 			++LowRareOrBetter;
+		}
+		if (LowRarity == EItemRarity::Mythic)
+		{
+			++LowMythic;
 		}
 
 		const EItemRarity HighRarity = FDropFormula::RollRarityForLevel(100, HighLevelRng);
@@ -128,11 +141,32 @@ bool FDropFormulaLevelRarityTrendTest::RunTest(const FString& Parameters)
 		{
 			++HighEpicOrBetter;
 		}
+		if (HighRarity == EItemRarity::Mythic)
+		{
+			++HighMythic;
+		}
 	}
 
 	TestTrue(TEXT("High-level drops roll Rare+ more often than low-level drops"), HighRareOrBetter > LowRareOrBetter);
 	TestTrue(TEXT("High-level drops can roll Epic+"), HighEpicOrBetter > 0);
+	TestEqual(TEXT("Level 1 drops never roll Mythic"), LowMythic, 0);
+	TestTrue(TEXT("Level 100 drops can roll Mythic"), HighMythic > 0);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FItemRarityMythicHudMappingTest,
+	"IdleProject.Inventory.Rarity.MythicHudMapping",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FItemRarityMythicHudMappingTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+	TestEqual(TEXT("Mythic rarity label is localized"), IdleProject::UI::RarityToLabel(EItemRarity::Mythic).ToString(), FString(TEXT("Mythic")));
+	TestEqual(TEXT("Mythic rarity color uses designer token"), IdleProject::UI::RarityToColor(EItemRarity::Mythic), IdleProject::UI::Theme::RarityMythicStart);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
@@ -164,6 +198,9 @@ bool FDropFormulaComputeItemBonusTest::RunTest(const FString& Parameters)
 	const FItemInstance RareArmor = FDropFormula::ComputeItemBonus(EItemSlot::Helmet, 10, EItemRarity::Rare, 2.0f);
 	TestEqual(TEXT("Rare armor defense uses float slot split"), RareArmor.BonusDef, 23.8f);
 	TestEqual(TEXT("Rare armor HP uses float slot split"), RareArmor.BonusHp, 102.0f);
+
+	const FItemInstance MythicWeapon = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, 10, EItemRarity::Mythic, 1.0f);
+	TestEqual(TEXT("Mythic weapon attack scales by level variance and rarity"), MythicWeapon.BonusAtk, 45.0f);
 
 	return true;
 }
@@ -215,6 +252,14 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Legendary roll is deterministic for speed"), LegendaryA.BonusAtkSpeed, LegendaryB.BonusAtkSpeed);
 	TestEqual(TEXT("Legendary roll is deterministic for magic"), LegendaryA.BonusMagicAtk, LegendaryB.BonusMagicAtk);
 
+	FItemInstance Mythic = MakeTestItem(TEXT("mythic_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 1.0f, 0.0f, 0.0f);
+	FRandomStream MythicRng(4004);
+	FDropFormula::RollAffixes(Mythic.Rarity, 20, MythicRng, Mythic);
+	TestEqual(TEXT("Mythic rolls all three affixes"), CountAffixes(Mythic), 3);
+	TestTrue(TEXT("Mythic crit affix stays in range"), Mythic.BonusCritRate >= 0.01f && Mythic.BonusCritRate <= 0.05f);
+	TestTrue(TEXT("Mythic attack speed affix stays in range"), Mythic.BonusAtkSpeed >= 0.05f && Mythic.BonusAtkSpeed <= 0.15f);
+	TestTrue(TEXT("Mythic magic attack affix scales by level"), Mythic.BonusMagicAtk >= 10.0f && Mythic.BonusMagicAtk <= 30.0f);
+
 	return true;
 }
 
@@ -246,6 +291,10 @@ bool FDropFormulaRollItemSetTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Rare+ rolls can produce Warrior"), bFoundWarrior);
 	TestTrue(TEXT("Rare+ rolls can produce Guardian"), bFoundGuardian);
 	TestTrue(TEXT("Rare+ rolls can produce Arcane"), bFoundArcane);
+
+	FRandomStream MythicRng(4303);
+	const EItemSet MythicSet = FDropFormula::RollItemSet(EItemRarity::Mythic, MythicRng);
+	TestTrue(TEXT("Mythic items roll an item set"), MythicSet >= EItemSet::Warrior && MythicSet <= EItemSet::Arcane);
 
 	return true;
 }
@@ -366,9 +415,11 @@ bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rare rarity quadruples enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Rare), static_cast<int64>(4));
 	TestEqual(TEXT("Epic rarity multiplies enhance cost by eight"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Epic), static_cast<int64>(8));
 	TestEqual(TEXT("Legendary rarity multiplies enhance cost by sixteen"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Legendary), static_cast<int64>(16));
+	TestEqual(TEXT("Mythic rarity multiplies enhance cost by thirty-two"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Mythic), static_cast<int64>(32));
 	TestEqual(TEXT("Common overload matches legacy single-argument cost"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Common), static_cast<int64>(400));
 	TestEqual(TEXT("Rare level 1 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Rare), static_cast<int64>(1600));
 	TestEqual(TEXT("Legendary level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Legendary), static_cast<int64>(1600));
+	TestEqual(TEXT("Mythic level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Mythic), static_cast<int64>(3200));
 	TestEqual(TEXT("Max level rarity cost remains zero"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel, EItemRarity::Legendary), static_cast<int64>(0));
 	TestEqual(TEXT("Uncommon level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Uncommon), static_cast<int64>(5000));
 	TestEqual(TEXT("Rare level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Rare), static_cast<int64>(10000));
@@ -721,7 +772,7 @@ bool FItemFactoryRandomDropRangeTest::RunTest(const FString& Parameters)
 	for (int32 Index = 0; Index < 100; ++Index)
 	{
 		const FItemInstance Drop = FItemFactory::RandomDropFromMonster(1);
-		TestTrue(TEXT("등급 범위"), Drop.Rarity >= EItemRarity::None && Drop.Rarity <= EItemRarity::Legendary);
+		TestTrue(TEXT("등급 범위"), Drop.Rarity >= EItemRarity::None && Drop.Rarity <= EItemRarity::Mythic);
 
 		if (Drop.Rarity == EItemRarity::None)
 		{
@@ -745,20 +796,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FItemFactoryHighLevelDropIncludesExpandedRarityTest::RunTest(const FString& Parameters)
 {
-	bool bFoundEpicOrLegendary = false;
-	for (int32 Index = 0; Index < 1000; ++Index)
+	bool bFoundEpicOrHigher = false;
+	for (int32 Index = 0; Index < 2000; ++Index)
 	{
 		const FItemInstance Drop = FItemFactory::RandomDropFromMonster(100);
 		if (Drop.Rarity >= EItemRarity::Epic)
 		{
-			bFoundEpicOrLegendary = true;
+			bFoundEpicOrHigher = true;
 			TestTrue(TEXT("Epic+ drop carries scaled stats"), FItemPowerScore::Compute(Drop) > 0);
 			TestAffixCountForRarity(*this, TEXT("High-level random drop"), Drop);
 			break;
 		}
 	}
 
-	TestTrue(TEXT("High-level monster drops can produce Epic or Legendary items"), bFoundEpicOrLegendary);
+	TestTrue(TEXT("High-level monster drops can produce Epic, Legendary, or Mythic items"), bFoundEpicOrHigher);
 
 	return true;
 }

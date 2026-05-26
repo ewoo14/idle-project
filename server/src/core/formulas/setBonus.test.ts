@@ -149,5 +149,6 @@ describe("set bonus formulas", () => {
     expect(rollItemSet("Rare", () => 0)).toBe("Warrior");
     expect(rollItemSet("Rare", () => 0.34)).toBe("Guardian");
     expect(rollItemSet("Rare", () => 0.67)).toBe("Arcane");
+    expect(rollItemSet("Mythic", () => 0.67)).toBe("Arcane");
   });
 });

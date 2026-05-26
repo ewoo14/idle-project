@@ -6,7 +6,8 @@ export type ItemRarity =
   | "Uncommon"
   | "Rare"
   | "Epic"
-  | "Legendary";
+  | "Legendary"
+  | "Mythic";
 
 export type DropRng = () => number;
 
@@ -34,6 +35,8 @@ export function getRarityStatMultiplier(rarity: ItemRarity): number {
       return toClientFloat(2.3);
     case "Legendary":
       return toClientFloat(3.2);
+    case "Mythic":
+      return toClientFloat(4.5);
     case "None":
       return toClientFloat(0);
   }
@@ -54,7 +57,8 @@ export function rollRarityForLevel(
     toClientFloat(0.08) + toClientFloat(toClientFloat(0.12) * levelScale),
   );
   const epicChance = toClientFloat(toClientFloat(0.06) * levelScale);
-  const legendaryChance = toClientFloat(toClientFloat(0.02) * levelScale);
+  const legendaryChance = toClientFloat(toClientFloat(0.015) * levelScale);
+  const mythicChance = toClientFloat(toClientFloat(0.005) * levelScale);
   const commonChance = toClientFloat(
     Math.max(
       0,
@@ -63,7 +67,7 @@ export function rollRarityForLevel(
           toClientFloat(toClientFloat(1 - noneChance) - uncommonChance) -
             rareChance,
         ) - epicChance,
-      ) - legendaryChance,
+      ) - legendaryChance - mythicChance,
     ),
   );
 
@@ -87,7 +91,11 @@ export function rollRarityForLevel(
   if (roll < epicThreshold) {
     return "Epic";
   }
-  return "Legendary";
+  const legendaryThreshold = toClientFloat(epicThreshold + legendaryChance);
+  if (roll < legendaryThreshold) {
+    return "Legendary";
+  }
+  return "Mythic";
 }
 
 export function computeItemBonus(
@@ -158,6 +166,8 @@ export function getAffixCount(
       return 2;
     case "Legendary":
       return rng() < 0.5 ? 2 : 3;
+    case "Mythic":
+      return 3;
     case "None":
     case "Common":
       return 0;

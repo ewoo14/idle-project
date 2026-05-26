@@ -15,6 +15,7 @@ describe("drop formulas", () => {
     expect(getRarityStatMultiplier("Rare")).toBe(Math.fround(1.7));
     expect(getRarityStatMultiplier("Epic")).toBe(Math.fround(2.3));
     expect(getRarityStatMultiplier("Legendary")).toBe(Math.fround(3.2));
+    expect(getRarityStatMultiplier("Mythic")).toBe(Math.fround(4.5));
   });
 
   it("rolls only None through Rare at level 1", () => {
@@ -38,6 +39,8 @@ describe("drop formulas", () => {
     expect(rollRarityForLevel(100, () => 0.920_001)).toBe("Epic");
     expect(rollRarityForLevel(100, () => 0.979_999)).toBe("Epic");
     expect(rollRarityForLevel(100, () => 0.980_001)).toBe("Legendary");
+    expect(rollRarityForLevel(100, () => 0.994_999)).toBe("Legendary");
+    expect(rollRarityForLevel(100, () => 0.995_001)).toBe("Mythic");
   });
 
   it("clamps level below 1 to the level 1 rarity table", () => {
@@ -107,6 +110,7 @@ describe("drop formulas", () => {
     expect(getAffixCount("Epic", () => 0.99)).toBe(2);
     expect(getAffixCount("Legendary", () => 0.49)).toBe(2);
     expect(getAffixCount("Legendary", () => 0.5)).toBe(3);
+    expect(getAffixCount("Mythic", () => 0.99)).toBe(3);
   });
 
   it("rolls no affixes for common equipment", () => {
@@ -144,6 +148,17 @@ describe("drop formulas", () => {
       bonusCritRate: 0.03,
       bonusAtkSpeed: 0.1,
       bonusMagicAtk: 20,
+    });
+  });
+
+  it("rolls all three affixes for Mythic equipment", () => {
+    const rolls = [0.5, 0, 0.99, 0.5, 0.5, 0.5];
+    const rng = () => rolls.shift() ?? 0;
+
+    expect(rollAffixes("Mythic", 20, rng)).toEqual({
+      bonusCritRate: 0.03,
+      bonusAtkSpeed: 0.1,
+      bonusMagicAtk: 30,
     });
   });
 

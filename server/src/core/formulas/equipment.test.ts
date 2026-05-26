@@ -264,7 +264,7 @@ describe("equipment formulas", () => {
 
   it("keeps slot and rarity values aligned to PR 9 enum ranges", () => {
     const slot: ItemSlot = 8;
-    const rarity: ItemRarity = 3;
+    const rarity: ItemRarity = 6;
     const typedItem = {
       ...rareWeapon,
       slot,
@@ -272,7 +272,7 @@ describe("equipment formulas", () => {
     } satisfies ItemInstance;
 
     expect(typedItem.slot).toBe(8);
-    expect(typedItem.rarity).toBe(3);
+    expect(typedItem.rarity).toBe(6);
   });
 
   it.each(

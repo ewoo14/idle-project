@@ -117,14 +117,16 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 ## PR #39 Balance Checklist Addendum (Section 4)
 
 - [ ] `FEnhanceFormula::GetRarityCostMultiplier` and the server mirror keep
-  None/Common/Uncommon/Rare/Epic/Legendary multipliers at 0/1/2/4/8/16.
+  None/Common/Uncommon/Rare/Epic/Legendary/Mythic multipliers at
+  0/1/2/4/8/16/32.
 - [ ] `TryEnhanceEquipped` spends the equipped item's rarity-scaled cost exactly
   once and preserves invalid-slot, empty-slot, max-level, and insufficient-gold
   guards.
 - [ ] The HUD enhancement panel displays rarity-scaled cost for each equipped
   slot while Common remains compatible with the PR #33 cost curve.
-- [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary +0 to +50 pressure
-  and the eight-slot Legendary expected cost against sampled Lv50 gold/hour.
+- [ ] `tools/balance-sim` reports Common/Rare/Epic/Legendary/Mythic +0 to +50
+  pressure and the eight-slot Legendary/Mythic expected cost against sampled
+  Lv50 gold/hour.
 
 ## PR #44 Design Checklist Addendum (Section 1)
 
@@ -153,6 +155,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `TryEnhanceEquipped` and the HUD use `FEnhanceFormula::MaxEnhanceLevel`
   rather than hard-coded 5-level assumptions.
 
+## PR #45 Character Checklist Addendum (Section 4)
+
+- [ ] `EItemRarity` preserves existing numeric values and appends
+  `Mythic = 6`.
+- [ ] Drop rarity thresholds keep level 1 Mythic at 0% and make level 100
+  Mythic available at 0.5%, with Common absorbing the residual probability.
+- [ ] Mythic uses stat multiplier 4.5, enhancement cost multiplier 32, three
+  affixes, and the same eligible item-set roll path as other non-common gear.
+- [ ] HUD/localization maps Mythic to `RARITY_MYTHIC` and
+  `Theme::RarityMythicStart`.
+- [ ] UE Automation and server Vitest cover Mythic stat, rarity, affix, set,
+  enhancement, HUD, localization, and Common-Legendary regression anchors.
+
 ## PR #42 Balance Checklist Addendum (Section 5)
 
 - [ ] `tools/balance-sim/reports/balance-sim-report.md` includes `Pet Feed
@@ -170,7 +185,7 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 
 - [ ] `FItemInstance` keeps affix defaults at zero for legacy item regression.
 - [ ] `FDropFormula::RollAffixes` uses injected `FRandomStream` and enforces
-  Common 0, Uncommon/Rare 1, Epic 2, Legendary 2-3 affixes.
+  Common 0, Uncommon/Rare 1, Epic 2, Legendary 2-3, Mythic 3 affixes.
 - [ ] `UInventoryComponent::ComputeEquipmentBonus` applies enhanced affix
   bonuses to CritRate, AtkSpeed, and MagicAtk.
 - [ ] `FItemPowerScore::Compute` includes CritRate, AtkSpeed, and MagicAtk
