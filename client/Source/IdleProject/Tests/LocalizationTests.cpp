@@ -24,6 +24,12 @@ bool FIdleLocalizationLookupTest::RunTest(const FString& Parameters)
 		IdleProject::Localization::UI(TEXT("HUD_GOLD_FORMAT"), GoldArgs).ToString(),
 		FString(TEXT("Gold 1,200")));
 
+	FFormatNamedArguments CombatPowerArgs;
+	CombatPowerArgs.Add(TEXT("Amount"), FText::FromString(TEXT("1,234,567")));
+	TestEqual(TEXT("English combat power label uses approved copy"),
+		IdleProject::Localization::UI(TEXT("HUD_COMBAT_POWER_FORMAT"), CombatPowerArgs).ToString(),
+		FString(TEXT("Combat Power 1,234,567")));
+
 	TestEqual(TEXT("English rarity lookup includes Legendary"),
 		IdleProject::Localization::UI(TEXT("RARITY_LEGENDARY")).ToString(),
 		FString(TEXT("Legendary")));

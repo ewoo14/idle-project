@@ -123,10 +123,12 @@ bool FStatInfoHudViewModelTest::RunTest(const FString& Parameters)
 		DerivedStats,
 		42,
 		EClassId::Mage,
-		3);
+		3,
+		1234567);
 
 	TestEqual(TEXT("Stat info title is localized"), ViewModel.Title.ToString(), FString(TEXT("Stat Info")));
 	TestEqual(TEXT("Header includes class, level, and rebirth count"), ViewModel.HeaderLabel.ToString(), FString(TEXT("Mage  Lv. 42  Rebirth 3")));
+	TestEqual(TEXT("Combat power label is localized with grouped digits"), ViewModel.CombatPowerLabel.ToString(), FString(TEXT("Combat Power 1,234,567")));
 	TestEqual(TEXT("Stat info exposes six primary rows"), ViewModel.PrimaryRows.Num(), 6);
 	TestEqual(TEXT("Primary INT maps to FPrimaryStats::Int_"), ViewModel.PrimaryRows[2].ValueLabel.ToString(), FString(TEXT("7")));
 	TestEqual(TEXT("Stat info exposes eleven derived rows"), ViewModel.DerivedRows.Num(), 11);

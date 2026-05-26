@@ -946,7 +946,7 @@ FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrima
 	return ViewModel;
 }
 
-FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount)
+FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower)
 {
 	FIdleHUDStatInfoViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("STAT_INFO_TITLE"));
@@ -958,6 +958,7 @@ FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimary
 		Args.Add(TEXT("Level"), FText::AsNumber(FMath::Max(1, Level)));
 		Args.Add(TEXT("Rebirth"), FText::AsNumber(FMath::Max(0, RebirthCount)));
 	});
+	ViewModel.CombatPowerLabel = FormatLocalizedUIWithInt64(TEXT("HUD_COMBAT_POWER_FORMAT"), TEXT("Amount"), FMath::Max<int64>(0, CombatPower));
 
 	const EPrimaryStat StatOrder[] = {
 		EPrimaryStat::Str,
@@ -2529,7 +2530,8 @@ void AIdleHUD::DrawStatInfoPanel()
 		IdleCharacter->GetCurrentDerivedStats(),
 		IdleCharacter->GetCurrentLevel(),
 		IdleCharacter->GetClassId(),
-		IdleGameInstance->GetRebirthCount());
+		IdleGameInstance->GetRebirthCount(),
+		IdleCharacter->GetCombatPower());
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float ToggleX = Canvas->SizeX - 392.0f * Scale;
@@ -2542,7 +2544,7 @@ void AIdleHUD::DrawStatInfoPanel()
 	}
 
 	const float PanelWidth = 364.0f * Scale;
-	const float HeaderHeight = 62.0f * Scale;
+	const float HeaderHeight = 84.0f * Scale;
 	const float RowHeight = 25.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
@@ -2562,6 +2564,7 @@ void AIdleHUD::DrawStatInfoPanel()
 
 	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
 	DrawText(ViewModel.HeaderLabel.ToString(), Theme::TextMuted, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 60.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 
 	float RowY = Y + HeaderHeight;
 	for (int32 Index = 0; Index < RowCount; ++Index)

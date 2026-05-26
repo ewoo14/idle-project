@@ -2,6 +2,7 @@ Namespace,Key,SourceString,Comment
 UI,HUD_HP_FORMAT,"HP {Current} / {Max}","HUD 체력"
 UI,HUD_EXP_FORMAT,"EXP {Current} / {Next}","HUD 경험치"
 UI,HUD_GOLD_FORMAT,"골드 {Amount}","HUD 골드"
+UI,HUD_COMBAT_POWER_FORMAT,"전투력 {Amount}","HUD 전투력"
 UI,HUD_LEVEL_FORMAT,"Lv. {Level}","HUD 레벨"
 UI,HUD_NO_WEAPON,"⚔ 무기 없음","장비 HUD"
 UI,HUD_WEAPON_FORMAT,"⚔ {Name} ({Rarity}, ATK+{Attack})","장비 HUD"
