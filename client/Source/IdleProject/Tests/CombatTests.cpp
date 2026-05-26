@@ -1189,6 +1189,61 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterTranscendNeutralStatsTest,
+	"IdleProject.Character.Stats.TranscendNeutralMultiplier",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterTranscendNeutralStatsTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+
+	const FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1);
+	FDerivedStats ExpectedDerived = FStatFormulas::DeriveStats(ExpectedPrimary, 1);
+	const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	if (Skills)
+	{
+		Skills->ApplyPassivesToStats(ExpectedDerived);
+	}
+	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
+
+	TestEqual(TEXT("Transcend count zero keeps HP unchanged"), CurrentDerived.Hp, ExpectedDerived.Hp);
+	TestEqual(TEXT("Transcend count zero keeps physical attack unchanged"), CurrentDerived.PhysAtk, ExpectedDerived.PhysAtk);
+	TestEqual(TEXT("Transcend count zero keeps magic attack unchanged"), CurrentDerived.MagicAtk, ExpectedDerived.MagicAtk);
+	TestEqual(TEXT("Transcend count zero keeps physical defense unchanged"), CurrentDerived.PhysDef, ExpectedDerived.PhysDef);
+	TestEqual(TEXT("Transcend count zero keeps magic defense unchanged"), CurrentDerived.MagicDef, ExpectedDerived.MagicDef);
+	TestEqual(TEXT("Cached derived stats expose neutral multiplier result"), Character->GetCurrentDerivedStats().Hp, CurrentDerived.Hp);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleCharacterTranscendDerivedStatsTest,
 	"IdleProject.Character.Stats.TranscendMultiplier",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

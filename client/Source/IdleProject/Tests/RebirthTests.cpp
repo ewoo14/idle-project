@@ -55,10 +55,11 @@ bool FTranscendFormulaTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Zero transcend count keeps neutral multiplier"), FTranscendFormula::GetTranscendStatMultiplier(0), 1.0f);
 	TestEqual(TEXT("One transcend adds twenty five percent"), FTranscendFormula::GetTranscendStatMultiplier(1), 1.25f);
 	TestEqual(TEXT("Four transcends double combat stats"), FTranscendFormula::GetTranscendStatMultiplier(4), 2.0f);
+	TestEqual(TEXT("Ten transcends keep the infinite linear multiplier"), FTranscendFormula::GetTranscendStatMultiplier(10), 3.5f);
 	TestEqual(TEXT("Negative transcend count clamps to neutral multiplier"), FTranscendFormula::GetTranscendStatMultiplier(-1), 1.0f);
 	TestFalse(TEXT("Four rebirths cannot transcend"), FTranscendFormula::CanTranscend(4));
 	TestTrue(TEXT("Five rebirths can transcend"), FTranscendFormula::CanTranscend(5));
-	TestTrue(TEXT("Higher rebirth counts can transcend"), FTranscendFormula::CanTranscend(9));
+	TestTrue(TEXT("Six rebirths can transcend"), FTranscendFormula::CanTranscend(6));
 
 	return true;
 }
@@ -137,6 +138,9 @@ bool FIdleGameInstanceTranscendGateAndPreviewTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Fresh game has neutral transcend multiplier"), GameInstance->GetTranscendStatMultiplier(), 1.0f);
 	TestEqual(TEXT("Preview shows the next transcend multiplier"), GameInstance->PreviewTranscendMultiplier(), 1.25f);
 	TestFalse(TEXT("Transcend returns false before threshold"), GameInstance->Transcend());
+	TestEqual(TEXT("Failed transcend keeps transcend count unchanged"), GameInstance->GetTranscendCount(), static_cast<int32>(0));
+	TestEqual(TEXT("Failed transcend keeps level unchanged"), GameInstance->GetCharacterLevel(), static_cast<int32>(1));
+	TestEqual(TEXT("Failed transcend keeps gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
 
 	TestTrue(TEXT("Test setup performs four rebirths"), PerformRebirths(*GameInstance, 4));
 	TestFalse(TEXT("Four rebirths still cannot transcend"), GameInstance->CanTranscend());
