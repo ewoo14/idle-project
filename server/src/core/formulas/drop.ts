@@ -12,6 +12,15 @@ export type DropRng = () => number;
 
 const ARMOR_SLOTS = new Set<ItemSlot>([2, 3, 4, 5, 6, 7]);
 const toClientFloat = Math.fround;
+const AFFIX_KINDS = ["CritRate", "AtkSpeed", "MagicAtk"] as const;
+
+type AffixKind = (typeof AFFIX_KINDS)[number];
+
+export interface AffixBonus {
+  bonusCritRate: number;
+  bonusAtkSpeed: number;
+  bonusMagicAtk: number;
+}
 
 export function getRarityStatMultiplier(rarity: ItemRarity): number {
   switch (rarity) {
@@ -99,6 +108,9 @@ export function computeItemBonus(
       bonusAtk: baseBonus,
       bonusDef: 0,
       bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     };
   }
 
@@ -107,6 +119,9 @@ export function computeItemBonus(
       bonusAtk: toClientFloat(baseBonus * toClientFloat(0.5)),
       bonusDef: toClientFloat(baseBonus * toClientFloat(0.3)),
       bonusHp: toClientFloat(baseBonus * toClientFloat(2)),
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     };
   }
 
@@ -115,6 +130,9 @@ export function computeItemBonus(
       bonusAtk: 0,
       bonusDef: toClientFloat(baseBonus * toClientFloat(0.7)),
       bonusHp: toClientFloat(baseBonus * toClientFloat(3)),
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     };
   }
 
@@ -122,5 +140,86 @@ export function computeItemBonus(
     bonusAtk: 0,
     bonusDef: 0,
     bonusHp: 0,
+    critRate: 0,
+    atkSpeed: 0,
+    magicAtk: 0,
   };
+}
+
+export function getAffixCount(
+  rarity: ItemRarity,
+  rng: DropRng = Math.random,
+): number {
+  switch (rarity) {
+    case "Uncommon":
+    case "Rare":
+      return 1;
+    case "Epic":
+      return 2;
+    case "Legendary":
+      return rng() < 0.5 ? 2 : 3;
+    case "None":
+    case "Common":
+      return 0;
+  }
+}
+
+function randRangeInt(min: number, max: number, rng: DropRng): number {
+  const roll = Math.floor(rng() * (max - min + 1)) + min;
+
+  return Math.min(Math.max(roll, min), max);
+}
+
+function randRangeFloat(min: number, max: number, rng: DropRng): number {
+  return toClientFloat(
+    toClientFloat(min) + toClientFloat(toClientFloat(max - min) * rng()),
+  );
+}
+
+function shuffleAffixKinds(rng: DropRng): AffixKind[] {
+  const kinds = [...AFFIX_KINDS];
+  for (let index = kinds.length - 1; index > 0; index -= 1) {
+    const swapIndex = randRangeInt(0, index, rng);
+    [kinds[index], kinds[swapIndex]] = [kinds[swapIndex], kinds[index]];
+  }
+
+  return kinds;
+}
+
+export function rollAffixes(
+  rarity: ItemRarity,
+  level: number,
+  rng: DropRng = Math.random,
+): AffixBonus {
+  const affixes: AffixBonus = {
+    bonusCritRate: 0,
+    bonusAtkSpeed: 0,
+    bonusMagicAtk: 0,
+  };
+  const affixCount = getAffixCount(rarity, rng);
+  if (affixCount <= 0) {
+    return affixes;
+  }
+
+  const safeLevel = Math.max(level, 1);
+  const affixKinds = shuffleAffixKinds(rng);
+  for (const affixKind of affixKinds.slice(0, affixCount)) {
+    switch (affixKind) {
+      case "CritRate":
+        affixes.bonusCritRate =
+          Math.round(randRangeFloat(0.01, 0.05, rng) * 1000) / 1000;
+        break;
+      case "AtkSpeed":
+        affixes.bonusAtkSpeed =
+          Math.round(randRangeFloat(0.05, 0.15, rng) * 1000) / 1000;
+        break;
+      case "MagicAtk":
+        affixes.bonusMagicAtk = Math.round(
+          toClientFloat(safeLevel) * randRangeFloat(0.5, 1.5, rng),
+        );
+        break;
+    }
+  }
+
+  return affixes;
 }

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   computeItemBonus,
+  getAffixCount,
   getRarityStatMultiplier,
+  rollAffixes,
   rollRarityForLevel,
 } from "./drop.js";
 
@@ -47,16 +49,25 @@ describe("drop formulas", () => {
       bonusAtk: 34,
       bonusDef: 0,
       bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
     expect(computeItemBonus(2, 10, "Rare", 2)).toEqual({
       bonusAtk: 0,
       bonusDef: Math.fround(Math.fround(34) * Math.fround(0.7)),
       bonusHp: 102,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
     expect(computeItemBonus(8, 10, "Rare", 2)).toEqual({
       bonusAtk: 17,
       bonusDef: Math.fround(Math.fround(34) * Math.fround(0.3)),
       bonusHp: 68,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
   });
 
@@ -74,11 +85,57 @@ describe("drop formulas", () => {
       bonusAtk: 1,
       bonusDef: 0,
       bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
     });
     expect(computeItemBonus(1, 10, "Legendary", -1)).toEqual({
       bonusAtk: 0,
       bonusDef: 0,
       bonusHp: 0,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+    });
+  });
+
+  it("gets affix count by rarity with deterministic legendary branching", () => {
+    expect(getAffixCount("None", () => 0.99)).toBe(0);
+    expect(getAffixCount("Common", () => 0.99)).toBe(0);
+    expect(getAffixCount("Uncommon", () => 0.99)).toBe(1);
+    expect(getAffixCount("Rare", () => 0.99)).toBe(1);
+    expect(getAffixCount("Epic", () => 0.99)).toBe(2);
+    expect(getAffixCount("Legendary", () => 0.49)).toBe(2);
+    expect(getAffixCount("Legendary", () => 0.5)).toBe(3);
+  });
+
+  it("rolls no affixes for common equipment", () => {
+    expect(rollAffixes("Common", 20, () => 0.99)).toEqual({
+      bonusCritRate: 0,
+      bonusAtkSpeed: 0,
+      bonusMagicAtk: 0,
+    });
+  });
+
+  it("rolls unique deterministic affixes with client ranges and rounding", () => {
+    const rolls = [0.5, 0, 0.99, 0.5, 0.5, 0.5];
+    const rng = () => rolls.shift() ?? 0;
+
+    expect(rollAffixes("Legendary", 20, rng)).toEqual({
+      bonusCritRate: 0.03,
+      bonusAtkSpeed: 0.1,
+      bonusMagicAtk: 20,
+    });
+  });
+
+  it("clamps affix level below one before magic attack scaling", () => {
+    const rolls = [0, 0.99, 0.5];
+    const rng = () => rolls.shift() ?? 0;
+
+    expect(rollAffixes("Uncommon", 0, rng)).toEqual({
+      bonusCritRate: 0,
+      bonusAtkSpeed: 0,
+      bonusMagicAtk: 1,
     });
   });
 });
