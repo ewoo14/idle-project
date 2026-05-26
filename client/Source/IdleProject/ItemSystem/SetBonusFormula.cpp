@@ -14,7 +14,14 @@ void AddBonus(FDerivedStats& Target, const FDerivedStats& Source)
 	Target.CritDmg += Source.CritDmg;
 }
 
-FDerivedStats GetTwoPieceBonus(EItemSet ItemSet)
+}
+
+int32 FSetBonusFormula::GetSetPieceThreshold(int32 TierIndex)
+{
+	return TierIndex <= 0 ? 2 : 4;
+}
+
+FDerivedStats FSetBonusFormula::GetTwoPieceBonus(EItemSet ItemSet)
 {
 	FDerivedStats Bonus;
 	switch (ItemSet)
@@ -36,7 +43,7 @@ FDerivedStats GetTwoPieceBonus(EItemSet ItemSet)
 	return Bonus;
 }
 
-FDerivedStats GetFourPieceBonus(EItemSet ItemSet)
+FDerivedStats FSetBonusFormula::GetFourPieceBonus(EItemSet ItemSet)
 {
 	FDerivedStats Bonus;
 	switch (ItemSet)
@@ -59,12 +66,6 @@ FDerivedStats GetFourPieceBonus(EItemSet ItemSet)
 	}
 	return Bonus;
 }
-}
-
-int32 FSetBonusFormula::GetSetPieceThreshold(int32 TierIndex)
-{
-	return TierIndex <= 0 ? 2 : 4;
-}
 
 FDerivedStats FSetBonusFormula::ComputeSetBonus(const TArray<FItemInstance>& EquippedItems)
 {
@@ -83,11 +84,11 @@ FDerivedStats FSetBonusFormula::ComputeSetBonus(const TArray<FItemInstance>& Equ
 	{
 		if (Pair.Value >= GetSetPieceThreshold(0))
 		{
-			AddBonus(TotalBonus, GetTwoPieceBonus(Pair.Key));
+			AddBonus(TotalBonus, FSetBonusFormula::GetTwoPieceBonus(Pair.Key));
 		}
 		if (Pair.Value >= GetSetPieceThreshold(1))
 		{
-			AddBonus(TotalBonus, GetFourPieceBonus(Pair.Key));
+			AddBonus(TotalBonus, FSetBonusFormula::GetFourPieceBonus(Pair.Key));
 		}
 	}
 

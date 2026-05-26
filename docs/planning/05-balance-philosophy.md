@@ -877,6 +877,62 @@ CritRate / AtkSpeed / MagicAtk order, using localized labels such as
 `Crit +3% / ASPD +0.10 / MATK +12`. Prefix/suffix names, reroll currencies,
 potential lines, set effects, and additional affix types remain follow-up scope.
 
+## PR #43 Equipment Sets V1
+
+Equipment sets add flat bonuses after per-item equipment bonuses and before the
+final `DeriveStats` clamp path. Set membership never changes
+`FItemPowerScore::Compute` or `computeItemPowerScore`; automatic equip still
+compares item-level PowerScore only.
+
+Set pieces are counted only when the equipped item has a non-None slot,
+non-None rarity, and one of the three V1 sets. A 4-piece set includes both the
+2-piece and 4-piece rows:
+
+| Set | 2-piece bonus | Additional 4-piece bonus | 4-piece total |
+| --- | --- | --- | --- |
+| Warrior | PhysAtk +20 | PhysAtk +50, CritRate +0.05 | PhysAtk +70, CritRate +0.05 |
+| Guardian | PhysDef +15, HP +100 | PhysDef +35, HP +250 | PhysDef +50, HP +350 |
+| Arcane | MagicAtk +20 | MagicAtk +50, CritDmg +0.10 | MagicAtk +70, CritDmg +0.10 |
+
+Current set assignment is intentionally simple and mirrors client/server
+behavior:
+
+| Rarity | Set assignment |
+| --- | --- |
+| None | None |
+| Common | None |
+| Uncommon | Warrior, Guardian, or Arcane |
+| Rare | Warrior, Guardian, or Arcane |
+| Epic | Warrior, Guardian, or Arcane |
+| Legendary | Warrior, Guardian, or Arcane |
+
+Eligible rarities pick one of the three V1 sets with the injected RNG. This
+creates a clear early rule: Common equipment preserves legacy behavior, while
+Uncommon and above can contribute to set goals without changing stat rolls,
+affixes, enhancement cost, or PowerScore.
+
+Build impact is intentionally moderate. Warrior and Arcane push attack lanes
+with small crit modifiers at 4 pieces, while Guardian converts set completion
+into survival. Because these are flat values, late-game scaling can eventually
+make the 2/4-piece reward feel too small; if telemetry shows set completion is
+ignored after higher level bands, the follow-up should evaluate percentage
+bonuses or class-specific set families rather than inflating every flat value.
+
+V1 auto-equip does not optimize for set completion. A lower-PowerScore item that
+would complete a 2-piece or 4-piece set will not replace a higher-PowerScore
+item automatically. Manual set targeting, set-aware compare UI, and optional
+set-weighted auto-equip remain follow-up scope.
+
+Automation coverage:
+
+- `IdleProject.Inventory.DropFormula.RollItemSet`
+- `IdleProject.Inventory.SetBonusFormula.DefinitionParity`
+- `IdleProject.Inventory.SetBonusFormula.Thresholds`
+- `IdleProject.Inventory.Bonus.SetBonus`
+- `IdleProject.UI.HUD.EquipmentSetSummary`
+- `server/src/core/formulas/setBonus.test.ts`
+- `server/src/core/formulas/equipment.test.ts`
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:

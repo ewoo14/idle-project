@@ -251,6 +251,43 @@ bool FDropFormulaRollItemSetTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSetBonusFormulaDefinitionParityTest,
+	"IdleProject.Inventory.SetBonusFormula.DefinitionParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSetBonusFormulaDefinitionParityTest::RunTest(const FString& Parameters)
+{
+	const FDerivedStats WarriorTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Warrior);
+	TestEqual(TEXT("Warrior 2-piece attack matches server"), WarriorTwoPiece.PhysAtk, 20.0f);
+	TestEqual(TEXT("Warrior 2-piece crit remains zero"), WarriorTwoPiece.CritRate, 0.0f);
+
+	const FDerivedStats WarriorFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Warrior);
+	TestEqual(TEXT("Warrior 4-piece adds attack"), WarriorFourPiece.PhysAtk, 50.0f);
+	TestEqual(TEXT("Warrior 4-piece adds crit"), WarriorFourPiece.CritRate, 0.05f);
+
+	const FDerivedStats GuardianTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Guardian);
+	TestEqual(TEXT("Guardian 2-piece defense matches server"), GuardianTwoPiece.PhysDef, 15.0f);
+	TestEqual(TEXT("Guardian 2-piece HP matches server"), GuardianTwoPiece.Hp, 100.0f);
+
+	const FDerivedStats GuardianFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Guardian);
+	TestEqual(TEXT("Guardian 4-piece defense matches server"), GuardianFourPiece.PhysDef, 35.0f);
+	TestEqual(TEXT("Guardian 4-piece HP matches server"), GuardianFourPiece.Hp, 250.0f);
+
+	const FDerivedStats ArcaneTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Arcane);
+	TestEqual(TEXT("Arcane 2-piece magic attack matches server"), ArcaneTwoPiece.MagicAtk, 20.0f);
+
+	const FDerivedStats ArcaneFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Arcane);
+	TestEqual(TEXT("Arcane 4-piece magic attack matches server"), ArcaneFourPiece.MagicAtk, 50.0f);
+	TestEqual(TEXT("Arcane 4-piece crit damage matches server"), ArcaneFourPiece.CritDmg, 0.10f);
+
+	const FDerivedStats NoneBonus = FSetBonusFormula::GetTwoPieceBonus(EItemSet::None);
+	TestEqual(TEXT("None set has no two-piece attack"), NoneBonus.PhysAtk, 0.0f);
+	TestEqual(TEXT("None set has no two-piece HP"), NoneBonus.Hp, 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSetBonusFormulaThresholdsTest,
 	"IdleProject.Inventory.SetBonusFormula.Thresholds",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
