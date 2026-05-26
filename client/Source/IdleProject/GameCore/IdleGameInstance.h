@@ -38,7 +38,29 @@ struct IDLEPROJECT_API FEnhanceAttemptResult
 	int32 NewLevel = INDEX_NONE;
 };
 
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FShopPurchaseResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Shop")
+	bool bPurchased = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Shop")
+	int64 GoldSpent = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Shop")
+	EItemRarity Rarity = EItemRarity::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Shop")
+	EItemSlot Slot = EItemSlot::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Shop")
+	FText ItemName;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnhanceResult, const FEnhanceAttemptResult&, Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnShopPurchase, const FShopPurchaseResult&, Result);
 
 /**
  * 게임 전역 서비스 컨테이너입니다.
@@ -84,6 +106,11 @@ public:
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot);
 
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, UInventoryComponent* Inventory);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	FShopPurchaseResult TryBuyGearRoll();
+
+	FShopPurchaseResult TryBuyGearRoll(UInventoryComponent* Inventory);
 
 	void SetEnhanceRandomSeed(int32 Seed);
 
@@ -213,6 +240,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Enhance")
 	FOnEnhanceResult OnEnhanceResult;
+
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Shop")
+	FOnShopPurchase OnShopPurchase;
 
 private:
 	UPROPERTY(Transient)

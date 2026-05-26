@@ -730,6 +730,44 @@ remains inside the 3-20h review band. No EXP curve change is applied in this
 slice. Keep BossBonus at 8x and re-run `npm run balance:sim` after enhancement
 spend or Chapter 2 reward data changes.
 
+## PR #38 Gold Shop Sink V1
+
+Gold shop gear rolls reuse the PR #32 stage reward multiplier:
+
+```text
+GearRollCost = max(1, round(300 * RewardMultiplier(globalStageIndex)))
+RewardMultiplier(globalStageIndex) = 1 + globalStageIndex * 0.15
+```
+
+This keeps the shop cost curve on the same progression axis as kill gold and
+monster stats. The V1 shop does not change kill rewards or enhancement costs;
+it adds a repeatable gold-to-gear outlet that can feed the existing
+drop-to-enhance loop.
+
+Representative costs:
+
+| Stage | idx | Reward x | Roll cost |
+| --- | ---: | ---: | ---: |
+| 1-1 | 0 | 1.00 | 300 |
+| 1-5 | 4 | 1.60 | 480 |
+| 2-5 | 9 | 2.35 | 705 |
+
+Pressure check against PR #33:
+
+- Enhancement remains a light single-item sink: expected +0 to +5 cost is
+  11,020.66 gold, or 0.017h at the sampled median Lv50 blended income of
+  654,689 gold/hour.
+- At that same sampled income, the V1 shop can absorb about 2,182 rolls/hour
+  at idx 0, 1,364 rolls/hour at idx 4, or 929 rolls/hour at idx 9 if the player
+  repeatedly buys gear.
+- A single roll is therefore not a hard endgame cap. The shop becomes the main
+  gold sink because it is repeatable and directly converts surplus gold into
+  more equipment comparison and enhancement candidates.
+- Keep the base cost at 300 for this slice to avoid blocking early gear
+  recovery. If telemetry shows excess rolling or continued gold hoarding,
+  raise `BaseCost` in both `FShopFormula` and the server `shop.ts` mirror, then
+  update parity tests in the same change.
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:

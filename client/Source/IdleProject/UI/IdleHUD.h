@@ -218,6 +218,23 @@ struct IDLEPROJECT_API FIdleHUDEnhancePanelViewModel
 	TArray<FIdleHUDEnhanceSlotViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
+{
+	FText Title;
+	FText GoldLabel;
+	FText CostLabel;
+	FText ButtonLabel;
+	FText StatusLabel;
+	FText LastResultLabel;
+	FName GearRollHitBoxName;
+	EItemRarity LastResultRarity = EItemRarity::None;
+	int64 GearRollCost = 0;
+	int64 Gold = 0;
+	bool bCanBuyGearRoll = false;
+	bool bHasLastResult = false;
+	bool bLastResultError = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDStatRowViewModel
 {
 	EPrimaryStat Stat = EPrimaryStat::Str;
@@ -260,6 +277,7 @@ IDLEPROJECT_API FIdleHUDBossViewModel BuildBossViewModel(float CurrentHp, float 
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
+IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 }
 
@@ -300,6 +318,9 @@ protected:
 	void HandleEnhanceResult(const FEnhanceAttemptResult& Result);
 
 	UFUNCTION()
+	void HandleShopPurchase(const FShopPurchaseResult& Result);
+
+	UFUNCTION()
 	void HandleStatPointsChanged();
 
 	UFUNCTION()
@@ -332,6 +353,8 @@ private:
 	void DrawStageIndicator();
 	void DrawBossBar();
 	void DrawBossSpecialWarning(float Now);
+	void DrawShopPanel();
+	void TryBuyGearRoll();
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
@@ -373,6 +396,7 @@ private:
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;
 	FText EnhanceFeedbackLabel;
 	bool bEnhanceFeedbackSuccess = false;
+	FShopPurchaseResult LastShopPurchaseResult;
 	TArray<FIdleHUDFloatingDamageEntry> FloatingDamageEntries;
 	FDelegateHandle AnyDamageReceivedHandle;
 	TWeakObjectPtr<UBattleAIComponent> BoundBossBattleAI;

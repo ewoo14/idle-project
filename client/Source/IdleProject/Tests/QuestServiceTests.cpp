@@ -5,6 +5,7 @@
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemTypes.h"
+#include "ItemSystem/ShopFormula.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -21,6 +22,66 @@ FItemInstance MakeEnhanceTestItem(FName ItemId, EItemSlot Slot, int32 EnhanceLev
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceGearRollPurchaseTest,
+	"IdleProject.GameCore.IdleGameInstance.GearRollPurchase",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceGearRollPurchaseTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+
+	const int64 Cost = FShopFormula::GetGearRollCost(0);
+
+	const FShopPurchaseResult MissingInventory = GameInstance->TryBuyGearRoll(nullptr);
+	TestFalse(TEXT("Missing inventory does not purchase"), MissingInventory.bPurchased);
+	TestEqual(TEXT("Missing inventory spends nothing"), MissingInventory.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Missing inventory leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	GameInstance->AddGold(Cost - 1);
+	const FShopPurchaseResult NoGold = GameInstance->TryBuyGearRoll(Inventory);
+	TestFalse(TEXT("Insufficient gold does not purchase"), NoGold.bPurchased);
+	TestEqual(TEXT("Insufficient gold spends nothing"), NoGold.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Insufficient gold keeps balance"), GameInstance->GetGold(), Cost - 1);
+	TestEqual(TEXT("Insufficient gold adds no item"), Inventory->GetItemCount(), 0);
+
+	GameInstance->AddGold(1);
+	const FShopPurchaseResult Success = GameInstance->TryBuyGearRoll(Inventory);
+	TestTrue(TEXT("Enough gold purchases a gear roll"), Success.bPurchased);
+	TestEqual(TEXT("Purchase spends exactly one roll cost"), Success.GoldSpent, Cost);
+	TestEqual(TEXT("Purchase deducts gold once"), GameInstance->GetGold(), static_cast<int64>(0));
+	TestEqual(TEXT("Purchase adds one item"), Inventory->GetItemCount(), 1);
+	TestTrue(TEXT("Purchase returns guaranteed rarity"), Success.Rarity >= EItemRarity::Common);
+	TestTrue(TEXT("Purchase returns equipment slot"), Success.Slot >= EItemSlot::Weapon && Success.Slot <= EItemSlot::Accessory);
+	TestFalse(TEXT("Purchase returns item name"), Success.ItemName.IsEmpty());
+
+	const FItemInstance* Equipped = Inventory->GetEquippedItem(Success.Slot);
+	TestNotNull(TEXT("Purchased item is present through auto equip"), Equipped);
+	if (Equipped)
+	{
+		TestEqual(TEXT("Result rarity matches inventory item"), Equipped->Rarity, Success.Rarity);
+		TestEqual(TEXT("Result name matches inventory item"), Equipped->DisplayName.ToString(), Success.ItemName.ToString());
+	}
+
+	UIdleGameInstance* FullInventoryGameInstance = NewObject<UIdleGameInstance>();
+	UInventoryComponent* FullInventory = NewObject<UInventoryComponent>();
+	for (int32 Index = 0; Index < 100; ++Index)
+	{
+		const FName ItemId(*FString::Printf(TEXT("full_inventory_sword_%d"), Index));
+		TestTrue(TEXT("Full inventory setup accepts item"), FullInventory->AddItem(MakeEnhanceTestItem(ItemId, EItemSlot::Weapon)));
+	}
+
+	FullInventoryGameInstance->AddGold(Cost);
+	const FShopPurchaseResult FullInventoryResult = FullInventoryGameInstance->TryBuyGearRoll(FullInventory);
+	TestFalse(TEXT("Full inventory does not purchase"), FullInventoryResult.bPurchased);
+	TestEqual(TEXT("Full inventory spends nothing"), FullInventoryResult.GoldSpent, static_cast<int64>(0));
+	TestEqual(TEXT("Full inventory keeps gold balance"), FullInventoryGameInstance->GetGold(), Cost);
+	TestEqual(TEXT("Full inventory does not add item"), FullInventory->GetItemCount(), 100);
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

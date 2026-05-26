@@ -4,6 +4,7 @@
 #include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "UI/IdleHUD.h"
 
@@ -24,6 +25,22 @@ FItemInstance MakeTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, flo
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FShopFormulaGearRollCostTest,
+	"IdleProject.Inventory.ShopFormula.GearRollCost",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopFormulaGearRollCostTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Negative stage uses stage zero cost"), FShopFormula::GetGearRollCost(-10), static_cast<int64>(300));
+	TestEqual(TEXT("Stage zero cost"), FShopFormula::GetGearRollCost(0), static_cast<int64>(300));
+	TestEqual(TEXT("Stage one cost rounds 300 * 1.15"), FShopFormula::GetGearRollCost(1), static_cast<int64>(345));
+	TestEqual(TEXT("Stage five cost rounds 300 * 1.75"), FShopFormula::GetGearRollCost(5), static_cast<int64>(525));
+	TestTrue(TEXT("Gear roll cost increases with stage"), FShopFormula::GetGearRollCost(10) > FShopFormula::GetGearRollCost(1));
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -246,6 +263,42 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FShopPanelViewModelStateTest,
+	"IdleProject.UI.HUD.ShopPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopPanelViewModelStateTest::RunTest(const FString& Parameters)
+{
+	FShopPurchaseResult PurchaseResult;
+	PurchaseResult.bPurchased = true;
+	PurchaseResult.GoldSpent = 300;
+	PurchaseResult.Rarity = EItemRarity::Rare;
+	PurchaseResult.Slot = EItemSlot::Weapon;
+	PurchaseResult.ItemName = FText::FromString(TEXT("rare_sword"));
+
+	const FIdleHUDShopPanelViewModel Ready = IdleProject::UI::BuildShopPanelViewModel(300, 450, PurchaseResult);
+	TestEqual(TEXT("Shop panel exposes gear roll cost"), Ready.GearRollCost, static_cast<int64>(300));
+	TestTrue(TEXT("Shop panel enables purchase when gold is enough"), Ready.bCanBuyGearRoll);
+	TestEqual(TEXT("Shop gear roll hitbox is stable"), Ready.GearRollHitBoxName, FName(TEXT("ShopGearRoll")));
+	TestEqual(TEXT("Shop result carries purchased rarity"), Ready.LastResultRarity, EItemRarity::Rare);
+	TestTrue(TEXT("Shop result is visible after purchase"), Ready.bHasLastResult);
+	TestFalse(TEXT("Shop result is not an error after purchase"), Ready.bLastResultError);
+
+	const FIdleHUDShopPanelViewModel NoGold = IdleProject::UI::BuildShopPanelViewModel(300, 250, FShopPurchaseResult());
+	TestFalse(TEXT("Shop panel disables purchase when gold is short"), NoGold.bCanBuyGearRoll);
+	TestFalse(TEXT("Empty shop result is hidden"), NoGold.bHasLastResult);
+
+	FShopPurchaseResult FailedResult;
+	FailedResult.bPurchased = false;
+	FailedResult.GoldSpent = 300;
+	const FIdleHUDShopPanelViewModel Failed = IdleProject::UI::BuildShopPanelViewModel(300, 250, FailedResult);
+	TestTrue(TEXT("Failed purchase result is visible when a cost was attempted"), Failed.bHasLastResult);
+	TestTrue(TEXT("Failed purchase result is flagged as an error"), Failed.bLastResultError);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FInventoryEquipmentBonusTwoSlotsTest,
 	"IdleProject.Inventory.Bonus.TwoSlots",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -280,6 +333,29 @@ bool FInventoryUnequipReducesBonusTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("무기 공격력 유지"), Bonus.PhysAtk, 12.0f);
 	TestEqual(TEXT("투구 방어력 제거"), Bonus.PhysDef, 0.0f);
 	TestEqual(TEXT("투구 체력 제거"), Bonus.Hp, 0.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FItemFactoryGuaranteedDropForLevelTest,
+	"IdleProject.Inventory.ItemFactory.GuaranteedDropForLevel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FItemFactoryGuaranteedDropForLevelTest::RunTest(const FString& Parameters)
+{
+	for (int32 Index = 0; Index < 100; ++Index)
+	{
+		const FItemInstance Drop = FItemFactory::GuaranteedDropForLevel(1);
+		TestTrue(TEXT("Guaranteed drop never returns None rarity"), Drop.Rarity >= EItemRarity::Common);
+		TestTrue(TEXT("Guaranteed drop has an equipment slot"), Drop.Slot >= EItemSlot::Weapon && Drop.Slot <= EItemSlot::Accessory);
+		TestTrue(TEXT("Guaranteed drop has stats"), FItemPowerScore::Compute(Drop) > 0);
+	}
+
+	const FItemInstance LowLevelDrop = FItemFactory::GuaranteedDropForLevel(-20);
+	const FItemInstance HighLevelDrop = FItemFactory::GuaranteedDropForLevel(20);
+	TestTrue(TEXT("Guaranteed drop clamps invalid levels to playable stats"), FItemPowerScore::Compute(LowLevelDrop) > 0);
+	TestTrue(TEXT("Guaranteed drop level affects item stats"), FItemPowerScore::Compute(HighLevelDrop) > FItemPowerScore::Compute(LowLevelDrop));
 
 	return true;
 }
