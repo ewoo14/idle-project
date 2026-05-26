@@ -202,6 +202,56 @@ bool FStageServiceBossCompletionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageServiceManualBossCompletionTest,
+	"IdleProject.GameCore.StageService.ManualBossCompletion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageServiceManualBossCompletionTest::RunTest(const FString& Parameters)
+{
+	UStageService* Stages = NewObject<UStageService>();
+	Stages->InitializeDefaultStages();
+	UStageEventTestReceiver* Receiver = NewObject<UStageEventTestReceiver>();
+	Stages->OnChapterBossDefeated.AddDynamic(Receiver, &UStageEventTestReceiver::CaptureChapterBossDefeated);
+
+	while (Stages->GetCurrentStage() < 5)
+	{
+		Stages->RecordKill(false);
+	}
+
+	Stages->MarkCurrentChapterBossDefeated();
+
+	TestEqual(TEXT("Manual chapter one boss completion advances to chapter two"), Stages->GetCurrentChapter(), 2);
+	TestEqual(TEXT("Manual chapter one boss completion starts chapter two stage one"), Stages->GetCurrentStage(), 1);
+	TestEqual(TEXT("Manual chapter one boss completion resets progress"), Stages->GetKillsThisStage(), 0);
+	TestEqual(TEXT("Manual chapter one boss completion records highest cleared chapter"), Stages->GetHighestClearedChapter(), 1);
+	TestEqual(TEXT("Manual chapter one boss completion broadcasts once"), Receiver->Count, 1);
+	TestEqual(TEXT("Manual chapter one boss completion reports chapter one"), Receiver->LastClearedChapter, 1);
+
+	Stages->MarkCurrentChapterBossDefeated();
+	TestEqual(TEXT("Manual completion is idempotent on non-boss chapter two start"), Receiver->Count, 1);
+	TestEqual(TEXT("Idempotent manual completion remains on chapter two stage one"), Stages->GetCurrentStage(), 1);
+
+	while (Stages->GetCurrentStage() < 5)
+	{
+		Stages->RecordKill(false);
+	}
+
+	Stages->MarkCurrentChapterBossDefeated();
+
+	TestEqual(TEXT("Manual final boss completion stays on final chapter"), Stages->GetCurrentChapter(), 2);
+	TestEqual(TEXT("Manual final boss completion stays on final stage"), Stages->GetCurrentStage(), 5);
+	TestEqual(TEXT("Manual final boss completion retains target progress"), Stages->GetKillsThisStage(), 1);
+	TestEqual(TEXT("Manual final boss completion records final chapter"), Stages->GetHighestClearedChapter(), 2);
+	TestEqual(TEXT("Manual final boss completion broadcasts second clear"), Receiver->Count, 2);
+	TestEqual(TEXT("Manual final boss completion reports chapter two"), Receiver->LastClearedChapter, 2);
+
+	Stages->MarkCurrentChapterBossDefeated();
+	TestEqual(TEXT("Manual final completion is idempotent"), Receiver->Count, 2);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleGameInstanceStageServiceHooksTest,
 	"IdleProject.GameCore.IdleGameInstance.StageServiceHooks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -41,7 +41,13 @@ void UStageService::AdvanceStage()
 		return;
 	}
 
-	if (HasClearedChapterBoss(CurrentChapter))
+	MarkCurrentChapterBossDefeated();
+}
+
+void UStageService::MarkCurrentChapterBossDefeated()
+{
+	if (!FStageFormula::IsBossStage(CurrentChapter, CurrentStage, StagesPerChapter)
+		|| HasClearedChapterBoss(CurrentChapter))
 	{
 		return;
 	}
@@ -50,9 +56,9 @@ void UStageService::AdvanceStage()
 	HighestClearedChapter = FMath::Max(HighestClearedChapter, ClearedChapter);
 	OnChapterBossDefeated.Broadcast(ClearedChapter);
 
-	if (CurrentChapter < TotalChapters)
+	if (ClearedChapter < TotalChapters)
 	{
-		++CurrentChapter;
+		CurrentChapter = ClearedChapter + 1;
 		CurrentStage = 1;
 		KillsThisStage = 0;
 	}
@@ -62,23 +68,6 @@ void UStageService::AdvanceStage()
 		KillsThisStage = GetKillsToAdvance();
 	}
 
-	OnStageChanged.Broadcast(GetCurrentStageInfo());
-}
-
-void UStageService::MarkCurrentChapterBossDefeated()
-{
-	if (HasClearedChapterBoss(CurrentChapter))
-	{
-		return;
-	}
-
-	HighestClearedChapter = FMath::Max(HighestClearedChapter, CurrentChapter);
-	if (CurrentChapter >= TotalChapters)
-	{
-		bFinalChapterCleared = true;
-	}
-	KillsThisStage = GetKillsToAdvance();
-	OnChapterBossDefeated.Broadcast(CurrentChapter);
 	OnStageChanged.Broadcast(GetCurrentStageInfo());
 }
 
