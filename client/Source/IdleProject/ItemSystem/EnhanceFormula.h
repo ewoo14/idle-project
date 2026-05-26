@@ -5,7 +5,7 @@
 
 struct IDLEPROJECT_API FEnhanceFormula
 {
-	static constexpr int32 MaxEnhanceLevel = 5;
+	static constexpr int32 MaxEnhanceLevel = 50;
 
 	static int64 GetEnhanceCost(int32 CurrentLevel);
 	static int64 GetEnhanceCost(int32 CurrentLevel, EItemRarity Rarity);

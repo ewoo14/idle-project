@@ -3,13 +3,9 @@
 namespace
 {
 constexpr int64 BaseEnhanceCost = 100;
-constexpr float EnhanceSuccessRates[FEnhanceFormula::MaxEnhanceLevel] = {
-	0.95f,
-	0.85f,
-	0.70f,
-	0.55f,
-	0.40f
-};
+constexpr float MaxEnhanceSuccessRate = 0.95f;
+constexpr float MinEnhanceSuccessRate = 0.05f;
+constexpr float EnhanceSuccessRateDecayPerLevel = 0.018f;
 }
 
 int64 FEnhanceFormula::GetEnhanceCost(int32 CurrentLevel)
@@ -57,7 +53,10 @@ float FEnhanceFormula::GetEnhanceSuccessRate(int32 CurrentLevel)
 	}
 
 	const int32 ClampedLevel = FMath::Clamp(CurrentLevel, 0, MaxEnhanceLevel - 1);
-	return EnhanceSuccessRates[ClampedLevel];
+	return FMath::Clamp(
+		MaxEnhanceSuccessRate - static_cast<float>(ClampedLevel) * EnhanceSuccessRateDecayPerLevel,
+		MinEnhanceSuccessRate,
+		MaxEnhanceSuccessRate);
 }
 
 bool FEnhanceFormula::RollEnhanceSuccess(float SuccessRate, FRandomStream& Stream)

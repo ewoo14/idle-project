@@ -92,32 +92,40 @@ describe("balance simulator", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);
 
-    expect(report.json.model.enhancementPressure.maxLevel).toBe(5);
-    expect(report.json.model.enhancementPressure.goldCostFloorToMax).toBe(5500);
+    expect(report.json.model.enhancementPressure.maxLevel).toBe(50);
+    expect(report.json.model.enhancementPressure.goldCostFloorToMax).toBe(
+      4292500,
+    );
     expect(
       report.json.model.enhancementPressure.expectedGoldCostToMax,
-    ).toBeCloseTo(11020.66, 2);
+    ).toBeCloseTo(22717602.46, 2);
     expect(
-      report.json.model.enhancementPressure.rows.map((row) => ({
+      report.json.model.enhancementPressure.rows.slice(0, 5).map((row) => ({
         currentLevel: row.currentLevel,
         cost: row.cost,
-        successRate: row.successRate,
+        successRate: Number(row.successRate.toFixed(3)),
       })),
     ).toEqual([
       { currentLevel: 0, cost: 100, successRate: 0.95 },
-      { currentLevel: 1, cost: 400, successRate: 0.85 },
-      { currentLevel: 2, cost: 900, successRate: 0.7 },
-      { currentLevel: 3, cost: 1600, successRate: 0.55 },
-      { currentLevel: 4, cost: 2500, successRate: 0.4 },
+      { currentLevel: 1, cost: 400, successRate: 0.932 },
+      { currentLevel: 2, cost: 900, successRate: 0.914 },
+      { currentLevel: 3, cost: 1600, successRate: 0.896 },
+      { currentLevel: 4, cost: 2500, successRate: 0.878 },
     ]);
+    expect(report.json.model.enhancementPressure.rows.at(-1)).toEqual(
+      expect.objectContaining({
+        currentLevel: 49,
+        nextLevel: 50,
+        cost: 250000,
+      }),
+    );
     expect(
       report.json.model.enhancementPressure.expectedHoursAtMedianGoldPerHour,
     ).toBeGreaterThan(0);
     expect(report.markdown).toContain("## Enhancement Spend Pressure");
-    expect(report.markdown).toContain("Expected +0 to +5 gold cost");
-    expect(report.markdown).toContain("11020.66");
+    expect(report.markdown).toContain("Expected +0 to +50 gold cost");
     expect(report.markdown).toContain(
-      "V1 enhancement is a light early sink, not a Lv50 progression blocker",
+      "V1 enhancement is a long-tail gold sink for infinite growth",
     );
   });
 
@@ -136,44 +144,44 @@ describe("balance simulator", () => {
       {
         rarity: "Common",
         multiplier: 1,
-        expectedGoldCostToMax: 11020.66,
-        expectedHoursAtMedianGoldPerHour: 0.017,
+        expectedGoldCostToMax: 22717602.46,
+        expectedHoursAtMedianGoldPerHour: 34.7,
       },
       {
         rarity: "Rare",
         multiplier: 4,
-        expectedGoldCostToMax: 44082.63,
-        expectedHoursAtMedianGoldPerHour: 0.067,
+        expectedGoldCostToMax: 90870409.85,
+        expectedHoursAtMedianGoldPerHour: 138.799,
       },
       {
         rarity: "Epic",
         multiplier: 8,
-        expectedGoldCostToMax: 88165.25,
-        expectedHoursAtMedianGoldPerHour: 0.135,
+        expectedGoldCostToMax: 181740819.7,
+        expectedHoursAtMedianGoldPerHour: 277.599,
       },
       {
         rarity: "Legendary",
         multiplier: 16,
-        expectedGoldCostToMax: 176330.51,
-        expectedHoursAtMedianGoldPerHour: 0.269,
+        expectedGoldCostToMax: 363481639.4,
+        expectedHoursAtMedianGoldPerHour: 555.197,
       },
     ]);
     expect(
       report.json.model.enhancementPressure.legendaryEightSlotExpectedGoldCost,
-    ).toBeCloseTo(1410644.08, 2);
+    ).toBeCloseTo(2907853115.2, 2);
     expect(
       report.json.model.enhancementPressure
         .legendaryEightSlotExpectedHoursAtMedianGoldPerHour,
-    ).toBe(2.155);
+    ).toBe(4441.579);
     expect(report.markdown).toContain("## Rarity Enhancement Pressure");
     expect(report.markdown).toContain(
-      "| Legendary | 16 | 88000 | 176330.51 | 0.269h |",
+      "| Legendary | 16 | 68680000 | 363481639.4 | 555.197h |",
     );
     expect(report.markdown).toContain(
-      "Eight Legendary slots: 1,410,644.08 expected gold",
+      "Eight Legendary slots: 2,907,853,115.20 expected gold",
     );
     expect(report.markdown).toContain(
-      "2.155h at sampled median Lv50 gold/hour",
+      "4441.579h at sampled median Lv50 gold/hour",
     );
   });
 

@@ -76,7 +76,7 @@ struct IDLEPROJECT_API FItemInstance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	float BonusMagicAtk = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item", meta = (ClampMin = "0", ClampMax = "5"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item", meta = (ClampMin = "0", ClampMax = "50"))
 	int32 EnhanceLevel = 0;
 };
 

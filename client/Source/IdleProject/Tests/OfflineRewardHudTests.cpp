@@ -154,11 +154,11 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Equipped weapon row is visible as equipped"), WeaponRow.bEquipped);
 	TestEqual(TEXT("Weapon row rarity label is localized"), WeaponRow.RarityLabel.ToString(), FString(TEXT("Rare")));
 	TestEqual(TEXT("Weapon row rarity color uses rare theme"), WeaponRow.RarityColor, IdleProject::UI::Theme::RarityRare);
-	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / +5")));
+	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / 50")));
 	TestEqual(TEXT("Weapon next cost follows rarity-scaled formula"), WeaponRow.Cost, static_cast<int64>(3600));
 	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 3,600")));
-	TestEqual(TEXT("Weapon success rate follows formula"), WeaponRow.SuccessRate, 0.70f);
-	TestEqual(TEXT("Weapon success label is localized"), WeaponRow.SuccessRateLabel.ToString(), FString(TEXT("Success 70%")));
+	TestEqual(TEXT("Weapon success rate follows formula"), WeaponRow.SuccessRate, FEnhanceFormula::GetEnhanceSuccessRate(2));
+	TestEqual(TEXT("Weapon success label is localized"), WeaponRow.SuccessRateLabel.ToString(), FString(TEXT("Success 91%")));
 	TestTrue(TEXT("Enough gold and below max enables enhance"), WeaponRow.bCanEnhance);
 	TestEqual(TEXT("Enabled button uses enhance copy"), WeaponRow.ButtonLabel.ToString(), FString(TEXT("Enhance")));
 

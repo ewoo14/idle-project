@@ -845,10 +845,10 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 			Args.Add(TEXT("MaxLevel"), FText::AsNumber(FEnhanceFormula::MaxEnhanceLevel));
 		});
 		Row.CostLabel = Row.bMaxLevel
-			? IdleProject::Localization::UI(TEXT("NONE_DASH"))
+			? IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_MAX"))
 			: FormatLocalizedUIWithInt64(TEXT("ENHANCE_COST_FORMAT"), TEXT("Cost"), Row.Cost);
 		Row.SuccessRateLabel = Row.bMaxLevel
-			? IdleProject::Localization::UI(TEXT("NONE_DASH"))
+			? IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_MAX"))
 			: FormatPercentLabel(TEXT("ENHANCE_SUCCESS_FORMAT"), Row.SuccessRate);
 
 		if (Row.bMaxLevel)
