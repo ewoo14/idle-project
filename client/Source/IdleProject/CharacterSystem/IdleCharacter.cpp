@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimInstance.h"
+#include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/FacialExpressionComponent.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "CharacterSystem/IdleAnimInstance.h"
@@ -237,6 +238,11 @@ FPrimaryStats AIdleCharacter::GetCurrentPrimaryStats() const
 FDerivedStats AIdleCharacter::GetCurrentDerivedStats() const
 {
 	return CachedDerivedStats;
+}
+
+int64 AIdleCharacter::GetCombatPower() const
+{
+	return FCombatPowerFormula::ComputeCombatPower(GetCurrentDerivedStats());
 }
 
 int32 AIdleCharacter::GetCurrentLevel() const

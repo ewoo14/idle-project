@@ -2,6 +2,7 @@ Namespace,Key,SourceString,Comment
 UI,HUD_HP_FORMAT,"HP {Current} / {Max}","HUD health"
 UI,HUD_EXP_FORMAT,"EXP {Current} / {Next}","HUD experience"
 UI,HUD_GOLD_FORMAT,"Gold {Amount}","HUD gold"
+UI,HUD_COMBAT_POWER_FORMAT,"Combat Power {Amount}","HUD combat power"
 UI,HUD_LEVEL_FORMAT,"Lv. {Level}","HUD level"
 UI,HUD_NO_WEAPON,"⚔ No weapon","Equipment HUD"
 UI,HUD_WEAPON_FORMAT,"⚔ {Name} ({Rarity}, ATK+{Attack})","Equipment HUD"

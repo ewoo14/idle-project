@@ -52,6 +52,9 @@ public:
 	FDerivedStats GetCurrentDerivedStats() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
+	int64 GetCombatPower() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Stats")
 	int32 GetCurrentLevel() const;
 
 	UFUNCTION()

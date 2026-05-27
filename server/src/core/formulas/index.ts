@@ -1,5 +1,6 @@
 export * from "./bossPhase.js";
 export * from "./combat.js";
+export * from "./combatPower.js";
 export {
   computeItemBonus,
   getRarityStatMultiplier,
