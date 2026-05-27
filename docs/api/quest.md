@@ -9,11 +9,17 @@ All endpoints require `Authorization: Bearer <accessToken>`.
 - Quest definitions live in `server/src/core/data/quests.ts`.
 - Main quests unlock when their `prerequisiteQuestId` has been claimed.
 - Daily quests reset lazily on first quest read or write after the UTC date changes.
+- Weekly quests reset lazily on first quest read or write after the UTC ISO week changes.
 - Rewards are server-authoritative and update `characters.gold` and `characters.total_exp`.
+- Quest types are `main`, `daily`, and `weekly`.
+- Objective ids are `kill_monster`, `clear_map`, `claim_offline`, `enhance`,
+  `defeat_boss`, `rebirth`, `transcend`, `climb_tower`, `reach_level`,
+  `spend_gold`, `roll_gear_shop`, and `feed_pet`.
 
 ## GET `/`
 
-Returns active quests for a character. Locked main quests are omitted.
+Returns active quests for a character. Locked main quests are omitted. Daily
+and weekly quests are always active in their current reset window.
 
 ```bash
 curl "http://localhost:3000/v1/quests?characterId=$CHARACTER_ID" \
@@ -43,6 +49,10 @@ curl -X POST "http://localhost:3000/v1/quests/main_ch1_001/claim" \
 ```
 
 Response includes the claimed quest state, updated character totals, and newly unlocked main quest IDs.
+
+Quest objects include `dailyResetDate` for daily quests and `weeklyResetId`
+for weekly quests. Non-matching quest types return `null` for those reset
+fields.
 
 Errors:
 

@@ -107,6 +107,7 @@ export const questProgress = pgTable(
     completed: boolean("completed").notNull().default(false),
     claimed: boolean("claimed").notNull().default(false),
     dailyResetDate: date("daily_reset_date"),
+    weeklyResetId: varchar("weekly_reset_id", { length: 8 }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (table) => ({
@@ -118,6 +119,9 @@ export const questProgress = pgTable(
     ),
     questProgressDailyReset: index("quest_progress_daily_reset_idx").on(
       table.dailyResetDate,
+    ),
+    questProgressWeeklyReset: index("quest_progress_weekly_reset_idx").on(
+      table.weeklyResetId,
     ),
   }),
 );

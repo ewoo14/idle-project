@@ -12,14 +12,28 @@ const questProgressResponse = {
     "completed",
     "claimed",
     "dailyResetDate",
+    "weeklyResetId",
   ],
   properties: {
     questId: { type: "string" },
-    type: { type: "string", enum: ["main", "daily"] },
+    type: { type: "string", enum: ["main", "daily", "weekly"] },
     title: { type: "string" },
     objective: {
       type: "string",
-      enum: ["kill_monster", "clear_map", "claim_offline", "enhance"],
+      enum: [
+        "kill_monster",
+        "clear_map",
+        "claim_offline",
+        "enhance",
+        "defeat_boss",
+        "rebirth",
+        "transcend",
+        "climb_tower",
+        "reach_level",
+        "spend_gold",
+        "roll_gear_shop",
+        "feed_pet",
+      ],
     },
     targetCount: { type: "integer", minimum: 1 },
     rewardGold: { type: "integer", minimum: 0 },
@@ -30,6 +44,7 @@ const questProgressResponse = {
     completed: { type: "boolean" },
     claimed: { type: "boolean" },
     dailyResetDate: { anyOf: [{ type: "string" }, { type: "null" }] },
+    weeklyResetId: { anyOf: [{ type: "string" }, { type: "null" }] },
   },
 } as const;
 
@@ -50,10 +65,11 @@ export const questListSchema = {
         ok: { type: "boolean" },
         data: {
           type: "object",
-          required: ["quests", "dailyResetDate"],
+          required: ["quests", "dailyResetDate", "weeklyResetId"],
           properties: {
             quests: { type: "array", items: questProgressResponse },
             dailyResetDate: { type: "string" },
+            weeklyResetId: { type: "string" },
           },
         },
       },

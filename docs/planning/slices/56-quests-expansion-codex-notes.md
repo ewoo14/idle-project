@@ -1,4 +1,4 @@
-# PR #56 Codex Notes - Character
+# PR #56 Codex Notes - Character + Backend
 
 ## Scope
 
@@ -29,5 +29,22 @@
 - Weekly reset ids use `YYYY-WNN` from UTC week calculation. Existing v2 saves
   without `QuestWeeklyResetId` restore with the week derived from the saved
   daily reset date.
-- Server quest parity was left to the backend slice; this character pass keeps
-  the implementation in client C++ and localization assets.
+
+## Backend Scope
+
+- Mirrored the client quest definition table in
+  `server/src/core/data/quests.ts`: 12 main quests, 7 daily quests, and 4
+  weekly quests.
+- Expanded server quest type and objective enums to include `weekly` plus
+  boss, rebirth, transcend, tower, level, gold spend, gear shop roll, and pet
+  feed objective ids.
+- Added lazy weekly reset support with `weekly_reset_id` persistence and
+  rollback migration `0007_quest_weekly_reset`.
+- Updated quest API docs to expose weekly reset semantics and the expanded
+  objective ids.
+
+## Backend Verification
+
+- `server/src/modules/quest/quest.service.test.ts` covers server definition
+  parity, schema enum expansion, daily and weekly reset windows, and expanded
+  objective progress for weekly quests.
