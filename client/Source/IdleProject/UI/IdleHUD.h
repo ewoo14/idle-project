@@ -319,12 +319,16 @@ struct IDLEPROJECT_API FIdleHUDTowerViewModel
 	FText HighestFloorLabel;
 	FText NextRequiredPowerLabel;
 	FText CombatPowerLabel;
+	FText MilestoneMultiplierLabel;
+	FText NextMilestoneLabel;
 	FText StatusLabel;
 	FText ButtonLabel;
 	FName ClimbHitBoxName;
 	int32 HighestFloor = 0;
+	int32 NextMilestoneFloor = 0;
 	int64 NextRequiredPower = 0;
 	int64 CombatPower = 0;
+	float MilestoneMultiplier = 1.0f;
 	bool bCanClimb = false;
 };
 
@@ -353,7 +357,7 @@ IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const U
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
-IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower);
+IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
 }
 

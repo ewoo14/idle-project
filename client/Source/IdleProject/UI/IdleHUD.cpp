@@ -13,6 +13,7 @@
 #include "EngineUtils.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/PetLevelFormula.h"
+#include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
@@ -1002,12 +1003,16 @@ FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimary
 	return ViewModel;
 }
 
-FIdleHUDTowerViewModel IdleProject::UI::BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower)
+FIdleHUDTowerViewModel IdleProject::UI::BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier)
 {
 	FIdleHUDTowerViewModel ViewModel;
 	ViewModel.HighestFloor = FMath::Max(0, HighestFloor);
+	ViewModel.NextMilestoneFloor = ((ViewModel.HighestFloor / FTowerMilestoneFormula::MilestoneStep) + 1) * FTowerMilestoneFormula::MilestoneStep;
 	ViewModel.NextRequiredPower = FMath::Max<int64>(0, NextRequiredPower);
 	ViewModel.CombatPower = FMath::Max<int64>(0, CombatPower);
+	ViewModel.MilestoneMultiplier = MilestoneMultiplier >= 0.0f
+		? MilestoneMultiplier
+		: FTowerMilestoneFormula::GetTowerMilestoneMultiplier(ViewModel.HighestFloor);
 	ViewModel.bCanClimb = ViewModel.NextRequiredPower > 0 && ViewModel.CombatPower >= ViewModel.NextRequiredPower;
 	ViewModel.ClimbHitBoxName = TowerClimbHitBoxName;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("TOWER_PANEL_TITLE"));
@@ -1020,6 +1025,14 @@ FIdleHUDTowerViewModel IdleProject::UI::BuildTowerViewModel(int32 HighestFloor, 
 		Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(ViewModel.NextRequiredPower)));
 	});
 	ViewModel.CombatPowerLabel = FormatLocalizedUIWithInt64(TEXT("HUD_COMBAT_POWER_FORMAT"), TEXT("Amount"), ViewModel.CombatPower);
+	ViewModel.MilestoneMultiplierLabel = FormatLocalizedUI(TEXT("TOWER_MILESTONE_MULTIPLIER_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Multiplier"), FormatMultiplierLabel(ViewModel.MilestoneMultiplier));
+	});
+	ViewModel.NextMilestoneLabel = FormatLocalizedUI(TEXT("TOWER_NEXT_MILESTONE_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Floor"), FText::AsNumber(ViewModel.NextMilestoneFloor));
+	});
 	ViewModel.StatusLabel = IdleProject::Localization::UI(ViewModel.bCanClimb ? TEXT("TOWER_STATUS_READY") : TEXT("TOWER_STATUS_NEED_CP"));
 	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("TOWER_CLIMB_BUTTON"));
 	return ViewModel;
@@ -3195,7 +3208,8 @@ void AIdleHUD::DrawTowerPanel()
 	const FIdleHUDTowerViewModel ViewModel = BuildTowerViewModel(
 		TowerService->GetHighestFloor(),
 		TowerService->GetNextFloorRequiredPower(),
-		IdleCharacter->GetCombatPower());
+		IdleCharacter->GetCombatPower(),
+		TowerService->GetMilestoneMultiplier());
 
 	const UWorld* World = GetWorld();
 	const float FeedbackElapsed = World ? World->GetTimeSeconds() - TowerFeedbackStartTime : 0.0f;
@@ -3204,7 +3218,7 @@ void AIdleHUD::DrawTowerPanel()
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
 	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
-	const float PanelHeight = 150.0f * Scale + FeedbackHeight;
+	const float PanelHeight = 198.0f * Scale + FeedbackHeight;
 	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
 	const float Y = 214.0f * Scale;
 	const float Padding = 14.0f * Scale;
@@ -3222,11 +3236,13 @@ void AIdleHUD::DrawTowerPanel()
 	DrawText(ViewModel.HighestFloorLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
 	DrawText(ViewModel.NextRequiredPowerLabel.ToString(), ViewModel.bCanClimb ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 76.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 102.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.MilestoneMultiplierLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 128.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(ViewModel.NextMilestoneLabel.ToString(), Theme::TextMuted, X + Padding, Y + 152.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
 
 	const float ButtonWidth = 94.0f * Scale;
 	const float ButtonHeight = 32.0f * Scale;
 	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
-	const float ButtonY = Y + 94.0f * Scale;
+	const float ButtonY = Y + 142.0f * Scale;
 	DrawRect(ViewModel.bCanClimb ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
 	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanClimb ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 24.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 	if (ViewModel.bCanClimb)
@@ -3236,7 +3252,7 @@ void AIdleHUD::DrawTowerPanel()
 
 	if (bShowFeedback)
 	{
-		DrawText(TowerFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, Y + 140.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+		DrawText(TowerFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, Y + 188.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
 	}
 	RefreshMouseInteraction();
 }
