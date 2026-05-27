@@ -5,7 +5,7 @@
  * - critDmg base 1.5 는 1.5x, 즉 +50% critical damage 표준값이다.
  * - accuracy base 0.75 는 PR #2 임시 초안 기준이며 M2 시뮬레이터로 보정 예정이다.
  */
-export type ClassId = 1 | 2 | 3 | 4 | 5;
+export type ClassId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export interface PrimaryStats {
   str: number;
@@ -84,6 +84,32 @@ const CLASS_GROWTH: Record<ClassId, ClassGrowth> = {
       con: 0.45,
       luk: 0.3,
     },
+  },
+  6: {
+    initialBonus: { str: 10, dex: 4, int: 3, wis: 5, con: 12, luk: 2 },
+    levelBonus: {
+      str: 1.2,
+      dex: 0.35,
+      int: 0.2,
+      wis: 0.6,
+      con: 1.65,
+      luk: 0.2,
+    },
+  },
+  7: {
+    initialBonus: { str: 13, dex: 5, int: 1, wis: 1, con: 6, luk: 6 },
+    levelBonus: {
+      str: 1.8,
+      dex: 0.55,
+      int: 0.1,
+      wis: 0.1,
+      con: 0.7,
+      luk: 0.65,
+    },
+  },
+  8: {
+    initialBonus: { str: 2, dex: 4, int: 12, wis: 10, con: 4, luk: 3 },
+    levelBonus: { str: 0.15, dex: 0.3, int: 1.7, wis: 1.3, con: 0.3, luk: 0.3 },
   },
 };
 

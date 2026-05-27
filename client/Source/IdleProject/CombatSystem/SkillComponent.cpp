@@ -28,6 +28,18 @@ const FName PurifyId(TEXT("purify"));
 const FName WisdomTrainingId(TEXT("wisdom_training"));
 const FName DivineVitalityId(TEXT("divine_vitality"));
 const FName SanctuaryId(TEXT("sanctuary"));
+const FName GuardianAegisId(TEXT("guardian_aegis"));
+const FName SacredOathId(TEXT("sacred_oath"));
+const FName BulwarkTrainingId(TEXT("bulwark_training"));
+const FName DivineBastionId(TEXT("divine_bastion"));
+const FName FrenzyStanceId(TEXT("frenzy_stance"));
+const FName BloodFrenzyId(TEXT("blood_frenzy"));
+const FName PainToPowerId(TEXT("pain_to_power"));
+const FName BerserkApexId(TEXT("berserk_apex"));
+const FName ArcaneBindingId(TEXT("arcane_binding"));
+const FName PactMasteryId(TEXT("pact_mastery"));
+const FName SpiritReservoirId(TEXT("spirit_reservoir"));
+const FName GrandFamiliarId(TEXT("grand_familiar"));
 
 FSkillDefinition MakeSkill(
 	const TCHAR* SkillId,
@@ -136,6 +148,45 @@ void USkillComponent::LoadDefaultClericSkills()
 	Skills.Add(MakeSkill(TEXT("sanctuary"), EClassId::Cleric, TEXT("Sanctuary"), ESkillType::Ultimate, ESkillEffectType::Heal, 0.0f, 0.0f, 0.4f, 0.0f, 6.0f, 6.0f));
 }
 
+void USkillComponent::LoadDefaultPaladinSkills()
+{
+	ResetSkillState();
+
+	Skills.Add(MakeSkill(TEXT("holy_verdict"), EClassId::Paladin, TEXT("Holy Verdict"), ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.3f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
+	Skills.Add(MakeSkill(TEXT("radiant_sweep"), EClassId::Paladin, TEXT("Radiant Sweep"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
+	Skills.Add(MakeSkill(TEXT("guardian_aegis"), EClassId::Paladin, TEXT("Guardian Aegis"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.45f, 5.0f, 0.0f, 2.0f));
+	Skills.Add(MakeSkill(TEXT("lay_on_hands"), EClassId::Paladin, TEXT("Lay on Hands"), ESkillType::Active, ESkillEffectType::Heal, 10.0f, 0.0f, 0.18f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("sacred_oath"), EClassId::Paladin, TEXT("Sacred Oath"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("bulwark_training"), EClassId::Paladin, TEXT("Bulwark Training"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("divine_bastion"), EClassId::Paladin, TEXT("Divine Bastion"), ESkillType::Ultimate, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.35f, 5.0f, 5.0f, 8.0f));
+}
+
+void USkillComponent::LoadDefaultBerserkerSkills()
+{
+	ResetSkillState();
+
+	Skills.Add(MakeSkill(TEXT("rage_cleave"), EClassId::Berserker, TEXT("Rage Cleave"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.8f, 0.0f, 0.0f, 2.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("blood_surge"), EClassId::Berserker, TEXT("Blood Surge"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.9f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire));
+	Skills.Add(MakeSkill(TEXT("frenzy_stance"), EClassId::Berserker, TEXT("Frenzy Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 11.0f, 0.0f, 0.3f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("savage_leap"), EClassId::Berserker, TEXT("Savage Leap"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.4f, 0.0f, 0.0f, 2.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("blood_frenzy"), EClassId::Berserker, TEXT("Blood Frenzy"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("pain_to_power"), EClassId::Berserker, TEXT("Pain to Power"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.08f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("berserk_apex"), EClassId::Berserker, TEXT("Berserk Apex"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.5f, 0.35f, 4.0f, 12.0f, 2.0f));
+}
+
+void USkillComponent::LoadDefaultSummonerSkills()
+{
+	ResetSkillState();
+
+	Skills.Add(MakeSkill(TEXT("spirit_bolt"), EClassId::Summoner, TEXT("Spirit Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.2f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("familiar_swarm"), EClassId::Summoner, TEXT("Familiar Swarm"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.6f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("arcane_binding"), EClassId::Summoner, TEXT("Arcane Binding"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.3f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice));
+	Skills.Add(MakeSkill(TEXT("pact_mastery"), EClassId::Summoner, TEXT("Pact Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("spirit_reservoir"), EClassId::Summoner, TEXT("Spirit Reservoir"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("grand_familiar"), EClassId::Summoner, TEXT("Grand Familiar"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning));
+}
+
 void USkillComponent::LoadSkillsForClass(EClassId ClassId)
 {
 	switch (ClassId)
@@ -151,6 +202,15 @@ void USkillComponent::LoadSkillsForClass(EClassId ClassId)
 		break;
 	case EClassId::Cleric:
 		LoadDefaultClericSkills();
+		break;
+	case EClassId::Paladin:
+		LoadDefaultPaladinSkills();
+		break;
+	case EClassId::Berserker:
+		LoadDefaultBerserkerSkills();
+		break;
+	case EClassId::Summoner:
+		LoadDefaultSummonerSkills();
 		break;
 	case EClassId::Warrior:
 	default:
@@ -394,6 +454,30 @@ void USkillComponent::ApplyPassivesToStats(FDerivedStats& InOutStats) const
 	{
 		InOutStats.Hp = FMath::RoundToFloat(InOutStats.Hp * 1.2f);
 	}
+	if (FindSkill(SacredOathId))
+	{
+		InOutStats.Hp = FMath::RoundToFloat(InOutStats.Hp * 1.15f);
+	}
+	if (FindSkill(BulwarkTrainingId))
+	{
+		InOutStats.PhysDef = FMath::RoundToFloat(InOutStats.PhysDef * 1.15f);
+	}
+	if (FindSkill(BloodFrenzyId))
+	{
+		InOutStats.PhysAtk = FMath::RoundToFloat(InOutStats.PhysAtk * 1.2f);
+	}
+	if (FindSkill(PainToPowerId))
+	{
+		InOutStats.CritRate = FMath::Clamp(InOutStats.CritRate + 0.08f, 0.0f, 1.0f);
+	}
+	if (FindSkill(PactMasteryId))
+	{
+		InOutStats.MagicAtk = FMath::RoundToFloat(InOutStats.MagicAtk * 1.15f);
+	}
+	if (FindSkill(SpiritReservoirId))
+	{
+		InOutStats.Mp = FMath::RoundToFloat(InOutStats.Mp * 1.2f);
+	}
 }
 
 float USkillComponent::GetGaugeGainOnHit() const
@@ -414,6 +498,18 @@ float USkillComponent::GetGaugeGainOnHit() const
 	if (!Ultimate)
 	{
 		Ultimate = FindSkill(SanctuaryId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(DivineBastionId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(BerserkApexId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(GrandFamiliarId);
 	}
 	return Ultimate ? Ultimate->GaugeGainOnHit : 0.0f;
 }
@@ -436,6 +532,18 @@ float USkillComponent::GetGaugeGainOnTakeDamage() const
 	if (!Ultimate)
 	{
 		Ultimate = FindSkill(SanctuaryId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(DivineBastionId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(BerserkApexId);
+	}
+	if (!Ultimate)
+	{
+		Ultimate = FindSkill(GrandFamiliarId);
 	}
 	return Ultimate ? Ultimate->GaugeGainOnTakeDamage : 0.0f;
 }
@@ -522,7 +630,7 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 		return;
 	}
 
-	const bool bMagicDamage = Skill.ClassId == EClassId::Mage || Skill.ClassId == EClassId::Cleric;
+	const bool bMagicDamage = Skill.ClassId == EClassId::Mage || Skill.ClassId == EClassId::Cleric || Skill.ClassId == EClassId::Summoner;
 	const float AttackPower = bMagicDamage ? OwnerCombat->MagicAtk : OwnerCombat->Atk;
 	const float Defense = bMagicDamage ? TargetCombat->MagicDef : TargetCombat->Def;
 	const float EffectiveDamageCoeff = GetEffectiveDamageCoeff(Skill.SkillId);
@@ -563,7 +671,7 @@ void USkillComponent::ApplyHeal(const FSkillDefinition& Skill)
 
 void USkillComponent::ApplySelfBuff(const FSkillDefinition& Skill, float Now)
 {
-	if (Skill.SkillId == ShieldUpId || Skill.SkillId == ManaShieldId || Skill.SkillId == PurifyId)
+	if (Skill.SkillId == ShieldUpId || Skill.SkillId == ManaShieldId || Skill.SkillId == PurifyId || Skill.SkillId == GuardianAegisId || Skill.SkillId == DivineBastionId)
 	{
 		DefBuffMagnitude = Skill.BuffMagnitude;
 		DefBuffEndTime = Now + Skill.BuffDuration;
@@ -575,7 +683,11 @@ void USkillComponent::ApplySelfBuff(const FSkillDefinition& Skill, float Now)
 		Skill.SkillId == EagleEyeId ||
 		Skill.SkillId == EvasionStanceId ||
 		Skill.SkillId == AssassinateId ||
-		Skill.SkillId == BlessingId)
+		Skill.SkillId == BlessingId ||
+		Skill.SkillId == FrenzyStanceId ||
+		Skill.SkillId == BerserkApexId ||
+		Skill.SkillId == ArcaneBindingId ||
+		Skill.SkillId == GrandFamiliarId)
 	{
 		AtkSpeedBuffMagnitude = Skill.BuffMagnitude;
 		AtkSpeedBuffEndTime = Now + Skill.BuffDuration;

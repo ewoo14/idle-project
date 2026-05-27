@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../../core/errors.js";
+import { createCharacterSchema } from "./character.schema.js";
 import { CharacterService } from "./character.service.js";
 
 describe("CharacterService", () => {
@@ -30,14 +31,43 @@ describe("CharacterService", () => {
     );
   });
 
-  it("rejects non-warrior classes in the MVP scope", async () => {
+  it("creates each supported expanded class with matching level 1 stats", async () => {
+    const repo = {
+      createCharacter: vi.fn().mockImplementation((input) =>
+        Promise.resolve({
+          id: "c1",
+          ...input,
+        }),
+      ),
+      findByIdForUser: vi.fn(),
+      rebirthCharacter: vi.fn(),
+    };
+    const service = new CharacterService(repo);
+
+    for (const classId of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      await service.create("u1", { classId });
+    }
+
+    expect(repo.createCharacter).toHaveBeenCalledTimes(8);
+    expect(repo.createCharacter).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        classId: 8,
+        stats: expect.objectContaining({
+          primary: expect.objectContaining({ int: 13, wis: 11 }),
+          derived: expect.objectContaining({ magicAtk: 32 }),
+        }),
+      }),
+    );
+  });
+
+  it("rejects unsupported classes outside the eight class roster", async () => {
     const service = new CharacterService({
       createCharacter: vi.fn(),
       findByIdForUser: vi.fn(),
       rebirthCharacter: vi.fn(),
     });
 
-    await expect(service.create("u1", { classId: 2 })).rejects.toBeInstanceOf(
+    await expect(service.create("u1", { classId: 9 })).rejects.toBeInstanceOf(
       ValidationError,
     );
   });
@@ -99,6 +129,15 @@ describe("CharacterService", () => {
     });
     expect(update.stats.derived.hp).toBe(270);
     expect(update.stats.derived.physAtk).toBe(54);
+  });
+});
+
+describe("createCharacterSchema", () => {
+  it("allows the full eight class roster", () => {
+    expect(createCharacterSchema.body.properties.classId).toMatchObject({
+      minimum: 1,
+      maximum: 8,
+    });
   });
 });
 

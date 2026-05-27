@@ -4,7 +4,7 @@ export const createCharacterSchema = {
     required: ["classId"],
     additionalProperties: false,
     properties: {
-      classId: { type: "integer", minimum: 1, maximum: 5 },
+      classId: { type: "integer", minimum: 1, maximum: 8 },
     },
   },
 } as const;

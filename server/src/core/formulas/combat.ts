@@ -18,7 +18,7 @@ export function computeClassDamage(
   physDef: number,
   magicDef = physDef,
 ): number {
-  return classId === 2 || classId === 5
+  return classId === 2 || classId === 5 || classId === 8
     ? computeMagicDamage(attackerStats.magicAtk, magicDef)
     : computeDamage(attackerStats.physAtk, physDef);
 }

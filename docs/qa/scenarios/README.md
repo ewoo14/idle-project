@@ -30,5 +30,6 @@
 | M8 | [M8-save-system-v3.md](M8-save-system-v3.md) | Cloud save upload/download, merge policy, offline fallback, schema regression, HUD sync states |
 | M9 | [M9-achievements-collection.md](M9-achievements-collection.md) | Achievement catalog, permanent stat multiplier, save/cloud restore, HUD panel, and soft-cap parity |
 | M9 | [M9-quests-expansion.md](M9-quests-expansion.md) | Main/Daily/Weekly quest expansion, ch1/ch2 chain, reset, reward, save/cloud, and HUD parity |
+| M9 | [M9-classes-expansion.md](M9-classes-expansion.md) | Paladin/Berserker/Summoner skills, growth, combat routing, localization, HUD, and parity |
 
 <!-- markdownlint-enable MD013 -->

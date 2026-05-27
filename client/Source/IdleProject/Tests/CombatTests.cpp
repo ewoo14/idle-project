@@ -456,10 +456,25 @@ bool FCombatClassDamageTest::RunTest(const FString& Parameters)
 	ClericStats.MagicAtk = 40.0f;
 	TestEqual(TEXT("Cleric damage uses magic attack and magic defense"), FCombatFormulas::ComputeDamage(ClericStats, EClassId::Cleric, 80.0f, 10.0f), 34.0f);
 
+	FDerivedStats SummonerStats;
+	SummonerStats.PhysAtk = 12.0f;
+	SummonerStats.MagicAtk = 40.0f;
+	TestEqual(TEXT("Summoner damage uses magic attack and magic defense"), FCombatFormulas::ComputeDamage(SummonerStats, EClassId::Summoner, 80.0f, 10.0f), 34.0f);
+
 	FDerivedStats WarriorStats;
 	WarriorStats.PhysAtk = 40.0f;
 	WarriorStats.MagicAtk = 80.0f;
 	TestEqual(TEXT("Warrior damage keeps physical attack and physical defense"), FCombatFormulas::ComputeDamage(WarriorStats, EClassId::Warrior, 10.0f, 80.0f), 34.0f);
+
+	FDerivedStats PaladinStats;
+	PaladinStats.PhysAtk = 40.0f;
+	PaladinStats.MagicAtk = 80.0f;
+	TestEqual(TEXT("Paladin damage keeps physical attack and physical defense"), FCombatFormulas::ComputeDamage(PaladinStats, EClassId::Paladin, 10.0f, 80.0f), 34.0f);
+
+	FDerivedStats BerserkerStats;
+	BerserkerStats.PhysAtk = 40.0f;
+	BerserkerStats.MagicAtk = 80.0f;
+	TestEqual(TEXT("Berserker damage keeps physical attack and physical defense"), FCombatFormulas::ComputeDamage(BerserkerStats, EClassId::Berserker, 10.0f, 80.0f), 34.0f);
 
 	return true;
 }
@@ -827,6 +842,30 @@ bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Cleric loads holy smite"), HasSkill(*Skills, TEXT("holy_smite")));
 	TestTrue(TEXT("Cleric loads heal"), HasSkill(*Skills, TEXT("heal")));
 
+	Skills->LoadDefaultPaladinSkills();
+	TestEqual(TEXT("Paladin has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Paladin has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Paladin has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Paladin has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Paladin loads holy verdict"), HasSkill(*Skills, TEXT("holy_verdict")));
+	TestTrue(TEXT("Paladin loads guardian_aegis"), HasSkill(*Skills, TEXT("guardian_aegis")));
+
+	Skills->LoadDefaultBerserkerSkills();
+	TestEqual(TEXT("Berserker has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Berserker has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Berserker has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Berserker has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Berserker loads rage_cleave"), HasSkill(*Skills, TEXT("rage_cleave")));
+	TestTrue(TEXT("Berserker loads blood_frenzy"), HasSkill(*Skills, TEXT("blood_frenzy")));
+
+	Skills->LoadDefaultSummonerSkills();
+	TestEqual(TEXT("Summoner has seven skills"), Skills->Skills.Num(), 7);
+	TestEqual(TEXT("Summoner has four active skills"), CountSkillsByType(*Skills, ESkillType::Active), 4);
+	TestEqual(TEXT("Summoner has two passive skills"), CountSkillsByType(*Skills, ESkillType::Passive), 2);
+	TestEqual(TEXT("Summoner has one ultimate skill"), CountSkillsByType(*Skills, ESkillType::Ultimate), 1);
+	TestTrue(TEXT("Summoner loads spirit_bolt"), HasSkill(*Skills, TEXT("spirit_bolt")));
+	TestTrue(TEXT("Summoner loads grand_familiar"), HasSkill(*Skills, TEXT("grand_familiar")));
+
 	Skills->LoadSkillsForClass(EClassId::Warrior);
 	TestTrue(TEXT("Class loader selects warrior skills"), HasSkill(*Skills, TEXT("heavy_strike")));
 	Skills->LoadSkillsForClass(EClassId::Mage);
@@ -837,6 +876,12 @@ bool FSkillClassDefaultsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Class loader selects thief skills"), HasSkill(*Skills, TEXT("shadow_stab")));
 	Skills->LoadSkillsForClass(EClassId::Cleric);
 	TestTrue(TEXT("Class loader selects cleric skills"), HasSkill(*Skills, TEXT("holy_smite")));
+	Skills->LoadSkillsForClass(EClassId::Paladin);
+	TestTrue(TEXT("Class loader selects paladin skills"), HasSkill(*Skills, TEXT("holy_verdict")));
+	Skills->LoadSkillsForClass(EClassId::Berserker);
+	TestTrue(TEXT("Class loader selects berserker skills"), HasSkill(*Skills, TEXT("rage_cleave")));
+	Skills->LoadSkillsForClass(EClassId::Summoner);
+	TestTrue(TEXT("Class loader selects summoner skills"), HasSkill(*Skills, TEXT("spirit_bolt")));
 
 	return true;
 }
@@ -941,8 +986,65 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		TestSkillDefinitionParity(*this, *Skills, Expected);
 	}
 
-	TestEqual(TEXT("DefinitionParity covers five classes times seven skills"), TotalCheckedSkills, 35);
+	Skills->LoadDefaultPaladinSkills();
+	const TArray<FExpectedSkillDefinition> PaladinSkills = {
+		{TEXT("holy_verdict"), EClassId::Paladin, ESkillType::Active, ESkillEffectType::DamageSingle, 4.0f, 2.3f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy},
+		{TEXT("radiant_sweep"), EClassId::Paladin, ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy},
+		{TEXT("guardian_aegis"), EClassId::Paladin, ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.45f, 5.0f, 0.0f, 2.0f},
+		{TEXT("lay_on_hands"), EClassId::Paladin, ESkillType::Active, ESkillEffectType::Heal, 10.0f, 0.0f, 0.18f, 0.0f, 0.0f, 0.0f},
+		{TEXT("sacred_oath"), EClassId::Paladin, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("bulwark_training"), EClassId::Paladin, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("divine_bastion"), EClassId::Paladin, ESkillType::Ultimate, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.35f, 5.0f, 5.0f, 8.0f},
+	};
+
+	TestEqual(TEXT("Paladin DefinitionParity covers seven skills"), Skills->Skills.Num(), PaladinSkills.Num());
+	TotalCheckedSkills += PaladinSkills.Num();
+	for (const FExpectedSkillDefinition& Expected : PaladinSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultBerserkerSkills();
+	const TArray<FExpectedSkillDefinition> BerserkerSkills = {
+		{TEXT("rage_cleave"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.8f, 0.0f, 0.0f, 2.0f, 0.0f},
+		{TEXT("blood_surge"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.9f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire},
+		{TEXT("frenzy_stance"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::SelfBuff, 11.0f, 0.0f, 0.3f, 4.0f, 0.0f, 0.0f},
+		{TEXT("savage_leap"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.4f, 0.0f, 0.0f, 2.0f, 0.0f},
+		{TEXT("blood_frenzy"), EClassId::Berserker, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("pain_to_power"), EClassId::Berserker, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.08f, 0.0f, 0.0f, 0.0f},
+		{TEXT("berserk_apex"), EClassId::Berserker, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.5f, 0.35f, 4.0f, 12.0f, 2.0f},
+	};
+
+	TestEqual(TEXT("Berserker DefinitionParity covers seven skills"), Skills->Skills.Num(), BerserkerSkills.Num());
+	TotalCheckedSkills += BerserkerSkills.Num();
+	for (const FExpectedSkillDefinition& Expected : BerserkerSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	Skills->LoadDefaultSummonerSkills();
+	const TArray<FExpectedSkillDefinition> SummonerSkills = {
+		{TEXT("spirit_bolt"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.2f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None},
+		{TEXT("familiar_swarm"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.6f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None},
+		{TEXT("arcane_binding"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f, 0.0f, 0.0f},
+		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.3f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice},
+		{TEXT("pact_mastery"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
+		{TEXT("spirit_reservoir"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
+		{TEXT("grand_familiar"), EClassId::Summoner, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning},
+	};
+
+	TestEqual(TEXT("Summoner DefinitionParity covers seven skills"), Skills->Skills.Num(), SummonerSkills.Num());
+	TotalCheckedSkills += SummonerSkills.Num();
+	for (const FExpectedSkillDefinition& Expected : SummonerSkills)
+	{
+		TestSkillDefinitionParity(*this, *Skills, Expected);
+	}
+
+	TestEqual(TEXT("DefinitionParity covers eight classes times seven skills"), TotalCheckedSkills, 56);
+	Skills->LoadDefaultClericSkills();
 	TestTrue(TEXT("Cleric DefinitionParity includes Heal effect"), HasSkill(*Skills, TEXT("heal")));
+	Skills->LoadDefaultPaladinSkills();
+	TestTrue(TEXT("Paladin DefinitionParity includes Heal effect"), HasSkill(*Skills, TEXT("lay_on_hands")));
 
 	return true;
 }
@@ -1026,6 +1128,30 @@ bool FSkillPassiveStatsTest::RunTest(const FString& Parameters)
 	Skills->ApplyPassivesToStats(Stats);
 	TestEqual(TEXT("Cleric divine vitality grants 20 percent max HP"), Stats.Hp, 1200.0f);
 	TestEqual(TEXT("Cleric wisdom training grants 10 percent magic attack"), Stats.MagicAtk, 220.0f);
+
+	Skills->LoadDefaultPaladinSkills();
+	Stats = FDerivedStats();
+	Stats.Hp = 1000.0f;
+	Stats.PhysDef = 200.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Paladin sacred oath grants 15 percent max HP"), Stats.Hp, 1150.0f);
+	TestEqual(TEXT("Paladin bulwark training grants 15 percent physical defense"), Stats.PhysDef, 230.0f);
+
+	Skills->LoadDefaultBerserkerSkills();
+	Stats = FDerivedStats();
+	Stats.PhysAtk = 200.0f;
+	Stats.CritRate = 0.10f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Berserker blood frenzy grants 20 percent physical attack"), Stats.PhysAtk, 240.0f);
+	TestEqual(TEXT("Berserker pain to power grants crit rate"), Stats.CritRate, 0.18f);
+
+	Skills->LoadDefaultSummonerSkills();
+	Stats = FDerivedStats();
+	Stats.MagicAtk = 200.0f;
+	Stats.Mp = 1000.0f;
+	Skills->ApplyPassivesToStats(Stats);
+	TestEqual(TEXT("Summoner pact mastery grants 15 percent magic attack"), Stats.MagicAtk, 230.0f);
+	TestEqual(TEXT("Summoner spirit reservoir grants 20 percent max MP"), Stats.Mp, 1200.0f);
 
 	return true;
 }
@@ -1155,7 +1281,7 @@ bool FClassSelectionHudDisplayModelTest::RunTest(const FString& Parameters)
 {
 	const TArray<FIdleHUDClassSelectionOptionViewModel> Options = IdleProject::UI::BuildClassSelectionOptions(EClassId::Mage);
 
-	TestEqual(TEXT("Class selector exposes five V1 classes"), Options.Num(), 5);
+	TestEqual(TEXT("Class selector exposes eight classes"), Options.Num(), 8);
 	TestEqual(TEXT("First class is warrior"), static_cast<int32>(Options[0].ClassId), static_cast<int32>(EClassId::Warrior));
 	TestEqual(TEXT("Warrior summary highlights STR and CON"), Options[0].StatSummary.ToString(), FString(TEXT("STR/CON")));
 	TestEqual(TEXT("Mage summary highlights INT and WIS"), Options[1].StatSummary.ToString(), FString(TEXT("INT/WIS")));
@@ -1164,6 +1290,12 @@ bool FClassSelectionHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Thief summary highlights DEX and LUK"), Options[3].StatSummary.ToString(), FString(TEXT("DEX/LUK")));
 	TestEqual(TEXT("Fifth class is cleric"), static_cast<int32>(Options[4].ClassId), static_cast<int32>(EClassId::Cleric));
 	TestEqual(TEXT("Cleric summary highlights WIS and INT"), Options[4].StatSummary.ToString(), FString(TEXT("WIS/INT")));
+	TestEqual(TEXT("Sixth class is paladin"), static_cast<int32>(Options[5].ClassId), static_cast<int32>(EClassId::Paladin));
+	TestEqual(TEXT("Paladin summary highlights CON and STR"), Options[5].StatSummary.ToString(), FString(TEXT("CON/STR")));
+	TestEqual(TEXT("Seventh class is berserker"), static_cast<int32>(Options[6].ClassId), static_cast<int32>(EClassId::Berserker));
+	TestEqual(TEXT("Berserker summary highlights STR and LUK"), Options[6].StatSummary.ToString(), FString(TEXT("STR/LUK")));
+	TestEqual(TEXT("Eighth class is summoner"), static_cast<int32>(Options[7].ClassId), static_cast<int32>(EClassId::Summoner));
+	TestEqual(TEXT("Summoner summary highlights INT and WIS"), Options[7].StatSummary.ToString(), FString(TEXT("INT/WIS")));
 	TestTrue(TEXT("Current class is marked selected"), Options[1].bSelected);
 	TestFalse(TEXT("Other classes are not selected"), Options[0].bSelected);
 
@@ -1194,12 +1326,12 @@ bool FIdleCharacterClassSelectionTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	Character->SetClassId(EClassId::Cleric);
+	Character->SetClassId(EClassId::Summoner);
 	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
 
-	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Cleric));
+	TestEqual(TEXT("ClassId stores selected class"), static_cast<int32>(Character->GetClassId()), static_cast<int32>(EClassId::Summoner));
 	TestNotNull(TEXT("Skill component exists"), Skills);
-	TestTrue(TEXT("Cleric skill set is loaded"), Skills && HasSkill(*Skills, TEXT("heal")));
+	TestTrue(TEXT("Summoner skill set is loaded"), Skills && HasSkill(*Skills, TEXT("spirit_bolt")));
 	TestFalse(TEXT("Warrior skill set is replaced"), Skills && HasSkill(*Skills, TEXT("heavy_strike")));
 
 	World->DestroyWorld(false);

@@ -251,6 +251,20 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   equipment affix/set bonuses, enhancement, rebirth bonus points, and
   transcend multiplier.
 
+## PR #57 Character Checklist Addendum (Section 4)
+
+- [ ] `EClassId` preserves existing numeric values for None and the first five
+  classes, then appends Paladin=6, Berserker=7, and Summoner=8.
+- [ ] `FClassGrowth` adds differentiated Paladin, Berserker, and Summoner
+  profiles without changing Warrior, Mage, Archer, Thief, or Cleric anchors.
+- [ ] `USkillComponent::LoadSkillsForClass` dispatches all eight classes and
+  every default class skill set contains exactly 4 active, 2 passive, and 1
+  ultimate skill.
+- [ ] Skill DefinitionParity covers 8 classes x 7 skills, including
+  classId/type/effect/cooldown/coefficient/buff/gauge/status/element fields.
+- [ ] Summoner uses magic attack/magic defense in combat formula and skill
+  damage routing, while Paladin and Berserker remain physical.
+
 ## PR #50 Character Checklist Addendum (Section 4)
 
 - [ ] `FTowerFormula::GetFloorRequiredPower` keeps floor 1 at 100 CP and uses

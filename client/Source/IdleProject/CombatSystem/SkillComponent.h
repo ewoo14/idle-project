@@ -108,6 +108,15 @@ public:
 	void LoadDefaultClericSkills();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultPaladinSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultBerserkerSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void LoadDefaultSummonerSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	void LoadSkillsForClass(EClassId ClassId);
 
 	/** 전투 틱에서 준비된 액티브/궁극기 스킬을 자동 발동합니다. */

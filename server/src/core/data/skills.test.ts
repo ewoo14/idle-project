@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   archerSkillDefinitions,
+  berserkerSkillDefinitions,
   clericSkillDefinitions,
   getSkillDefinitionsForClass,
   mageSkillDefinitions,
+  paladinSkillDefinitions,
   type SkillDefinition,
+  summonerSkillDefinitions,
   thiefSkillDefinitions,
   warriorSkillDefinitions,
 } from "./skills.js";
@@ -537,6 +540,314 @@ const expectedSkillDefinitionsByClass = new Map<
       },
     ],
   ],
+  [
+    6,
+    [
+      {
+        skillId: "holy_verdict",
+        classId: 6,
+        displayName: "Holy Verdict",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 4,
+        damageCoeff: 2.3,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 1,
+        element: "holy",
+      },
+      {
+        skillId: "radiant_sweep",
+        classId: 6,
+        displayName: "Radiant Sweep",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 8,
+        damageCoeff: 1.6,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 1,
+        element: "holy",
+      },
+      {
+        skillId: "guardian_aegis",
+        classId: 6,
+        displayName: "Guardian Aegis",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 12,
+        damageCoeff: 0,
+        buffMagnitude: 0.45,
+        buffDuration: 5,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 2,
+      },
+      {
+        skillId: "lay_on_hands",
+        classId: 6,
+        displayName: "Lay on Hands",
+        type: "active",
+        effectType: "heal",
+        cooldown: 10,
+        damageCoeff: 0,
+        buffMagnitude: 0.18,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "sacred_oath",
+        classId: 6,
+        displayName: "Sacred Oath",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "bulwark_training",
+        classId: 6,
+        displayName: "Bulwark Training",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "divine_bastion",
+        classId: 6,
+        displayName: "Divine Bastion",
+        type: "ultimate",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.35,
+        buffDuration: 5,
+        gaugeGainOnHit: 5,
+        gaugeGainOnTakeDamage: 8,
+      },
+    ],
+  ],
+  [
+    7,
+    [
+      {
+        skillId: "rage_cleave",
+        classId: 7,
+        displayName: "Rage Cleave",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 3.5,
+        damageCoeff: 2.8,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 2,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "blood_surge",
+        classId: 7,
+        displayName: "Blood Surge",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 7.5,
+        damageCoeff: 1.9,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 2,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "burn",
+        statusDuration: 2,
+        statusMagnitude: 3,
+        element: "fire",
+      },
+      {
+        skillId: "frenzy_stance",
+        classId: 7,
+        displayName: "Frenzy Stance",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 11,
+        damageCoeff: 0,
+        buffMagnitude: 0.3,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "savage_leap",
+        classId: 7,
+        displayName: "Savage Leap",
+        type: "active",
+        effectType: "dash_damage",
+        cooldown: 9,
+        damageCoeff: 2.4,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 2,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "blood_frenzy",
+        classId: 7,
+        displayName: "Blood Frenzy",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "pain_to_power",
+        classId: 7,
+        displayName: "Pain to Power",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.08,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "berserk_apex",
+        classId: 7,
+        displayName: "Berserk Apex",
+        type: "ultimate",
+        effectType: "damage_single",
+        cooldown: 0,
+        damageCoeff: 6.5,
+        buffMagnitude: 0.35,
+        buffDuration: 4,
+        gaugeGainOnHit: 12,
+        gaugeGainOnTakeDamage: 2,
+      },
+    ],
+  ],
+  [
+    8,
+    [
+      {
+        skillId: "spirit_bolt",
+        classId: 8,
+        displayName: "Spirit Bolt",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 3.2,
+        damageCoeff: 2.2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "poison",
+        statusDuration: 3,
+        statusMagnitude: 2.5,
+      },
+      {
+        skillId: "familiar_swarm",
+        classId: 8,
+        displayName: "Familiar Swarm",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 7,
+        damageCoeff: 1.6,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "poison",
+        statusDuration: 4,
+        statusMagnitude: 2,
+      },
+      {
+        skillId: "arcane_binding",
+        classId: 8,
+        displayName: "Arcane Binding",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 10,
+        damageCoeff: 0,
+        buffMagnitude: 0.22,
+        buffDuration: 4,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "void_call",
+        classId: 8,
+        displayName: "Void Call",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 12,
+        damageCoeff: 2.3,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1.5,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "freeze",
+        statusDuration: 2,
+        statusMagnitude: 0.2,
+        element: "ice",
+      },
+      {
+        skillId: "pact_mastery",
+        classId: 8,
+        displayName: "Pact Mastery",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.15,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "spirit_reservoir",
+        classId: 8,
+        displayName: "Spirit Reservoir",
+        type: "passive",
+        effectType: "self_buff",
+        cooldown: 0,
+        damageCoeff: 0,
+        buffMagnitude: 0.2,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "grand_familiar",
+        classId: 8,
+        displayName: "Grand Familiar",
+        type: "ultimate",
+        effectType: "damage_aoe",
+        cooldown: 0,
+        damageCoeff: 5.7,
+        buffMagnitude: 0.25,
+        buffDuration: 4,
+        gaugeGainOnHit: 10,
+        gaugeGainOnTakeDamage: 3,
+        statusEffect: "poison",
+        statusDuration: 5,
+        statusMagnitude: 4,
+        element: "lightning",
+      },
+    ],
+  ],
 ]);
 
 describe("warriorSkillDefinitions", () => {
@@ -574,6 +885,27 @@ describe("clericSkillDefinitions", () => {
   });
 });
 
+describe("paladinSkillDefinitions", () => {
+  it("mirrors the seven class expansion paladin skills including holy tank effects", () => {
+    expect(paladinSkillDefinitions).toHaveLength(7);
+    expect(paladinSkillDefinitions).toEqual(expectedSkillsForClass(6));
+  });
+});
+
+describe("berserkerSkillDefinitions", () => {
+  it("mirrors the seven class expansion berserker skills including rage effects", () => {
+    expect(berserkerSkillDefinitions).toHaveLength(7);
+    expect(berserkerSkillDefinitions).toEqual(expectedSkillsForClass(7));
+  });
+});
+
+describe("summonerSkillDefinitions", () => {
+  it("mirrors the seven class expansion summoner skills including status effects", () => {
+    expect(summonerSkillDefinitions).toHaveLength(7);
+    expect(summonerSkillDefinitions).toEqual(expectedSkillsForClass(8));
+  });
+});
+
 describe("skill definition parity by class", () => {
   it("returns the V1 skill set for every supported class id", () => {
     expect(getSkillDefinitionsForClass(1)).toBe(warriorSkillDefinitions);
@@ -581,23 +913,26 @@ describe("skill definition parity by class", () => {
     expect(getSkillDefinitionsForClass(3)).toBe(archerSkillDefinitions);
     expect(getSkillDefinitionsForClass(4)).toBe(thiefSkillDefinitions);
     expect(getSkillDefinitionsForClass(5)).toBe(clericSkillDefinitions);
+    expect(getSkillDefinitionsForClass(6)).toBe(paladinSkillDefinitions);
+    expect(getSkillDefinitionsForClass(7)).toBe(berserkerSkillDefinitions);
+    expect(getSkillDefinitionsForClass(8)).toBe(summonerSkillDefinitions);
   });
 
   it("keeps every supported class id aligned with its lookup key", () => {
-    for (const classId of [1, 2, 3, 4, 5]) {
+    for (const classId of [1, 2, 3, 4, 5, 6, 7, 8]) {
       for (const skill of getSkillDefinitionsForClass(classId)) {
         expect(skill.classId).toBe(classId);
       }
     }
   });
 
-  it("contains 35 V1 skill definitions across the five supported classes", () => {
-    const allSkills = [1, 2, 3, 4, 5].flatMap((classId) =>
+  it("contains 56 skill definitions across the eight supported classes", () => {
+    const allSkills = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((classId) =>
       getSkillDefinitionsForClass(classId),
     );
 
-    expect(allSkills).toHaveLength(35);
-    expect(new Set(allSkills.map((skill) => skill.skillId)).size).toBe(35);
+    expect(allSkills).toHaveLength(56);
+    expect(new Set(allSkills.map((skill) => skill.skillId)).size).toBe(56);
     expect(new Set(allSkills.map((skill) => skill.effectType))).toContain(
       "heal",
     );
