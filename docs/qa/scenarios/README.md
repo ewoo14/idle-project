@@ -31,5 +31,6 @@
 | M9 | [M9-achievements-collection.md](M9-achievements-collection.md) | Achievement catalog, permanent stat multiplier, save/cloud restore, HUD panel, and soft-cap parity |
 | M9 | [M9-quests-expansion.md](M9-quests-expansion.md) | Main/Daily/Weekly quest expansion, ch1/ch2 chain, reset, reward, save/cloud, and HUD parity |
 | M9 | [M9-classes-expansion.md](M9-classes-expansion.md) | Paladin/Berserker/Summoner skills, growth, combat routing, localization, HUD, and parity |
+| M10 | [M10-class-balance.md](M10-class-balance.md) | 8-class DPS band, role exceptions, Berserker/Summoner anchors, parity, and balance-sim evidence |
 
 <!-- markdownlint-enable MD013 -->

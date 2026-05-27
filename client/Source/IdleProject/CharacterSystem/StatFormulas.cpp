@@ -36,11 +36,11 @@ const FClassGrowth& GetClassGrowth(EClassId ClassId)
 	};
 	static const FClassGrowth Berserker{
 		{13.0f, 5.0f, 1.0f, 1.0f, 6.0f, 6.0f},
-		{1.8f, 0.55f, 0.1f, 0.1f, 0.7f, 0.65f}
+		{1.5f, 0.55f, 0.1f, 0.1f, 0.7f, 0.7f}
 	};
 	static const FClassGrowth Summoner{
 		{2.0f, 4.0f, 12.0f, 10.0f, 4.0f, 3.0f},
-		{0.15f, 0.3f, 1.7f, 1.3f, 0.3f, 0.3f}
+		{0.15f, 0.3f, 1.45f, 1.3f, 0.52f, 0.3f}
 	};
 
 	switch (ClassId)

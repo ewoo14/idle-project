@@ -4,10 +4,10 @@
 
 - Runs: 1000
 - Target: Lv100 + boss clear
-- p10: 4.9h
-- median: 5.324h
-- p90: 5.758h
-- min/max: 4.582h / 6.128h
+- p10: 4.919h
+- median: 5.328h
+- p90: 5.751h
+- min/max: 4.564h / 6.144h
 - status: inside-target (target 5-10h, acceptable 3-20h)
 
 ## Sensitivity
@@ -178,6 +178,49 @@
 | 125 | 2.25 | 2.197 | 9.226 |
 | 250 | 3.5 | 2.475 | 10.395 |
 | 500 | 6 | 2.5 | 10.499 |
+
+<!-- markdownlint-enable MD013 -->
+
+## Class Balance Snapshot
+
+- Effective DPS uses the class attack route through `computeClassDamage`,
+  review defense, attack speed, crit expectation, and active skill
+  `damageCoeff / cooldown` pressure from `skills.ts`.
+- DPS classes target +/-15% around each level's DPS median.
+- Paladin and Cleric are role exceptions: tank/healer utility may sit below
+  the DPS band while preserving survival/support compensation.
+
+### Lv50
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Warrior | dps | 1884 | 1010 | 2000 | -1% | 2928 |
+| Mage | dps | 1467 | 1054 | 2295 | 13% | 2980 |
+| Archer | dps | 1501 | 893 | 1895 | -7% | 2804 |
+| Thief | dps | 1467 | 882 | 2027 | 0% | 2787 |
+| Cleric | healer | 1526 | 1016 | 1599 | 0% | 3005 |
+| Paladin | tank | 2184 | 989 | 1687 | 0% | 3118 |
+| Berserker | dps | 1658 | 1024 | 2143 | 6% | 2871 |
+| Summoner | dps | 1550 | 1067 | 2030 | 0% | 3065 |
+
+<!-- markdownlint-enable MD013 -->
+
+### Lv100
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Warrior | dps | 3684 | 2000 | 4295 | -7% | 5444 |
+| Mage | dps | 2892 | 2084 | 4787 | 3% | 5519 |
+| Archer | dps | 2951 | 1778 | 4451 | -4% | 5197 |
+| Thief | dps | 2892 | 1757 | 4669 | 1% | 5145 |
+| Cleric | healer | 3001 | 2013 | 3378 | 0% | 5566 |
+| Paladin | tank | 4259 | 1959 | 3644 | 0% | 5805 |
+| Berserker | dps | 3258 | 2024 | 4629 | 0% | 5316 |
+| Summoner | dps | 3060 | 2107 | 4249 | -8% | 5681 |
 
 <!-- markdownlint-enable MD013 -->
 

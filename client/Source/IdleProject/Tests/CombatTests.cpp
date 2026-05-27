@@ -1006,10 +1006,10 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultBerserkerSkills();
 	const TArray<FExpectedSkillDefinition> BerserkerSkills = {
-		{TEXT("rage_cleave"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.8f, 0.0f, 0.0f, 2.0f, 0.0f},
-		{TEXT("blood_surge"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.9f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire},
+		{TEXT("rage_cleave"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.35f, 0.0f, 0.0f, 2.0f, 0.0f},
+		{TEXT("blood_surge"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.65f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire},
 		{TEXT("frenzy_stance"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::SelfBuff, 11.0f, 0.0f, 0.3f, 4.0f, 0.0f, 0.0f},
-		{TEXT("savage_leap"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.4f, 0.0f, 0.0f, 2.0f, 0.0f},
+		{TEXT("savage_leap"), EClassId::Berserker, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.05f, 0.0f, 0.0f, 2.0f, 0.0f},
 		{TEXT("blood_frenzy"), EClassId::Berserker, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("pain_to_power"), EClassId::Berserker, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.08f, 0.0f, 0.0f, 0.0f},
 		{TEXT("berserk_apex"), EClassId::Berserker, ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.5f, 0.35f, 4.0f, 12.0f, 2.0f},
@@ -1024,10 +1024,10 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultSummonerSkills();
 	const TArray<FExpectedSkillDefinition> SummonerSkills = {
-		{TEXT("spirit_bolt"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.2f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None},
-		{TEXT("familiar_swarm"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.6f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None},
+		{TEXT("spirit_bolt"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 1.9f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None},
+		{TEXT("familiar_swarm"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None},
 		{TEXT("arcane_binding"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f, 0.0f, 0.0f},
-		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.3f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice},
+		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice},
 		{TEXT("pact_mastery"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
 		{TEXT("spirit_reservoir"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("grand_familiar"), EClassId::Summoner, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning},

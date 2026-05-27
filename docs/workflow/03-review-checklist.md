@@ -265,6 +265,18 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] Summoner uses magic attack/magic defense in combat formula and skill
   damage routing, while Paladin and Berserker remain physical.
 
+## PR #60 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim` class DPS uses `computeClassDamage` for base hits and
+  active skill damage under the shared Lv-scaled review defense.
+- [ ] Lv50 and Lv100 DPS classes stay within +/-15% of the DPS median.
+- [ ] Paladin and Cleric stay below 0.8x DPS median while preserving tank/healer
+  HP, defense, or MagicDef compensation.
+- [ ] `client/Content/Data/SkillDB.csv`, `USkillComponent`, and server
+  `skills.ts` keep Berserker and Summoner tuned coefficients in parity.
+- [ ] The balance report includes the 1000-run first-rebirth distribution and
+  the Lv50/Lv100 class balance table.
+
 ## PR #50 Character Checklist Addendum (Section 4)
 
 - [ ] `FTowerFormula::GetFloorRequiredPower` keeps floor 1 at 100 CP and uses
