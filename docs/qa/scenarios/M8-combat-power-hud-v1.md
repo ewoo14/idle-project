@@ -71,6 +71,20 @@ Automation: `IdleProject.Character.CombatPower.GrowthSources`,
 `IdleProject.Inventory.Bonus.Affixes`, `IdleProject.Inventory.Bonus.SetBonus`,
 `IdleProject.Inventory.EnhanceEquippedItem.SuccessAndMaxGuard`
 
+## Scenario 4.1: Growth-source parity never leaves final derived stats
+
+Given CP has been sampled at base, stat allocation, equipment, enhancement,
+rebirth, and transcendence milestones.
+
+When each milestone calls `AIdleCharacter::GetCombatPower()`.
+
+Then the value equals
+`FCombatPowerFormula::ComputeCombatPower(GetCurrentDerivedStats())`.
+
+And no milestone uses a stale pre-refresh stat cache or a direct CP increment.
+
+Automation: `IdleProject.Character.CombatPower.GrowthSources`
+
 ## Scenario 5: Rebirth and transcendence growth are reflected
 
 Given the player has rebirth bonus points or a transcend stat multiplier.

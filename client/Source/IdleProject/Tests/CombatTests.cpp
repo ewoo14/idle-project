@@ -99,6 +99,12 @@ FItemInstance MakeCombatPowerTestItem(EItemSlot Slot, EItemSet ItemSet, float At
 	Item.BonusMagicAtk = 8.0f;
 	return Item;
 }
+
+void TestCurrentCombatPowerParity(FAutomationTestBase& Test, const TCHAR* Label, const AIdleCharacter& Character)
+{
+	const FDerivedStats CurrentDerived = Character.GetCurrentDerivedStats();
+	Test.TestEqual(Label, Character.GetCombatPower(), FCombatPowerFormula::ComputeCombatPower(CurrentDerived));
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -179,6 +185,17 @@ bool FCombatPowerFormulaTest::RunTest(const FString& Parameters)
 	Stats.CritDmg = 1.8f;
 
 	TestEqual(TEXT("Weighted derived stats round to a stable int64 combat power"), FCombatPowerFormula::ComputeCombatPower(Stats), static_cast<int64>(978));
+
+	Stats.Hp = 1234567.0f;
+	Stats.PhysAtk = 10000000.0f;
+	Stats.MagicAtk = 3000000.0f;
+	Stats.PhysDef = 100000.0f;
+	Stats.MagicDef = 50000.0f;
+	Stats.AtkSpeed = 2.25f;
+	Stats.CritRate = 0.333f;
+	Stats.CritDmg = 2.75f;
+	TestEqual(TEXT("Large derived stats use double precision parity anchor"), FCombatPowerFormula::ComputeCombatPower(Stats), static_cast<int64>(13424348));
+
 	TestEqual(TEXT("Zero stats produce zero combat power"), FCombatPowerFormula::ComputeCombatPower(FDerivedStats()), static_cast<int64>(0));
 
 	Stats.Hp = -100.0f;
@@ -1329,6 +1346,7 @@ bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Paramete
 
 	Character->SetClassId(EClassId::Warrior);
 	const int64 BaseCombatPower = Character->GetCombatPower();
+	TestCurrentCombatPowerParity(*this, TEXT("Base combat power mirrors current derived stats"), *Character);
 
 	GameInstance->GrantStatPoints(2);
 	TestTrue(TEXT("Allocated STR setup succeeds"), GameInstance->AllocateStatPoint(EPrimaryStat::Str));
@@ -1336,6 +1354,7 @@ bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Paramete
 	Character->RefreshDerivedStats();
 	const int64 AllocatedCombatPower = Character->GetCombatPower();
 	TestTrue(TEXT("Stat allocation increases combat power through current derived stats"), AllocatedCombatPower > BaseCombatPower);
+	TestCurrentCombatPowerParity(*this, TEXT("Allocated combat power mirrors current derived stats"), *Character);
 
 	UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>();
 	TestNotNull(TEXT("Inventory component exists"), Inventory);
@@ -1352,11 +1371,13 @@ bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Paramete
 	Character->RefreshDerivedStats();
 	const int64 EquippedCombatPower = Character->GetCombatPower();
 	TestTrue(TEXT("Equipment affixes and set bonuses increase combat power"), EquippedCombatPower > AllocatedCombatPower);
+	TestCurrentCombatPowerParity(*this, TEXT("Equipped combat power mirrors current derived stats"), *Character);
 
 	TestTrue(TEXT("Enhancing equipped weapon succeeds"), Inventory->EnhanceEquippedItem(EItemSlot::Weapon));
 	Character->RefreshDerivedStats();
 	const int64 EnhancedCombatPower = Character->GetCombatPower();
 	TestTrue(TEXT("Enhancement increases combat power"), EnhancedCombatPower > EquippedCombatPower);
+	TestCurrentCombatPowerParity(*this, TEXT("Enhanced combat power mirrors current derived stats"), *Character);
 
 	for (int32 Index = 0; Index < 5; ++Index)
 	{
@@ -1367,6 +1388,7 @@ bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Paramete
 	Character->RefreshDerivedStats();
 	const int64 RebirthCombatPower = Character->GetCombatPower();
 	TestTrue(TEXT("Rebirth bonus points increase combat power versus original level one baseline"), RebirthCombatPower > BaseCombatPower);
+	TestCurrentCombatPowerParity(*this, TEXT("Rebirth combat power mirrors current derived stats"), *Character);
 
 	TestTrue(TEXT("Test setup transcend succeeds"), GameInstance->Transcend());
 	Character->RefreshDerivedStats();
@@ -1380,6 +1402,7 @@ bool FIdleCharacterCombatPowerGrowthSourcesTest::RunTest(const FString& Paramete
 	WithoutTranscend.MagicDef /= TranscendMultiplier;
 	TestTrue(TEXT("Transcend multiplier increases combat power over equivalent post-reset stats"), TranscendedCombatPower > FCombatPowerFormula::ComputeCombatPower(WithoutTranscend));
 	TestEqual(TEXT("Combat power remains formula over current derived stats"), TranscendedCombatPower, FCombatPowerFormula::ComputeCombatPower(Character->GetCurrentDerivedStats()));
+	TestCurrentCombatPowerParity(*this, TEXT("Transcended combat power mirrors current derived stats"), *Character);
 
 	World->DestroyWorld(false);
 	return true;

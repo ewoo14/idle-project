@@ -34,6 +34,22 @@ describe("combat power formula", () => {
     ).toBe(978);
   });
 
+  it("uses double precision accumulation for large parity anchors", () => {
+    expect(
+      computeCombatPower({
+        ...baseDerivedStats,
+        hp: 1234567,
+        physAtk: 10000000,
+        magicAtk: 3000000,
+        physDef: 100000,
+        magicDef: 50000,
+        atkSpeed: 2.25,
+        critRate: 0.333,
+        critDmg: 2.75,
+      }),
+    ).toBe(13424348);
+  });
+
   it("returns zero when all stats are zero", () => {
     expect(computeCombatPower(baseDerivedStats)).toBe(0);
   });

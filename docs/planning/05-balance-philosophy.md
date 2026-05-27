@@ -1074,3 +1074,47 @@ V1 guardrails:
   threshold.
 - Re-run UE automation and server Vitest when changing the threshold,
   multiplier step, reset policy, or affected stat list.
+
+## PR #49 Combat Power V1
+
+Combat Power is a display and validation aggregate over final derived stats. V1
+does not add a separate CP stat, ranking authority, content gate, or direct
+skill-rank contribution. Any growth source must first change
+`GetCurrentDerivedStats()`, then CP is recomputed from that final cache.
+
+Formula:
+
+```text
+CP = round(
+  PhysAtk * 1
+  + MagicAtk * 1
+  + PhysDef * 2
+  + MagicDef * 2
+  + Hp * 0.1
+  + CritRate * 500
+  + CritDmg * 100
+  + AtkSpeed * 200
+)
+CP = max(0, CP)
+```
+
+Server and client parity use double precision accumulation before the final
+round. Do not use `Math.fround` or float-step rounding in the TypeScript mirror;
+large CP anchors intentionally detect that drift.
+
+Representative examples:
+
+| Build state | Inputs summarized | CP |
+| --- | --- | ---: |
+| Early warrior | HP 130, PATK 24, MATK 5, PDEF 14, MDEF 4, crit 0.006/x1.503, ASPD 1.024 | 436 |
+| Mid growth | HP 1234, PATK 100, MATK 50, PDEF 30, MDEF 20, crit 0.25/x1.8, ASPD 1.5 | 978 |
+| Large parity anchor | HP 1234567, PATK 10000000, MATK 3000000, PDEF 100000, MDEF 50000, crit 0.333/x2.75, ASPD 2.25 | 13424348 |
+
+Guardrails:
+
+- CP is monotonic for positive stat allocation, equipment affix/set bonuses,
+  enhancement, rebirth bonus points, and transcend multipliers because all of
+  them flow through final derived stats.
+- CP may eventually require coefficient tuning if HP or defense dominates player
+  perception, but V1 keeps the weights simple and transparent for QA.
+- HUD copy must stay compact: `전투력 {Amount}` and `Combat Power {Amount}`.

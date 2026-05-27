@@ -20,7 +20,7 @@
 ### 2.3 UI (디자이너)
 - HUD 헤더(골드/EXP/레벨 근처) 또는 정보 패널(#41)에 "전투력 N" 표시. 큰 수 천단위 콤마. 로컬라이즈 ko/en.
 ### 2.4 서버 (백엔드)
-- `server/src/core/formulas/combatPower.ts`: computeCombatPower(derivedStats) 클라 미러(Math.fround 가중) + parity 테스트.
+- `server/src/core/formulas/combatPower.ts`: computeCombatPower(derivedStats) 클라 미러(double 가중 합산) + parity 테스트.
 ### 2.5 데이터/밸런스
 - CP 가중치 근거 + 성장 단계별 CP 예시(초기/중반/엔드) + 무한 증가 맥락 문서.
 ### 2.6 테스트 (통합 검증 핵심)
@@ -50,7 +50,7 @@
 | --- | --- |
 | CP 가중치로 일부 스탯 과대/과소 대표 | 보수적 가중 + balance 문서, V1 단순 가중(후속 튜닝) |
 | 큰 수 오버플로 | int64 CP, round/clamp |
-| 서버↔클라 CP parity | combatPower.ts Math.fround 가중 + 경계 테스트 |
+| 서버↔클라 CP parity | combatPower.ts double 가중 합산 + 경계 테스트 |
 | 통합 합성 누락(소스 미반영) | GetCurrentDerivedStats(#41, 최종 합성 캐싱) 사용 → 전 소스 자동 포함, 통합 Automation 으로 단조 증가 검증 |
 | 기존 전투/스탯 회귀 | CP 는 읽기/표시 전용, 공식/전투 무변경 |
 
