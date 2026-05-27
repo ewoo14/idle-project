@@ -110,7 +110,7 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	RequestAutosave();
 }
 
-void UIdleGameInstance::SaveProgress() const
+void UIdleGameInstance::SaveProgress()
 {
 	UIdleSaveGame* SaveGame = Cast<UIdleSaveGame>(UGameplayStatics::CreateSaveGameObject(UIdleSaveGame::StaticClass()));
 	if (!CaptureToSave(SaveGame))
@@ -118,7 +118,10 @@ void UIdleGameInstance::SaveProgress() const
 		return;
 	}
 
-	UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, 0);
+	if (UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, 0))
+	{
+		OnProgressSaved.Broadcast();
+	}
 }
 
 void UIdleGameInstance::LoadProgress()
@@ -817,7 +820,7 @@ int64 UIdleGameInstance::GetCurrentUnixSeconds()
 	return FDateTime::UtcNow().ToUnixTimestamp();
 }
 
-void UIdleGameInstance::RequestAutosave() const
+void UIdleGameInstance::RequestAutosave()
 {
 	if (!bAutosaveSuppressed)
 	{

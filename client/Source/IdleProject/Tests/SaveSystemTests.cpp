@@ -5,6 +5,8 @@
 #include "GameCore/PetService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
+#include "Kismet/GameplayStatics.h"
+#include "Tests/SaveProgressTestReceiver.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -110,6 +112,32 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemProgressSavedBroadcastTest,
+	"IdleProject.GameCore.SaveSystem.ProgressSavedBroadcast",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemProgressSavedBroadcastTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	USaveProgressTestReceiver* Receiver = NewObject<USaveProgressTestReceiver>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	TestNotNull(TEXT("Receiver is created"), Receiver);
+	if (!GameInstance || !Receiver)
+	{
+		return false;
+	}
+
+	GameInstance->OnProgressSaved.AddDynamic(Receiver, &USaveProgressTestReceiver::HandleProgressSaved);
+	GameInstance->SaveProgress();
+
+	TestEqual(TEXT("SaveProgress broadcasts after a successful save"), Receiver->SavedCount, 1);
+
+	GameInstance->OnProgressSaved.RemoveDynamic(Receiver, &USaveProgressTestReceiver::HandleProgressSaved);
+	UGameplayStatics::DeleteGameInSlot(TEXT("IdleSave"), 0);
 	return true;
 }
 

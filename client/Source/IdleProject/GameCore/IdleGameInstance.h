@@ -23,6 +23,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, i
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatPointsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTranscend);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProgressSaved);
 
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FEnhanceAttemptResult
@@ -126,7 +127,7 @@ public:
 	void AddGold(int64 Amount);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
-	void SaveProgress() const;
+	void SaveProgress();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
 	void LoadProgress();
@@ -311,6 +312,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Pet")
 	FOnPetFed OnPetFed;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Save")
+	FOnProgressSaved OnProgressSaved;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
@@ -378,7 +382,7 @@ private:
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
-	void RequestAutosave() const;
+	void RequestAutosave();
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();
