@@ -185,6 +185,43 @@ bool FSaveProgressHudFeedbackLabelTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCloudSyncHudViewModelTest,
+	"IdleProject.UI.HUD.CloudSyncViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCloudSyncHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FIdleHUDCloudSyncViewModel IdleViewModel = IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState::Idle);
+	TestFalse(TEXT("Idle cloud sync state is hidden"), IdleViewModel.bVisible);
+
+	const FIdleHUDCloudSyncViewModel SyncingViewModel = IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState::Syncing);
+	TestTrue(TEXT("Syncing cloud sync state is visible"), SyncingViewModel.bVisible);
+	TestEqual(TEXT("Syncing cloud sync state uses approved copy"), SyncingViewModel.Label.ToString(), FString(TEXT("Syncing...")));
+	TestFalse(TEXT("Syncing state is not an error"), SyncingViewModel.bError);
+
+	const FIdleHUDCloudSyncViewModel SyncedViewModel = IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState::Synced);
+	TestTrue(TEXT("Synced cloud sync state is visible for transient feedback"), SyncedViewModel.bVisible);
+	TestEqual(TEXT("Synced cloud sync state uses approved copy"), SyncedViewModel.Label.ToString(), FString(TEXT("Cloud Saved")));
+	TestTrue(TEXT("Synced state may fade out"), SyncedViewModel.bTransient);
+
+	const FIdleHUDCloudSyncViewModel OfflineViewModel = IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState::Offline);
+	TestTrue(TEXT("Offline cloud sync state stays visible"), OfflineViewModel.bVisible);
+	TestEqual(TEXT("Offline cloud sync state uses approved copy"), OfflineViewModel.Label.ToString(), FString(TEXT("Offline")));
+	TestTrue(TEXT("Offline state is an error"), OfflineViewModel.bError);
+	TestFalse(TEXT("Offline state is persistent"), OfflineViewModel.bTransient);
+
+	const FIdleHUDCloudSyncViewModel ConflictViewModel = IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState::Conflict);
+	TestTrue(TEXT("Conflict cloud sync state stays visible"), ConflictViewModel.bVisible);
+	TestEqual(TEXT("Conflict cloud sync state uses approved copy"), ConflictViewModel.Label.ToString(), FString(TEXT("Sync Conflict")));
+	TestTrue(TEXT("Conflict state is an error"), ConflictViewModel.bError);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEnhanceHudViewModelTest,
 	"IdleProject.UI.HUD.EnhancePanelViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

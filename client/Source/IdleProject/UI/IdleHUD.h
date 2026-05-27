@@ -51,6 +51,15 @@ struct IDLEPROJECT_API FIdleHUDOfflineRewardViewModel
 	FText ClaimLabel;
 };
 
+struct IDLEPROJECT_API FIdleHUDCloudSyncViewModel
+{
+	ECloudSyncState State = ECloudSyncState::Idle;
+	FText Label;
+	bool bVisible = false;
+	bool bError = false;
+	bool bTransient = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDQuestLogRowViewModel
 {
 	FString QuestId;
@@ -360,6 +369,7 @@ IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryS
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
+IDLEPROJECT_API FIdleHUDCloudSyncViewModel BuildCloudSyncViewModel(ECloudSyncState State);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -425,6 +435,9 @@ protected:
 	UFUNCTION()
 	void HandleProgressSaved();
 
+	UFUNCTION()
+	void HandleCloudSyncStateChanged(ECloudSyncState NewState);
+
 private:
 	void BindStageService();
 	void UnbindStageService();
@@ -483,6 +496,7 @@ private:
 	void DrawFloatingDamageTexts(float Now);
 	void DrawStatusIndicators(float Now);
 	void DrawProgressSavedIndicator(float Now);
+	void DrawCloudSyncIndicator(float Now);
 	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)
@@ -516,10 +530,12 @@ private:
 	FText StageFeedbackLabel;
 	FText TowerFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
+	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
+	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 	bool bStatInfoVisible = false;
 };
