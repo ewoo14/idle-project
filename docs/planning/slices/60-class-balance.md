@@ -1,5 +1,7 @@
 # PR #60 기획서 — 직업 밸런스 정밀 튜닝 (시스템 심화/밸런스)
 
+<!-- markdownlint-disable MD013 MD022 MD026 MD032 MD058 -->
+
 > **사용자 방향(시스템 심화/밸런스).** #57에서 8직업 추가 시 [4] 리뷰가 "정밀 튜닝은 후속"으로 명시 연기. 데이터 확인 결과 **파워 크리프**: 신규 직업이 원조보다 동일 역할에서 더 잘 스케일링 — Berserker STR 성장 1.8 vs Warrior 1.4(+28%), Summoner INT 1.7 vs Mage 1.4(+21%), 게다가 Berserker는 방어 스탯도 준수해 전사 상위호환. "왜 전사/마법사를 고르나" 문제. **8직업 상대 파워를 측정·검증 도구로 정량화하고, 아웃라이어를 타깃 밴드로 튜닝**(역할 차별화는 유지하되 직군 내 상위호환 제거). client + balance(검증 도구) + backend(parity) 멀티시스템(+qa).
 
 ## 1. 목표 / DoD
@@ -50,3 +52,18 @@
 
 ## 7. 후속
 - 전직/승급, 직업 전용 장비, 스킬 메커니즘 심화(콤보/연계), 추가 직업. (밸런스 원칙 문서가 향후 직업 추가의 가이드.)
+
+## 8. Codex TM Fix Notes
+
+- `tools/balance-sim` class DPS now routes both base hits and active skill
+  pressure through `computeClassDamage` with Lv-scaled review defense, instead
+  of multiplying raw effective attack.
+- `client/Content/Data/SkillDB.csv` now matches the tuned Berserker and
+  Summoner coefficients already present in `USkillComponent` and `skills.ts`.
+- `server/tests/class-balance.test.ts` guards Lv50/Lv100 +/-15% DPS rows,
+  Paladin/Cleric role exceptions, and tuned SkillDB coefficient parity.
+- Latest simulator output: 1000 runs, median 5.328h, p10 4.919h, p90 5.751h,
+  min/max 4.564h / 6.144h.
+- Latest Lv100 DPS deltas: Warrior -7%, Mage +3%, Archer -4%, Thief +1%,
+  Berserker 0%, Summoner -8%; Paladin and Cleric remain below 0.8x median
+  while preserving tank/healer stat compensation.

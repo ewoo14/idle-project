@@ -1028,17 +1028,23 @@ The simulator effective DPS row uses:
 
 ```text
 EffectiveAttack = MagicAtk for Mage/Cleric/Summoner, otherwise PhysAtk
+ReviewDefense = Level * 5
 SkillDpsRate = sum(active damageCoeff / cooldown)
-EffectiveDps = EffectiveAttack
-  * effective attack-speed expectation
+BaseHit = computeClassDamage(DerivedStats, ClassId, ReviewDefense, ReviewDefense)
+SkillDps = sum(
+  computeClassDamage(Attack * damageCoeff, ClassId, ReviewDefense, ReviewDefense)
+  / cooldown
+)
+EffectiveDps = (BaseHit * effective attack-speed expectation + SkillDps)
   * effective crit expectation
-  * (1 + SkillDpsRate)
 ```
 
-Attack speed and crit are partially weighted in the review model to represent
-real idle uptime instead of assuming perfect burst conversion. Combat Power is
-reported next to DPS, but CP is not the DPS gate; it is a separate survivability
-and aggregate-stat signal from PR #49.
+The review row intentionally uses the same physical/magic mitigation routing as
+runtime combat instead of raw attack multiplication. Attack speed and crit are
+partially weighted in the review model to represent real idle uptime instead of
+assuming perfect burst conversion. Combat Power is reported next to DPS, but CP
+is not the DPS gate; it is a separate survivability and aggregate-stat signal
+from PR #49.
 
 PR #60 tuning anchors:
 
@@ -1050,12 +1056,14 @@ PR #60 tuning anchors:
   upgrade.
 - Berserker active coefficients are reduced to `2.35 / 1.65 / 2.05`.
 - Summoner active coefficients are reduced to `1.9 / 1.45 / 2.0`.
+- Client `SkillDB.csv`, client `USkillComponent`, and server `skills.ts` must
+  keep those tuned coefficients in parity.
 - `tools/balance-sim` samples all eight classes and reports Lv50/Lv100 class
   DPS, CP, HP, and effective attack rows in
   `tools/balance-sim/reports/balance-sim-report.md`.
 
 The generated PR #60 report shows Lv100 DPS class deltas from the median at
-Warrior -8%, Mage 0%, Archer +6%, Thief +10%, Berserker 0%, and Summoner -11%.
+Warrior -7%, Mage +3%, Archer -4%, Thief +1%, Berserker 0%, and Summoner -8%.
 Paladin remains below the DPS band while having the highest HP/CP, and Cleric
 remains below the DPS band while preserving the healer MagicDef/support budget.
 

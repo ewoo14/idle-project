@@ -8,7 +8,10 @@ import {
   ACHIEVEMENT_POINTS_MULTIPLIER,
   getAchievementStatMultiplier,
 } from "../../server/src/core/formulas/achievement.js";
-import { computeDamage } from "../../server/src/core/formulas/combat.js";
+import {
+  computeClassDamage,
+  computeDamage,
+} from "../../server/src/core/formulas/combat.js";
 import { computeCombatPower } from "../../server/src/core/formulas/combatPower.js";
 import {
   type EnhanceItemRarity,
@@ -242,6 +245,7 @@ const ACCEPTABLE_MAX_HOURS = 20;
 const ACTIVE_EXP_TUNING = 5.5;
 const ACTIVE_GOLD_TUNING = 7.4;
 const SKILL_DPS_MULTIPLIER = 1.35;
+const CLASS_BALANCE_REVIEW_DEF_PER_LEVEL = 5;
 const BOSS_HP_MULTIPLIER = 0.012;
 const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Common",
@@ -602,11 +606,32 @@ function buildClassBalanceRow(
   const effectiveAttack = isMagicClass(classId)
     ? stats.magicAtk
     : stats.physAtk;
-  const skillDpsRate = getSkillDefinitionsForClass(classId)
-    .filter((skill) => skill.cooldown > 0 && skill.damageCoeff > 0)
-    .reduce((sum, skill) => sum + skill.damageCoeff / skill.cooldown, 0);
+  const damageSkills = getSkillDefinitionsForClass(classId).filter(
+    (skill) => skill.cooldown > 0 && skill.damageCoeff > 0,
+  );
+  const skillDpsRate = damageSkills.reduce(
+    (sum, skill) => sum + skill.damageCoeff / skill.cooldown,
+    0,
+  );
   const effectiveAtkSpeed = 1 + (stats.atkSpeed - 1) * 0.6;
   const critMultiplier = 1 + stats.critRate * (stats.critDmg - 1) * 0.6;
+  const reviewDef = level * CLASS_BALANCE_REVIEW_DEF_PER_LEVEL;
+  const baseHit = computeClassDamage(stats, classId, reviewDef, reviewDef);
+  const skillDps = damageSkills.reduce(
+    (sum, skill) =>
+      sum +
+      computeClassDamage(
+        {
+          physAtk: stats.physAtk * skill.damageCoeff,
+          magicAtk: stats.magicAtk * skill.damageCoeff,
+        },
+        classId,
+        reviewDef,
+        reviewDef,
+      ) /
+        skill.cooldown,
+    0,
+  );
 
   return {
     classId,
@@ -623,7 +648,7 @@ function buildClassBalanceRow(
     effectiveAttack,
     skillDpsRate: round(skillDpsRate, 3),
     effectiveDps: Math.round(
-      effectiveAttack * effectiveAtkSpeed * critMultiplier * (1 + skillDpsRate),
+      (baseHit * effectiveAtkSpeed + skillDps) * critMultiplier,
     ),
     dpsDeltaFromMedian: 0,
     combatPower: computeCombatPower(stats),
@@ -1110,14 +1135,14 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "## Class Balance Snapshot",
     "",
-    "- Effective DPS uses the class attack route, attack speed, crit expectation,",
-    "  and active skill `damageCoeff / cooldown` pressure from `skills.ts`.",
+    "- Effective DPS uses the class attack route through `computeClassDamage`,",
+    "  review defense, attack speed, crit expectation, and active skill",
+    "  `damageCoeff / cooldown` pressure from `skills.ts`.",
     "- DPS classes target +/-15% around each level's DPS median.",
     "- Paladin and Cleric are role exceptions: tank/healer utility may sit below",
     "  the DPS band while preserving survival/support compensation.",
     "",
     ...renderClassBalanceTables(report.model.classBalance),
-    "",
     "## Formula Sources",
     "",
     ...report.model.formulas.map((source) => `- ${source}`),

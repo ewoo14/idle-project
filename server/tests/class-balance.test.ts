@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildClassBalanceSnapshot,
@@ -10,6 +12,7 @@ import {
 import { defaultPrimaryStats } from "../src/core/formulas/stats.js";
 
 const dpsClassIds = new Set([1, 2, 3, 4, 7, 8]);
+const tunedClassIds = new Set([7, 8]);
 
 function assertWithinBand(rows: ClassBalanceRow[], tolerance: number) {
   const dpsRows = rows.filter((row) => dpsClassIds.has(row.classId));
@@ -107,4 +110,39 @@ describe("class balance formula anchors", () => {
       damageCoeff: 1.9,
     });
   });
+
+  it("keeps the client SkillDB tuned coefficients aligned with the server mirror", () => {
+    const csvRows = readSkillDbRows();
+    const serverSkills = [
+      ...berserkerSkillDefinitions,
+      ...summonerSkillDefinitions,
+    ];
+
+    for (const serverSkill of serverSkills) {
+      const clientSkill = csvRows.get(serverSkill.skillId);
+
+      expect(clientSkill).toBeDefined();
+      expect(clientSkill?.classId).toBe(serverSkill.classId);
+      expect(clientSkill?.cooldown).toBe(serverSkill.cooldown);
+      expect(clientSkill?.damageCoeff).toBe(serverSkill.damageCoeff);
+    }
+  });
 });
+
+function readSkillDbRows() {
+  const csvPath = resolve(process.cwd(), "../client/Content/Data/SkillDB.csv");
+  const [, ...rows] = readFileSync(csvPath, "utf8").trim().split(/\r?\n/);
+  return new Map(
+    rows
+      .map((row) => row.split(","))
+      .filter((columns) => tunedClassIds.has(Number(columns[1])))
+      .map((columns) => [
+        columns[0],
+        {
+          classId: Number(columns[1]),
+          cooldown: Number(columns[5]),
+          damageCoeff: Number(columns[6]),
+        },
+      ]),
+  );
+}

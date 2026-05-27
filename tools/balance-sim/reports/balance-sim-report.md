@@ -183,8 +183,9 @@
 
 ## Class Balance Snapshot
 
-- Effective DPS uses the class attack route, attack speed, crit expectation,
-  and active skill `damageCoeff / cooldown` pressure from `skills.ts`.
+- Effective DPS uses the class attack route through `computeClassDamage`,
+  review defense, attack speed, crit expectation, and active skill
+  `damageCoeff / cooldown` pressure from `skills.ts`.
 - DPS classes target +/-15% around each level's DPS median.
 - Paladin and Cleric are role exceptions: tank/healer utility may sit below
   the DPS band while preserving survival/support compensation.
@@ -195,14 +196,14 @@
 
 | Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Warrior | dps | 1884 | 1010 | 2376 | -7% | 2928 |
-| Mage | dps | 1467 | 1054 | 2713 | 7% | 2980 |
-| Archer | dps | 1501 | 893 | 2416 | -5% | 2804 |
-| Thief | dps | 1467 | 882 | 2596 | 2% | 2787 |
-| Cleric | healer | 1526 | 1016 | 1898 | 0% | 3005 |
-| Paladin | tank | 2184 | 989 | 2010 | 0% | 3118 |
-| Berserker | dps | 1658 | 1024 | 2546 | 0% | 2871 |
-| Summoner | dps | 1550 | 1067 | 2412 | -5% | 3065 |
+| Warrior | dps | 1884 | 1010 | 2000 | -1% | 2928 |
+| Mage | dps | 1467 | 1054 | 2295 | 13% | 2980 |
+| Archer | dps | 1501 | 893 | 1895 | -7% | 2804 |
+| Thief | dps | 1467 | 882 | 2027 | 0% | 2787 |
+| Cleric | healer | 1526 | 1016 | 1599 | 0% | 3005 |
+| Paladin | tank | 2184 | 989 | 1687 | 0% | 3118 |
+| Berserker | dps | 1658 | 1024 | 2143 | 6% | 2871 |
+| Summoner | dps | 1550 | 1067 | 2030 | 0% | 3065 |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -212,17 +213,16 @@
 
 | Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Warrior | dps | 3684 | 2000 | 5371 | -8% | 5444 |
-| Mage | dps | 2892 | 2084 | 5827 | 0% | 5519 |
-| Archer | dps | 2951 | 1778 | 6160 | 6% | 5197 |
-| Thief | dps | 2892 | 1757 | 6406 | 10% | 5145 |
-| Cleric | healer | 3001 | 2013 | 4093 | 0% | 5566 |
-| Paladin | tank | 4259 | 1959 | 4537 | 0% | 5805 |
-| Berserker | dps | 3258 | 2024 | 5801 | 0% | 5316 |
-| Summoner | dps | 3060 | 2107 | 5184 | -11% | 5681 |
+| Warrior | dps | 3684 | 2000 | 4295 | -7% | 5444 |
+| Mage | dps | 2892 | 2084 | 4787 | 3% | 5519 |
+| Archer | dps | 2951 | 1778 | 4451 | -4% | 5197 |
+| Thief | dps | 2892 | 1757 | 4669 | 1% | 5145 |
+| Cleric | healer | 3001 | 2013 | 3378 | 0% | 5566 |
+| Paladin | tank | 4259 | 1959 | 3644 | 0% | 5805 |
+| Berserker | dps | 3258 | 2024 | 4629 | 0% | 5316 |
+| Summoner | dps | 3060 | 2107 | 4249 | -8% | 5681 |
 
 <!-- markdownlint-enable MD013 -->
-
 
 ## Formula Sources
 
