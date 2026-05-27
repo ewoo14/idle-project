@@ -6,7 +6,11 @@ enum class EAffixKind : uint8
 {
 	CritRate,
 	AtkSpeed,
-	MagicAtk
+	MagicAtk,
+	PhysDef,
+	MagicDef,
+	Hp,
+	CritDmg
 };
 
 int32 GetAffixCount(EItemRarity Rarity, FRandomStream& Rng)
@@ -109,7 +113,7 @@ EItemSet FDropFormula::RollItemSet(EItemRarity Rarity, FRandomStream& Rng)
 		return EItemSet::None;
 	}
 
-	const int32 Roll = Rng.RandRange(0, 2);
+	const int32 Roll = Rng.RandRange(0, 6);
 	switch (Roll)
 	{
 	case 0:
@@ -117,8 +121,16 @@ EItemSet FDropFormula::RollItemSet(EItemRarity Rarity, FRandomStream& Rng)
 	case 1:
 		return EItemSet::Guardian;
 	case 2:
-	default:
 		return EItemSet::Arcane;
+	case 3:
+		return EItemSet::Assassin;
+	case 4:
+		return EItemSet::Hunter;
+	case 5:
+		return EItemSet::Holy;
+	case 6:
+	default:
+		return EItemSet::Berserker;
 	}
 }
 
@@ -166,6 +178,10 @@ void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& R
 	OutItem.BonusCritRate = 0.0f;
 	OutItem.BonusAtkSpeed = 0.0f;
 	OutItem.BonusMagicAtk = 0.0f;
+	OutItem.BonusPhysDef = 0.0f;
+	OutItem.BonusMagicDef = 0.0f;
+	OutItem.BonusAffixHp = 0.0f;
+	OutItem.BonusCritDmg = 0.0f;
 
 	const int32 AffixCount = GetAffixCount(Rarity, Rng);
 	if (AffixCount <= 0)
@@ -176,7 +192,11 @@ void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& R
 	TArray<EAffixKind> AffixKinds{
 		EAffixKind::CritRate,
 		EAffixKind::AtkSpeed,
-		EAffixKind::MagicAtk
+		EAffixKind::MagicAtk,
+		EAffixKind::PhysDef,
+		EAffixKind::MagicDef,
+		EAffixKind::Hp,
+		EAffixKind::CritDmg
 	};
 	ShuffleAffixKinds(AffixKinds, Rng);
 
@@ -194,6 +214,18 @@ void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& R
 			break;
 		case EAffixKind::MagicAtk:
 			OutItem.BonusMagicAtk = static_cast<float>(FMath::RoundToInt(static_cast<float>(SafeLevel) * Rng.FRandRange(0.5f, 1.5f)));
+			break;
+		case EAffixKind::PhysDef:
+			OutItem.BonusPhysDef = static_cast<float>(FMath::Max(1, FMath::RoundToInt(static_cast<float>(SafeLevel) * Rng.FRandRange(0.3f, 1.0f))));
+			break;
+		case EAffixKind::MagicDef:
+			OutItem.BonusMagicDef = static_cast<float>(FMath::Max(1, FMath::RoundToInt(static_cast<float>(SafeLevel) * Rng.FRandRange(0.3f, 1.0f))));
+			break;
+		case EAffixKind::Hp:
+			OutItem.BonusAffixHp = static_cast<float>(FMath::Max(1, FMath::RoundToInt(static_cast<float>(SafeLevel) * Rng.FRandRange(2.0f, 5.0f))));
+			break;
+		case EAffixKind::CritDmg:
+			OutItem.BonusCritDmg = FMath::RoundToFloat(Rng.FRandRange(0.05f, 0.20f) * 1000.0f) / 1000.0f;
 			break;
 		default:
 			break;

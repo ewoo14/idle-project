@@ -522,6 +522,14 @@ const TCHAR* ItemSetToLocalizationKey(EItemSet ItemSet)
 		return TEXT("ITEM_SET_GUARDIAN");
 	case EItemSet::Arcane:
 		return TEXT("ITEM_SET_ARCANE");
+	case EItemSet::Assassin:
+		return TEXT("ITEM_SET_ASSASSIN");
+	case EItemSet::Hunter:
+		return TEXT("ITEM_SET_HUNTER");
+	case EItemSet::Holy:
+		return TEXT("ITEM_SET_HOLY");
+	case EItemSet::Berserker:
+		return TEXT("ITEM_SET_BERSERKER");
 	case EItemSet::None:
 	default:
 		return TEXT("NONE_DASH");
@@ -720,6 +728,22 @@ FText IdleProject::UI::BuildAffixSummary(const FItemInstance& Item)
 	{
 		Parts.Add(FormatAffixFlatLabel(TEXT("AFFIX_MAGIC_ATK_FORMAT"), Item.BonusMagicAtk).ToString());
 	}
+	if (Item.BonusPhysDef > 0.0f)
+	{
+		Parts.Add(FormatAffixFlatLabel(TEXT("AFFIX_PHYS_DEF_FORMAT"), Item.BonusPhysDef).ToString());
+	}
+	if (Item.BonusMagicDef > 0.0f)
+	{
+		Parts.Add(FormatAffixFlatLabel(TEXT("AFFIX_MAGIC_DEF_FORMAT"), Item.BonusMagicDef).ToString());
+	}
+	if (Item.BonusAffixHp > 0.0f)
+	{
+		Parts.Add(FormatAffixFlatLabel(TEXT("AFFIX_HP_FORMAT"), Item.BonusAffixHp).ToString());
+	}
+	if (Item.BonusCritDmg > 0.0f)
+	{
+		Parts.Add(FormatAffixRateLabel(TEXT("AFFIX_CRIT_DMG_FORMAT"), Item.BonusCritDmg).ToString());
+	}
 
 	return Parts.IsEmpty()
 		? FText::GetEmpty()
@@ -743,7 +767,11 @@ FIdleHUDSetSummaryViewModel IdleProject::UI::BuildSetSummaryViewModel(const TArr
 	const EItemSet SetOrder[] = {
 		EItemSet::Warrior,
 		EItemSet::Guardian,
-		EItemSet::Arcane
+		EItemSet::Arcane,
+		EItemSet::Assassin,
+		EItemSet::Hunter,
+		EItemSet::Holy,
+		EItemSet::Berserker
 	};
 
 	for (const EItemSet ItemSet : SetOrder)

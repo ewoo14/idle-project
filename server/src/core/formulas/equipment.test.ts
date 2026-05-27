@@ -95,15 +95,23 @@ const clientServerEquipmentAnchors = [
       bonusCritRate: 0.02,
       bonusAtkSpeed: 0.1,
       bonusMagicAtk: 5,
+      bonusPhysDef: 4,
+      bonusMagicDef: 6,
+      bonusAffixHp: 30,
+      bonusCritDmg: 0.12,
       enhanceLevel: 2,
     } satisfies ItemInstance,
-    clientPowerScore: 54,
+    clientPowerScore: 84,
     clientBonus: {
       ...zeroEquipmentBonus,
       bonusAtk: 12,
+      bonusDef: 4.8,
+      bonusHp: 36,
       critRate: 0.024,
       atkSpeed: 0.12,
       magicAtk: 6,
+      magicDef: 7.199999999999999,
+      critDmg: 0.144,
     },
   },
   {
@@ -195,15 +203,23 @@ describe("equipment formulas", () => {
           bonusCritRate: 0.03,
           bonusAtkSpeed: 0.12,
           bonusMagicAtk: 20,
+          bonusPhysDef: 4,
+          bonusMagicDef: 6,
+          bonusAffixHp: 30,
+          bonusCritDmg: 0.12,
           enhanceLevel: 2,
         },
       ]),
     ).toEqual({
       ...zeroEquipmentBonus,
       bonusAtk: 18,
+      bonusDef: 4.8,
+      bonusHp: 36,
       critRate: 0.036,
       atkSpeed: 0.144,
       magicAtk: 24,
+      magicDef: 7.199999999999999,
+      critDmg: 0.144,
     });
   });
 
@@ -258,8 +274,12 @@ describe("equipment formulas", () => {
         bonusCritRate: 0.02,
         bonusAtkSpeed: 0.09,
         bonusMagicAtk: 10,
+        bonusPhysDef: 5,
+        bonusMagicDef: 7,
+        bonusAffixHp: 40,
+        bonusCritDmg: 0.2,
       }),
-    ).toBe(54);
+    ).toBe(90);
   });
 
   it("keeps slot and rarity values aligned to PR 9 enum ranges", () => {

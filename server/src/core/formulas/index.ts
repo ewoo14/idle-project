@@ -6,6 +6,8 @@ export {
   computeItemBonus,
   getRarityStatMultiplier,
   type ItemRarity,
+  rollAffixes,
+  rollBaseItem,
   rollRarityForLevel,
 } from "./drop.js";
 export * from "./enhance.js";

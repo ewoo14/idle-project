@@ -311,6 +311,46 @@ bool FIdleSaveSystemInventoryStateRoundTripTest::RunTest(const FString& Paramete
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemExpandedItemFieldsRoundTripTest,
+	"IdleProject.GameCore.SaveSystem.ExpandedItemFieldsRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemExpandedItemFieldsRoundTripTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* SourceInventory = NewObject<UInventoryComponent>();
+	FItemInstance SourceItem = MakeSaveTestItem(TEXT("mythic_runeblade_l77"), EItemSlot::Weapon, EItemRarity::Mythic, 40.0f, 0.0f, 0.0f, 9, 0.04f, 0.11f, 22.0f, EItemSet::Assassin);
+	SourceItem.BaseItemId = TEXT("runeblade");
+	SourceItem.BonusPhysDef = 8.0f;
+	SourceItem.BonusMagicDef = 13.0f;
+	SourceItem.BonusAffixHp = 75.0f;
+	SourceItem.BonusCritDmg = 0.18f;
+	SourceInventory->AddItem(SourceItem);
+
+	TArray<FItemInstance> CapturedItems;
+	TMap<EItemSlot, int32> CapturedEquipped;
+	SourceInventory->CaptureState(CapturedItems, CapturedEquipped);
+
+	UInventoryComponent* RestoredInventory = NewObject<UInventoryComponent>();
+	RestoredInventory->RestoreState(CapturedItems, CapturedEquipped);
+
+	TArray<FItemInstance> RestoredItems;
+	TMap<EItemSlot, int32> RestoredEquipped;
+	RestoredInventory->CaptureState(RestoredItems, RestoredEquipped);
+
+	TestEqual(TEXT("Expanded inventory item count round trips"), RestoredItems.Num(), 1);
+	const FItemInstance& RestoredItem = RestoredItems[0];
+	TestEqual(TEXT("Base item id round trips"), RestoredItem.BaseItemId, FName(TEXT("runeblade")));
+	TestEqual(TEXT("Expanded set enum round trips"), RestoredItem.ItemSet, EItemSet::Assassin);
+	TestEqual(TEXT("Physical defense affix round trips"), RestoredItem.BonusPhysDef, 8.0f);
+	TestEqual(TEXT("Magic defense affix round trips"), RestoredItem.BonusMagicDef, 13.0f);
+	TestEqual(TEXT("HP affix round trips"), RestoredItem.BonusAffixHp, 75.0f);
+	TestEqual(TEXT("Crit damage affix round trips"), RestoredItem.BonusCritDmg, 0.18f);
+	TestEqual(TEXT("Expanded item stays equipped"), RestoredEquipped.FindRef(EItemSlot::Weapon), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleSaveSystemSkillRankStateRoundTripTest,
 	"IdleProject.GameCore.SaveSystem.SkillRankStateRoundTrip",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

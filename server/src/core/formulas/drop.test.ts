@@ -4,10 +4,19 @@ import {
   getAffixCount,
   getRarityStatMultiplier,
   rollAffixes,
+  rollBaseItem,
   rollRarityForLevel,
 } from "./drop.js";
 
 describe("drop formulas", () => {
+  function seededRng(seed: number) {
+    let state = seed >>> 0;
+    return () => {
+      state = (state * 1664525 + 1013904223) >>> 0;
+      return state / 0x1_0000_0000;
+    };
+  }
+
   function clientFloatThresholds(level: number) {
     const safeLevel = Math.max(level, 1);
     const levelScale = Math.fround(
@@ -175,6 +184,10 @@ describe("drop formulas", () => {
       bonusCritRate: 0,
       bonusAtkSpeed: 0,
       bonusMagicAtk: 0,
+      bonusPhysDef: 0,
+      bonusMagicDef: 0,
+      bonusAffixHp: 0,
+      bonusCritDmg: 0,
     });
   });
 
@@ -202,9 +215,13 @@ describe("drop formulas", () => {
     const rng = () => rolls.shift() ?? 0;
 
     expect(rollAffixes("Legendary", 20, rng)).toEqual({
-      bonusCritRate: 0.03,
-      bonusAtkSpeed: 0.1,
-      bonusMagicAtk: 20,
+      bonusCritRate: 0,
+      bonusAtkSpeed: 0.05,
+      bonusMagicAtk: 0,
+      bonusPhysDef: 6,
+      bonusMagicDef: 0,
+      bonusAffixHp: 0,
+      bonusCritDmg: 0.05,
     });
   });
 
@@ -213,20 +230,62 @@ describe("drop formulas", () => {
     const rng = () => rolls.shift() ?? 0;
 
     expect(rollAffixes("Mythic", 20, rng)).toEqual({
-      bonusCritRate: 0.03,
-      bonusAtkSpeed: 0.1,
-      bonusMagicAtk: 30,
+      bonusCritRate: 0,
+      bonusAtkSpeed: 0.05,
+      bonusMagicAtk: 0,
+      bonusPhysDef: 0,
+      bonusMagicDef: 0,
+      bonusAffixHp: 40,
+      bonusCritDmg: 0.05,
     });
   });
 
-  it("clamps affix level below one before magic attack scaling", () => {
+  it("clamps affix level below one before flat scaling", () => {
     const rolls = [0, 0.99, 0.5];
     const rng = () => rolls.shift() ?? 0;
 
     expect(rollAffixes("Uncommon", 0, rng)).toEqual({
       bonusCritRate: 0,
-      bonusAtkSpeed: 0,
-      bonusMagicAtk: 1,
+      bonusAtkSpeed: 0.05,
+      bonusMagicAtk: 0,
+      bonusPhysDef: 0,
+      bonusMagicDef: 0,
+      bonusAffixHp: 0,
+      bonusCritDmg: 0,
     });
+  });
+
+  it("selects deterministic base item names per slot", () => {
+    const rolls = [0.99];
+    const rng = () => rolls.shift() ?? 0;
+
+    expect(rollBaseItem(1, rng)).toEqual({
+      baseItemId: "wand",
+      nameKo: "마법봉",
+      nameEn: "Wand",
+      statBias: "magic",
+    });
+  });
+
+  it("exposes at least six weapon base items", () => {
+    const weaponBaseIds = new Set<string>();
+    for (let index = 0; index < 6; index += 1) {
+      weaponBaseIds.add(rollBaseItem(1, () => index / 6).baseItemId);
+    }
+
+    expect(weaponBaseIds.size).toBeGreaterThanOrEqual(6);
+  });
+
+  it("can roll every expanded affix from the Mythic pool", () => {
+    const found = new Set<string>();
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const affixes = rollAffixes("Mythic", 30, seededRng(seed));
+      if (affixes.bonusPhysDef > 0) found.add("PhysDef");
+      if (affixes.bonusMagicDef > 0) found.add("MagicDef");
+      if (affixes.bonusAffixHp > 0) found.add("Hp");
+      if (affixes.bonusCritDmg > 0) found.add("CritDmg");
+    }
+
+    expect(found).toEqual(new Set(["PhysDef", "MagicDef", "Hp", "CritDmg"]));
   });
 });

@@ -37,7 +37,11 @@ int32 CountAffixes(const FItemInstance& Item)
 {
 	return (Item.BonusCritRate > 0.0f ? 1 : 0)
 		+ (Item.BonusAtkSpeed > 0.0f ? 1 : 0)
-		+ (Item.BonusMagicAtk > 0.0f ? 1 : 0);
+		+ (Item.BonusMagicAtk > 0.0f ? 1 : 0)
+		+ (Item.BonusPhysDef > 0.0f ? 1 : 0)
+		+ (Item.BonusMagicDef > 0.0f ? 1 : 0)
+		+ (Item.BonusAffixHp > 0.0f ? 1 : 0)
+		+ (Item.BonusCritDmg > 0.0f ? 1 : 0);
 }
 
 void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, const FItemInstance& Item)
@@ -67,6 +71,39 @@ void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, co
 		break;
 	}
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FItemFactoryBaseCatalogDeterministicTest,
+	"IdleProject.Inventory.ItemFactory.BaseCatalogDeterministic",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FItemFactoryBaseCatalogDeterministicTest::RunTest(const FString& Parameters)
+{
+	FRandomStream SeedA(5801);
+	FRandomStream SeedB(5801);
+	const FItemInstance First = FItemFactory::GuaranteedDropForLevel(35, SeedA);
+	const FItemInstance Second = FItemFactory::GuaranteedDropForLevel(35, SeedB);
+
+	TestTrue(TEXT("Generated item id includes selected base item, not only rarity and slot"), First.ItemId.ToString().Find(TEXT("_L35")) != INDEX_NONE);
+	TestEqual(TEXT("Deterministic item id repeats with the same stream"), First.ItemId, Second.ItemId);
+	TestEqual(TEXT("Deterministic display name repeats with the same stream"), First.DisplayName.ToString(), Second.DisplayName.ToString());
+	TestFalse(TEXT("Display name no longer uses generic enum slot noun"), First.DisplayName.ToString().Contains(TEXT("EItemSlot")));
+	TestTrue(TEXT("Generated item keeps playable stats"), FItemPowerScore::Compute(First) > 0);
+
+	FRandomStream VarietyRng(5802);
+	TSet<FName> WeaponBaseIds;
+	for (int32 Index = 0; Index < 240; ++Index)
+	{
+		const FItemInstance Drop = FItemFactory::GuaranteedDropForLevel(60, VarietyRng);
+		if (Drop.Slot == EItemSlot::Weapon)
+		{
+			WeaponBaseIds.Add(Drop.BaseItemId);
+		}
+	}
+	TestTrue(TEXT("Weapon base catalog exposes at least six distinct weapon bases"), WeaponBaseIds.Num() >= 6);
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -216,11 +253,19 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	Common.BonusCritRate = 0.05f;
 	Common.BonusAtkSpeed = 0.15f;
 	Common.BonusMagicAtk = 30.0f;
+	Common.BonusPhysDef = 20.0f;
+	Common.BonusMagicDef = 20.0f;
+	Common.BonusAffixHp = 100.0f;
+	Common.BonusCritDmg = 0.20f;
 	FRandomStream CommonRng(4001);
 	FDropFormula::RollAffixes(Common.Rarity, 20, CommonRng, Common);
 	TestEqual(TEXT("Common items roll no crit affix"), Common.BonusCritRate, 0.0f);
 	TestEqual(TEXT("Common items roll no speed affix"), Common.BonusAtkSpeed, 0.0f);
 	TestEqual(TEXT("Common items roll no magic affix"), Common.BonusMagicAtk, 0.0f);
+	TestEqual(TEXT("Common items roll no physical defense affix"), Common.BonusPhysDef, 0.0f);
+	TestEqual(TEXT("Common items roll no magic defense affix"), Common.BonusMagicDef, 0.0f);
+	TestEqual(TEXT("Common items roll no HP affix"), Common.BonusAffixHp, 0.0f);
+	TestEqual(TEXT("Common items roll no crit damage affix"), Common.BonusCritDmg, 0.0f);
 
 	FItemInstance Uncommon = MakeTestItem(TEXT("uncommon_sword"), EItemSlot::Weapon, EItemRarity::Uncommon, 1.0f, 0.0f, 0.0f);
 	Uncommon.BonusCritRate = 0.05f;
@@ -255,11 +300,45 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	FItemInstance Mythic = MakeTestItem(TEXT("mythic_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 1.0f, 0.0f, 0.0f);
 	FRandomStream MythicRng(4004);
 	FDropFormula::RollAffixes(Mythic.Rarity, 20, MythicRng, Mythic);
-	TestEqual(TEXT("Mythic rolls all three affixes"), CountAffixes(Mythic), 3);
-	TestTrue(TEXT("Mythic crit affix stays in range"), Mythic.BonusCritRate >= 0.01f && Mythic.BonusCritRate <= 0.05f);
-	TestTrue(TEXT("Mythic attack speed affix stays in range"), Mythic.BonusAtkSpeed >= 0.05f && Mythic.BonusAtkSpeed <= 0.15f);
-	TestTrue(TEXT("Mythic magic attack affix scales by level"), Mythic.BonusMagicAtk >= 10.0f && Mythic.BonusMagicAtk <= 30.0f);
+	TestEqual(TEXT("Mythic rolls three affixes from the expanded pool"), CountAffixes(Mythic), 3);
+	TestTrue(TEXT("Mythic crit affix stays in range when present"), Mythic.BonusCritRate == 0.0f || (Mythic.BonusCritRate >= 0.01f && Mythic.BonusCritRate <= 0.05f));
+	TestTrue(TEXT("Mythic attack speed affix stays in range when present"), Mythic.BonusAtkSpeed == 0.0f || (Mythic.BonusAtkSpeed >= 0.05f && Mythic.BonusAtkSpeed <= 0.15f));
+	TestTrue(TEXT("Mythic magic attack affix scales by level when present"), Mythic.BonusMagicAtk == 0.0f || (Mythic.BonusMagicAtk >= 10.0f && Mythic.BonusMagicAtk <= 30.0f));
+	TestTrue(TEXT("Mythic physical defense affix scales by level when present"), Mythic.BonusPhysDef == 0.0f || (Mythic.BonusPhysDef >= 6.0f && Mythic.BonusPhysDef <= 20.0f));
+	TestTrue(TEXT("Mythic magic defense affix scales by level when present"), Mythic.BonusMagicDef == 0.0f || (Mythic.BonusMagicDef >= 6.0f && Mythic.BonusMagicDef <= 20.0f));
+	TestTrue(TEXT("Mythic HP affix scales by level when present"), Mythic.BonusAffixHp == 0.0f || (Mythic.BonusAffixHp >= 40.0f && Mythic.BonusAffixHp <= 100.0f));
+	TestTrue(TEXT("Mythic crit damage affix stays in range when present"), Mythic.BonusCritDmg == 0.0f || (Mythic.BonusCritDmg >= 0.05f && Mythic.BonusCritDmg <= 0.20f));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDropFormulaExpandedAffixesCoverageTest,
+	"IdleProject.Inventory.DropFormula.ExpandedAffixesCoverage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDropFormulaExpandedAffixesCoverageTest::RunTest(const FString& Parameters)
+{
+	bool bFoundPhysDef = false;
+	bool bFoundMagicDef = false;
+	bool bFoundHp = false;
+	bool bFoundCritDmg = false;
+	for (int32 Seed = 5803; Seed < 6203; ++Seed)
+	{
+		FItemInstance Item = MakeTestItem(TEXT("mythic_affix_scan"), EItemSlot::Weapon, EItemRarity::Mythic, 1.0f, 0.0f, 0.0f);
+		FRandomStream Rng(Seed);
+		FDropFormula::RollAffixes(Item.Rarity, 25, Rng, Item);
+		TestEqual(TEXT("Mythic still rolls exactly three unique affixes from expanded pool"), CountAffixes(Item), 3);
+		bFoundPhysDef = bFoundPhysDef || Item.BonusPhysDef > 0.0f;
+		bFoundMagicDef = bFoundMagicDef || Item.BonusMagicDef > 0.0f;
+		bFoundHp = bFoundHp || Item.BonusAffixHp > 0.0f;
+		bFoundCritDmg = bFoundCritDmg || Item.BonusCritDmg > 0.0f;
+	}
+
+	TestTrue(TEXT("Expanded pool can roll physical defense"), bFoundPhysDef);
+	TestTrue(TEXT("Expanded pool can roll magic defense"), bFoundMagicDef);
+	TestTrue(TEXT("Expanded pool can roll HP"), bFoundHp);
+	TestTrue(TEXT("Expanded pool can roll crit damage"), bFoundCritDmg);
 	return true;
 }
 
@@ -278,23 +357,35 @@ bool FDropFormulaRollItemSetTest::RunTest(const FString& Parameters)
 	bool bFoundWarrior = false;
 	bool bFoundGuardian = false;
 	bool bFoundArcane = false;
+	bool bFoundAssassin = false;
+	bool bFoundHunter = false;
+	bool bFoundHoly = false;
+	bool bFoundBerserker = false;
 	FRandomStream RareRng(4302);
-	for (int32 Index = 0; Index < 120; ++Index)
+	for (int32 Index = 0; Index < 320; ++Index)
 	{
 		const EItemSet ItemSet = FDropFormula::RollItemSet(EItemRarity::Rare, RareRng);
-		TestTrue(TEXT("Rare+ set roll stays in enum range"), ItemSet >= EItemSet::Warrior && ItemSet <= EItemSet::Arcane);
+		TestTrue(TEXT("Rare+ set roll stays in enum range"), ItemSet >= EItemSet::Warrior && ItemSet <= EItemSet::Berserker);
 		bFoundWarrior = bFoundWarrior || ItemSet == EItemSet::Warrior;
 		bFoundGuardian = bFoundGuardian || ItemSet == EItemSet::Guardian;
 		bFoundArcane = bFoundArcane || ItemSet == EItemSet::Arcane;
+		bFoundAssassin = bFoundAssassin || ItemSet == EItemSet::Assassin;
+		bFoundHunter = bFoundHunter || ItemSet == EItemSet::Hunter;
+		bFoundHoly = bFoundHoly || ItemSet == EItemSet::Holy;
+		bFoundBerserker = bFoundBerserker || ItemSet == EItemSet::Berserker;
 	}
 
 	TestTrue(TEXT("Rare+ rolls can produce Warrior"), bFoundWarrior);
 	TestTrue(TEXT("Rare+ rolls can produce Guardian"), bFoundGuardian);
 	TestTrue(TEXT("Rare+ rolls can produce Arcane"), bFoundArcane);
+	TestTrue(TEXT("Rare+ rolls can produce Assassin"), bFoundAssassin);
+	TestTrue(TEXT("Rare+ rolls can produce Hunter"), bFoundHunter);
+	TestTrue(TEXT("Rare+ rolls can produce Holy"), bFoundHoly);
+	TestTrue(TEXT("Rare+ rolls can produce Berserker"), bFoundBerserker);
 
 	FRandomStream MythicRng(4303);
 	const EItemSet MythicSet = FDropFormula::RollItemSet(EItemRarity::Mythic, MythicRng);
-	TestTrue(TEXT("Mythic items roll an item set"), MythicSet >= EItemSet::Warrior && MythicSet <= EItemSet::Arcane);
+	TestTrue(TEXT("Mythic items roll an item set"), MythicSet >= EItemSet::Warrior && MythicSet <= EItemSet::Berserker);
 
 	return true;
 }
@@ -328,6 +419,26 @@ bool FSetBonusFormulaDefinitionParityTest::RunTest(const FString& Parameters)
 	const FDerivedStats ArcaneFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Arcane);
 	TestEqual(TEXT("Arcane 4-piece magic attack matches server"), ArcaneFourPiece.MagicAtk, 50.0f);
 	TestEqual(TEXT("Arcane 4-piece crit damage matches server"), ArcaneFourPiece.CritDmg, 0.10f);
+
+	const FDerivedStats AssassinTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Assassin);
+	TestEqual(TEXT("Assassin 2-piece crit matches server"), AssassinTwoPiece.CritRate, 0.03f);
+	const FDerivedStats AssassinFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Assassin);
+	TestEqual(TEXT("Assassin 4-piece crit damage matches server"), AssassinFourPiece.CritDmg, 0.15f);
+
+	const FDerivedStats HunterTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Hunter);
+	TestEqual(TEXT("Hunter 2-piece speed matches server"), HunterTwoPiece.AtkSpeed, 0.05f);
+	const FDerivedStats HunterFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Hunter);
+	TestEqual(TEXT("Hunter 4-piece attack matches server"), HunterFourPiece.PhysAtk, 35.0f);
+
+	const FDerivedStats HolyTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Holy);
+	TestEqual(TEXT("Holy 2-piece HP matches server"), HolyTwoPiece.Hp, 120.0f);
+	const FDerivedStats HolyFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Holy);
+	TestEqual(TEXT("Holy 4-piece magic defense matches server"), HolyFourPiece.MagicDef, 30.0f);
+
+	const FDerivedStats BerserkerTwoPiece = FSetBonusFormula::GetTwoPieceBonus(EItemSet::Berserker);
+	TestEqual(TEXT("Berserker 2-piece attack matches server"), BerserkerTwoPiece.PhysAtk, 30.0f);
+	const FDerivedStats BerserkerFourPiece = FSetBonusFormula::GetFourPieceBonus(EItemSet::Berserker);
+	TestEqual(TEXT("Berserker 4-piece crit matches server"), BerserkerFourPiece.CritRate, 0.04f);
 
 	const FDerivedStats NoneBonus = FSetBonusFormula::GetTwoPieceBonus(EItemSet::None);
 	TestEqual(TEXT("None set has no two-piece attack"), NoneBonus.PhysAtk, 0.0f);
@@ -365,6 +476,16 @@ bool FSetBonusFormulaThresholdsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("None and under-threshold sets grant no attack"), Bonus.PhysAtk, 0.0f);
 	TestEqual(TEXT("None and under-threshold sets grant no defense"), Bonus.PhysDef, 0.0f);
 	TestEqual(TEXT("None and under-threshold sets grant no HP"), Bonus.Hp, 0.0f);
+
+	TArray<FItemInstance> HolyItems;
+	HolyItems.Add(MakeTestItem(TEXT("holy_weapon"), EItemSlot::Weapon, EItemRarity::Rare, 3.0f, 0.0f, 0.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Holy));
+	HolyItems.Add(MakeTestItem(TEXT("holy_helmet"), EItemSlot::Helmet, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Holy));
+	HolyItems.Add(MakeTestItem(TEXT("holy_top"), EItemSlot::Top, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Holy));
+	HolyItems.Add(MakeTestItem(TEXT("holy_bottom"), EItemSlot::Bottom, EItemRarity::Rare, 0.0f, 1.0f, 5.0f, 0, 0.0f, 0.0f, 0.0f, EItemSet::Holy));
+	Bonus = FSetBonusFormula::ComputeSetBonus(HolyItems);
+	TestEqual(TEXT("Holy 4-piece includes HP"), Bonus.Hp, 120.0f);
+	TestEqual(TEXT("Holy 4-piece adds both defenses"), Bonus.PhysDef, 20.0f);
+	TestEqual(TEXT("Holy 4-piece adds magic defense"), Bonus.MagicDef, 30.0f);
 
 	return true;
 }
@@ -459,6 +580,13 @@ bool FItemPowerScoreDeterministicTest::RunTest(const FString& Parameters)
 
 	const FItemInstance AffixSword = MakeTestItem(TEXT("affix_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 2, 0.02f, 0.10f, 5.0f);
 	TestEqual(TEXT("Affixes contribute weighted power before enhance multiplier"), FItemPowerScore::Compute(AffixSword), 54);
+
+	FItemInstance ExpandedAffixSword = MakeTestItem(TEXT("expanded_affix_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 10.0f, 0.0f, 0.0f, 1);
+	ExpandedAffixSword.BonusPhysDef = 5.0f;
+	ExpandedAffixSword.BonusMagicDef = 7.0f;
+	ExpandedAffixSword.BonusAffixHp = 40.0f;
+	ExpandedAffixSword.BonusCritDmg = 0.20f;
+	TestEqual(TEXT("Expanded affixes contribute weighted power before enhance multiplier"), FItemPowerScore::Compute(ExpandedAffixSword), 51);
 
 	return true;
 }
@@ -708,13 +836,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FInventoryEquipmentBonusAffixTest::RunTest(const FString& Parameters)
 {
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
-	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 2, 0.02f, 0.10f, 5.0f));
+	FItemInstance AffixItem = MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 2, 0.02f, 0.10f, 5.0f);
+	AffixItem.BonusPhysDef = 4.0f;
+	AffixItem.BonusMagicDef = 6.0f;
+	AffixItem.BonusAffixHp = 30.0f;
+	AffixItem.BonusCritDmg = 0.12f;
+	Inventory->AddItem(AffixItem);
 
 	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
 	TestEqual(TEXT("Enhanced item increases physical attack"), Bonus.PhysAtk, 12.0f);
 	TestEqual(TEXT("Enhanced item increases crit affix"), Bonus.CritRate, 0.024f);
 	TestEqual(TEXT("Enhanced item increases attack speed affix"), Bonus.AtkSpeed, 0.12f);
 	TestEqual(TEXT("Enhanced item increases magic attack affix"), Bonus.MagicAtk, 6.0f);
+	TestEqual(TEXT("Enhanced item increases physical defense affix"), Bonus.PhysDef, 4.8f);
+	TestEqual(TEXT("Enhanced item increases magic defense affix"), Bonus.MagicDef, 7.2f);
+	TestEqual(TEXT("Enhanced item increases HP affix"), Bonus.Hp, 36.0f);
+	TestEqual(TEXT("Enhanced item increases crit damage affix"), Bonus.CritDmg, 0.144f);
 
 	return true;
 }
