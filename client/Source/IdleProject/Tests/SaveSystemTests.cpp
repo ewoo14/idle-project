@@ -8,7 +8,9 @@
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
+#include "CharacterSystem/IdleCharacter.h"
 #include "CombatSystem/SkillComponent.h"
+#include "Engine/World.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemTypes.h"
 #include "Kismet/GameplayStatics.h"
@@ -180,6 +182,92 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemInventoryRestoreRemapsEquippedIndexesTest,
+	"IdleProject.GameCore.SaveSystem.InventoryRestoreRemapsEquippedIndexes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemInventoryRestoreRemapsEquippedIndexesTest::RunTest(const FString& Parameters)
+{
+	TArray<FItemInstance> SavedItems;
+	SavedItems.Add(MakeSaveTestItem(TEXT("bad_none"), EItemSlot::None, EItemRarity::Rare, 1.0f, 0.0f, 0.0f));
+	SavedItems.Add(MakeSaveTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 7, 0.03f, 0.10f, 4.0f, EItemSet::Warrior));
+	SavedItems.Add(MakeSaveTestItem(TEXT("bad_rarity"), EItemSlot::Helmet, EItemRarity::None, 0.0f, 8.0f, 30.0f));
+	SavedItems.Add(MakeSaveTestItem(TEXT("legendary_helmet"), EItemSlot::Helmet, EItemRarity::Legendary, 0.0f, 8.0f, 30.0f, 12, 0.04f, 0.12f, 9.0f, EItemSet::Guardian));
+
+	TMap<EItemSlot, int32> SavedEquipped;
+	SavedEquipped.Add(EItemSlot::Weapon, 1);
+	SavedEquipped.Add(EItemSlot::Helmet, 3);
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->RestoreState(SavedItems, SavedEquipped);
+
+	TArray<FItemInstance> RestoredItems;
+	TMap<EItemSlot, int32> RestoredEquipped;
+	Inventory->CaptureState(RestoredItems, RestoredEquipped);
+
+	TestEqual(TEXT("Restore keeps only valid items"), RestoredItems.Num(), 2);
+	TestEqual(TEXT("Weapon equipped index is remapped after invalid item drop"), RestoredEquipped.FindRef(EItemSlot::Weapon), 0);
+	TestEqual(TEXT("Helmet equipped index is remapped after invalid item drop"), RestoredEquipped.FindRef(EItemSlot::Helmet), 1);
+
+	const FItemInstance* EquippedWeapon = Inventory->GetEquippedItem(EItemSlot::Weapon);
+	const FItemInstance* EquippedHelmet = Inventory->GetEquippedItem(EItemSlot::Helmet);
+	TestNotNull(TEXT("Restored weapon remains equipped"), EquippedWeapon);
+	TestNotNull(TEXT("Restored helmet remains equipped"), EquippedHelmet);
+	TestEqual(TEXT("Equipped weapon payload survives remap"), EquippedWeapon ? EquippedWeapon->ItemId : NAME_None, FName(TEXT("rare_sword")));
+	TestEqual(TEXT("Equipped helmet payload survives remap"), EquippedHelmet ? EquippedHelmet->ItemId : NAME_None, FName(TEXT("legendary_helmet")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemPendingCharacterStateAppliesAfterPawnSpawnTest,
+	"IdleProject.GameCore.SaveSystem.PendingCharacterStateAppliesAfterPawnSpawn",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemPendingCharacterStateAppliesAfterPawnSpawnTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* SourceSave = NewObject<UIdleSaveGame>();
+	SourceSave->bHasSave = true;
+	SourceSave->InventoryItems.Add(MakeSaveTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 7, 0.03f, 0.10f, 4.0f, EItemSet::Warrior));
+	SourceSave->EquippedSlotIndex.Add(EItemSlot::Weapon, 0);
+	SourceSave->SkillRanks.Add(TEXT("heavy_strike"), 3);
+	SourceSave->SkillPoints = 2;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave queues v2 character state when no pawn exists"), GameInstance->ApplyFromSave(SourceSave));
+
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>();
+	TestNotNull(TEXT("Character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+	GameInstance->ApplyPendingCharacterSaveToCharacter(Character);
+
+	UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>();
+	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	TestNotNull(TEXT("Character has inventory"), Inventory);
+	TestNotNull(TEXT("Character has skills"), Skills);
+	TestEqual(TEXT("Pending inventory item is restored"), Inventory ? Inventory->GetItemCount() : INDEX_NONE, 1);
+	TestEqual(TEXT("Pending equipped weapon is restored"), Inventory && Inventory->GetEquippedItem(EItemSlot::Weapon) ? Inventory->GetEquippedItem(EItemSlot::Weapon)->ItemId : NAME_None, FName(TEXT("rare_sword")));
+	TestEqual(TEXT("Pending skill rank is restored"), Skills ? Skills->GetSkillRank(TEXT("heavy_strike")) : INDEX_NONE, 3);
+	TestEqual(TEXT("Pending skill points are restored"), Skills ? Skills->GetSkillPoints() : INDEX_NONE, 2);
+
+	World->DestroyWorld(false);
 	return true;
 }
 

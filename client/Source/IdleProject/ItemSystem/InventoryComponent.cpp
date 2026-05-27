@@ -158,12 +158,14 @@ void UInventoryComponent::CaptureState(TArray<FItemInstance>& OutItems, TMap<EIt
 void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, const TMap<EItemSlot, int32>& InEquipped)
 {
 	Items.Reset();
-	for (const FItemInstance& SourceItem : InItems)
+	TMap<int32, int32> RestoredIndexBySavedIndex;
+	for (int32 SavedIndex = 0; SavedIndex < InItems.Num(); ++SavedIndex)
 	{
 		if (Items.Num() >= MaxItems)
 		{
 			break;
 		}
+		const FItemInstance& SourceItem = InItems[SavedIndex];
 		if (SourceItem.Slot == EItemSlot::None || SourceItem.Rarity == EItemRarity::None)
 		{
 			continue;
@@ -171,7 +173,8 @@ void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, con
 
 		FItemInstance RestoredItem = SourceItem;
 		RestoredItem.EnhanceLevel = FMath::Clamp(RestoredItem.EnhanceLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
-		Items.Add(RestoredItem);
+		const int32 RestoredIndex = Items.Add(RestoredItem);
+		RestoredIndexBySavedIndex.Add(SavedIndex, RestoredIndex);
 	}
 
 	EquippedIndex.Empty();
@@ -189,7 +192,8 @@ void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, con
 	for (const EItemSlot Slot : Slots)
 	{
 		const int32* SavedIndex = InEquipped.Find(Slot);
-		const int32 CandidateIndex = SavedIndex ? *SavedIndex : INDEX_NONE;
+		const int32* RemappedIndex = SavedIndex ? RestoredIndexBySavedIndex.Find(*SavedIndex) : nullptr;
+		const int32 CandidateIndex = RemappedIndex ? *RemappedIndex : INDEX_NONE;
 		if (Items.IsValidIndex(CandidateIndex) && Items[CandidateIndex].Slot == Slot)
 		{
 			EquippedIndex.Add(Slot, CandidateIndex);

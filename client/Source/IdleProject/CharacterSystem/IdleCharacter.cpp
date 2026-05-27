@@ -103,6 +103,10 @@ void AIdleCharacter::BeginPlay()
 		IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleCharacter::HandleStatPointsChanged);
 	}
 	SetClassId(DefaultClassId);
+	if (UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
+	{
+		IdleGameInstance->ApplyPendingCharacterSaveToCharacter(this);
+	}
 	LastObservedHp = Combat ? Combat->CurrentHp : 0.0f;
 
 	if (BattleAI)

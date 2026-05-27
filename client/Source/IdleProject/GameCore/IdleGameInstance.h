@@ -135,6 +135,7 @@ public:
 
 	bool CaptureToSave(UIdleSaveGame* SaveGame);
 	bool ApplyFromSave(const UIdleSaveGame* SaveGame);
+	void ApplyPendingCharacterSaveToCharacter(AIdleCharacter* Character);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
 	int64 ClimbTower();
@@ -377,6 +378,11 @@ private:
 
 	bool bAutosaveSuppressed = false;
 	bool bAutosavePending = false;
+	bool bHasPendingCharacterSaveV2 = false;
+	TArray<FItemInstance> PendingInventoryItems;
+	TMap<EItemSlot, int32> PendingEquippedSlotIndex;
+	TMap<FName, int32> PendingSkillRanks;
+	int32 PendingSkillPoints = 0;
 	FTimerHandle AutosaveTimerHandle;
 
 	FRandomStream EnhanceRandomStream;
@@ -386,6 +392,12 @@ private:
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
+	bool ApplyCharacterSaveState(
+		AIdleCharacter* Character,
+		const TArray<FItemInstance>& InventoryItems,
+		const TMap<EItemSlot, int32>& EquippedSlotIndex,
+		const TMap<FName, int32>& SkillRanks,
+		int32 SkillPoints);
 	void RequestAutosave();
 	void FlushPendingAutosave();
 	void EnsureQuestService();
