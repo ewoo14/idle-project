@@ -62,6 +62,7 @@ void UIdleGameInstance::Init()
 	EnsureSeasonService();
 	EnsureStageService();
 	EnsureTowerService();
+	EnsureAchievementService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	LoadLanguage();
@@ -86,6 +87,7 @@ void UIdleGameInstance::Shutdown()
 	SeasonService = nullptr;
 	StageService = nullptr;
 	TowerService = nullptr;
+	AchievementService = nullptr;
 	Super::Shutdown();
 }
 
@@ -106,12 +108,14 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	if (Amount > 0 && Gold > MAX_int64 - Amount)
 	{
 		Gold = MAX_int64;
+		RecordAchievementMetric(EAchievementMetric::GoldEarned, Amount);
 		OnGoldChanged.Broadcast(Gold);
 		RequestAutosave();
 		return;
 	}
 	if (Amount < 0 && (Amount == MIN_int64 || Gold < -Amount))
 	{
+		RecordAchievementMetric(EAchievementMetric::GoldSpent, Gold);
 		Gold = 0;
 		OnGoldChanged.Broadcast(Gold);
 		RequestAutosave();
@@ -119,6 +123,14 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	}
 
 	Gold = Gold + Amount;
+	if (Amount > 0)
+	{
+		RecordAchievementMetric(EAchievementMetric::GoldEarned, Amount);
+	}
+	else if (Amount < 0)
+	{
+		RecordAchievementMetric(EAchievementMetric::GoldSpent, -Amount);
+	}
 	OnGoldChanged.Broadcast(Gold);
 	RequestAutosave();
 }
@@ -303,6 +315,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsurePetService();
 	EnsureQuestService();
 	EnsureSeasonService();
+	EnsureAchievementService();
 
 	SaveGame->SaveVersion = 2;
 	SaveGame->bHasSave = true;
@@ -369,6 +382,11 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (SeasonService)
 	{
 		SeasonService->CaptureState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
+	}
+
+	if (AchievementService)
+	{
+		AchievementService->CaptureState(SaveGame->AchievementMetrics, SaveGame->Achievements);
 	}
 
 	return true;
@@ -453,11 +471,18 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		{
 			SeasonService->RestoreState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
 		}
+
+		EnsureAchievementService();
+		if (AchievementService)
+		{
+			AchievementService->RestoreState(SaveGame->AchievementMetrics, SaveGame->Achievements);
+		}
 	}
 	else
 	{
 		EnsureQuestService();
 		EnsureSeasonService();
+		EnsureAchievementService();
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -534,6 +559,7 @@ int64 UIdleGameInstance::ClimbTower()
 	const int64 Reward = TowerService->TryClimbTower(Character->GetCombatPower());
 	if (Reward > 0)
 	{
+		RecordAchievementMetric(EAchievementMetric::TowerHighestFloor, TowerService->GetHighestFloor());
 		AddGold(Reward);
 		RequestAutosave();
 	}
@@ -583,6 +609,7 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 	}
 
 	RecordGearEnhanced();
+	RecordAchievementMetric(EAchievementMetric::HighestEnhanceLevel, Result.NewLevel);
 	OnEnhanceResult.Broadcast(Result);
 	RequestAutosave();
 	return Result;
@@ -619,7 +646,9 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	}
 
 	AddGold(-Cost);
+	RecordAchievementMetric(EAchievementMetric::GearRollsPurchased, 1);
 	Inventory->AddItem(Item);
+	RecordAchievementMetric(EAchievementMetric::ItemsCollected, 1);
 
 	Result.bPurchased = true;
 	Result.GoldSpent = Cost;
@@ -666,6 +695,7 @@ void UIdleGameInstance::LevelUp()
 	}
 
 	++CharacterLevel;
+	RecordAchievementMetric(EAchievementMetric::HighestLevelReached, CharacterLevel);
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	GrantStatPoints(FStatPointFormula::GetStatPointsForLevelUp(CharacterLevel));
 	OnLevelUp.Broadcast(CharacterLevel);
@@ -756,6 +786,7 @@ bool UIdleGameInstance::Rebirth()
 
 	const int32 Reward = FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
 	++RebirthCount;
+	RecordAchievementMetric(EAchievementMetric::RebirthCount, RebirthCount);
 	RebirthBonusPoints += Reward;
 	CharacterLevel = 1;
 	CurrentExp = 0;
@@ -795,6 +826,7 @@ bool UIdleGameInstance::Transcend()
 	}
 
 	++TranscendCount;
+	RecordAchievementMetric(EAchievementMetric::TranscendCount, TranscendCount);
 	RebirthCount = 0;
 	RebirthBonusPoints = 0;
 	CharacterLevel = 1;
@@ -826,6 +858,21 @@ float UIdleGameInstance::GetTranscendStatMultiplier() const
 float UIdleGameInstance::GetTowerMilestoneMultiplier() const
 {
 	return TowerService ? TowerService->GetMilestoneMultiplier() : 1.0f;
+}
+
+float UIdleGameInstance::GetAchievementStatMultiplier() const
+{
+	return AchievementService ? AchievementService->GetStatMultiplier() : 1.0f;
+}
+
+int32 UIdleGameInstance::GetAchievementTotalPoints() const
+{
+	return AchievementService ? AchievementService->GetTotalPoints() : 0;
+}
+
+int64 UIdleGameInstance::GetAchievementMetricValue(EAchievementMetric Metric) const
+{
+	return AchievementService ? AchievementService->GetMetricValue(Metric) : 0;
 }
 
 float UIdleGameInstance::PreviewTranscendMultiplier() const
@@ -866,6 +913,7 @@ FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, 
 	AddGold(Reward.Gold);
 	AddExp(Reward.Exp);
 	RecordQuestProgress(EQuestObjective::ClaimOffline, 1);
+	RecordAchievementMetric(EAchievementMetric::OfflineRewardsClaimed, 1);
 	LastSeenUnixSec = FMath::Max(LastSeenUnixSec, NowUnixSec);
 	RequestAutosave();
 	return Reward;
@@ -898,11 +946,22 @@ void UIdleGameInstance::RecordQuestProgress(EQuestObjective Objective, int32 Amo
 void UIdleGameInstance::RecordMonsterKilled()
 {
 	RecordQuestProgress(EQuestObjective::KillMonster, 1);
+	RecordAchievementMetric(EAchievementMetric::MonstersKilled, 1);
 }
 
 void UIdleGameInstance::RecordGearEnhanced()
 {
 	RecordQuestProgress(EQuestObjective::Enhance, 1);
+	RecordAchievementMetric(EAchievementMetric::GearEnhanced, 1);
+}
+
+void UIdleGameInstance::RecordAchievementMetric(EAchievementMetric Metric, int64 AmountOrValue)
+{
+	EnsureAchievementService();
+	if (AchievementService)
+	{
+		AchievementService->RecordMetric(Metric, AmountOrValue);
+	}
 }
 
 FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
@@ -924,6 +983,7 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 
 	AddGold(Result.RewardGold);
 	AddExp(Result.RewardExp);
+	RecordAchievementMetric(EAchievementMetric::QuestsCompleted, 1);
 	EnsureSeasonService();
 	if (SeasonService)
 	{
@@ -1036,6 +1096,8 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 	Result.bFed = true;
 	Result.GoldSpent = Cost;
 	Result.NewLevel = CurrentLevel + 1;
+	RecordAchievementMetric(EAchievementMetric::PetsFed, 1);
+	RecordAchievementMetric(EAchievementMetric::HighestPetLevel, Result.NewLevel);
 	OnPetFed.Broadcast(Result);
 	RequestAutosave();
 	return Result;
@@ -1100,6 +1162,7 @@ FSeasonClaimResult UIdleGameInstance::ClaimSeasonReward(int32 Tier)
 	{
 		ApiClient->ClaimSeasonReward(Tier);
 	}
+	RecordAchievementMetric(EAchievementMetric::SeasonRewardsClaimed, 1);
 	RequestAutosave();
 	return Result;
 }
@@ -1223,6 +1286,15 @@ void UIdleGameInstance::EnsureTowerService()
 	{
 		TowerService = NewObject<UTowerService>(this);
 		TowerService->InitializeTower();
+	}
+}
+
+void UIdleGameInstance::EnsureAchievementService()
+{
+	if (!AchievementService)
+	{
+		AchievementService = NewObject<UAchievementService>(this);
+		AchievementService->InitializeDefaultAchievements();
 	}
 }
 

@@ -1263,6 +1263,12 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 	{
 		Skills->ApplyPassivesToStats(ExpectedDerived);
 	}
+	const float AchievementMultiplier = GameInstance->GetAchievementStatMultiplier();
+	ExpectedDerived.Hp *= AchievementMultiplier;
+	ExpectedDerived.PhysAtk *= AchievementMultiplier;
+	ExpectedDerived.MagicAtk *= AchievementMultiplier;
+	ExpectedDerived.PhysDef *= AchievementMultiplier;
+	ExpectedDerived.MagicDef *= AchievementMultiplier;
 	const FPrimaryStats CurrentPrimary = Character->GetCurrentPrimaryStats();
 	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
 	const UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>();
@@ -1271,8 +1277,8 @@ bool FIdleCharacterCurrentStatsAccessorsTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Skill component exists"), Skills);
 	TestEqual(TEXT("Current primary STR mirrors refreshed stats"), CurrentPrimary.Str, ExpectedPrimary.Str);
 	TestEqual(TEXT("Current primary INT mirrors refreshed stats"), CurrentPrimary.Int_, ExpectedPrimary.Int_);
-	TestEqual(TEXT("Current derived HP mirrors refreshed stats"), CurrentDerived.Hp, ExpectedDerived.Hp);
-	TestEqual(TEXT("Current derived magic attack mirrors refreshed stats"), CurrentDerived.MagicAtk, ExpectedDerived.MagicAtk);
+	TestEqual(TEXT("Current derived HP mirrors refreshed stats with achievement multiplier"), CurrentDerived.Hp, ExpectedDerived.Hp);
+	TestEqual(TEXT("Current derived magic attack mirrors refreshed stats with achievement multiplier"), CurrentDerived.MagicAtk, ExpectedDerived.MagicAtk);
 	TestNotNull(TEXT("Combat component exists"), Combat);
 	TestEqual(TEXT("Combat max HP uses refreshed derived stats"), Combat ? Combat->MaxHp : 0.0f, CurrentDerived.Hp);
 	TestEqual(TEXT("Combat magic attack uses refreshed derived stats"), Combat ? Combat->MagicAtk : 0.0f, CurrentDerived.MagicAtk);
@@ -1519,11 +1525,12 @@ bool FIdleCharacterTranscendDerivedStatsTest::RunTest(const FString& Parameters)
 	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
 	const UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>();
 
-	TestEqual(TEXT("Transcend count one multiplies HP by 1.25"), CurrentDerived.Hp, BaseDerived.Hp * 1.25f);
-	TestEqual(TEXT("Transcend count one multiplies physical attack by 1.25"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * 1.25f);
-	TestEqual(TEXT("Transcend count one multiplies magic attack by 1.25"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * 1.25f);
-	TestEqual(TEXT("Transcend count one multiplies physical defense by 1.25"), CurrentDerived.PhysDef, BaseDerived.PhysDef * 1.25f);
-	TestEqual(TEXT("Transcend count one multiplies magic defense by 1.25"), CurrentDerived.MagicDef, BaseDerived.MagicDef * 1.25f);
+	const float CombinedProgressMultiplier = GameInstance->GetTranscendStatMultiplier() * GameInstance->GetAchievementStatMultiplier();
+	TestEqual(TEXT("Transcend count one and achievements multiply HP"), CurrentDerived.Hp, BaseDerived.Hp * CombinedProgressMultiplier);
+	TestEqual(TEXT("Transcend count one and achievements multiply physical attack"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * CombinedProgressMultiplier);
+	TestEqual(TEXT("Transcend count one and achievements multiply magic attack"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * CombinedProgressMultiplier);
+	TestEqual(TEXT("Transcend count one and achievements multiply physical defense"), CurrentDerived.PhysDef, BaseDerived.PhysDef * CombinedProgressMultiplier);
+	TestEqual(TEXT("Transcend count one and achievements multiply magic defense"), CurrentDerived.MagicDef, BaseDerived.MagicDef * CombinedProgressMultiplier);
 	TestEqual(TEXT("Transcend multiplier does not alter attack speed"), CurrentDerived.AtkSpeed, BaseDerived.AtkSpeed);
 	TestEqual(TEXT("Transcend multiplier does not alter crit rate"), CurrentDerived.CritRate, BaseDerived.CritRate);
 	TestNotNull(TEXT("Combat component exists"), Combat);
@@ -1660,12 +1667,12 @@ bool FIdleCharacterTranscendAndTowerMilestoneDerivedStatsTest::RunTest(const FSt
 		Skills->ApplyPassivesToStats(BaseDerived);
 	}
 
-	const float CombinedMultiplier = GameInstance->GetTranscendStatMultiplier() * FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10);
+	const float CombinedMultiplier = GameInstance->GetTranscendStatMultiplier() * FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10) * GameInstance->GetAchievementStatMultiplier();
 	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
 
-	TestEqual(TEXT("Transcend and tower milestone multiply HP together"), CurrentDerived.Hp, BaseDerived.Hp * CombinedMultiplier);
-	TestEqual(TEXT("Transcend and tower milestone multiply physical attack together"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * CombinedMultiplier);
-	TestEqual(TEXT("Transcend and tower milestone multiply magic attack together"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * CombinedMultiplier);
+	TestEqual(TEXT("Transcend, tower milestone, and achievement multiply HP together"), CurrentDerived.Hp, BaseDerived.Hp * CombinedMultiplier);
+	TestEqual(TEXT("Transcend, tower milestone, and achievement multiply physical attack together"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * CombinedMultiplier);
+	TestEqual(TEXT("Transcend, tower milestone, and achievement multiply magic attack together"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * CombinedMultiplier);
 	TestEqual(TEXT("Combined multipliers do not alter attack speed"), CurrentDerived.AtkSpeed, BaseDerived.AtkSpeed);
 	TestEqual(TEXT("Combined multipliers do not alter crit rate"), CurrentDerived.CritRate, BaseDerived.CritRate);
 

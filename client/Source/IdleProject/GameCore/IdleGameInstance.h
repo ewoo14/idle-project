@@ -4,6 +4,7 @@
 #include "Engine/GameInstance.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
+#include "GameCore/AchievementService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -126,6 +127,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UTowerService* GetTowerService() const { return TowerService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UAchievementService* GetAchievementService() const { return AchievementService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -253,6 +257,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
 	float GetTowerMilestoneMultiplier() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
+	float GetAchievementStatMultiplier() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
+	int32 GetAchievementTotalPoints() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
+	int64 GetAchievementMetricValue(EAchievementMetric Metric) const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	float PreviewTranscendMultiplier() const;
 
@@ -267,6 +280,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
 	void RecordGearEnhanced();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Achievement")
+	void RecordAchievementMetric(EAchievementMetric Metric, int64 AmountOrValue);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
 	FQuestClaimResult ClaimQuest(const FString& QuestId);
@@ -360,6 +376,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UTowerService> TowerService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UAchievementService> AchievementService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -433,6 +452,7 @@ private:
 	void EnsureSeasonService();
 	void EnsureStageService();
 	void EnsureTowerService();
+	void EnsureAchievementService();
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();
