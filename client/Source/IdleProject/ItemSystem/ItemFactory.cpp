@@ -1,5 +1,6 @@
 #include "ItemSystem/ItemFactory.h"
 
+#include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/DropFormula.h"
 
 namespace
@@ -9,6 +10,7 @@ struct FBaseItemDefinition
 	FName BaseItemId;
 	EItemSlot Slot = EItemSlot::None;
 	const TCHAR* DisplayName = TEXT("Item");
+	const TCHAR* DisplayNameKey = TEXT("BASE_ITEM_LONGSWORD");
 	float AtkScale = 1.0f;
 	float DefScale = 1.0f;
 	float HpScale = 1.0f;
@@ -17,33 +19,33 @@ struct FBaseItemDefinition
 const TArray<FBaseItemDefinition>& GetBaseItemCatalog()
 {
 	static const TArray<FBaseItemDefinition> Catalog = {
-		{TEXT("longsword"), EItemSlot::Weapon, TEXT("Longsword"), 1.05f, 1.0f, 1.0f},
-		{TEXT("greatsword"), EItemSlot::Weapon, TEXT("Greatsword"), 1.15f, 0.9f, 1.0f},
-		{TEXT("dagger"), EItemSlot::Weapon, TEXT("Dagger"), 0.9f, 1.0f, 1.0f},
-		{TEXT("bow"), EItemSlot::Weapon, TEXT("Bow"), 1.0f, 1.0f, 1.0f},
-		{TEXT("staff"), EItemSlot::Weapon, TEXT("Staff"), 0.9f, 1.0f, 1.0f},
-		{TEXT("wand"), EItemSlot::Weapon, TEXT("Wand"), 0.85f, 1.0f, 1.0f},
-		{TEXT("helm"), EItemSlot::Helmet, TEXT("Helm"), 1.0f, 1.08f, 1.0f},
-		{TEXT("hood"), EItemSlot::Helmet, TEXT("Hood"), 1.0f, 0.92f, 1.05f},
-		{TEXT("circlet"), EItemSlot::Helmet, TEXT("Circlet"), 1.0f, 1.0f, 1.0f},
-		{TEXT("armor"), EItemSlot::Top, TEXT("Armor"), 1.0f, 1.1f, 1.05f},
-		{TEXT("robe"), EItemSlot::Top, TEXT("Robe"), 1.0f, 0.9f, 1.0f},
-		{TEXT("jacket"), EItemSlot::Top, TEXT("Jacket"), 1.0f, 1.0f, 0.95f},
-		{TEXT("greaves"), EItemSlot::Bottom, TEXT("Greaves"), 1.0f, 1.08f, 1.0f},
-		{TEXT("trousers"), EItemSlot::Bottom, TEXT("Battle Trousers"), 1.0f, 0.95f, 0.95f},
-		{TEXT("leggings"), EItemSlot::Bottom, TEXT("Arcane Leggings"), 1.0f, 0.9f, 1.05f},
-		{TEXT("boots"), EItemSlot::Shoes, TEXT("Boots"), 1.0f, 1.0f, 1.0f},
-		{TEXT("shoes"), EItemSlot::Shoes, TEXT("Shoes"), 1.0f, 0.92f, 0.9f},
-		{TEXT("sandals"), EItemSlot::Shoes, TEXT("Blessed Sandals"), 1.0f, 0.95f, 1.05f},
-		{TEXT("gauntlets"), EItemSlot::Gloves, TEXT("Gauntlets"), 1.0f, 1.08f, 1.0f},
-		{TEXT("gloves"), EItemSlot::Gloves, TEXT("Gloves"), 1.0f, 0.92f, 0.95f},
-		{TEXT("bracers"), EItemSlot::Gloves, TEXT("Bracers"), 1.0f, 1.0f, 1.0f},
-		{TEXT("cloak"), EItemSlot::Cloak, TEXT("Cloak"), 1.0f, 1.0f, 1.0f},
-		{TEXT("cape"), EItemSlot::Cloak, TEXT("Battle Cape"), 1.0f, 1.02f, 0.95f},
-		{TEXT("mantle"), EItemSlot::Cloak, TEXT("Sage Mantle"), 1.0f, 0.95f, 1.08f},
-		{TEXT("ring"), EItemSlot::Accessory, TEXT("Ring"), 1.0f, 1.0f, 1.0f},
-		{TEXT("amulet"), EItemSlot::Accessory, TEXT("Amulet"), 0.95f, 1.0f, 1.05f},
-		{TEXT("talisman"), EItemSlot::Accessory, TEXT("Talisman"), 0.9f, 1.08f, 1.0f}
+		{TEXT("longsword"), EItemSlot::Weapon, TEXT("Longsword"), TEXT("BASE_ITEM_LONGSWORD"), 1.05f, 1.0f, 1.0f},
+		{TEXT("greatsword"), EItemSlot::Weapon, TEXT("Greatsword"), TEXT("BASE_ITEM_GREATSWORD"), 1.15f, 0.9f, 1.0f},
+		{TEXT("dagger"), EItemSlot::Weapon, TEXT("Dagger"), TEXT("BASE_ITEM_DAGGER"), 0.9f, 1.0f, 1.0f},
+		{TEXT("bow"), EItemSlot::Weapon, TEXT("Bow"), TEXT("BASE_ITEM_BOW"), 1.0f, 1.0f, 1.0f},
+		{TEXT("staff"), EItemSlot::Weapon, TEXT("Staff"), TEXT("BASE_ITEM_STAFF"), 0.9f, 1.0f, 1.0f},
+		{TEXT("wand"), EItemSlot::Weapon, TEXT("Wand"), TEXT("BASE_ITEM_WAND"), 0.85f, 1.0f, 1.0f},
+		{TEXT("helm"), EItemSlot::Helmet, TEXT("Helm"), TEXT("BASE_ITEM_HELM"), 1.0f, 1.08f, 1.0f},
+		{TEXT("hood"), EItemSlot::Helmet, TEXT("Hood"), TEXT("BASE_ITEM_HOOD"), 1.0f, 0.92f, 1.05f},
+		{TEXT("circlet"), EItemSlot::Helmet, TEXT("Circlet"), TEXT("BASE_ITEM_CIRCLET"), 1.0f, 1.0f, 1.0f},
+		{TEXT("armor"), EItemSlot::Top, TEXT("Armor"), TEXT("BASE_ITEM_ARMOR"), 1.0f, 1.1f, 1.05f},
+		{TEXT("robe"), EItemSlot::Top, TEXT("Robe"), TEXT("BASE_ITEM_ROBE"), 1.0f, 0.9f, 1.0f},
+		{TEXT("jacket"), EItemSlot::Top, TEXT("Jacket"), TEXT("BASE_ITEM_JACKET"), 1.0f, 1.0f, 0.95f},
+		{TEXT("greaves"), EItemSlot::Bottom, TEXT("Greaves"), TEXT("BASE_ITEM_GREAVES"), 1.0f, 1.08f, 1.0f},
+		{TEXT("trousers"), EItemSlot::Bottom, TEXT("Battle Trousers"), TEXT("BASE_ITEM_TROUSERS"), 1.0f, 0.95f, 0.95f},
+		{TEXT("leggings"), EItemSlot::Bottom, TEXT("Arcane Leggings"), TEXT("BASE_ITEM_LEGGINGS"), 1.0f, 0.9f, 1.05f},
+		{TEXT("boots"), EItemSlot::Shoes, TEXT("Boots"), TEXT("BASE_ITEM_BOOTS"), 1.0f, 1.0f, 1.0f},
+		{TEXT("shoes"), EItemSlot::Shoes, TEXT("Shoes"), TEXT("BASE_ITEM_SHOES"), 1.0f, 0.92f, 0.9f},
+		{TEXT("sandals"), EItemSlot::Shoes, TEXT("Blessed Sandals"), TEXT("BASE_ITEM_SANDALS"), 1.0f, 0.95f, 1.05f},
+		{TEXT("gauntlets"), EItemSlot::Gloves, TEXT("Gauntlets"), TEXT("BASE_ITEM_GAUNTLETS"), 1.0f, 1.08f, 1.0f},
+		{TEXT("gloves"), EItemSlot::Gloves, TEXT("Gloves"), TEXT("BASE_ITEM_GLOVES"), 1.0f, 0.92f, 0.95f},
+		{TEXT("bracers"), EItemSlot::Gloves, TEXT("Bracers"), TEXT("BASE_ITEM_BRACERS"), 1.0f, 1.0f, 1.0f},
+		{TEXT("cloak"), EItemSlot::Cloak, TEXT("Cloak"), TEXT("BASE_ITEM_CLOAK"), 1.0f, 1.0f, 1.0f},
+		{TEXT("cape"), EItemSlot::Cloak, TEXT("Battle Cape"), TEXT("BASE_ITEM_CAPE"), 1.0f, 1.02f, 0.95f},
+		{TEXT("mantle"), EItemSlot::Cloak, TEXT("Sage Mantle"), TEXT("BASE_ITEM_MANTLE"), 1.0f, 0.95f, 1.08f},
+		{TEXT("ring"), EItemSlot::Accessory, TEXT("Ring"), TEXT("BASE_ITEM_RING"), 1.0f, 1.0f, 1.0f},
+		{TEXT("amulet"), EItemSlot::Accessory, TEXT("Amulet"), TEXT("BASE_ITEM_AMULET"), 0.95f, 1.0f, 1.05f},
+		{TEXT("talisman"), EItemSlot::Accessory, TEXT("Talisman"), TEXT("BASE_ITEM_TALISMAN"), 0.9f, 1.08f, 1.0f}
 	};
 	return Catalog;
 }
@@ -101,26 +103,34 @@ const FBaseItemDefinition& RollBaseItem(EItemSlot Slot, FRandomStream& Rng)
 	return *Candidates[Rng.RandRange(0, Candidates.Num() - 1)];
 }
 
-FString GetRarityAdjective(EItemRarity Rarity)
+const TCHAR* GetRarityDisplayKey(EItemRarity Rarity)
 {
 	switch (Rarity)
 	{
 	case EItemRarity::Uncommon:
-		return TEXT("Sturdy");
+		return TEXT("RARITY_UNCOMMON");
 	case EItemRarity::Rare:
-		return TEXT("Gleaming");
+		return TEXT("RARITY_RARE");
 	case EItemRarity::Epic:
-		return TEXT("Epic");
+		return TEXT("RARITY_EPIC");
 	case EItemRarity::Legendary:
-		return TEXT("Legendary");
+		return TEXT("RARITY_LEGENDARY");
 	case EItemRarity::Mythic:
-		return TEXT("Mythic");
+		return TEXT("RARITY_MYTHIC");
 	case EItemRarity::None:
-		return TEXT("Item");
+		return TEXT("RARITY_NONE");
 	case EItemRarity::Common:
 	default:
-		return TEXT("Rough");
+		return TEXT("RARITY_COMMON");
 	}
+}
+
+FText BuildLocalizedItemDisplayName(EItemRarity Rarity, const FBaseItemDefinition& BaseItem)
+{
+	FFormatNamedArguments Args;
+	Args.Add(TEXT("Rarity"), IdleProject::Localization::UI(GetRarityDisplayKey(Rarity)));
+	Args.Add(TEXT("BaseItem"), IdleProject::Localization::UI(BaseItem.DisplayNameKey));
+	return IdleProject::Localization::UI(TEXT("ITEM_NAME_FORMAT"), Args);
 }
 
 FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem, FRandomStream& Rng)
@@ -146,7 +156,7 @@ FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem, FRandomStream&
 	Item.BonusHp *= BaseItem.HpScale;
 	Item.ItemSet = FDropFormula::RollItemSet(Rarity, Rng);
 	FDropFormula::RollAffixes(Rarity, SafeLevel, Rng, Item);
-	Item.DisplayName = FText::FromString(FString::Printf(TEXT("%s %s"), *GetRarityAdjective(Rarity), BaseItem.DisplayName));
+	Item.DisplayName = BuildLocalizedItemDisplayName(Rarity, BaseItem);
 	Item.ItemId = FName(*FString::Printf(TEXT("%s_%s_L%d"), *BaseItem.BaseItemId.ToString(), *UEnum::GetValueAsString(Rarity), SafeLevel));
 
 	return Item;

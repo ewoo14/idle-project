@@ -264,6 +264,30 @@ describe("drop formulas", () => {
       nameKo: "마법봉",
       nameEn: "Wand",
       statBias: "magic",
+      atkScale: 0.85,
+      defScale: 1,
+      hpScale: 1,
+    });
+  });
+
+  it("keeps base item stat scales aligned with ItemFactory catalog", () => {
+    expect(rollBaseItem(1, () => 1 / 6)).toMatchObject({
+      baseItemId: "greatsword",
+      atkScale: 1.15,
+      defScale: 0.9,
+      hpScale: 1,
+    });
+    expect(rollBaseItem(2, () => 0)).toMatchObject({
+      baseItemId: "helm",
+      atkScale: 1,
+      defScale: 1.08,
+      hpScale: 1,
+    });
+    expect(rollBaseItem(8, () => 1 / 3)).toMatchObject({
+      baseItemId: "amulet",
+      atkScale: 0.95,
+      defScale: 1,
+      hpScale: 1.05,
     });
   });
 

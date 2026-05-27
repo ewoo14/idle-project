@@ -80,6 +80,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FItemFactoryBaseCatalogDeterministicTest::RunTest(const FString& Parameters)
 {
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
 	FRandomStream SeedA(5801);
 	FRandomStream SeedB(5801);
 	const FItemInstance First = FItemFactory::GuaranteedDropForLevel(35, SeedA);
@@ -102,6 +103,17 @@ bool FItemFactoryBaseCatalogDeterministicTest::RunTest(const FString& Parameters
 		}
 	}
 	TestTrue(TEXT("Weapon base catalog exposes at least six distinct weapon bases"), WeaponBaseIds.Num() >= 6);
+
+	FRandomStream EnglishRng(5810);
+	const FItemInstance EnglishDrop = FItemFactory::GuaranteedDropForLevel(40, EnglishRng);
+	TestTrue(TEXT("English localized item name contains a rarity and base item"), EnglishDrop.DisplayName.ToString().Contains(TEXT(" ")));
+	TestFalse(TEXT("English localized item name does not expose localization keys"), EnglishDrop.DisplayName.ToString().Contains(TEXT("BASE_ITEM_")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	FRandomStream KoreanRng(5810);
+	const FItemInstance KoreanDrop = FItemFactory::GuaranteedDropForLevel(40, KoreanRng);
+	TestNotEqual(TEXT("Korean and English item names localize from the same deterministic drop"), KoreanDrop.DisplayName.ToString(), EnglishDrop.DisplayName.ToString());
+	TestFalse(TEXT("Korean localized item name does not expose localization keys"), KoreanDrop.DisplayName.ToString().Contains(TEXT("BASE_ITEM_")));
 
 	return true;
 }

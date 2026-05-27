@@ -40,9 +40,50 @@ export interface BaseItemDefinition {
   nameKo: string;
   nameEn: string;
   statBias: "physical" | "magic" | "defense" | "speed" | "balanced";
+  atkScale: number;
+  defScale: number;
+  hpScale: number;
 }
 
-const BASE_ITEMS_BY_SLOT: Partial<Record<ItemSlot, BaseItemDefinition[]>> = {
+const BASE_ITEM_STAT_SCALES: Record<
+  string,
+  Pick<BaseItemDefinition, "atkScale" | "defScale" | "hpScale">
+> = {
+  longsword: { atkScale: 1.05, defScale: 1, hpScale: 1 },
+  greatsword: { atkScale: 1.15, defScale: 0.9, hpScale: 1 },
+  dagger: { atkScale: 0.9, defScale: 1, hpScale: 1 },
+  bow: { atkScale: 1, defScale: 1, hpScale: 1 },
+  staff: { atkScale: 0.9, defScale: 1, hpScale: 1 },
+  wand: { atkScale: 0.85, defScale: 1, hpScale: 1 },
+  helm: { atkScale: 1, defScale: 1.08, hpScale: 1 },
+  hood: { atkScale: 1, defScale: 0.92, hpScale: 1.05 },
+  circlet: { atkScale: 1, defScale: 1, hpScale: 1 },
+  armor: { atkScale: 1, defScale: 1.1, hpScale: 1.05 },
+  robe: { atkScale: 1, defScale: 0.9, hpScale: 1 },
+  jacket: { atkScale: 1, defScale: 1, hpScale: 0.95 },
+  greaves: { atkScale: 1, defScale: 1.08, hpScale: 1 },
+  trousers: { atkScale: 1, defScale: 0.95, hpScale: 0.95 },
+  leggings: { atkScale: 1, defScale: 0.9, hpScale: 1.05 },
+  boots: { atkScale: 1, defScale: 1, hpScale: 1 },
+  shoes: { atkScale: 1, defScale: 0.92, hpScale: 0.9 },
+  sandals: { atkScale: 1, defScale: 0.95, hpScale: 1.05 },
+  gauntlets: { atkScale: 1, defScale: 1.08, hpScale: 1 },
+  gloves: { atkScale: 1, defScale: 0.92, hpScale: 0.95 },
+  bracers: { atkScale: 1, defScale: 1, hpScale: 1 },
+  cloak: { atkScale: 1, defScale: 1, hpScale: 1 },
+  cape: { atkScale: 1, defScale: 1.02, hpScale: 0.95 },
+  mantle: { atkScale: 1, defScale: 0.95, hpScale: 1.08 },
+  ring: { atkScale: 1, defScale: 1, hpScale: 1 },
+  amulet: { atkScale: 0.95, defScale: 1, hpScale: 1.05 },
+  talisman: { atkScale: 0.9, defScale: 1.08, hpScale: 1 },
+};
+
+type BaseItemCatalogEntry = Omit<
+  BaseItemDefinition,
+  "atkScale" | "defScale" | "hpScale"
+>;
+
+const BASE_ITEMS_BY_SLOT: Partial<Record<ItemSlot, BaseItemCatalogEntry[]>> = {
   1: [
     {
       baseItemId: "longsword",
@@ -327,7 +368,17 @@ export function rollBaseItem(
     Math.max(Math.floor(rng() * candidates.length), 0),
     candidates.length - 1,
   );
-  return candidates[index];
+  const selected = candidates[index];
+  const statScales = BASE_ITEM_STAT_SCALES[selected.baseItemId] ?? {
+    atkScale: 1,
+    defScale: 1,
+    hpScale: 1,
+  };
+
+  return {
+    ...selected,
+    ...statScales,
+  };
 }
 
 export function getAffixCount(
