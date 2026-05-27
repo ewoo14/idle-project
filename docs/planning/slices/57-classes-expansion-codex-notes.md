@@ -9,6 +9,12 @@
   unchanged.
 - Added seven default skills per new class in `USkillComponent` and wired
   `LoadSkillsForClass` for all eight classes.
+- Mirrored Paladin, Berserker, and Summoner in the server SkillDB with seven
+  skills per class and exact client parity fields.
+- Expanded the server `ClassId` stat formula mirror to `1..8` and added the
+  Paladin, Berserker, and Summoner growth profiles.
+- Routed server combat formula class damage for Summoner through magic attack
+  and magic defense, matching the client skill damage path.
 - Reused existing effect, status, and element enums. No new backend API,
   secrets, or environment files were changed.
 - Updated the class selection view model and localization keys so the selector
@@ -36,11 +42,17 @@
   `IdleProject.Localization.CsvIntegrity`.
 - GREEN: full `Automation RunTests IdleProject` exited 0; log reported 158
   tests found and `TEST COMPLETE. EXIT CODE: 0`.
+- RED: server targeted vitest failed for missing classId 6/7/8 SkillDB,
+  missing stat growth profiles, and Summoner class damage using physical
+  damage.
+- GREEN: `npm test -- src/core/data/skills.test.ts src/core/formulas/stats.test.ts src/core/formulas/combat.test.ts`
+  exited 0 with 57 tests passing.
 
 ## Review Notes
 
 - The Korean localization CSV files already contain mojibake in existing rows.
   New Korean-side class/skill keys were added with ASCII source strings to keep
   ko/en key parity without further encoding churn.
-- Backend parity remains for the backend owner because this Codex pass was
-  limited to client C++ and client CSV/localization wiring.
+- Backend parity now covers SkillDB definitions, class growth, and Summoner
+  magic damage routing. Character creation API availability remains governed by
+  the existing character module rules and was not expanded in this backend pass.

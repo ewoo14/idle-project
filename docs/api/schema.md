@@ -112,7 +112,7 @@ PR #15 keeps combat execution authoritative in the Unreal client, but the server
 | Field | Meaning |
 | --- | --- |
 | `skillId` | Stable client/server skill identifier |
-| `classId` | Class owner; warrior is `1`, mage `2`, archer `3`, thief `4`, cleric `5` |
+| `classId` | Class owner; warrior is `1`, mage `2`, archer `3`, thief `4`, cleric `5`, paladin `6`, berserker `7`, summoner `8` |
 | `displayName` | Localized display name |
 | `type` | `active`, `passive`, or `ultimate` |
 | `effectType` | `damage_single`, `damage_aoe`, `self_buff`, `dash_damage`, or `heal` |
