@@ -159,7 +159,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Equipped pet round trips"), CapturedSave->EquippedPetId, SourceSave->EquippedPetId);
 	TestEqual(TEXT("Dog level round trips"), CapturedSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(2));
 	TestEqual(TEXT("Bird level round trips"), CapturedSave->PetLevels.FindRef(TEXT("bird")), static_cast<int32>(4));
-	TestEqual(TEXT("Quest payload round trips"), CapturedSave->Quests.Num(), 4);
+	TestEqual(TEXT("Quest payload round trips"), CapturedSave->Quests.Num(), 12);
 	const FQuestSaveEntry* CapturedQuest = CapturedSave->Quests.FindByPredicate([](const FQuestSaveEntry& Entry)
 	{
 		return Entry.QuestId == TEXT("main_ch1_001");

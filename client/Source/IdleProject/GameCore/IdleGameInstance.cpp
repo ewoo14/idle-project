@@ -116,6 +116,7 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	if (Amount < 0 && (Amount == MIN_int64 || Gold < -Amount))
 	{
 		RecordAchievementMetric(EAchievementMetric::GoldSpent, Gold);
+		RecordQuestProgress(EQuestObjective::SpendGold, static_cast<int32>(FMath::Min<int64>(Gold, MAX_int32)));
 		Gold = 0;
 		OnGoldChanged.Broadcast(Gold);
 		RequestAutosave();
@@ -130,6 +131,7 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	else if (Amount < 0)
 	{
 		RecordAchievementMetric(EAchievementMetric::GoldSpent, -Amount);
+		RecordQuestProgress(EQuestObjective::SpendGold, static_cast<int32>(FMath::Min<int64>(-Amount, MAX_int32)));
 	}
 	OnGoldChanged.Broadcast(Gold);
 	RequestAutosave();
@@ -376,7 +378,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 
 	if (QuestService)
 	{
-		QuestService->CaptureState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+		QuestService->CaptureState(SaveGame->Quests, SaveGame->QuestDailyResetDate, SaveGame->QuestWeeklyResetId);
 	}
 
 	if (SeasonService)
@@ -462,8 +464,9 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		EnsureQuestService();
 		if (QuestService)
 		{
-			QuestService->RestoreState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+			QuestService->RestoreState(SaveGame->Quests, SaveGame->QuestDailyResetDate, SaveGame->QuestWeeklyResetId);
 			QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+			QuestService->ResetWeeklyQuestsIfNeeded(UQuestService::GetCurrentUtcWeekString());
 		}
 
 		EnsureSeasonService();
@@ -556,10 +559,12 @@ int64 UIdleGameInstance::ClimbTower()
 		return 0;
 	}
 
+	const int32 PreviousHighestFloor = TowerService->GetHighestFloor();
 	const int64 Reward = TowerService->TryClimbTower(Character->GetCombatPower());
 	if (Reward > 0)
 	{
 		RecordAchievementMetric(EAchievementMetric::TowerHighestFloor, TowerService->GetHighestFloor());
+		RecordQuestProgress(EQuestObjective::ClimbTower, FMath::Max(1, TowerService->GetHighestFloor() - PreviousHighestFloor));
 		AddGold(Reward);
 		RequestAutosave();
 	}
@@ -647,6 +652,7 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 
 	AddGold(-Cost);
 	RecordAchievementMetric(EAchievementMetric::GearRollsPurchased, 1);
+	RecordQuestProgress(EQuestObjective::RollGearShop, 1);
 	Inventory->AddItem(Item);
 	RecordAchievementItemCollected(Item);
 
@@ -696,6 +702,7 @@ void UIdleGameInstance::LevelUp()
 
 	++CharacterLevel;
 	RecordAchievementMetric(EAchievementMetric::HighestLevelReached, CharacterLevel);
+	RecordQuestProgress(EQuestObjective::ReachLevel, CharacterLevel);
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	GrantStatPoints(FStatPointFormula::GetStatPointsForLevelUp(CharacterLevel));
 	OnLevelUp.Broadcast(CharacterLevel);
@@ -786,6 +793,7 @@ bool UIdleGameInstance::Rebirth()
 
 	const int32 Reward = FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
 	++RebirthCount;
+	RecordQuestProgress(EQuestObjective::Rebirth, 1);
 	RecordAchievementMetric(EAchievementMetric::RebirthCount, RebirthCount);
 	RebirthBonusPoints += Reward;
 	CharacterLevel = 1;
@@ -826,6 +834,7 @@ bool UIdleGameInstance::Transcend()
 	}
 
 	++TranscendCount;
+	RecordQuestProgress(EQuestObjective::Transcend, 1);
 	RecordAchievementMetric(EAchievementMetric::TranscendCount, TranscendCount);
 	RebirthCount = 0;
 	RebirthBonusPoints = 0;
@@ -940,6 +949,7 @@ void UIdleGameInstance::RecordQuestProgress(EQuestObjective Objective, int32 Amo
 	}
 
 	QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+	QuestService->ResetWeeklyQuestsIfNeeded(UQuestService::GetCurrentUtcWeekString());
 	QuestService->RecordProgress(Objective, Amount);
 }
 
@@ -984,6 +994,7 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 	}
 
 	QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+	QuestService->ResetWeeklyQuestsIfNeeded(UQuestService::GetCurrentUtcWeekString());
 	Result = QuestService->ClaimQuest(QuestId);
 	if (!Result.bSuccess)
 	{
@@ -1105,6 +1116,7 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 	Result.bFed = true;
 	Result.GoldSpent = Cost;
 	Result.NewLevel = CurrentLevel + 1;
+	RecordQuestProgress(EQuestObjective::FeedPet, 1);
 	RecordAchievementMetric(EAchievementMetric::PetsFed, 1);
 	RecordAchievementMetric(EAchievementMetric::HighestPetLevel, Result.NewLevel);
 	OnPetFed.Broadcast(Result);
@@ -1313,6 +1325,7 @@ void UIdleGameInstance::HandleChapterBossDefeated(int32 ClearedChapter)
 	{
 		MarkChapter1BossDefeated();
 	}
+	RecordQuestProgress(EQuestObjective::DefeatBoss, 1);
 }
 
 void UIdleGameInstance::LoadLastSeenUnixSec()

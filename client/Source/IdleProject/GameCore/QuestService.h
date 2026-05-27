@@ -8,7 +8,8 @@ UENUM(BlueprintType)
 enum class EQuestType : uint8
 {
 	Main,
-	Daily
+	Daily,
+	Weekly
 };
 
 UENUM(BlueprintType)
@@ -17,7 +18,15 @@ enum class EQuestObjective : uint8
 	KillMonster,
 	ClearMap,
 	ClaimOffline,
-	Enhance
+	Enhance,
+	DefeatBoss,
+	Rebirth,
+	Transcend,
+	ClimbTower,
+	ReachLevel,
+	SpendGold,
+	RollGearShop,
+	FeedPet
 };
 
 USTRUCT(BlueprintType)
@@ -96,6 +105,9 @@ struct FQuestState
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Quest")
 	FString DailyResetDate;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Quest")
+	FString WeeklyResetId;
 };
 
 USTRUCT(BlueprintType)
@@ -120,6 +132,9 @@ struct FQuestSaveEntry
 
 	UPROPERTY()
 	FString DailyResetDate;
+
+	UPROPERTY()
+	FString WeeklyResetId;
 };
 
 USTRUCT(BlueprintType)
@@ -159,6 +174,9 @@ public:
 	void ResetDailyQuestsIfNeeded(const FString& CurrentUtcDate);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
+	void ResetWeeklyQuestsIfNeeded(const FString& CurrentUtcWeek);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
 	void RecordProgress(EQuestObjective Objective, int32 Amount = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
@@ -172,17 +190,22 @@ public:
 	bool GetQuestState(const FString& QuestId, FQuestState& OutState) const;
 
 	void CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset) const;
+	void CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset, FString& OutWeeklyReset) const;
 	void RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset);
+	void RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset, const FString& InWeeklyReset);
 
 	static FString GetCurrentUtcDateString();
+	static FString GetCurrentUtcWeekString();
 
 private:
 	TArray<FQuestDefinition> Definitions;
 	TMap<FString, FQuestDefinition> DefinitionById;
 	TMap<FString, FQuestState> ActiveStates;
 	FString DailyResetDate;
+	FString WeeklyResetId;
 
 	void BuildDefaultDefinitions();
 	void AddActiveQuest(const FQuestDefinition& Definition, const FString& CurrentDailyResetDate);
+	void AddActiveQuest(const FQuestDefinition& Definition, const FString& CurrentDailyResetDate, const FString& CurrentWeeklyResetId);
 	bool IsQuestActive(const FString& QuestId) const;
 };

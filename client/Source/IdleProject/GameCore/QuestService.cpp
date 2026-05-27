@@ -2,17 +2,79 @@
 
 #include "Internationalization/IdleLocalization.h"
 
+namespace
+{
+FString GetUtcWeekString(const FDateTime& Date)
+{
+	const int32 DayOfYear = Date.GetDayOfYear();
+	int32 IsoWeekday = 1;
+	switch (Date.GetDayOfWeek())
+	{
+	case EDayOfWeek::Monday:
+		IsoWeekday = 1;
+		break;
+	case EDayOfWeek::Tuesday:
+		IsoWeekday = 2;
+		break;
+	case EDayOfWeek::Wednesday:
+		IsoWeekday = 3;
+		break;
+	case EDayOfWeek::Thursday:
+		IsoWeekday = 4;
+		break;
+	case EDayOfWeek::Friday:
+		IsoWeekday = 5;
+		break;
+	case EDayOfWeek::Saturday:
+		IsoWeekday = 6;
+		break;
+	case EDayOfWeek::Sunday:
+		IsoWeekday = 7;
+		break;
+	default:
+		break;
+	}
+	const int32 Week = FMath::Clamp(FMath::FloorToInt(static_cast<float>(DayOfYear - IsoWeekday + 10) / 7.0f), 1, 53);
+	return FString::Printf(TEXT("%04d-W%02d"), Date.GetYear(), Week);
+}
+
+FString GetUtcWeekStringFromDateString(const FString& DateString)
+{
+	TArray<FString> Parts;
+	if (DateString.ParseIntoArray(Parts, TEXT("-")) == 3)
+	{
+		int32 Year = 0;
+		int32 Month = 0;
+		int32 Day = 0;
+		if (LexTryParseString(Year, *Parts[0])
+			&& LexTryParseString(Month, *Parts[1])
+			&& LexTryParseString(Day, *Parts[2])
+			&& Year > 0
+			&& Month >= 1
+			&& Month <= 12
+			&& Day >= 1
+			&& Day <= 31)
+		{
+			return GetUtcWeekString(FDateTime(Year, Month, Day));
+		}
+	}
+
+	return UQuestService::GetCurrentUtcWeekString();
+}
+}
+
 void UQuestService::InitializeDefaultQuests(const FString& CurrentUtcDate)
 {
 	BuildDefaultDefinitions();
 	ActiveStates.Empty();
 	DailyResetDate = CurrentUtcDate.IsEmpty() ? GetCurrentUtcDateString() : CurrentUtcDate;
+	WeeklyResetId = CurrentUtcDate.IsEmpty() ? GetCurrentUtcWeekString() : GetUtcWeekStringFromDateString(DailyResetDate);
 
 	for (const FQuestDefinition& Definition : Definitions)
 	{
-		if (Definition.Type == EQuestType::Daily || Definition.PrerequisiteQuestId.IsEmpty())
+		if (Definition.Type == EQuestType::Daily || Definition.Type == EQuestType::Weekly || Definition.PrerequisiteQuestId.IsEmpty())
 		{
-			AddActiveQuest(Definition, DailyResetDate);
+			AddActiveQuest(Definition, DailyResetDate, WeeklyResetId);
 		}
 	}
 }
@@ -30,7 +92,25 @@ void UQuestService::ResetDailyQuestsIfNeeded(const FString& CurrentUtcDate)
 	{
 		if (Definition.Type == EQuestType::Daily)
 		{
-			AddActiveQuest(Definition, DailyResetDate);
+			AddActiveQuest(Definition, DailyResetDate, WeeklyResetId);
+		}
+	}
+}
+
+void UQuestService::ResetWeeklyQuestsIfNeeded(const FString& CurrentUtcWeek)
+{
+	const FString ResetWeek = CurrentUtcWeek.IsEmpty() ? GetCurrentUtcWeekString() : CurrentUtcWeek;
+	if (WeeklyResetId == ResetWeek)
+	{
+		return;
+	}
+
+	WeeklyResetId = ResetWeek;
+	for (const FQuestDefinition& Definition : Definitions)
+	{
+		if (Definition.Type == EQuestType::Weekly)
+		{
+			AddActiveQuest(Definition, DailyResetDate, WeeklyResetId);
 		}
 	}
 }
@@ -90,7 +170,7 @@ FQuestClaimResult UQuestService::ClaimQuest(const FString& QuestId)
 			&& Definition.PrerequisiteQuestId == QuestId
 			&& !IsQuestActive(Definition.QuestId))
 		{
-			AddActiveQuest(Definition, DailyResetDate);
+			AddActiveQuest(Definition, DailyResetDate, WeeklyResetId);
 			Result.UnlockedQuestIds.Add(Definition.QuestId);
 		}
 	}
@@ -130,8 +210,15 @@ bool UQuestService::GetQuestState(const FString& QuestId, FQuestState& OutState)
 
 void UQuestService::CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset) const
 {
+	FString IgnoredWeeklyReset;
+	CaptureState(OutEntries, OutDailyReset, IgnoredWeeklyReset);
+}
+
+void UQuestService::CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset, FString& OutWeeklyReset) const
+{
 	OutEntries.Reset();
 	OutDailyReset = DailyResetDate;
+	OutWeeklyReset = WeeklyResetId;
 
 	TArray<FQuestState> States = GetActiveQuestStates();
 	for (const FQuestState& State : States)
@@ -143,14 +230,21 @@ void UQuestService::CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& O
 		Entry.bCompleted = State.bCompleted;
 		Entry.bClaimed = State.bClaimed;
 		Entry.DailyResetDate = State.DailyResetDate;
+		Entry.WeeklyResetId = State.WeeklyResetId;
 		OutEntries.Add(Entry);
 	}
 }
 
 void UQuestService::RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset)
 {
+	RestoreState(InEntries, InDailyReset, FString());
+}
+
+void UQuestService::RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset, const FString& InWeeklyReset)
+{
 	const FString RestoreDate = InDailyReset.IsEmpty() ? GetCurrentUtcDateString() : InDailyReset;
 	InitializeDefaultQuests(RestoreDate);
+	WeeklyResetId = InWeeklyReset.IsEmpty() ? GetUtcWeekStringFromDateString(RestoreDate) : InWeeklyReset;
 
 	for (const FQuestSaveEntry& Entry : InEntries)
 	{
@@ -161,7 +255,7 @@ void UQuestService::RestoreState(const TArray<FQuestSaveEntry>& InEntries, const
 		}
 		if (!IsQuestActive(Entry.QuestId))
 		{
-			AddActiveQuest(*Definition, RestoreDate);
+			AddActiveQuest(*Definition, RestoreDate, WeeklyResetId);
 		}
 
 		FQuestState& State = ActiveStates.FindChecked(Entry.QuestId);
@@ -171,12 +265,20 @@ void UQuestService::RestoreState(const TArray<FQuestSaveEntry>& InEntries, const
 		State.DailyResetDate = State.Type == EQuestType::Daily
 			? (Entry.DailyResetDate.IsEmpty() ? RestoreDate : Entry.DailyResetDate)
 			: FString();
+		State.WeeklyResetId = State.Type == EQuestType::Weekly
+			? (Entry.WeeklyResetId.IsEmpty() ? WeeklyResetId : Entry.WeeklyResetId)
+			: FString();
 	}
 }
 
 FString UQuestService::GetCurrentUtcDateString()
 {
 	return FDateTime::UtcNow().ToString(TEXT("%Y-%m-%d"));
+}
+
+FString UQuestService::GetCurrentUtcWeekString()
+{
+	return GetUtcWeekString(FDateTime::UtcNow());
 }
 
 void UQuestService::BuildDefaultDefinitions()
@@ -216,12 +318,32 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch1_003"), EQuestType::Main, TEXT("Repeating Echoes"), EQuestObjective::KillMonster, 12, 420, 300, TEXT("main_ch1_002"), TEXT("1-2"));
 	AddDefinition(TEXT("main_ch1_004"), EQuestType::Main, TEXT("Trace of the Guardian"), EQuestObjective::ClearMap, 1, 700, 520, TEXT("main_ch1_003"), TEXT("1-3"));
 	AddDefinition(TEXT("main_ch1_005"), EQuestType::Main, TEXT("Gate of the Winged Legion"), EQuestObjective::KillMonster, 20, 1200, 900, TEXT("main_ch1_004"), TEXT("1-5"));
+	AddDefinition(TEXT("main_ch1_006"), EQuestType::Main, TEXT("Temper the Gate Key"), EQuestObjective::Enhance, 2, 1600, 1200, TEXT("main_ch1_005"), TEXT("1-5"));
+	AddDefinition(TEXT("main_ch1_007"), EQuestType::Main, TEXT("Break the First Seal"), EQuestObjective::DefeatBoss, 1, 2200, 1600, TEXT("main_ch1_006"), TEXT("1-5"));
+	AddDefinition(TEXT("main_ch2_001"), EQuestType::Main, TEXT("Enter the Ashen Road"), EQuestObjective::KillMonster, 25, 2600, 1900, TEXT("main_ch1_007"), TEXT("2-1"));
+	AddDefinition(TEXT("main_ch2_002"), EQuestType::Main, TEXT("Map the Ember Ruins"), EQuestObjective::ClearMap, 1, 3200, 2300, TEXT("main_ch2_001"), TEXT("2-2"));
+	AddDefinition(TEXT("main_ch2_003"), EQuestType::Main, TEXT("Reach the Watch Spire"), EQuestObjective::ReachLevel, 10, 3900, 2800, TEXT("main_ch2_002"), TEXT("2-3"));
+	AddDefinition(TEXT("main_ch2_004"), EQuestType::Main, TEXT("Reforge Through Rebirth"), EQuestObjective::Rebirth, 1, 4800, 3400, TEXT("main_ch2_003"), TEXT("2-4"));
+	AddDefinition(TEXT("main_ch2_005"), EQuestType::Main, TEXT("Defeat the Ember Warden"), EQuestObjective::DefeatBoss, 1, 6200, 4500, TEXT("main_ch2_004"), TEXT("2-5"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);
+	AddDefinition(TEXT("daily_reach_level"), EQuestType::Daily, TEXT("Push Your Training"), EQuestObjective::ReachLevel, 10, 700, 360);
+	AddDefinition(TEXT("daily_spend_gold"), EQuestType::Daily, TEXT("Keep the Market Moving"), EQuestObjective::SpendGold, 1000, 750, 380);
+	AddDefinition(TEXT("daily_roll_gear_shop"), EQuestType::Daily, TEXT("Try the Gear Shop"), EQuestObjective::RollGearShop, 1, 850, 420);
+	AddDefinition(TEXT("daily_feed_pet"), EQuestType::Daily, TEXT("Feed a Companion"), EQuestObjective::FeedPet, 1, 900, 450);
+	AddDefinition(TEXT("weekly_defeat_bosses"), EQuestType::Weekly, TEXT("Weekly Boss Breaker"), EQuestObjective::DefeatBoss, 3, 5000, 2500);
+	AddDefinition(TEXT("weekly_rebirth"), EQuestType::Weekly, TEXT("Weekly Rebirth"), EQuestObjective::Rebirth, 1, 8000, 4000);
+	AddDefinition(TEXT("weekly_climb_tower"), EQuestType::Weekly, TEXT("Weekly Tower Push"), EQuestObjective::ClimbTower, 10, 7000, 3600);
+	AddDefinition(TEXT("weekly_spend_gold"), EQuestType::Weekly, TEXT("Weekly Gold Sink"), EQuestObjective::SpendGold, 10000, 6500, 3200);
 }
 
 void UQuestService::AddActiveQuest(const FQuestDefinition& Definition, const FString& CurrentDailyResetDate)
+{
+	AddActiveQuest(Definition, CurrentDailyResetDate, WeeklyResetId);
+}
+
+void UQuestService::AddActiveQuest(const FQuestDefinition& Definition, const FString& CurrentDailyResetDate, const FString& CurrentWeeklyResetId)
 {
 	FQuestState State;
 	State.QuestId = Definition.QuestId;
@@ -234,6 +356,7 @@ void UQuestService::AddActiveQuest(const FQuestDefinition& Definition, const FSt
 	State.PrerequisiteQuestId = Definition.PrerequisiteQuestId;
 	State.ChapterMapId = Definition.ChapterMapId;
 	State.DailyResetDate = Definition.Type == EQuestType::Daily ? CurrentDailyResetDate : FString();
+	State.WeeklyResetId = Definition.Type == EQuestType::Weekly ? CurrentWeeklyResetId : FString();
 	ActiveStates.Add(Definition.QuestId, State);
 }
 

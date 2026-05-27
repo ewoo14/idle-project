@@ -22,6 +22,7 @@ FItemInstance MakeEnhanceTestItem(FName ItemId, EItemSlot Slot, int32 EnhanceLev
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -198,7 +199,7 @@ bool FQuestServiceProgressClaimTest::RunTest(const FString& Parameters)
 	UQuestService* Quests = NewObject<UQuestService>();
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
-	TestEqual(TEXT("First main quest and three dailies are active"), Quests->GetActiveQuestStates().Num(), 4);
+	TestEqual(TEXT("First main quest, daily quests, and weekly quests are active"), Quests->GetActiveQuestStates().Num(), 12);
 
 	Quests->RecordProgress(EQuestObjective::KillMonster, 5);
 
@@ -235,7 +236,7 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
 	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
-	TestEqual(TEXT("Quest definition count matches server quests.ts"), Definitions.Num(), 8);
+	TestEqual(TEXT("Quest definition count matches expanded client contract"), Definitions.Num(), 23);
 
 	struct FExpectedQuestDefinition
 	{
@@ -255,9 +256,24 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("main_ch1_003"), EQuestType::Main, EQuestObjective::KillMonster, 12, 420, 300, TEXT("main_ch1_002"), TEXT("1-2")},
 		{TEXT("main_ch1_004"), EQuestType::Main, EQuestObjective::ClearMap, 1, 700, 520, TEXT("main_ch1_003"), TEXT("1-3")},
 		{TEXT("main_ch1_005"), EQuestType::Main, EQuestObjective::KillMonster, 20, 1200, 900, TEXT("main_ch1_004"), TEXT("1-5")},
+		{TEXT("main_ch1_006"), EQuestType::Main, EQuestObjective::Enhance, 2, 1600, 1200, TEXT("main_ch1_005"), TEXT("1-5")},
+		{TEXT("main_ch1_007"), EQuestType::Main, static_cast<EQuestObjective>(4), 1, 2200, 1600, TEXT("main_ch1_006"), TEXT("1-5")},
+		{TEXT("main_ch2_001"), EQuestType::Main, EQuestObjective::KillMonster, 25, 2600, 1900, TEXT("main_ch1_007"), TEXT("2-1")},
+		{TEXT("main_ch2_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 3200, 2300, TEXT("main_ch2_001"), TEXT("2-2")},
+		{TEXT("main_ch2_003"), EQuestType::Main, static_cast<EQuestObjective>(8), 10, 3900, 2800, TEXT("main_ch2_002"), TEXT("2-3")},
+		{TEXT("main_ch2_004"), EQuestType::Main, static_cast<EQuestObjective>(5), 1, 4800, 3400, TEXT("main_ch2_003"), TEXT("2-4")},
+		{TEXT("main_ch2_005"), EQuestType::Main, static_cast<EQuestObjective>(4), 1, 6200, 4500, TEXT("main_ch2_004"), TEXT("2-5")},
 		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
 		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
 		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
+		{TEXT("daily_reach_level"), EQuestType::Daily, static_cast<EQuestObjective>(8), 10, 700, 360, TEXT(""), TEXT("")},
+		{TEXT("daily_spend_gold"), EQuestType::Daily, static_cast<EQuestObjective>(9), 1000, 750, 380, TEXT(""), TEXT("")},
+		{TEXT("daily_roll_gear_shop"), EQuestType::Daily, static_cast<EQuestObjective>(10), 1, 850, 420, TEXT(""), TEXT("")},
+		{TEXT("daily_feed_pet"), EQuestType::Daily, static_cast<EQuestObjective>(11), 1, 900, 450, TEXT(""), TEXT("")},
+		{TEXT("weekly_defeat_bosses"), static_cast<EQuestType>(2), static_cast<EQuestObjective>(4), 3, 5000, 2500, TEXT(""), TEXT("")},
+		{TEXT("weekly_rebirth"), static_cast<EQuestType>(2), static_cast<EQuestObjective>(5), 1, 8000, 4000, TEXT(""), TEXT("")},
+		{TEXT("weekly_climb_tower"), static_cast<EQuestType>(2), static_cast<EQuestObjective>(7), 10, 7000, 3600, TEXT(""), TEXT("")},
+		{TEXT("weekly_spend_gold"), static_cast<EQuestType>(2), static_cast<EQuestObjective>(9), 10000, 6500, 3200, TEXT(""), TEXT("")},
 	};
 
 	for (int32 Index = 0; Index < Definitions.Num() && Index < UE_ARRAY_COUNT(Expected); ++Index)
@@ -275,6 +291,80 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		TestEqual(*(Prefix + TEXT("prerequisite")), Actual.PrerequisiteQuestId, FString(ExpectedQuest.PrerequisiteQuestId));
 		TestEqual(*(Prefix + TEXT("chapter map")), Actual.ChapterMapId, FString(ExpectedQuest.ChapterMapId));
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceExpandedUnlockWeeklyResetTest,
+	"IdleProject.GameCore.QuestService.ExpandedUnlockWeeklyReset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceExpandedUnlockWeeklyResetTest::RunTest(const FString& Parameters)
+{
+	UQuestService* Quests = NewObject<UQuestService>();
+	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
+
+	FQuestState WeeklyBoss;
+	TestTrue(TEXT("Weekly boss quest is active on initialize"), Quests->GetQuestState(TEXT("weekly_defeat_bosses"), WeeklyBoss));
+	TestEqual(TEXT("Weekly quest uses type enum slot 2"), static_cast<int32>(WeeklyBoss.Type), 2);
+
+	Quests->RecordProgress(static_cast<EQuestObjective>(4), 3);
+	TestTrue(TEXT("Weekly boss quest remains available"), Quests->GetQuestState(TEXT("weekly_defeat_bosses"), WeeklyBoss));
+	TestTrue(TEXT("Weekly progress completes at target"), WeeklyBoss.bCompleted);
+
+	Quests->ResetWeeklyQuestsIfNeeded(TEXT("2026-W22"));
+	TestTrue(TEXT("Same week keeps weekly progress"), Quests->GetQuestState(TEXT("weekly_defeat_bosses"), WeeklyBoss));
+	TestEqual(TEXT("Same ISO week keeps progress"), WeeklyBoss.Progress, 3);
+
+	Quests->ResetWeeklyQuestsIfNeeded(TEXT("2026-W23"));
+	TestTrue(TEXT("Next week keeps weekly quest active"), Quests->GetQuestState(TEXT("weekly_defeat_bosses"), WeeklyBoss));
+	TestEqual(TEXT("Weekly progress resets on next week"), WeeklyBoss.Progress, 0);
+	TestFalse(TEXT("Weekly completion resets on next week"), WeeklyBoss.bCompleted);
+	TestFalse(TEXT("Weekly claim state resets on next week"), WeeklyBoss.bClaimed);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceChapterTwoPrerequisiteChainTest,
+	"IdleProject.GameCore.QuestService.ChapterTwoPrerequisiteChain",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceChapterTwoPrerequisiteChainTest::RunTest(const FString& Parameters)
+{
+	UQuestService* Quests = NewObject<UQuestService>();
+	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
+
+	const TArray<TPair<EQuestObjective, int32>> MainChainProgress = {
+		{EQuestObjective::KillMonster, 5},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::KillMonster, 12},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::KillMonster, 20},
+		{EQuestObjective::Enhance, 2},
+		{static_cast<EQuestObjective>(4), 1},
+	};
+	const TCHAR* MainChainIds[] = {
+		TEXT("main_ch1_001"),
+		TEXT("main_ch1_002"),
+		TEXT("main_ch1_003"),
+		TEXT("main_ch1_004"),
+		TEXT("main_ch1_005"),
+		TEXT("main_ch1_006"),
+		TEXT("main_ch1_007"),
+	};
+
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(MainChainIds); ++Index)
+	{
+		Quests->RecordProgress(MainChainProgress[Index].Key, MainChainProgress[Index].Value);
+		const FQuestClaimResult Claim = Quests->ClaimQuest(MainChainIds[Index]);
+		TestTrue(*FString::Printf(TEXT("%s can be claimed"), MainChainIds[Index]), Claim.bSuccess);
+	}
+
+	FQuestState ChapterTwoStart;
+	TestTrue(TEXT("Claiming chapter one finale unlocks chapter two start"), Quests->GetQuestState(TEXT("main_ch2_001"), ChapterTwoStart));
+	TestEqual(TEXT("Chapter two quest starts on map 2-1"), ChapterTwoStart.ChapterMapId, FString(TEXT("2-1")));
 
 	return true;
 }
@@ -302,6 +392,38 @@ bool FQuestServiceDailyResetTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Daily completion resets on next UTC date"), DailyQuest.bCompleted);
 	TestFalse(TEXT("Daily claimed state resets on next UTC date"), DailyQuest.bClaimed);
 	TestEqual(TEXT("Daily reset date advances"), DailyQuest.DailyResetDate, FString(TEXT("2026-05-27")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceWeeklySaveRoundTripTest,
+	"IdleProject.GameCore.QuestService.WeeklySaveRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceWeeklySaveRoundTripTest::RunTest(const FString& Parameters)
+{
+	UQuestService* SourceQuests = NewObject<UQuestService>();
+	SourceQuests->InitializeDefaultQuests(TEXT("2026-05-26"));
+	SourceQuests->ResetWeeklyQuestsIfNeeded(TEXT("2026-W22"));
+	SourceQuests->RecordProgress(static_cast<EQuestObjective>(9), 2500);
+
+	TArray<FQuestSaveEntry> CapturedEntries;
+	FString CapturedDailyReset;
+	FString CapturedWeeklyReset;
+	SourceQuests->CaptureState(CapturedEntries, CapturedDailyReset, CapturedWeeklyReset);
+
+	UQuestService* RestoredQuests = NewObject<UQuestService>();
+	RestoredQuests->RestoreState(CapturedEntries, CapturedDailyReset, CapturedWeeklyReset);
+
+	FQuestState WeeklySpend;
+	TestTrue(TEXT("Weekly spend quest restores"), RestoredQuests->GetQuestState(TEXT("weekly_spend_gold"), WeeklySpend));
+	TestEqual(TEXT("Weekly progress round trips"), WeeklySpend.Progress, 2500);
+	TestEqual(TEXT("Weekly reset id round trips"), WeeklySpend.WeeklyResetId, FString(TEXT("2026-W22")));
+
+	RestoredQuests->ResetWeeklyQuestsIfNeeded(TEXT("2026-W23"));
+	TestTrue(TEXT("Weekly spend remains active after reset"), RestoredQuests->GetQuestState(TEXT("weekly_spend_gold"), WeeklySpend));
+	TestEqual(TEXT("Weekly progress resets after restored week boundary"), WeeklySpend.Progress, 0);
 
 	return true;
 }
@@ -342,6 +464,60 @@ bool FIdleGameInstanceQuestRewardTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Enhance daily quest exists"), GameInstance->GetQuestState(TEXT("daily_enhance_gear"), EnhanceDaily));
 	TestEqual(TEXT("Enhance hook reaches daily quest target"), EnhanceDaily.Progress, 3);
 	TestTrue(TEXT("Enhance hook completes daily quest"), EnhanceDaily.bCompleted);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceExpandedQuestHookTest,
+	"IdleProject.GameCore.IdleGameInstance.ExpandedQuestHooks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceExpandedQuestHookTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeQuestServiceForTests(TEXT("2026-05-26"));
+	GameInstance->InitializeStageServiceForTests();
+	GameInstance->InitializePetSeasonServicesForTests();
+
+	UStageService* StageService = GameInstance->GetStageService();
+	TestNotNull(TEXT("Stage service exists for boss hook"), StageService);
+	if (StageService)
+	{
+		for (int32 Stage = 1; Stage <= UStageService::StagesPerChapter; ++Stage)
+		{
+			const int32 KillsToAdvance = StageService->GetKillsToAdvance();
+			for (int32 Kill = 0; Kill < KillsToAdvance; ++Kill)
+			{
+				StageService->RecordKill(Stage == UStageService::StagesPerChapter);
+			}
+		}
+	}
+
+	FQuestState WeeklyBoss;
+	TestTrue(TEXT("Weekly boss quest exists after stage hook"), GameInstance->GetQuestState(TEXT("weekly_defeat_bosses"), WeeklyBoss));
+	TestEqual(TEXT("Chapter boss event records DefeatBoss progress"), WeeklyBoss.Progress, 1);
+
+	GameInstance->AddExp(1000000);
+	FQuestState ReachLevelDaily;
+	TestTrue(TEXT("Reach level daily exists"), GameInstance->GetQuestState(TEXT("daily_reach_level"), ReachLevelDaily));
+	TestTrue(TEXT("Level up hook records highest reached level progress"), ReachLevelDaily.Progress >= 10);
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	GameInstance->AddGold(100000);
+	const FShopPurchaseResult GearRoll = GameInstance->TryBuyGearRoll(Inventory);
+	TestTrue(TEXT("Gear roll succeeds for hook test"), GearRoll.bPurchased);
+
+	FQuestState GearRollDaily;
+	TestTrue(TEXT("Gear roll daily exists"), GameInstance->GetQuestState(TEXT("daily_roll_gear_shop"), GearRollDaily));
+	TestEqual(TEXT("Gear roll hook records one roll"), GearRollDaily.Progress, 1);
+
+	const FPetFeedResult PetFeed = GameInstance->TryFeedPet(TEXT("dog"));
+	TestTrue(TEXT("Pet feed succeeds for hook test"), PetFeed.bFed);
+
+	FQuestState FeedPetDaily;
+	TestTrue(TEXT("Feed pet daily exists"), GameInstance->GetQuestState(TEXT("daily_feed_pet"), FeedPetDaily));
+	TestEqual(TEXT("Pet feed hook records one feed"), FeedPetDaily.Progress, 1);
 
 	return true;
 }

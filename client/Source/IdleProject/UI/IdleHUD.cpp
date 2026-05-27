@@ -183,9 +183,16 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 
 FText QuestTypeToLabel(EQuestType Type)
 {
-	return Type == EQuestType::Main
-		? IdleProject::Localization::UI(TEXT("QUEST_TYPE_MAIN"))
-		: IdleProject::Localization::UI(TEXT("QUEST_TYPE_DAILY"));
+	switch (Type)
+	{
+	case EQuestType::Main:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_MAIN"));
+	case EQuestType::Weekly:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_WEEKLY"));
+	case EQuestType::Daily:
+	default:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_DAILY"));
+	}
 }
 
 FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)

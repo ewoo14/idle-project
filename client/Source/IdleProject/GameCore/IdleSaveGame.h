@@ -96,6 +96,9 @@ public:
 	FString QuestDailyResetDate;
 
 	UPROPERTY()
+	FString QuestWeeklyResetId;
+
+	UPROPERTY()
 	int32 SeasonId = 1;
 
 	UPROPERTY()
