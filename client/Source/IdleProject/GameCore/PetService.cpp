@@ -35,6 +35,23 @@ int32 UPetService::GetPetLevel(const FString& PetId) const
 	return Level ? *Level : 0;
 }
 
+void UPetService::RestoreState(const FString& PetId, const TMap<FString, int32>& Levels)
+{
+	InitializeDefaultPets();
+	for (const TPair<FString, int32>& Pair : Levels)
+	{
+		if (OwnedPetIds.Contains(Pair.Key) && DefinitionById.Contains(Pair.Key))
+		{
+			PetLevels.FindOrAdd(Pair.Key) = FMath::Clamp(Pair.Value, 0, FPetLevelFormula::MaxPetLevel);
+		}
+	}
+
+	if (OwnedPetIds.Contains(PetId) && DefinitionById.Contains(PetId))
+	{
+		EquippedPetId = PetId;
+	}
+}
+
 bool UPetService::FeedPet(const FString& PetId)
 {
 	if (!OwnedPetIds.Contains(PetId) || !DefinitionById.Contains(PetId))

@@ -83,6 +83,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
 	int32 GetHighestClearedChapter() const { return HighestClearedChapter; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
+	bool HasFinalChapterCleared() const { return bFinalChapterCleared; }
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
+	void RestoreState(int32 Chapter, int32 Stage, int32 Kills, bool bFinalCleared, int32 HighestCleared);
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Stage")
 	FOnStageChanged OnStageChanged;
 

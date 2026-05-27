@@ -359,6 +359,7 @@ IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimar
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
+IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -421,6 +422,9 @@ protected:
 	UFUNCTION()
 	void HandleTowerClimbed(int32 NewHighestFloor, int64 TotalReward);
 
+	UFUNCTION()
+	void HandleProgressSaved();
+
 private:
 	void BindStageService();
 	void UnbindStageService();
@@ -478,6 +482,7 @@ private:
 	void ClaimSeasonTierFromHitBox(FName BoxName);
 	void DrawFloatingDamageTexts(float Now);
 	void DrawStatusIndicators(float Now);
+	void DrawProgressSavedIndicator(float Now);
 	void RefreshMouseInteraction();
 
 	UPROPERTY(Transient)
@@ -510,9 +515,11 @@ private:
 	TWeakObjectPtr<UTowerService> BoundTowerService;
 	FText StageFeedbackLabel;
 	FText TowerFeedbackLabel;
+	FText ProgressSavedFeedbackLabel;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;
+	float ProgressSavedFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 	bool bStatInfoVisible = false;
 };

@@ -11,17 +11,20 @@
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "TimerManager.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
 class UInventoryComponent;
 class AIdleCharacter;
+class UIdleSaveGame;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLevelUp, int32, NewLevel);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatPointsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTranscend);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProgressSaved);
 
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FEnhanceAttemptResult
@@ -123,6 +126,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddGold(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
+	void SaveProgress();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
+	void LoadProgress();
+
+	bool CaptureToSave(UIdleSaveGame* SaveGame);
+	bool ApplyFromSave(const UIdleSaveGame* SaveGame);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
 	int64 ClimbTower();
@@ -301,6 +313,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Pet")
 	FOnPetFed OnPetFed;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Save")
+	FOnProgressSaved OnProgressSaved;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
@@ -360,11 +375,19 @@ private:
 	UPROPERTY()
 	int64 LastSeenUnixSec = 0;
 
+	bool bAutosaveSuppressed = false;
+	bool bAutosavePending = false;
+	FTimerHandle AutosaveTimerHandle;
+
 	FRandomStream EnhanceRandomStream;
 
+	static const TCHAR* SaveSlotName;
+	static constexpr float AutosaveDebounceSeconds = 1.0f;
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
+	void RequestAutosave();
+	void FlushPendingAutosave();
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();

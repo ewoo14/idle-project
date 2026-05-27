@@ -50,6 +50,7 @@ constexpr float StageFeedbackDurationSeconds = 2.2f;
 constexpr float PetFeedbackDurationSeconds = 2.2f;
 constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 constexpr float TowerFeedbackDurationSeconds = 2.4f;
+constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -1049,6 +1050,11 @@ FText IdleProject::UI::BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64
 	});
 }
 
+FText IdleProject::UI::BuildProgressSavedFeedbackLabel()
+{
+	return IdleProject::Localization::UI(TEXT("SAVE_PROGRESS_SAVED"));
+}
+
 FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
 {
 	FIdleHUDOfflineRewardViewModel ViewModel;
@@ -1400,6 +1406,7 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnPetFed.AddDynamic(this, &AIdleHUD::HandlePetFed);
 	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 	IdleGameInstance->OnTranscend.AddDynamic(this, &AIdleHUD::HandleTranscend);
+	IdleGameInstance->OnProgressSaved.AddDynamic(this, &AIdleHUD::HandleProgressSaved);
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
@@ -1449,6 +1456,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		IdleGameInstance->OnPetFed.RemoveDynamic(this, &AIdleHUD::HandlePetFed);
 		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 		IdleGameInstance->OnTranscend.RemoveDynamic(this, &AIdleHUD::HandleTranscend);
+		IdleGameInstance->OnProgressSaved.RemoveDynamic(this, &AIdleHUD::HandleProgressSaved);
 	}
 
 	if (GEngine && GEngine->GameViewport && RootWidget)
@@ -1495,6 +1503,7 @@ void AIdleHUD::DrawHUD()
 		DrawBossSpecialWarning(World->GetTimeSeconds());
 		DrawFloatingDamageTexts(World->GetTimeSeconds());
 		DrawStatusIndicators(World->GetTimeSeconds());
+		DrawProgressSavedIndicator(World->GetTimeSeconds());
 	}
 }
 
@@ -1771,6 +1780,15 @@ void AIdleHUD::HandleTowerClimbed(int32 NewHighestFloor, int64 TotalReward)
 		TowerFeedbackStartTime = World->GetTimeSeconds();
 	}
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::HandleProgressSaved()
+{
+	ProgressSavedFeedbackLabel = IdleProject::UI::BuildProgressSavedFeedbackLabel();
+	if (const UWorld* World = GetWorld())
+	{
+		ProgressSavedFeedbackStartTime = World->GetTimeSeconds();
+	}
 }
 
 void AIdleHUD::BindStageService()
@@ -3631,6 +3649,33 @@ void AIdleHUD::DrawStatusIndicators(float Now)
 			X += IndicatorSize + Gap;
 		}
 	}
+}
+
+void AIdleHUD::DrawProgressSavedIndicator(float Now)
+{
+	using namespace IdleProject::UI::Theme;
+
+	if (!Canvas || ProgressSavedFeedbackLabel.IsEmpty())
+	{
+		return;
+	}
+
+	const float Elapsed = Now - ProgressSavedFeedbackStartTime;
+	if (Elapsed < 0.0f || Elapsed > ProgressSavedFeedbackDurationSeconds)
+	{
+		return;
+	}
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float Alpha = FMath::Clamp(1.0f - (Elapsed / ProgressSavedFeedbackDurationSeconds), 0.0f, 1.0f);
+	const float Width = 132.0f * Scale;
+	const float Height = 28.0f * Scale;
+	const float X = Canvas->SizeX - Width - 24.0f * Scale;
+	const float Y = 58.0f * Scale;
+
+	DrawRect(BgPrimary.CopyWithNewOpacity(0.78f * Alpha), X, Y, Width, Height);
+	DrawRect(AccentGold.CopyWithNewOpacity(0.92f * Alpha), X, Y, 3.0f * Scale, Height);
+	DrawText(ProgressSavedFeedbackLabel.ToString(), AccentGold.CopyWithNewOpacity(Alpha), X + 14.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 }
 
 void AIdleHUD::RefreshMouseInteraction()

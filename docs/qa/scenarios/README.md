@@ -23,3 +23,4 @@
 | M6 | [M6-status-elements-v1.md](M6-status-elements-v1.md) | Status effects, element multipliers, and HUD status indicator regression coverage |
 | M6 | [M6-item-affix-hud-v1.md](M6-item-affix-hud-v1.md) | Item affix HUD summary, Common zero-affix regression, equipment refresh, and CSV integrity |
 | M7 | [M7-character-stats-panel-v1.md](M7-character-stats-panel-v1.md) | Character stat info HUD, final primary/derived stat display, toggle behavior, and CSV integrity |
+| M8 | [M8-save-system-v1.md](M8-save-system-v1.md) | Local save/load, autosave HUD feedback, restart, offline reward persistence, and server-down regression |

@@ -165,6 +165,26 @@ bool FTranscendHudViewModelTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSaveProgressHudFeedbackLabelTest,
+	"IdleProject.UI.HUD.SaveProgressFeedbackLabel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSaveProgressHudFeedbackLabelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+	TestEqual(TEXT("Saved feedback uses approved English copy"),
+		IdleProject::UI::BuildProgressSavedFeedbackLabel().ToString(),
+		FString(TEXT("Saved")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	TestEqual(TEXT("Saved feedback uses approved Korean copy"),
+		IdleProject::UI::BuildProgressSavedFeedbackLabel().ToString(),
+		FString(TEXT("저장됨")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEnhanceHudViewModelTest,
 	"IdleProject.UI.HUD.EnhancePanelViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

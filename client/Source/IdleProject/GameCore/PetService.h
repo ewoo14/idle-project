@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	int32 GetPetLevel(const FString& PetId) const;
 
+	const TMap<FString, int32>& GetPetLevels() const { return PetLevels; }
+
+	void RestoreState(const FString& PetId, const TMap<FString, int32>& Levels);
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool FeedPet(const FString& PetId);
 
