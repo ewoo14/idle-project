@@ -105,12 +105,12 @@ describe("stats formulas", () => {
       { str: 26.3, dex: 12.7, int: 10.3, wis: 15.9, con: 32.4, luk: 9.3 },
     ],
     [7, 1, { str: 14, dex: 6, int: 2, wis: 2, con: 7, luk: 7 }],
-    [7, 10, { str: 34.7, dex: 15.5, int: 7.4, wis: 7.4, con: 17.8, luk: 17.4 }],
+    [7, 10, { str: 32, dex: 15.5, int: 7.4, wis: 7.4, con: 17.8, luk: 17.8 }],
     [8, 1, { str: 3, dex: 5, int: 13, wis: 11, con: 5, luk: 4 }],
     [
       8,
       10,
-      { str: 8.9, dex: 12.2, int: 32.8, wis: 27.2, con: 12.2, luk: 11.2 },
+      { str: 8.9, dex: 12.2, int: 30.6, wis: 27.2, con: 14.2, luk: 11.2 },
     ],
   ])("mirrors class expansion growth for classId %i at level %i", (classId, level, expected) => {
     expect(

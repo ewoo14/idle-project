@@ -165,10 +165,10 @@ void USkillComponent::LoadDefaultBerserkerSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("rage_cleave"), EClassId::Berserker, TEXT("Rage Cleave"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.8f, 0.0f, 0.0f, 2.0f, 0.0f));
-	Skills.Add(MakeSkill(TEXT("blood_surge"), EClassId::Berserker, TEXT("Blood Surge"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.9f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire));
+	Skills.Add(MakeSkill(TEXT("rage_cleave"), EClassId::Berserker, TEXT("Rage Cleave"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.5f, 2.35f, 0.0f, 0.0f, 2.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("blood_surge"), EClassId::Berserker, TEXT("Blood Surge"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.65f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire));
 	Skills.Add(MakeSkill(TEXT("frenzy_stance"), EClassId::Berserker, TEXT("Frenzy Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 11.0f, 0.0f, 0.3f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("savage_leap"), EClassId::Berserker, TEXT("Savage Leap"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.4f, 0.0f, 0.0f, 2.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("savage_leap"), EClassId::Berserker, TEXT("Savage Leap"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.05f, 0.0f, 0.0f, 2.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("blood_frenzy"), EClassId::Berserker, TEXT("Blood Frenzy"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("pain_to_power"), EClassId::Berserker, TEXT("Pain to Power"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.08f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("berserk_apex"), EClassId::Berserker, TEXT("Berserk Apex"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.5f, 0.35f, 4.0f, 12.0f, 2.0f));
@@ -178,10 +178,10 @@ void USkillComponent::LoadDefaultSummonerSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("spirit_bolt"), EClassId::Summoner, TEXT("Spirit Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 2.2f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None));
-	Skills.Add(MakeSkill(TEXT("familiar_swarm"), EClassId::Summoner, TEXT("Familiar Swarm"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.6f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("spirit_bolt"), EClassId::Summoner, TEXT("Spirit Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 1.9f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("familiar_swarm"), EClassId::Summoner, TEXT("Familiar Swarm"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("arcane_binding"), EClassId::Summoner, TEXT("Arcane Binding"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.3f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice));
+	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice));
 	Skills.Add(MakeSkill(TEXT("pact_mastery"), EClassId::Summoner, TEXT("Pact Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("spirit_reservoir"), EClassId::Summoner, TEXT("Spirit Reservoir"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("grand_familiar"), EClassId::Summoner, TEXT("Grand Familiar"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning));

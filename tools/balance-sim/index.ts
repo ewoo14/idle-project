@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSkillDefinitionsForClass } from "../../server/src/core/data/skills.js";
 import {
   ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS,
   ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS,
@@ -8,6 +9,7 @@ import {
   getAchievementStatMultiplier,
 } from "../../server/src/core/formulas/achievement.js";
 import { computeDamage } from "../../server/src/core/formulas/combat.js";
+import { computeCombatPower } from "../../server/src/core/formulas/combatPower.js";
 import {
   type EnhanceItemRarity,
   getEnhanceCost,
@@ -113,10 +115,37 @@ export type BalanceReport = {
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
       achievementPressure: AchievementPressure;
+      classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
     evaluation: BalanceEvaluation;
   };
+};
+
+export type ClassRole = "dps" | "tank" | "healer";
+
+export type ClassBalanceRow = {
+  classId: ClassId;
+  className: string;
+  role: ClassRole;
+  level: number;
+  hp: number;
+  physAtk: number;
+  magicAtk: number;
+  physDef: number;
+  magicDef: number;
+  critRate: number;
+  atkSpeed: number;
+  effectiveAttack: number;
+  skillDpsRate: number;
+  effectiveDps: number;
+  dpsDeltaFromMedian: number;
+  combatPower: number;
+};
+
+export type ClassBalanceSnapshot = {
+  levels: number[];
+  rowsByLevel: Record<number, ClassBalanceRow[]>;
 };
 
 export type StageRewardComparison = {
@@ -295,6 +324,7 @@ export function buildBalanceReport(
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
       achievementPressure: buildAchievementPressure(),
+      classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
     evaluation,
@@ -529,11 +559,75 @@ function playerDps(
     physAtk: level * 16 * equipmentMultiplier,
     magicAtk: level * 16 * equipmentMultiplier,
   });
-  const attack =
-    classId === 2 || classId === 5 ? stats.magicAtk : stats.physAtk;
+  const attack = isMagicClass(classId) ? stats.magicAtk : stats.physAtk;
   const baseHit = computeDamage(attack, monsterDef(level));
   const critMultiplier = 1 + stats.critRate * (stats.critDmg - 1);
   return baseHit * stats.atkSpeed * critMultiplier * SKILL_DPS_MULTIPLIER;
+}
+
+export function buildClassBalanceSnapshot(
+  levels: number[] = [50, 100],
+): ClassBalanceSnapshot {
+  const rowsByLevel: Record<number, ClassBalanceRow[]> = {};
+  for (const level of levels) {
+    const rows = ALL_CLASSES.map((classId) =>
+      buildClassBalanceRow(classId, level),
+    );
+    const dpsValues = rows
+      .filter((row) => row.role === "dps")
+      .map((row) => row.effectiveDps)
+      .sort((left, right) => left - right);
+    const medianDps = dpsValues[Math.floor(dpsValues.length / 2)] ?? 0;
+
+    rowsByLevel[level] = rows.map((row) => ({
+      ...row,
+      dpsDeltaFromMedian:
+        row.role === "dps" && medianDps > 0
+          ? round((row.effectiveDps - medianDps) / medianDps, 3)
+          : 0,
+    }));
+  }
+
+  return { levels, rowsByLevel };
+}
+
+function buildClassBalanceRow(
+  classId: ClassId,
+  level: number,
+): ClassBalanceRow {
+  const stats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const effectiveAttack = isMagicClass(classId)
+    ? stats.magicAtk
+    : stats.physAtk;
+  const skillDpsRate = getSkillDefinitionsForClass(classId)
+    .filter((skill) => skill.cooldown > 0 && skill.damageCoeff > 0)
+    .reduce((sum, skill) => sum + skill.damageCoeff / skill.cooldown, 0);
+  const effectiveAtkSpeed = 1 + (stats.atkSpeed - 1) * 0.6;
+  const critMultiplier = 1 + stats.critRate * (stats.critDmg - 1) * 0.6;
+
+  return {
+    classId,
+    className: CLASS_NAMES[classId],
+    role: CLASS_ROLES[classId],
+    level,
+    hp: stats.hp,
+    physAtk: stats.physAtk,
+    magicAtk: stats.magicAtk,
+    physDef: stats.physDef,
+    magicDef: stats.magicDef,
+    critRate: stats.critRate,
+    atkSpeed: stats.atkSpeed,
+    effectiveAttack,
+    skillDpsRate: round(skillDpsRate, 3),
+    effectiveDps: Math.round(
+      effectiveAttack * effectiveAtkSpeed * critMultiplier * (1 + skillDpsRate),
+    ),
+    dpsDeltaFromMedian: 0,
+    combatPower: computeCombatPower(stats),
+  };
 }
 
 function bossClearSeconds(
@@ -1014,11 +1108,39 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "<!-- markdownlint-enable MD013 -->",
     "",
+    "## Class Balance Snapshot",
+    "",
+    "- Effective DPS uses the class attack route, attack speed, crit expectation,",
+    "  and active skill `damageCoeff / cooldown` pressure from `skills.ts`.",
+    "- DPS classes target +/-15% around each level's DPS median.",
+    "- Paladin and Cleric are role exceptions: tank/healer utility may sit below",
+    "  the DPS band while preserving survival/support compensation.",
+    "",
+    ...renderClassBalanceTables(report.model.classBalance),
+    "",
     "## Formula Sources",
     "",
     ...report.model.formulas.map((source) => `- ${source}`),
   ];
   return `${lines.join("\n")}\n`;
+}
+
+function renderClassBalanceTables(snapshot: ClassBalanceSnapshot): string[] {
+  return snapshot.levels.flatMap((level) => [
+    `### Lv${level}`,
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ...snapshot.rowsByLevel[level].map(
+      (row) =>
+        `| ${row.className} | ${row.role} | ${row.hp} | ${row.effectiveAttack} | ${row.effectiveDps} | ${Math.round(row.dpsDeltaFromMedian * 100)}% | ${row.combatPower} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+  ]);
 }
 
 function formatNumber(value: number): string {
@@ -1029,8 +1151,7 @@ function formatNumber(value: number): string {
 }
 
 function randomClass(random: () => number): ClassId {
-  const classes: ClassId[] = [1, 2, 3];
-  return classes[Math.floor(random() * classes.length)] ?? 1;
+  return ALL_CLASSES[Math.floor(random() * ALL_CLASSES.length)] ?? 1;
 }
 
 function randomRange(random: () => number, min: number, max: number): number {
@@ -1061,6 +1182,34 @@ function assertPositiveInteger(value: number, name: string) {
 
 function defaultOutputDir(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "reports");
+}
+
+const ALL_CLASSES: ClassId[] = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const CLASS_NAMES: Record<ClassId, string> = {
+  1: "Warrior",
+  2: "Mage",
+  3: "Archer",
+  4: "Thief",
+  5: "Cleric",
+  6: "Paladin",
+  7: "Berserker",
+  8: "Summoner",
+};
+
+const CLASS_ROLES: Record<ClassId, ClassRole> = {
+  1: "dps",
+  2: "dps",
+  3: "dps",
+  4: "dps",
+  5: "healer",
+  6: "tank",
+  7: "dps",
+  8: "dps",
+};
+
+function isMagicClass(classId: ClassId): boolean {
+  return classId === 2 || classId === 5 || classId === 8;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

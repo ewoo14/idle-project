@@ -99,17 +99,24 @@ const CLASS_GROWTH: Record<ClassId, ClassGrowth> = {
   7: {
     initialBonus: { str: 13, dex: 5, int: 1, wis: 1, con: 6, luk: 6 },
     levelBonus: {
-      str: 1.8,
+      str: 1.5,
       dex: 0.55,
       int: 0.1,
       wis: 0.1,
       con: 0.7,
-      luk: 0.65,
+      luk: 0.7,
     },
   },
   8: {
     initialBonus: { str: 2, dex: 4, int: 12, wis: 10, con: 4, luk: 3 },
-    levelBonus: { str: 0.15, dex: 0.3, int: 1.7, wis: 1.3, con: 0.3, luk: 0.3 },
+    levelBonus: {
+      str: 0.15,
+      dex: 0.3,
+      int: 1.45,
+      wis: 1.3,
+      con: 0.52,
+      luk: 0.3,
+    },
   },
 };
 

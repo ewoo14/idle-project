@@ -4,10 +4,10 @@
 
 - Runs: 1000
 - Target: Lv100 + boss clear
-- p10: 4.9h
-- median: 5.324h
-- p90: 5.758h
-- min/max: 4.582h / 6.128h
+- p10: 4.919h
+- median: 5.328h
+- p90: 5.751h
+- min/max: 4.564h / 6.144h
 - status: inside-target (target 5-10h, acceptable 3-20h)
 
 ## Sensitivity
@@ -180,6 +180,49 @@
 | 500 | 6 | 2.5 | 10.499 |
 
 <!-- markdownlint-enable MD013 -->
+
+## Class Balance Snapshot
+
+- Effective DPS uses the class attack route, attack speed, crit expectation,
+  and active skill `damageCoeff / cooldown` pressure from `skills.ts`.
+- DPS classes target +/-15% around each level's DPS median.
+- Paladin and Cleric are role exceptions: tank/healer utility may sit below
+  the DPS band while preserving survival/support compensation.
+
+### Lv50
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Warrior | dps | 1884 | 1010 | 2376 | -7% | 2928 |
+| Mage | dps | 1467 | 1054 | 2713 | 7% | 2980 |
+| Archer | dps | 1501 | 893 | 2416 | -5% | 2804 |
+| Thief | dps | 1467 | 882 | 2596 | 2% | 2787 |
+| Cleric | healer | 1526 | 1016 | 1898 | 0% | 3005 |
+| Paladin | tank | 2184 | 989 | 2010 | 0% | 3118 |
+| Berserker | dps | 1658 | 1024 | 2546 | 0% | 2871 |
+| Summoner | dps | 1550 | 1067 | 2412 | -5% | 3065 |
+
+<!-- markdownlint-enable MD013 -->
+
+### Lv100
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Role | HP | Effective ATK | Effective DPS | DPS delta | CP |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Warrior | dps | 3684 | 2000 | 5371 | -8% | 5444 |
+| Mage | dps | 2892 | 2084 | 5827 | 0% | 5519 |
+| Archer | dps | 2951 | 1778 | 6160 | 6% | 5197 |
+| Thief | dps | 2892 | 1757 | 6406 | 10% | 5145 |
+| Cleric | healer | 3001 | 2013 | 4093 | 0% | 5566 |
+| Paladin | tank | 4259 | 1959 | 4537 | 0% | 5805 |
+| Berserker | dps | 3258 | 2024 | 5801 | 0% | 5316 |
+| Summoner | dps | 3060 | 2107 | 5184 | -11% | 5681 |
+
+<!-- markdownlint-enable MD013 -->
+
 
 ## Formula Sources
 

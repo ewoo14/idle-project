@@ -57,12 +57,14 @@ bool FStatFormulasDefaultPrimaryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Paladin level 50 CON"), PaladinLevel50.Con, 118.4f);
 
 	const FPrimaryStats BerserkerLevel50 = FStatFormulas::DefaultPrimaryStats(EClassId::Berserker, 50);
-	TestEqual(TEXT("Berserker level 50 STR"), BerserkerLevel50.Str, 126.7f);
+	TestEqual(TEXT("Berserker level 50 STR"), BerserkerLevel50.Str, 112.0f);
 	TestEqual(TEXT("Berserker level 50 CON"), BerserkerLevel50.Con, 65.8f);
+	TestEqual(TEXT("Berserker level 50 LUK"), BerserkerLevel50.Luk, 65.8f);
 
 	const FPrimaryStats SummonerLevel50 = FStatFormulas::DefaultPrimaryStats(EClassId::Summoner, 50);
-	TestEqual(TEXT("Summoner level 50 INT"), SummonerLevel50.Int_, 120.8f);
+	TestEqual(TEXT("Summoner level 50 INT"), SummonerLevel50.Int_, 108.6f);
 	TestEqual(TEXT("Summoner level 50 WIS"), SummonerLevel50.Wis, 99.2f);
+	TestEqual(TEXT("Summoner level 50 CON"), SummonerLevel50.Con, 55.0f);
 
 	return true;
 }

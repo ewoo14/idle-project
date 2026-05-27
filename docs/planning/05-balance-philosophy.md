@@ -1002,6 +1002,63 @@ PowerScore = round((ATK + DEF + HP / 10 + CritRate times 1000 + AtkSpeed times 1
   times (1 + EnhanceLevel times 0.1))
 ```
 
+## PR #60 Class Balance Philosophy
+
+PR #60 keeps the eight-class expansion but removes strict-better growth from
+the new damage classes. The rule is parity by role, not identical stats:
+Warrior, Mage, Archer, Thief, Berserker, and Summoner target effective DPS
+within +/-15% at Lv50 and Lv100 under the shared review loadout, while Paladin
+and Cleric are allowed to sit below the DPS band because their value budget is
+survival and support.
+
+Class identity anchors:
+
+| Class | Role budget | Trade-off |
+| --- | --- | --- |
+| Warrior | physical baseline | stable STR/CON, no extreme spike |
+| Mage | magic baseline | high INT/WIS, lower HP |
+| Archer | physical crit/ASPD | lower raw ATK, higher DEX/LUK scaling |
+| Thief | physical crit/evasion | lower raw ATK, high LUK/DEX pressure |
+| Cleric | healer/support | lower DPS, high WIS/MagicDef and recovery |
+| Paladin | tank | lower DPS, highest HP/defense budget |
+| Berserker | physical high-risk DPS | strong STR/LUK, lower defense than Warrior/Paladin |
+| Summoner | magic status DPS | INT/WIS magic route, less raw INT growth than Mage |
+
+The simulator effective DPS row uses:
+
+```text
+EffectiveAttack = MagicAtk for Mage/Cleric/Summoner, otherwise PhysAtk
+SkillDpsRate = sum(active damageCoeff / cooldown)
+EffectiveDps = EffectiveAttack
+  * effective attack-speed expectation
+  * effective crit expectation
+  * (1 + SkillDpsRate)
+```
+
+Attack speed and crit are partially weighted in the review model to represent
+real idle uptime instead of assuming perfect burst conversion. Combat Power is
+reported next to DPS, but CP is not the DPS gate; it is a separate survivability
+and aggregate-stat signal from PR #49.
+
+PR #60 tuning anchors:
+
+- Berserker STR growth is reduced from 1.8 to 1.5 and LUK growth rises to 0.7,
+  so the class keeps high-risk physical burst identity without simply replacing
+  Warrior's STR curve.
+- Summoner INT growth is reduced from 1.7 to 1.45 and CON growth rises to 0.52,
+  so Summoner remains a magic/status DPS class without being a strict Mage
+  upgrade.
+- Berserker active coefficients are reduced to `2.35 / 1.65 / 2.05`.
+- Summoner active coefficients are reduced to `1.9 / 1.45 / 2.0`.
+- `tools/balance-sim` samples all eight classes and reports Lv50/Lv100 class
+  DPS, CP, HP, and effective attack rows in
+  `tools/balance-sim/reports/balance-sim-report.md`.
+
+The generated PR #60 report shows Lv100 DPS class deltas from the median at
+Warrior -8%, Mage 0%, Archer +6%, Thief +10%, Berserker 0%, and Summoner -11%.
+Paladin remains below the DPS band while having the highest HP/CP, and Cleric
+remains below the DPS band while preserving the healer MagicDef/support budget.
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:
