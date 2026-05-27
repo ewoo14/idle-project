@@ -2,6 +2,8 @@
 
 마일스톤별 QA 시나리오 문서를 이 디렉터리에 추가한다.
 
+<!-- markdownlint-disable MD013 -->
+
 | 마일스톤 | 문서 | 범위 |
 | --- | --- | --- |
 | M1 | [M1-client-core-boot.md](M1-client-core-boot.md) | UE5 클라이언트 코어 부트, 메인 메뉴, 캐릭터 입력, 수식 Automation |
@@ -27,3 +29,6 @@
 | M8 | [M8-save-system-v2.md](M8-save-system-v2.md) | SaveGame V2 Inventory/Skill/Quest/Season 라운드트립, V1 마이그레이션, 손상 페이로드 새니타이즈 |
 | M8 | [M8-save-system-v3.md](M8-save-system-v3.md) | Cloud save upload/download, merge policy, offline fallback, schema regression, HUD sync states |
 | M9 | [M9-achievements-collection.md](M9-achievements-collection.md) | Achievement catalog, permanent stat multiplier, save/cloud restore, HUD panel, and soft-cap parity |
+| M9 | [M9-quests-expansion.md](M9-quests-expansion.md) | Main/Daily/Weekly quest expansion, ch1/ch2 chain, reset, reward, save/cloud, and HUD parity |
+
+<!-- markdownlint-enable MD013 -->

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { questDefinitions } from "../../core/data/quests.js";
+import {
+  dailyQuestIds,
+  questDefinitions,
+  weeklyQuestIds,
+} from "../../core/data/quests.js";
 import { NotFoundError, ValidationError } from "../../core/errors.js";
+import { questListSchema } from "./quest.schema.js";
 import type { QuestProgressRecord, QuestRepo } from "./quest.service.js";
 import { QuestService } from "./quest.service.js";
 
@@ -8,6 +13,254 @@ const userId = "00000000-0000-0000-0000-000000000001";
 const characterId = "00000000-0000-0000-0000-000000000010";
 
 describe("QuestService", () => {
+  it("mirrors the expanded client quest definition table", () => {
+    expect(
+      questDefinitions.map((quest) => ({
+        questId: quest.questId,
+        type: quest.type,
+        objective: quest.objective,
+        targetCount: quest.targetCount,
+        rewardGold: quest.rewardGold,
+        rewardExp: quest.rewardExp,
+        prerequisiteQuestId: quest.prerequisiteQuestId,
+        chapterMapId: quest.chapterMapId,
+      })),
+    ).toEqual([
+      {
+        questId: "main_ch1_001",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 5,
+        rewardGold: 150,
+        rewardExp: 80,
+        chapterMapId: "1-1",
+      },
+      {
+        questId: "main_ch1_002",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 220,
+        rewardExp: 140,
+        prerequisiteQuestId: "main_ch1_001",
+        chapterMapId: "1-1",
+      },
+      {
+        questId: "main_ch1_003",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 12,
+        rewardGold: 420,
+        rewardExp: 300,
+        prerequisiteQuestId: "main_ch1_002",
+        chapterMapId: "1-2",
+      },
+      {
+        questId: "main_ch1_004",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 700,
+        rewardExp: 520,
+        prerequisiteQuestId: "main_ch1_003",
+        chapterMapId: "1-3",
+      },
+      {
+        questId: "main_ch1_005",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 20,
+        rewardGold: 1200,
+        rewardExp: 900,
+        prerequisiteQuestId: "main_ch1_004",
+        chapterMapId: "1-5",
+      },
+      {
+        questId: "main_ch1_006",
+        type: "main",
+        objective: "enhance",
+        targetCount: 2,
+        rewardGold: 1600,
+        rewardExp: 1200,
+        prerequisiteQuestId: "main_ch1_005",
+        chapterMapId: "1-5",
+      },
+      {
+        questId: "main_ch1_007",
+        type: "main",
+        objective: "defeat_boss",
+        targetCount: 1,
+        rewardGold: 2200,
+        rewardExp: 1600,
+        prerequisiteQuestId: "main_ch1_006",
+        chapterMapId: "1-5",
+      },
+      {
+        questId: "main_ch2_001",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 25,
+        rewardGold: 2600,
+        rewardExp: 1900,
+        prerequisiteQuestId: "main_ch1_007",
+        chapterMapId: "2-1",
+      },
+      {
+        questId: "main_ch2_002",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 3200,
+        rewardExp: 2300,
+        prerequisiteQuestId: "main_ch2_001",
+        chapterMapId: "2-2",
+      },
+      {
+        questId: "main_ch2_003",
+        type: "main",
+        objective: "reach_level",
+        targetCount: 10,
+        rewardGold: 3900,
+        rewardExp: 2800,
+        prerequisiteQuestId: "main_ch2_002",
+        chapterMapId: "2-3",
+      },
+      {
+        questId: "main_ch2_004",
+        type: "main",
+        objective: "rebirth",
+        targetCount: 1,
+        rewardGold: 4800,
+        rewardExp: 3400,
+        prerequisiteQuestId: "main_ch2_003",
+        chapterMapId: "2-4",
+      },
+      {
+        questId: "main_ch2_005",
+        type: "main",
+        objective: "defeat_boss",
+        targetCount: 1,
+        rewardGold: 6200,
+        rewardExp: 4500,
+        prerequisiteQuestId: "main_ch2_004",
+        chapterMapId: "2-5",
+      },
+      {
+        questId: "daily_kill_monsters",
+        type: "daily",
+        objective: "kill_monster",
+        targetCount: 30,
+        rewardGold: 500,
+        rewardExp: 240,
+      },
+      {
+        questId: "daily_claim_offline",
+        type: "daily",
+        objective: "claim_offline",
+        targetCount: 1,
+        rewardGold: 300,
+        rewardExp: 180,
+      },
+      {
+        questId: "daily_enhance_gear",
+        type: "daily",
+        objective: "enhance",
+        targetCount: 3,
+        rewardGold: 650,
+        rewardExp: 320,
+      },
+      {
+        questId: "daily_reach_level",
+        type: "daily",
+        objective: "reach_level",
+        targetCount: 10,
+        rewardGold: 700,
+        rewardExp: 360,
+      },
+      {
+        questId: "daily_spend_gold",
+        type: "daily",
+        objective: "spend_gold",
+        targetCount: 1000,
+        rewardGold: 750,
+        rewardExp: 380,
+      },
+      {
+        questId: "daily_roll_gear_shop",
+        type: "daily",
+        objective: "roll_gear_shop",
+        targetCount: 1,
+        rewardGold: 850,
+        rewardExp: 420,
+      },
+      {
+        questId: "daily_feed_pet",
+        type: "daily",
+        objective: "feed_pet",
+        targetCount: 1,
+        rewardGold: 900,
+        rewardExp: 450,
+      },
+      {
+        questId: "weekly_defeat_bosses",
+        type: "weekly",
+        objective: "defeat_boss",
+        targetCount: 3,
+        rewardGold: 5000,
+        rewardExp: 2500,
+      },
+      {
+        questId: "weekly_rebirth",
+        type: "weekly",
+        objective: "rebirth",
+        targetCount: 1,
+        rewardGold: 8000,
+        rewardExp: 4000,
+      },
+      {
+        questId: "weekly_climb_tower",
+        type: "weekly",
+        objective: "climb_tower",
+        targetCount: 10,
+        rewardGold: 7000,
+        rewardExp: 3600,
+      },
+      {
+        questId: "weekly_spend_gold",
+        type: "weekly",
+        objective: "spend_gold",
+        targetCount: 10000,
+        rewardGold: 6500,
+        rewardExp: 3200,
+      },
+    ]);
+  });
+
+  it("exposes schema enums for weekly quests and expanded objectives", () => {
+    const questItemSchema =
+      questListSchema.response[200].properties.data.properties.quests.items;
+
+    expect(questItemSchema.properties.type.enum).toEqual([
+      "main",
+      "daily",
+      "weekly",
+    ]);
+    expect(questItemSchema.properties.objective.enum).toEqual([
+      "kill_monster",
+      "clear_map",
+      "claim_offline",
+      "enhance",
+      "defeat_boss",
+      "rebirth",
+      "transcend",
+      "climb_tower",
+      "reach_level",
+      "spend_gold",
+      "roll_gear_shop",
+      "feed_pet",
+    ]);
+  });
+
   it("lists unlocked main quests and resets stale daily progress on UTC date change", async () => {
     const repo = createRepo({
       progress: [
@@ -27,11 +280,11 @@ describe("QuestService", () => {
 
     const result = await service.list(userId, characterId);
 
-    expect(repo.resetDailyProgress).toHaveBeenCalledWith(userId, "2026-05-26", [
-      "daily_kill_monsters",
-      "daily_claim_offline",
-      "daily_enhance_gear",
-    ]);
+    expect(repo.resetDailyProgress).toHaveBeenCalledWith(
+      userId,
+      "2026-05-26",
+      dailyQuestIds,
+    );
     expect(result.quests.map((quest) => quest.questId)).toContain(
       "main_ch1_001",
     );
@@ -45,6 +298,41 @@ describe("QuestService", () => {
       completed: false,
       claimed: false,
       dailyResetDate: "2026-05-26",
+    });
+  });
+
+  it("lists and resets weekly progress on ISO week change", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "weekly_defeat_bosses",
+          progress: 3,
+          completed: true,
+          claimed: true,
+          weeklyResetId: "2026-W21",
+        }),
+      ],
+    });
+    const service = new QuestService(
+      repo,
+      () => new Date("2026-05-27T02:00:00.000Z"),
+    );
+
+    const result = await service.list(userId, characterId);
+
+    expect(repo.resetWeeklyProgress).toHaveBeenCalledWith(
+      userId,
+      "2026-W22",
+      weeklyQuestIds,
+    );
+    expect(result.weeklyResetId).toBe("2026-W22");
+    expect(
+      result.quests.find((quest) => quest.questId === "weekly_defeat_bosses"),
+    ).toMatchObject({
+      progress: 0,
+      completed: false,
+      claimed: false,
+      weeklyResetId: "2026-W22",
     });
   });
 
@@ -68,12 +356,71 @@ describe("QuestService", () => {
       progress: 5,
       completed: true,
       dailyResetDate: null,
+      weeklyResetId: null,
     });
     expect(result).toMatchObject({
       questId: "main_ch1_001",
       progress: 5,
       completed: true,
       claimed: false,
+    });
+  });
+
+  it("records reach level progress as the highest reached level instead of accumulating levels", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "daily_reach_level",
+          progress: 4,
+          dailyResetDate: "2026-05-26",
+        }),
+      ],
+    });
+    const service = new QuestService(
+      repo,
+      () => new Date("2026-05-26T02:00:00.000Z"),
+    );
+
+    const lowerResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 3 },
+    );
+    const targetResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 10 },
+    );
+
+    expect(lowerResults).toEqual([
+      expect.objectContaining({
+        questId: "daily_reach_level",
+        progress: 4,
+        completed: false,
+      }),
+    ]);
+    expect(targetResults).toEqual([
+      expect.objectContaining({
+        questId: "daily_reach_level",
+        progress: 10,
+        completed: true,
+      }),
+    ]);
+    expect(repo.upsertProgress).toHaveBeenNthCalledWith(1, {
+      userId,
+      questId: "daily_reach_level",
+      progress: 4,
+      completed: false,
+      dailyResetDate: "2026-05-26",
+      weeklyResetId: null,
+    });
+    expect(repo.upsertProgress).toHaveBeenNthCalledWith(2, {
+      userId,
+      questId: "daily_reach_level",
+      progress: 10,
+      completed: true,
+      dailyResetDate: "2026-05-26",
+      weeklyResetId: null,
     });
   });
 
@@ -156,6 +503,44 @@ describe("QuestService", () => {
     expect(repo.upsertProgress).not.toHaveBeenCalledWith(
       expect.objectContaining({ questId: "daily_claim_offline" }),
     );
+  });
+
+  it("advances weekly quests through expanded objectives", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "weekly_climb_tower",
+          progress: 9,
+          weeklyResetId: "2026-W22",
+        }),
+      ],
+    });
+    const service = new QuestService(
+      repo,
+      () => new Date("2026-05-27T02:00:00.000Z"),
+    );
+
+    const results = await service.addProgressForObjective(userId, characterId, {
+      objective: "climb_tower",
+      amount: 2,
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({
+        questId: "weekly_climb_tower",
+        progress: 10,
+        completed: true,
+        weeklyResetId: "2026-W22",
+      }),
+    ]);
+    expect(repo.upsertProgress).toHaveBeenCalledWith({
+      userId,
+      questId: "weekly_climb_tower",
+      progress: 10,
+      completed: true,
+      dailyResetDate: null,
+      weeklyResetId: "2026-W22",
+    });
   });
 
   it("keeps listed quest data aligned with the canonical quest definitions", async () => {
@@ -291,6 +676,7 @@ function progressRecord(
     completed: false,
     claimed: false,
     dailyResetDate: null,
+    weeklyResetId: null,
     updatedAt: new Date("2026-05-26T00:00:00.000Z"),
     ...overrides,
   };
@@ -302,12 +688,14 @@ function createRepo(options: { progress?: QuestProgressRecord[] } = {}) {
     findCharacter: vi.fn().mockResolvedValue({ id: characterId, userId }),
     listProgress: vi.fn().mockResolvedValue(progress),
     resetDailyProgress: vi.fn().mockResolvedValue(undefined),
+    resetWeeklyProgress: vi.fn().mockResolvedValue(undefined),
     upsertProgress: vi.fn(async (input) =>
       progressRecord({
         questId: input.questId,
         progress: input.progress,
         completed: input.completed,
         dailyResetDate: input.dailyResetDate,
+        weeklyResetId: input.weeklyResetId,
       }),
     ),
     claimQuest: vi.fn(),

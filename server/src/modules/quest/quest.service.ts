@@ -4,6 +4,7 @@ import {
   type QuestObjective,
   questById,
   questDefinitions,
+  weeklyQuestIds,
 } from "../../core/data/quests.js";
 import { NotFoundError, ValidationError } from "../../core/errors.js";
 
@@ -14,6 +15,7 @@ export type QuestProgressRecord = {
   completed: boolean;
   claimed: boolean;
   dailyResetDate: string | null;
+  weeklyResetId: string | null;
   updatedAt: Date;
 };
 
@@ -28,12 +30,18 @@ export type QuestRepo = {
     dailyResetDate: string,
     questIds: string[],
   ): Promise<void>;
+  resetWeeklyProgress(
+    userId: string,
+    weeklyResetId: string,
+    questIds: string[],
+  ): Promise<void>;
   upsertProgress(input: {
     userId: string;
     questId: string;
     progress: number;
     completed: boolean;
     dailyResetDate: string | null;
+    weeklyResetId: string | null;
   }): Promise<QuestProgressRecord>;
   claimQuest(input: {
     userId: string;
@@ -59,13 +67,17 @@ export class QuestService {
     return {
       quests: questDefinitions
         .filter(
-          (quest) => quest.type === "daily" || state.isUnlocked(quest.questId),
+          (quest) =>
+            quest.type === "daily" ||
+            quest.type === "weekly" ||
+            state.isUnlocked(quest.questId),
         )
         .map((quest) => ({
           ...quest,
           ...state.progressFor(quest.questId),
         })),
       dailyResetDate: state.today,
+      weeklyResetId: state.week,
     };
   }
 
@@ -100,7 +112,9 @@ export class QuestService {
     const activeMatches = questDefinitions.filter(
       (quest) =>
         quest.objective === input.objective &&
-        (quest.type === "daily" || state.isUnlocked(quest.questId)),
+        (quest.type === "daily" ||
+          quest.type === "weekly" ||
+          state.isUnlocked(quest.questId)),
     );
 
     const results = [];
@@ -132,13 +146,18 @@ export class QuestService {
       return { ...quest, ...current };
     }
 
-    const progress = Math.min(quest.targetCount, current.progress + amount);
+    const nextProgress =
+      quest.objective === "reach_level"
+        ? Math.max(current.progress, amount)
+        : current.progress + amount;
+    const progress = Math.min(quest.targetCount, nextProgress);
     const saved = await this.repo.upsertProgress({
       userId,
       questId: quest.questId,
       progress,
       completed: progress >= quest.targetCount,
       dailyResetDate: quest.type === "daily" ? state.today : null,
+      weeklyResetId: quest.type === "weekly" ? state.week : null,
     });
     return { ...quest, ...saved };
   }
@@ -197,7 +216,9 @@ export class QuestService {
       });
     }
 
-    const today = toUtcDate(this.now());
+    const now = this.now();
+    const today = toUtcDate(now);
+    const week = toUtcWeek(now);
     const rows = await this.repo.listProgress(userId);
     const hasStaleDaily = rows.some((row) => {
       const quest = questById.get(row.questId);
@@ -205,6 +226,13 @@ export class QuestService {
     });
     if (hasStaleDaily) {
       await this.repo.resetDailyProgress(userId, today, dailyQuestIds);
+    }
+    const hasStaleWeekly = rows.some((row) => {
+      const quest = questById.get(row.questId);
+      return quest?.type === "weekly" && row.weeklyResetId !== week;
+    });
+    if (hasStaleWeekly) {
+      await this.repo.resetWeeklyProgress(userId, week, weeklyQuestIds);
     }
 
     const progress = new Map(
@@ -219,6 +247,18 @@ export class QuestService {
               completed: false,
               claimed: false,
               dailyResetDate: today,
+            },
+          ];
+        }
+        if (quest?.type === "weekly" && row.weeklyResetId !== week) {
+          return [
+            row.questId,
+            {
+              ...row,
+              progress: 0,
+              completed: false,
+              claimed: false,
+              weeklyResetId: week,
             },
           ];
         }
@@ -237,15 +277,18 @@ export class QuestService {
         claimed: row?.claimed ?? false,
         dailyResetDate:
           quest?.type === "daily" ? (row?.dailyResetDate ?? today) : null,
+        weeklyResetId:
+          quest?.type === "weekly" ? (row?.weeklyResetId ?? week) : null,
       };
     };
 
     return {
       today,
+      week,
       progressFor,
       isUnlocked: (questId: string) => {
         const quest = questById.get(questId);
-        if (!quest || quest.type === "daily") {
+        if (!quest || quest.type === "daily" || quest.type === "weekly") {
           return true;
         }
         return quest.prerequisiteQuestId
@@ -258,4 +301,17 @@ export class QuestService {
 
 function toUtcDate(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function toUtcWeek(date: Date) {
+  const utcDate = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  const day = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((utcDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+  return `${utcDate.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }

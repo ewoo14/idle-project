@@ -183,9 +183,30 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 
 FText QuestTypeToLabel(EQuestType Type)
 {
-	return Type == EQuestType::Main
-		? IdleProject::Localization::UI(TEXT("QUEST_TYPE_MAIN"))
-		: IdleProject::Localization::UI(TEXT("QUEST_TYPE_DAILY"));
+	switch (Type)
+	{
+	case EQuestType::Main:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_MAIN"));
+	case EQuestType::Weekly:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_WEEKLY"));
+	case EQuestType::Daily:
+	default:
+		return IdleProject::Localization::UI(TEXT("QUEST_TYPE_DAILY"));
+	}
+}
+
+FLinearColor QuestTypeToAccentColor(EQuestType Type)
+{
+	switch (Type)
+	{
+	case EQuestType::Main:
+		return IdleProject::UI::Theme::AccentBlue;
+	case EQuestType::Weekly:
+		return IdleProject::UI::Theme::AccentGold;
+	case EQuestType::Daily:
+	default:
+		return IdleProject::UI::Theme::TextMuted;
+	}
 }
 
 FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
@@ -1284,6 +1305,26 @@ FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<F
 	ViewModel.ShortcutLabel = IdleProject::Localization::UI(TEXT("QUEST_LOG_SHORTCUT_CLOSE"));
 	ViewModel.EmptyLabel = IdleProject::Localization::UI(TEXT("QUEST_LOG_EMPTY"));
 
+	auto FindOrAddSection = [&ViewModel](EQuestType Type) -> FIdleHUDQuestLogSectionViewModel&
+	{
+		for (FIdleHUDQuestLogSectionViewModel& Section : ViewModel.Sections)
+		{
+			if (Section.Type == Type)
+			{
+				return Section;
+			}
+		}
+
+		FIdleHUDQuestLogSectionViewModel& Section = ViewModel.Sections.AddDefaulted_GetRef();
+		Section.Type = Type;
+		Section.TypeLabel = QuestTypeToLabel(Type);
+		return Section;
+	};
+
+	FindOrAddSection(EQuestType::Main);
+	FindOrAddSection(EQuestType::Daily);
+	FindOrAddSection(EQuestType::Weekly);
+
 	for (const FQuestState& State : QuestStates)
 	{
 		FIdleHUDQuestLogRowViewModel Row;
@@ -1318,7 +1359,13 @@ FIdleHUDQuestLogViewModel IdleProject::UI::BuildQuestLogViewModel(const TArray<F
 			Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_IN_PROGRESS"));
 		}
 		ViewModel.Rows.Add(Row);
+		FindOrAddSection(State.Type).Rows.Add(Row);
 	}
+
+	ViewModel.Sections.RemoveAll([](const FIdleHUDQuestLogSectionViewModel& Section)
+	{
+		return Section.Rows.IsEmpty();
+	});
 
 	return ViewModel;
 }
@@ -3224,10 +3271,15 @@ void AIdleHUD::DrawQuestLog()
 	const FIdleHUDQuestLogViewModel ViewModel = BuildQuestLogViewModel(IdleGameInstance->GetActiveQuestStates());
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.36f, 420.0f * Scale, 620.0f * Scale);
-	const float RowHeight = 74.0f * Scale;
+	const float RowHeight = 58.0f * Scale;
+	const float SectionHeight = 26.0f * Scale;
 	const float HeaderHeight = 54.0f * Scale;
 	const float Padding = 18.0f * Scale;
-	const float PanelHeight = HeaderHeight + Padding + FMath::Max(1, ViewModel.Rows.Num()) * (RowHeight + 10.0f * Scale) + Padding;
+	const int32 VisibleSectionCount = ViewModel.Rows.IsEmpty() ? 0 : ViewModel.Sections.Num();
+	const float ContentHeight = ViewModel.Rows.IsEmpty()
+		? 52.0f * Scale
+		: VisibleSectionCount * SectionHeight + ViewModel.Rows.Num() * (RowHeight + 8.0f * Scale);
+	const float PanelHeight = FMath::Min(HeaderHeight + Padding + ContentHeight + Padding, Canvas->SizeY - 120.0f * Scale);
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
 	const float Y = 92.0f * Scale;
 	const float Border = 2.0f * Scale;
@@ -3248,36 +3300,53 @@ void AIdleHUD::DrawQuestLog()
 		return;
 	}
 
-	for (const FIdleHUDQuestLogRowViewModel& Row : ViewModel.Rows)
+	for (const FIdleHUDQuestLogSectionViewModel& Section : ViewModel.Sections)
 	{
-		const float RowX = X + Padding;
-		const float InnerWidth = PanelWidth - Padding * 2.0f;
-		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), RowX, RowY, InnerWidth, RowHeight);
-		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.42f), RowX, RowY, 4.0f * Scale, RowHeight);
-
-		DrawText(Row.TypeLabel.ToString(), Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue, RowX + 12.0f * Scale, RowY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-		DrawText(Row.Title.ToString(), Theme::TextPrimary, RowX + 58.0f * Scale, RowY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.92f * Scale);
-		DrawText(Row.ProgressLabel.ToString(), Theme::TextMuted, RowX + 12.0f * Scale, RowY + 33.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-		DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, RowX + 132.0f * Scale, RowY + 33.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-
-		const float BarX = RowX + 12.0f * Scale;
-		const float BarY = RowY + RowHeight - 12.0f * Scale;
-		const float BarWidth = InnerWidth - 104.0f * Scale;
-		DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.96f), BarX, BarY, BarWidth, 5.0f * Scale);
-		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue, BarX, BarY, BarWidth * Row.ProgressRatio, 5.0f * Scale);
-
-		const float ButtonWidth = 72.0f * Scale;
-		const float ButtonHeight = 30.0f * Scale;
-		const float ButtonX = RowX + InnerWidth - ButtonWidth - 12.0f * Scale;
-		const float ButtonY = RowY + 22.0f * Scale;
-		DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-		DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 19.0f * Scale, ButtonY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
-		if (Row.bCanClaim)
+		if (RowY + SectionHeight > Y + PanelHeight - Padding)
 		{
-			AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeQuestClaimHitBoxName(Row.QuestId), true, 90);
+			break;
 		}
 
-		RowY += RowHeight + 10.0f * Scale;
+		const float RowX = X + Padding;
+		const float InnerWidth = PanelWidth - Padding * 2.0f;
+		const FLinearColor SectionColor = QuestTypeToAccentColor(Section.Type);
+		DrawText(Section.TypeLabel.ToString(), SectionColor, RowX, RowY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+		DrawRect(SectionColor.CopyWithNewOpacity(0.70f), RowX + 58.0f * Scale, RowY + 14.0f * Scale, InnerWidth - 58.0f * Scale, 1.0f * Scale);
+		RowY += SectionHeight;
+
+		for (const FIdleHUDQuestLogRowViewModel& Row : Section.Rows)
+		{
+			if (RowY + RowHeight > Y + PanelHeight - Padding)
+			{
+				return;
+			}
+
+			DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), RowX, RowY, InnerWidth, RowHeight);
+			DrawRect(Row.bCanClaim ? Theme::AccentGold : SectionColor.CopyWithNewOpacity(0.64f), RowX, RowY, 4.0f * Scale, RowHeight);
+
+			DrawText(Row.Title.ToString(), Theme::TextPrimary, RowX + 12.0f * Scale, RowY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+			DrawText(Row.ProgressLabel.ToString(), Theme::TextMuted, RowX + 12.0f * Scale, RowY + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+			DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, RowX + 132.0f * Scale, RowY + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+
+			const float BarX = RowX + 12.0f * Scale;
+			const float BarY = RowY + RowHeight - 11.0f * Scale;
+			const float BarWidth = InnerWidth - 104.0f * Scale;
+			DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.96f), BarX, BarY, BarWidth, 5.0f * Scale);
+			DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue, BarX, BarY, BarWidth * Row.ProgressRatio, 5.0f * Scale);
+
+			const float ButtonWidth = 72.0f * Scale;
+			const float ButtonHeight = 26.0f * Scale;
+			const float ButtonX = RowX + InnerWidth - ButtonWidth - 12.0f * Scale;
+			const float ButtonY = RowY + 18.0f * Scale;
+			DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+			DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 19.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+			if (Row.bCanClaim)
+			{
+				AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeQuestClaimHitBoxName(Row.QuestId), true, 90);
+			}
+
+			RowY += RowHeight + 8.0f * Scale;
+		}
 	}
 }
 

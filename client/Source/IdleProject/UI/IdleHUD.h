@@ -73,12 +73,20 @@ struct IDLEPROJECT_API FIdleHUDQuestLogRowViewModel
 	bool bClaimed = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDQuestLogSectionViewModel
+{
+	EQuestType Type = EQuestType::Main;
+	FText TypeLabel;
+	TArray<FIdleHUDQuestLogRowViewModel> Rows;
+};
+
 struct IDLEPROJECT_API FIdleHUDQuestLogViewModel
 {
 	FText Title;
 	FText ShortcutLabel;
 	FText EmptyLabel;
 	TArray<FIdleHUDQuestLogRowViewModel> Rows;
+	TArray<FIdleHUDQuestLogSectionViewModel> Sections;
 };
 
 struct IDLEPROJECT_API FIdleHUDRebirthViewModel

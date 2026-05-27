@@ -87,9 +87,24 @@ bool FQuestLogHudViewModelTest::RunTest(const FString& Parameters)
 	DailyQuest.RewardExp = 180;
 	States.Add(DailyQuest);
 
+	FQuestState WeeklyQuest;
+	WeeklyQuest.QuestId = TEXT("weekly_climb_tower");
+	WeeklyQuest.Type = EQuestType::Weekly;
+	WeeklyQuest.Title = FText::FromString(TEXT("Weekly Tower Push"));
+	WeeklyQuest.TargetCount = 10;
+	WeeklyQuest.Progress = 4;
+	WeeklyQuest.RewardGold = 7000;
+	WeeklyQuest.RewardExp = 3600;
+	States.Add(WeeklyQuest);
+
 	const FIdleHUDQuestLogViewModel ViewModel = IdleProject::UI::BuildQuestLogViewModel(States);
 	TestEqual(TEXT("Quest log uses approved title copy"), ViewModel.Title.ToString(), FString(TEXT("퀘스트")));
-	TestEqual(TEXT("Quest log exposes all active quests"), ViewModel.Rows.Num(), 2);
+	TestEqual(TEXT("Quest log exposes all active quests"), ViewModel.Rows.Num(), 3);
+	TestEqual(TEXT("Quest log groups rows into main, daily, and weekly sections"), ViewModel.Sections.Num(), 3);
+	TestEqual(TEXT("Main section contains main rows"), ViewModel.Sections[0].Rows.Num(), 1);
+	TestEqual(TEXT("Daily section contains daily rows"), ViewModel.Sections[1].Rows.Num(), 1);
+	TestEqual(TEXT("Weekly section contains weekly rows"), ViewModel.Sections[2].Rows.Num(), 1);
+	TestEqual(TEXT("Weekly row remains available in flat row list"), ViewModel.Rows[2].QuestId, FString(TEXT("weekly_climb_tower")));
 	TestEqual(TEXT("Main quest row uses approved Korean type label"), ViewModel.Rows[0].TypeLabel.ToString(), FString(TEXT("메인")));
 	TestEqual(TEXT("Daily quest row uses approved Korean type label"), ViewModel.Rows[1].TypeLabel.ToString(), FString(TEXT("일일")));
 	TestEqual(TEXT("Progress line shows current and target count"), ViewModel.Rows[0].ProgressLabel.ToString(), FString(TEXT("진행 3 / 5")));
