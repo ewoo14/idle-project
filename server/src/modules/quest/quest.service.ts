@@ -146,7 +146,11 @@ export class QuestService {
       return { ...quest, ...current };
     }
 
-    const progress = Math.min(quest.targetCount, current.progress + amount);
+    const nextProgress =
+      quest.objective === "reach_level"
+        ? Math.max(current.progress, amount)
+        : current.progress + amount;
+    const progress = Math.min(quest.targetCount, nextProgress);
     const saved = await this.repo.upsertProgress({
       userId,
       questId: quest.questId,

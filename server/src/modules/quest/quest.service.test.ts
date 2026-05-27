@@ -366,6 +366,64 @@ describe("QuestService", () => {
     });
   });
 
+  it("records reach level progress as the highest reached level instead of accumulating levels", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "daily_reach_level",
+          progress: 4,
+          dailyResetDate: "2026-05-26",
+        }),
+      ],
+    });
+    const service = new QuestService(
+      repo,
+      () => new Date("2026-05-26T02:00:00.000Z"),
+    );
+
+    const lowerResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 3 },
+    );
+    const targetResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 10 },
+    );
+
+    expect(lowerResults).toEqual([
+      expect.objectContaining({
+        questId: "daily_reach_level",
+        progress: 4,
+        completed: false,
+      }),
+    ]);
+    expect(targetResults).toEqual([
+      expect.objectContaining({
+        questId: "daily_reach_level",
+        progress: 10,
+        completed: true,
+      }),
+    ]);
+    expect(repo.upsertProgress).toHaveBeenNthCalledWith(1, {
+      userId,
+      questId: "daily_reach_level",
+      progress: 4,
+      completed: false,
+      dailyResetDate: "2026-05-26",
+      weeklyResetId: null,
+    });
+    expect(repo.upsertProgress).toHaveBeenNthCalledWith(2, {
+      userId,
+      questId: "daily_reach_level",
+      progress: 10,
+      completed: true,
+      dailyResetDate: "2026-05-26",
+      weeklyResetId: null,
+    });
+  });
+
   it("advances unlocked active quests by objective without progressing claimed rewards", async () => {
     const repo = createRepo({
       progress: [

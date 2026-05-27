@@ -327,6 +327,33 @@ bool FQuestServiceExpandedUnlockWeeklyResetTest::RunTest(const FString& Paramete
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceReachLevelMaximumProgressTest,
+	"IdleProject.GameCore.QuestService.ReachLevelMaximumProgress",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceReachLevelMaximumProgressTest::RunTest(const FString& Parameters)
+{
+	UQuestService* Quests = NewObject<UQuestService>();
+	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
+
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 2);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 3);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 4);
+
+	FQuestState ReachLevelDaily;
+	TestTrue(TEXT("Reach level daily quest is active"), Quests->GetQuestState(TEXT("daily_reach_level"), ReachLevelDaily));
+	TestEqual(TEXT("ReachLevel records the maximum observed level, not cumulative levels"), ReachLevelDaily.Progress, 4);
+	TestFalse(TEXT("Partial maximum level does not complete the quest"), ReachLevelDaily.bCompleted);
+
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 10);
+	TestTrue(TEXT("Reach level daily quest remains active"), Quests->GetQuestState(TEXT("daily_reach_level"), ReachLevelDaily));
+	TestEqual(TEXT("ReachLevel completes at the reached level target"), ReachLevelDaily.Progress, 10);
+	TestTrue(TEXT("Target level completes the quest"), ReachLevelDaily.bCompleted);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FQuestServiceChapterTwoPrerequisiteChainTest,
 	"IdleProject.GameCore.QuestService.ChapterTwoPrerequisiteChain",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

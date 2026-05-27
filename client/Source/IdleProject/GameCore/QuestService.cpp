@@ -130,7 +130,14 @@ void UQuestService::RecordProgress(EQuestObjective Objective, int32 Amount)
 			continue;
 		}
 
-		State.Progress = FMath::Clamp(State.Progress + Amount, 0, State.TargetCount);
+		if (Objective == EQuestObjective::ReachLevel)
+		{
+			State.Progress = FMath::Clamp(FMath::Max(State.Progress, Amount), 0, State.TargetCount);
+		}
+		else
+		{
+			State.Progress = FMath::Clamp(State.Progress + Amount, 0, State.TargetCount);
+		}
 		State.bCompleted = State.Progress >= State.TargetCount;
 	}
 }
