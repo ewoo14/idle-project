@@ -1118,3 +1118,33 @@ Guardrails:
 - CP may eventually require coefficient tuning if HP or defense dominates player
   perception, but V1 keeps the weights simple and transparent for QA.
 - HUD copy must stay compact: `전투력 {Amount}` and `Combat Power {Amount}`.
+
+## PR #50 Infinity Tower V1
+
+Infinity Tower is an optional infinite-progress track keyed only by current
+combat power. It must not mutate combat stats, stage progress, rebirth state, or
+transcend state. The client character slice uses the following V1 anchors:
+
+```text
+RequiredPower(floor) = round(100 * 1.15^(max(1, floor) - 1))
+CanClearFloor(cp, floor) = cp >= RequiredPower(floor)
+FloorReward(floor) = round(50 * max(1, floor))
+```
+
+Representative client anchors:
+
+| Floor | Required CP | Reward gold |
+| ---: | ---: | ---: |
+| 1 | 100 | 50 |
+| 2 | 115 | 100 |
+| 3 | 132 | 150 |
+
+Guardrails:
+
+- `TryClimbTower` may clear several consecutive floors in one call, but one
+  call is capped at 100 floors to prevent runaway loops when CP is very high.
+- Rewards are granted only for newly cleared floors; calling again with the same
+  CP cannot reclaim previous rewards.
+- CP shortage leaves `HighestFloor` unchanged and pays zero gold.
+- HUD/server follow-up work must preserve these anchors or explicitly update
+  client/server parity tests together.

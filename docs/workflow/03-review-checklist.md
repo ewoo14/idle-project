@@ -251,6 +251,21 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   equipment affix/set bonuses, enhancement, rebirth bonus points, and
   transcend multiplier.
 
+## PR #50 Character Checklist Addendum (Section 4)
+
+- [ ] `FTowerFormula::GetFloorRequiredPower` keeps floor 1 at 100 CP and uses
+  `round(100 * 1.15^(max(1, Floor) - 1))`.
+- [ ] `FTowerFormula::CanClearFloor` is an exact `CombatPower >= RequiredPower`
+  gate, including one-below and exact-boundary tests.
+- [ ] `FTowerFormula::GetFloorReward` keeps the V1 linear
+  `round(50 * max(1, Floor))` gold reward.
+- [ ] `UTowerService::TryClimbTower` advances only newly clearable consecutive
+  floors, sums rewards once, broadcasts `OnTowerClimbed` only when progress is
+  made, and caps one call at 100 floors.
+- [ ] `UIdleGameInstance::ClimbTower` reads current
+  `AIdleCharacter::GetCombatPower()`, applies successful tower rewards through
+  `AddGold`, and safely returns zero when no player character is available.
+
 ## PR #43 QA Checklist Addendum (Section 7)
 
 - [ ] QA scenario covers 2-piece active, 4-piece complete, under-threshold,

@@ -1,5 +1,6 @@
 #include "GameCore/IdleGameInstance.h"
 
+#include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
@@ -39,6 +40,7 @@ void UIdleGameInstance::Init()
 	EnsurePetService();
 	EnsureSeasonService();
 	EnsureStageService();
+	EnsureTowerService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	LoadLanguage();
@@ -64,6 +66,7 @@ void UIdleGameInstance::Shutdown()
 	PetService = nullptr;
 	SeasonService = nullptr;
 	StageService = nullptr;
+	TowerService = nullptr;
 	Super::Shutdown();
 }
 
@@ -83,6 +86,23 @@ void UIdleGameInstance::AddGold(int64 Amount)
 
 	Gold = FMath::Max<int64>(0, Gold + Amount);
 	OnGoldChanged.Broadcast(Gold);
+}
+
+int64 UIdleGameInstance::ClimbTower()
+{
+	EnsureTowerService();
+	AIdleCharacter* Character = FindPlayerCharacter();
+	if (!TowerService || !Character)
+	{
+		return 0;
+	}
+
+	const int64 Reward = TowerService->TryClimbTower(Character->GetCombatPower());
+	if (Reward > 0)
+	{
+		AddGold(Reward);
+	}
+	return Reward;
 }
 
 FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot)
@@ -492,6 +512,12 @@ void UIdleGameInstance::InitializeStageServiceForTests()
 	StageService->OnChapterBossDefeated.AddUniqueDynamic(this, &UIdleGameInstance::HandleChapterBossDefeated);
 }
 
+void UIdleGameInstance::InitializeTowerServiceForTests()
+{
+	TowerService = NewObject<UTowerService>(this);
+	TowerService->InitializeTower();
+}
+
 bool UIdleGameInstance::EquipPet(const FString& PetId)
 {
 	EnsurePetService();
@@ -632,6 +658,14 @@ UInventoryComponent* UIdleGameInstance::FindPlayerInventory() const
 	return Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr;
 }
 
+AIdleCharacter* UIdleGameInstance::FindPlayerCharacter() const
+{
+	const UWorld* World = GetWorld();
+	APlayerController* PlayerController = World ? World->GetFirstPlayerController() : nullptr;
+	APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+	return Cast<AIdleCharacter>(Pawn);
+}
+
 void UIdleGameInstance::EnsureQuestService()
 {
 	if (!QuestService)
@@ -668,6 +702,15 @@ void UIdleGameInstance::EnsureStageService()
 	}
 
 	StageService->OnChapterBossDefeated.AddUniqueDynamic(this, &UIdleGameInstance::HandleChapterBossDefeated);
+}
+
+void UIdleGameInstance::EnsureTowerService()
+{
+	if (!TowerService)
+	{
+		TowerService = NewObject<UTowerService>(this);
+		TowerService->InitializeTower();
+	}
 }
 
 void UIdleGameInstance::HandleChapterBossDefeated(int32 ClearedChapter)

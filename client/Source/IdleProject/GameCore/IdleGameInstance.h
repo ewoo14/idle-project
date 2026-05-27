@@ -9,11 +9,13 @@
 #include "GameCore/QuestService.h"
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
+#include "GameCore/TowerService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
 class UInventoryComponent;
+class AIdleCharacter;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
@@ -107,6 +109,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UStageService* GetStageService() const { return StageService; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UTowerService* GetTowerService() const { return TowerService; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
 
@@ -118,6 +123,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddGold(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
+	int64 ClimbTower();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot);
@@ -237,6 +245,8 @@ public:
 
 	void InitializeStageServiceForTests();
 
+	void InitializeTowerServiceForTests();
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool EquipPet(const FString& PetId);
 
@@ -304,6 +314,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UStageService> StageService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UTowerService> TowerService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -348,10 +361,12 @@ private:
 
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
+	AIdleCharacter* FindPlayerCharacter() const;
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();
 	void EnsureStageService();
+	void EnsureTowerService();
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();
