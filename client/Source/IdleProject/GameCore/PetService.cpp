@@ -42,7 +42,7 @@ void UPetService::RestoreState(const FString& PetId, const TMap<FString, int32>&
 	{
 		if (OwnedPetIds.Contains(Pair.Key) && DefinitionById.Contains(Pair.Key))
 		{
-			PetLevels.FindOrAdd(Pair.Key) = FMath::Max(0, Pair.Value);
+			PetLevels.FindOrAdd(Pair.Key) = FMath::Clamp(Pair.Value, 0, FPetLevelFormula::MaxPetLevel);
 		}
 	}
 

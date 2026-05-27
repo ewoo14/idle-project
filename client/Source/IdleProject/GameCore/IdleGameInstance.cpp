@@ -17,6 +17,20 @@
 #include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
 
+namespace
+{
+FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
+{
+	return FPrimaryStats(
+		FMath::Max(0.0f, Stats.Str),
+		FMath::Max(0.0f, Stats.Dex),
+		FMath::Max(0.0f, Stats.Int_),
+		FMath::Max(0.0f, Stats.Wis),
+		FMath::Max(0.0f, Stats.Con),
+		FMath::Max(0.0f, Stats.Luk));
+}
+}
+
 const TCHAR* UIdleGameInstance::SaveSlotName = TEXT("IdleSave");
 
 void UIdleGameInstance::Init()
@@ -64,6 +78,7 @@ void UIdleGameInstance::Init()
 void UIdleGameInstance::Shutdown()
 {
 	LastSeenUnixSec = GetCurrentUnixSeconds();
+	FlushPendingAutosave();
 	SaveProgress();
 	SaveLanguage();
 	SaveLastSeenUnixSec();
@@ -135,12 +150,16 @@ void UIdleGameInstance::LoadProgress()
 	ApplyFromSave(SaveGame);
 }
 
-bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame) const
+bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 {
 	if (!SaveGame)
 	{
 		return false;
 	}
+
+	EnsureStageService();
+	EnsureTowerService();
+	EnsurePetService();
 
 	SaveGame->SaveVersion = 1;
 	SaveGame->bHasSave = true;
@@ -152,7 +171,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame) const
 	SaveGame->RebirthBonusPoints = RebirthBonusPoints;
 	SaveGame->TranscendCount = TranscendCount;
 	SaveGame->AvailableStatPoints = AvailableStatPoints;
-	SaveGame->AllocatedStats = AllocatedStats;
+	SaveGame->AllocatedStats = ClampPrimaryStats(AllocatedStats);
 	SaveGame->bChapter1BossDefeated = bChapter1BossDefeated;
 	SaveGame->LastSeenUnixSec = LastSeenUnixSec;
 
@@ -186,8 +205,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		return false;
 	}
 
-	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
-	bAutosaveSuppressed = true;
+	TGuardValue<bool> AutosaveGuard(bAutosaveSuppressed, true);
 
 	Gold = FMath::Max<int64>(0, SaveGame->Gold);
 	CharacterLevel = FMath::Max(1, SaveGame->CharacterLevel);
@@ -197,7 +215,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	RebirthBonusPoints = FMath::Max(0, SaveGame->RebirthBonusPoints);
 	TranscendCount = FMath::Max(0, SaveGame->TranscendCount);
 	AvailableStatPoints = FMath::Max(0, SaveGame->AvailableStatPoints);
-	AllocatedStats = SaveGame->AllocatedStats;
+	AllocatedStats = ClampPrimaryStats(SaveGame->AllocatedStats);
 	bChapter1BossDefeated = SaveGame->bChapter1BossDefeated;
 	LastSeenUnixSec = FMath::Max<int64>(0, SaveGame->LastSeenUnixSec);
 
@@ -229,7 +247,6 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
 
-	bAutosaveSuppressed = bWasAutosaveSuppressed;
 	return true;
 }
 
@@ -822,10 +839,45 @@ int64 UIdleGameInstance::GetCurrentUnixSeconds()
 
 void UIdleGameInstance::RequestAutosave()
 {
-	if (!bAutosaveSuppressed)
+	if (bAutosaveSuppressed)
 	{
-		SaveProgress();
+		return;
 	}
+
+	bAutosavePending = true;
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		FlushPendingAutosave();
+		return;
+	}
+
+	FTimerManager& WorldTimerManager = World->GetTimerManager();
+	if (!WorldTimerManager.IsTimerActive(AutosaveTimerHandle))
+	{
+		WorldTimerManager.SetTimer(
+			AutosaveTimerHandle,
+			this,
+			&UIdleGameInstance::FlushPendingAutosave,
+			AutosaveDebounceSeconds,
+			false);
+	}
+}
+
+void UIdleGameInstance::FlushPendingAutosave()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AutosaveTimerHandle);
+	}
+
+	if (!bAutosavePending || bAutosaveSuppressed)
+	{
+		return;
+	}
+
+	bAutosavePending = false;
+	SaveProgress();
 }
 
 UInventoryComponent* UIdleGameInstance::FindPlayerInventory() const

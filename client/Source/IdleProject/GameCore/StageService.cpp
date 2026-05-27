@@ -115,10 +115,21 @@ FStageInfo UStageService::GetCurrentStageInfo() const
 
 void UStageService::RestoreState(int32 Chapter, int32 Stage, int32 Kills, bool bFinalCleared, int32 HighestCleared)
 {
+	bFinalChapterCleared = bFinalCleared;
+	if (bFinalChapterCleared)
+	{
+		CurrentChapter = TotalChapters;
+		CurrentStage = StagesPerChapter;
+		HighestClearedChapter = TotalChapters;
+		KillsThisStage = GetKillsToAdvance();
+		OnStageChanged.Broadcast(GetCurrentStageInfo());
+		return;
+	}
+
 	CurrentChapter = FMath::Clamp(Chapter, 1, TotalChapters);
 	CurrentStage = FMath::Clamp(Stage, 1, StagesPerChapter);
-	bFinalChapterCleared = bFinalCleared;
 	HighestClearedChapter = FMath::Clamp(HighestCleared, 0, TotalChapters);
+	HighestClearedChapter = FMath::Min(HighestClearedChapter, CurrentChapter - 1);
 	KillsThisStage = FMath::Clamp(Kills, 0, GetKillsToAdvance());
 	OnStageChanged.Broadcast(GetCurrentStageInfo());
 }

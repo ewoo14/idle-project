@@ -107,6 +107,32 @@ Automation: `IdleProject.Localization.CsvIntegrity`,
 - 4K: confirm the Canvas scale keeps the indicator compact and inside the safe
   viewport area.
 
+## Scenario 8: Malformed or missing local save is graceful
+
+Given a V1 save payload is empty, versionless, missing from disk, or contains
+out-of-range values.
+
+When `ApplyFromSave()` or `LoadProgress()` runs.
+
+Then invalid payloads are rejected without mutating current progress.
+
+And accepted malformed values are clamped before reaching Stage, Tower, and Pet
+services.
+
+Automation: `IdleProject.GameCore.SaveSystem.InvalidLoadIsNoOp`,
+`IdleProject.GameCore.SaveSystem.RestoreSanitizesServiceState`
+
+## Save V2 Backlog
+
+- Inventory: equipped items, bag contents, enhancement levels, affixes, and set
+  membership.
+- Skills: unlocked skills, ranks, available skill points, and any persistent
+  cooldown/ultimate state required after restart.
+- Quest: active quest progress, claimed rewards, daily reset anchor, and
+  chapter/story quest flags.
+- Season: season tokens, reached tier, claimed tier rewards, and pass reset
+  metadata.
+
 ## Verification Commands
 
 <!-- markdownlint-disable MD013 -->

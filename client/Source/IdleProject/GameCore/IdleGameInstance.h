@@ -11,6 +11,7 @@
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "TimerManager.h"
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
@@ -132,7 +133,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
 	void LoadProgress();
 
-	bool CaptureToSave(UIdleSaveGame* SaveGame) const;
+	bool CaptureToSave(UIdleSaveGame* SaveGame);
 	bool ApplyFromSave(const UIdleSaveGame* SaveGame);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
@@ -375,14 +376,18 @@ private:
 	int64 LastSeenUnixSec = 0;
 
 	bool bAutosaveSuppressed = false;
+	bool bAutosavePending = false;
+	FTimerHandle AutosaveTimerHandle;
 
 	FRandomStream EnhanceRandomStream;
 
 	static const TCHAR* SaveSlotName;
+	static constexpr float AutosaveDebounceSeconds = 1.0f;
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
 	void RequestAutosave();
+	void FlushPendingAutosave();
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();

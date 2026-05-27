@@ -34,3 +34,22 @@
   `IdleProject.GameCore.SaveSystem.ProgressSavedBroadcast`,
   `IdleProject.UI.HUD.SaveProgressFeedbackLabel`,
   `IdleProject.Localization.CsvIntegrity`.
+
+## Codex TM fix v3 follow-up
+
+- Expanded save round-trip automation to assert all six allocated stats,
+  stage final-clear state, tower floor, equipped pet, and pet levels.
+- Added malformed-load coverage:
+  `IdleProject.GameCore.SaveSystem.RestoreSanitizesServiceState` verifies
+  clamping for core values, final stage state, tower floor, unknown pets, and
+  pet level bounds.
+- Added no-op load coverage:
+  `IdleProject.GameCore.SaveSystem.InvalidLoadIsNoOp` verifies empty,
+  versionless, and missing-slot saves leave current progress intact.
+- `CaptureToSave` now ensures Stage/Tower/Pet services before capture so the
+  V1 payload is complete even when save is requested before UI/service access.
+- Event autosave is debounced through `RequestAutosave()` and flushed on
+  `Shutdown()`, while direct `SaveProgress()` remains immediate for explicit
+  saves and tests.
+- Save v2 backlog: Inventory equipment/bag state, Skill ranks/cooldowns,
+  Quest progress/claims, and Season pass tokens/claim state.
