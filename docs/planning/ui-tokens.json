@@ -64,6 +64,34 @@
     "md": 6,
     "lg": 8
   },
+  "hud": {
+    "questLog": {
+      "anchor": "top-right",
+      "marginRightPx1080": 28,
+      "topPx1080": 92,
+      "widthViewportRatio": 0.36,
+      "minWidthPx1080": 420,
+      "maxWidthPx1080": 620,
+      "headerHeightPx1080": 54,
+      "sectionHeightPx1080": 26,
+      "rowHeightPx1080": 58,
+      "rowGapPx1080": 8,
+      "scaleByCanvasHeight": {
+        "baseHeight": 1080,
+        "min": 1.0,
+        "max": 2.0
+      },
+      "sectionColors": {
+        "main": "{color.accent.blue}",
+        "daily": "{color.text.muted}",
+        "weekly": "{color.accent.gold}"
+      },
+      "progressColor": "{color.accent.blue}",
+      "claimColor": "{color.accent.gold}",
+      "panelColor": "{color.bg.panel}",
+      "rowColor": "{color.bg.primary}"
+    }
+  },
   "$todo": [
     "다크/라이트 분리는 1.0 출시 전 결정 (현재 다크 단일).",
     "Mythic gradient angle/stops 최종 확정 — PR #2.",
