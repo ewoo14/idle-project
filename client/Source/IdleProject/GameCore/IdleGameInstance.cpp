@@ -389,6 +389,11 @@ float UIdleGameInstance::GetTranscendStatMultiplier() const
 	return FTranscendFormula::GetTranscendStatMultiplier(TranscendCount);
 }
 
+float UIdleGameInstance::GetTowerMilestoneMultiplier() const
+{
+	return TowerService ? TowerService->GetMilestoneMultiplier() : 1.0f;
+}
+
 float UIdleGameInstance::PreviewTranscendMultiplier() const
 {
 	return FTranscendFormula::GetTranscendStatMultiplier(TranscendCount + 1);

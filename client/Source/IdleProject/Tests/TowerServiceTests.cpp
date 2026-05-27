@@ -2,6 +2,7 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/TowerFormula.h"
+#include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TowerService.h"
 #include "Internationalization/IdleLocalization.h"
 #include "Tests/TowerEventTestReceiver.h"
@@ -29,6 +30,23 @@ bool FTowerFormulaScalingTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("One CP below requirement cannot clear"), FTowerFormula::CanClearFloor(114, 2));
 	TestEqual(TEXT("Floor zero reward clamps to first floor"), FTowerFormula::GetFloorReward(0), static_cast<int64>(50));
 	TestEqual(TEXT("Floor three reward is linear gold"), FTowerFormula::GetFloorReward(3), static_cast<int64>(150));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FTowerMilestoneFormulaTest,
+	"IdleProject.GameCore.Tower.MilestoneFormula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTowerMilestoneFormulaTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Negative floors keep neutral milestone multiplier"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(-1), 1.0f);
+	TestEqual(TEXT("Floor zero keeps neutral milestone multiplier"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(0), 1.0f);
+	TestEqual(TEXT("Floor nine stays below first milestone"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(9), 1.0f);
+	TestEqual(TEXT("Floor ten applies first milestone bonus"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10), 1.02f);
+	TestEqual(TEXT("Floor twenty five applies two milestone bonuses"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(25), 1.04f);
+	TestEqual(TEXT("Floor one hundred applies ten milestone bonuses"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(100), 1.20f);
 
 	return true;
 }
@@ -62,6 +80,11 @@ bool FTowerServiceClimbTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Same CP cannot claim already cleared rewards"), Tower->TryClimbTower(132), static_cast<int64>(0));
 	TestEqual(TEXT("No-new-floor call does not rebroadcast"), Receiver->Count, 1);
+	TestEqual(TEXT("Highest floor below first milestone keeps neutral multiplier"), Tower->GetMilestoneMultiplier(), 1.0f);
+
+	Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	TestEqual(TEXT("Highest floor ten applies first milestone multiplier through service"), Tower->GetHighestFloor(), 10);
+	TestEqual(TEXT("Tower service exposes milestone multiplier"), Tower->GetMilestoneMultiplier(), 1.02f);
 
 	return true;
 }
@@ -101,8 +124,15 @@ bool FIdleGameInstanceTowerHooksTest::RunTest(const FString& Parameters)
 	UTowerService* Tower = GameInstance->GetTowerService();
 	TestNotNull(TEXT("Game instance creates tower service for tests"), Tower);
 	TestEqual(TEXT("Game instance tower starts before floor one"), Tower ? Tower->GetHighestFloor() : INDEX_NONE, 0);
+	TestEqual(TEXT("Game instance tower starts with neutral milestone multiplier"), GameInstance->GetTowerMilestoneMultiplier(), 1.0f);
 	TestEqual(TEXT("Climb without a player character is safely ignored"), GameInstance->ClimbTower(), static_cast<int64>(0));
 	TestEqual(TEXT("Ignored climb leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	if (Tower)
+	{
+		Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	}
+	TestEqual(TEXT("Game instance proxies tower milestone multiplier"), GameInstance->GetTowerMilestoneMultiplier(), 1.02f);
 
 	GameInstance->AddGold(MAX_int64);
 	GameInstance->AddGold(1);
@@ -125,15 +155,29 @@ bool FTowerHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Highest floor formats through localization"), Ready.HighestFloorLabel.ToString(), FString(TEXT("Best Floor 3")));
 	TestEqual(TEXT("Next required CP formats with separators"), Ready.NextRequiredPowerLabel.ToString(), FString(TEXT("Next CP 152")));
 	TestEqual(TEXT("Current CP formats with separators"), Ready.CombatPowerLabel.ToString(), FString(TEXT("Combat Power 200")));
+	TestEqual(TEXT("Milestone multiplier formats through localization"), Ready.MilestoneMultiplierLabel.ToString(), FString(TEXT("Permanent Bonus x1.00")));
+	TestEqual(TEXT("Next milestone floor formats through localization"), Ready.NextMilestoneLabel.ToString(), FString(TEXT("Next +2%: Floor 10")));
 	TestEqual(TEXT("Ready status uses localized copy"), Ready.StatusLabel.ToString(), FString(TEXT("Ready to climb")));
 	TestEqual(TEXT("Ready button uses localized copy"), Ready.ButtonLabel.ToString(), FString(TEXT("Climb")));
 	TestEqual(TEXT("Tower climb hitbox is stable"), Ready.ClimbHitBoxName, FName(TEXT("TowerClimb")));
 	TestTrue(TEXT("Enough CP can climb"), Ready.bCanClimb);
+	TestEqual(TEXT("Current milestone multiplier is exposed numerically"), Ready.MilestoneMultiplier, 1.0f);
+	TestEqual(TEXT("Next milestone floor is exposed numerically"), Ready.NextMilestoneFloor, 10);
 
 	const FIdleHUDTowerViewModel Blocked = IdleProject::UI::BuildTowerViewModel(3, 1'234'567, 999);
 	TestEqual(TEXT("Large next required CP uses comma formatting"), Blocked.NextRequiredPowerLabel.ToString(), FString(TEXT("Next CP 1,234,567")));
 	TestEqual(TEXT("Blocked status uses localized copy"), Blocked.StatusLabel.ToString(), FString(TEXT("Need more CP")));
 	TestFalse(TEXT("Insufficient CP blocks climb"), Blocked.bCanClimb);
+
+	const FIdleHUDTowerViewModel Milestone = IdleProject::UI::BuildTowerViewModel(10, 250, 300);
+	TestEqual(TEXT("Floor 10 milestone multiplier is visible"), Milestone.MilestoneMultiplierLabel.ToString(), FString(TEXT("Permanent Bonus x1.02")));
+	TestEqual(TEXT("Floor 10 next milestone points at floor 20"), Milestone.NextMilestoneLabel.ToString(), FString(TEXT("Next +2%: Floor 20")));
+	TestEqual(TEXT("Floor 10 multiplier is exposed numerically"), Milestone.MilestoneMultiplier, 1.02f);
+	TestEqual(TEXT("Floor 10 next milestone is exposed numerically"), Milestone.NextMilestoneFloor, 20);
+
+	const FIdleHUDTowerViewModel ExplicitNeutral = IdleProject::UI::BuildTowerViewModel(0, 100, 100, 0.0f);
+	TestEqual(TEXT("Explicit zero multiplier falls back to neutral formula"), ExplicitNeutral.MilestoneMultiplier, 1.0f);
+	TestEqual(TEXT("Explicit zero multiplier still renders neutral label"), ExplicitNeutral.MilestoneMultiplierLabel.ToString(), FString(TEXT("Permanent Bonus x1.00")));
 
 	const FText Feedback = IdleProject::UI::BuildTowerClimbFeedbackLabel(7, 12'500);
 	TestEqual(TEXT("Climb feedback includes highest floor and reward"), Feedback.ToString(), FString(TEXT("Floor 7 cleared! Gold +12,500")));

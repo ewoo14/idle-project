@@ -1155,3 +1155,40 @@ Guardrails:
 - Oversized required-power calculations clamp to int64 max, and gold grants
   saturate rather than wrapping when tower rewards are applied near the int64
   boundary.
+
+## PR #51 Tower Milestone Bonus V1
+
+Tower milestone bonus turns the highest cleared Infinity Tower floor into a
+small permanent combat-stat multiplier:
+
+```text
+TowerMilestoneMultiplier = 1 + floor(max(0, HighestFloor) / 10) * 0.02
+```
+
+Every 10 cleared floors adds +2% to HP, physical attack, magic attack, physical
+defense, and magic defense. Floors 0 through 9 stay neutral at 1.00x, floor 10
+is 1.02x, floor 25 is 1.04x, and floor 100 is 1.20x. Rate-style stats such as
+attack speed, crit rate, crit damage, dodge, and accuracy are intentionally not
+multiplied, matching the PR #47 transcend stat-list boundary.
+
+The bonus is economic-neutral by itself. It does not change tower gold rewards,
+stage rewards, drop rates, enhancement costs, shop costs, pet growth, rebirth
+rewards, or season rewards. Any pacing impact must come through final derived
+stats and the PR #49 Combat Power formula, which then lets the player clear
+more tower floors or other CP-gated checks.
+
+Transcendence and tower milestones multiply together at the final derived-stat
+cache boundary:
+
+```text
+StatMultiplier = TranscendStatMultiplier * TowerMilestoneMultiplier
+```
+
+Guardrails:
+
+- `HighestFloor <= 0` and missing tower state must resolve to 1.00x.
+- Client `FTowerMilestoneFormula` and server `getTowerMilestoneMultiplier`
+  must keep parity anchors for 0, 9, 10, 25, and 100.
+- HUD copy should stay compact as `xN.NN` and show the next 10-floor milestone.
+- Re-run UE automation and server Vitest when changing the step size, bonus
+  rate, affected stat list, or CP formula weights.
