@@ -8,6 +8,8 @@
 #include "GameCore/AchievementService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "Internationalization/IdleLocalization.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -104,6 +106,49 @@ bool FAchievementServiceProgressTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Restored points round trip"), Restored->GetTotalPoints(), Service->GetTotalPoints());
 	TestEqual(TEXT("Restored multiplier round trips"), Restored->GetStatMultiplier(), Service->GetStatMultiplier());
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAchievementHudViewModelTest,
+	"IdleProject.UI.HUD.AchievementPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAchievementHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UAchievementService* Service = NewObject<UAchievementService>();
+	Service->InitializeDefaultAchievements();
+	Service->RecordMetric(EAchievementMetric::MonstersKilled, 10);
+	Service->RecordMetric(EAchievementMetric::HighestLevelReached, 25);
+
+	const FIdleHUDAchievementViewModel ViewModel = IdleProject::UI::BuildAchievementViewModel(*Service);
+	TestEqual(TEXT("Achievement panel title uses localized copy"), ViewModel.Title.ToString(), FString(TEXT("Achievements")));
+	TestEqual(TEXT("Total points are exposed"), ViewModel.TotalPoints, 3);
+	TestEqual(TEXT("Total points label is localized"), ViewModel.TotalPointsLabel.ToString(), FString(TEXT("Points 3")));
+	TestEqual(TEXT("Stat multiplier is exposed"), ViewModel.StatMultiplier, 1.03f);
+	TestEqual(TEXT("Stat multiplier label is localized"), ViewModel.StatMultiplierLabel.ToString(), FString(TEXT("Stat Bonus x1.03")));
+	TestTrue(TEXT("Achievement categories are summarized"), ViewModel.Rows.Num() >= 8);
+
+	const FIdleHUDAchievementRowViewModel* CombatRow = ViewModel.Rows.FindByPredicate([](const FIdleHUDAchievementRowViewModel& Row)
+	{
+		return Row.Category == EAchievementCategory::Combat;
+	});
+	TestNotNull(TEXT("Combat category row exists"), CombatRow);
+	if (CombatRow)
+	{
+		TestEqual(TEXT("Combat row label is localized"), CombatRow->CategoryLabel.ToString(), FString(TEXT("Combat")));
+		TestEqual(TEXT("Combat row shows unlocked points"), CombatRow->Points, 1);
+		TestEqual(TEXT("Combat row shows current tier"), CombatRow->Tier, 1);
+		TestEqual(TEXT("Combat row value label is localized"), CombatRow->ValueLabel.ToString(), FString(TEXT("Progress 10")));
+	}
+
+	TestEqual(TEXT("Unlock feedback includes achievement name and tier"),
+		IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(TEXT("combat_monster_slayer"), 2).ToString(),
+		FString(TEXT("Achievement Unlocked: Monster Slayer (Tier 2)")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 

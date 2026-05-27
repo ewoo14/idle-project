@@ -341,6 +341,31 @@ struct IDLEPROJECT_API FIdleHUDTowerViewModel
 	bool bCanClimb = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDAchievementRowViewModel
+{
+	EAchievementCategory Category = EAchievementCategory::Misc;
+	FText CategoryLabel;
+	FText TierLabel;
+	FText PointsLabel;
+	FText ValueLabel;
+	FText NextThresholdLabel;
+	int32 Tier = 0;
+	int32 Points = 0;
+	int64 CurrentValue = 0;
+	int64 NextThreshold = 0;
+	float ProgressRatio = 0.0f;
+};
+
+struct IDLEPROJECT_API FIdleHUDAchievementViewModel
+{
+	FText Title;
+	FText TotalPointsLabel;
+	FText StatMultiplierLabel;
+	int32 TotalPoints = 0;
+	float StatMultiplier = 1.0f;
+	TArray<FIdleHUDAchievementRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -368,6 +393,8 @@ IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimar
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
+IDLEPROJECT_API FIdleHUDAchievementViewModel BuildAchievementViewModel(const UAchievementService& AchievementService);
+IDLEPROJECT_API FText BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
 IDLEPROJECT_API FIdleHUDCloudSyncViewModel BuildCloudSyncViewModel(ECloudSyncState State);
 }
@@ -438,11 +465,16 @@ protected:
 	UFUNCTION()
 	void HandleCloudSyncStateChanged(ECloudSyncState NewState);
 
+	UFUNCTION()
+	void HandleAchievementUnlocked(const FString& AchievementId, int32 Tier);
+
 private:
 	void BindStageService();
 	void UnbindStageService();
 	void BindTowerService();
 	void UnbindTowerService();
+	void BindAchievementService();
+	void UnbindAchievementService();
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
 	void BindPlayerInventory();
@@ -486,6 +518,7 @@ private:
 	void TryTranscend();
 	void DrawTowerPanel();
 	void TryClimbTower();
+	void DrawAchievementPanel();
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipPetFromHitBox(FName BoxName);
@@ -527,13 +560,16 @@ private:
 	TWeakObjectPtr<AActor> BossSpecialAttackActor;
 	TWeakObjectPtr<UStageService> BoundStageService;
 	TWeakObjectPtr<UTowerService> BoundTowerService;
+	TWeakObjectPtr<UAchievementService> BoundAchievementService;
 	FText StageFeedbackLabel;
 	FText TowerFeedbackLabel;
+	FText AchievementFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;
+	float AchievementFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
