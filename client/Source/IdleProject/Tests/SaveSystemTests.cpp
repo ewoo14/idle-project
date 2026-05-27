@@ -11,6 +11,7 @@
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
 #include "CharacterSystem/IdleCharacter.h"
+#include "CharacterSystem/LevelFormulas.h"
 #include "CombatSystem/SkillComponent.h"
 #include "Engine/World.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -545,6 +546,15 @@ bool FIdleSaveSystemInvalidLoadIsNoOpTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Versionless save payload is rejected"), GameInstance->ApplyFromSave(VersionlessSave));
 	TestEqual(TEXT("Versionless save keeps gold unchanged"), GameInstance->GetGold(), static_cast<int64>(500));
 
+	UIdleSaveGame* OverCapSave = NewObject<UIdleSaveGame>();
+	OverCapSave->bHasSave = true;
+	OverCapSave->Gold = 500;
+	OverCapSave->CharacterLevel = FLevelFormulas::LEVEL_CAP + 1;
+	OverCapSave->NextExp = 0;
+	TestTrue(TEXT("Over-cap save payload is accepted and clamped"), GameInstance->ApplyFromSave(OverCapSave));
+	TestEqual(TEXT("Over-cap save clamps to level cap"), GameInstance->GetCharacterLevel(), FLevelFormulas::LEVEL_CAP);
+	TestEqual(TEXT("Level cap rebuilds next exp sentinel"), GameInstance->GetNextExp(), static_cast<int64>(0));
+
 	UGameplayStatics::DeleteGameInSlot(TEXT("IdleSave"), 0);
 	GameInstance->LoadProgress();
 	TestEqual(TEXT("Missing slot load keeps current gold unchanged"), GameInstance->GetGold(), static_cast<int64>(500));
@@ -611,6 +621,20 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->TowerHighestFloor = 42;
 	SourceSave->SkillPoints = 9;
 	SourceSave->InventoryItems.Add(MakeSaveTestItem(TEXT("mythic_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 100.0f, 0.0f, 0.0f));
+	SourceSave->EquippedSlotIndex.Add(EItemSlot::Weapon, 0);
+	SourceSave->SkillRanks.Add(TEXT("heavy_strike"), 4);
+	SourceSave->PetLevels.Add(TEXT("dog"), 3);
+	FQuestSaveEntry QuestEntry;
+	QuestEntry.QuestId = TEXT("main_ch1_001");
+	QuestEntry.Type = EQuestType::Main;
+	QuestEntry.Progress = 3;
+	QuestEntry.bCompleted = true;
+	QuestEntry.bClaimed = false;
+	SourceSave->Quests.Add(QuestEntry);
+	SourceSave->QuestDailyResetDate = TEXT("2026-05-27");
+	SourceSave->SeasonId = USeasonService::CurrentSeasonId;
+	SourceSave->SeasonTokens = 25;
+	SourceSave->SeasonClaimedTiers.Add(1);
 
 	FString PayloadJson;
 	TestTrue(TEXT("Cloud payload serializes populated local save"), FCloudSavePayloadMapper::SaveToPayloadJson(*SourceSave, PayloadJson));
@@ -630,7 +654,17 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Tower floor round trips through cloud payload"), RestoredSave->TowerHighestFloor, SourceSave->TowerHighestFloor);
 	TestEqual(TEXT("Skill points round trips through cloud payload"), RestoredSave->SkillPoints, SourceSave->SkillPoints);
 	TestEqual(TEXT("Inventory item round trips through cloud payload"), RestoredSave->InventoryItems.Num(), 1);
+	TestEqual(TEXT("Inventory item id survives cloud payload"), RestoredSave->InventoryItems[0].ItemId, FName(TEXT("mythic_sword")));
+	TestEqual(TEXT("Inventory display name survives cloud payload"), RestoredSave->InventoryItems[0].DisplayName.ToString(), FString(TEXT("mythic_sword")));
 	TestEqual(TEXT("Mythic rarity survives cloud payload"), RestoredSave->InventoryItems[0].Rarity, EItemRarity::Mythic);
+	TestEqual(TEXT("Equipped slot map survives cloud payload"), RestoredSave->EquippedSlotIndex.FindRef(EItemSlot::Weapon), static_cast<int32>(0));
+	TestEqual(TEXT("Skill rank map survives cloud payload"), RestoredSave->SkillRanks.FindRef(TEXT("heavy_strike")), static_cast<int32>(4));
+	TestEqual(TEXT("Pet level map survives cloud payload"), RestoredSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(3));
+	TestEqual(TEXT("Quest list survives cloud payload"), RestoredSave->Quests.Num(), 1);
+	TestEqual(TEXT("Quest id survives cloud payload"), RestoredSave->Quests[0].QuestId, FString(TEXT("main_ch1_001")));
+	TestEqual(TEXT("Quest reset date survives cloud payload"), RestoredSave->QuestDailyResetDate, FString(TEXT("2026-05-27")));
+	TestEqual(TEXT("Season tokens survive cloud payload"), RestoredSave->SeasonTokens, static_cast<int32>(25));
+	TestTrue(TEXT("Season claimed tiers survive cloud payload"), RestoredSave->SeasonClaimedTiers.Contains(1));
 
 	FCloudSaveProgressSnapshot Snapshot;
 	TestTrue(TEXT("Snapshot extracts from payload"), FCloudSavePayloadMapper::ExtractSnapshot(PayloadJson, Snapshot));

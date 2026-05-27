@@ -42,7 +42,7 @@ export class SaveRepoPg {
          set level = greatest(level, $2),
              rebirth_count = greatest(rebirth_count, $3),
              gold = greatest(gold, coalesce(($4::jsonb ->> 'gold')::int, gold)),
-             total_exp = greatest(total_exp, coalesce(($4::jsonb ->> 'totalExp')::int, total_exp)),
+             total_exp = greatest(total_exp, coalesce(($4::jsonb ->> 'totalExp')::bigint, total_exp)),
              last_seen_at = coalesce(to_timestamp(($4::jsonb ->> 'lastSeenUnixSec')::double precision), last_seen_at, now()),
              last_save_at = now()
          where id = $1`,

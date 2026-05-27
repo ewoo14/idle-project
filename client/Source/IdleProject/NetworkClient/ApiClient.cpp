@@ -279,20 +279,47 @@ bool UApiClient::ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 N
 
 bool UApiClient::RequestQuestList(const FString& CharacterId)
 {
-	if (CharacterId.IsEmpty())
+	FString ResolvedCharacterId = CharacterId;
+	if (ResolvedCharacterId.IsEmpty())
 	{
-		return false;
+		if (CachedCharacterId.IsEmpty())
+		{
+			CachedCharacterId = LoadCachedCharacterId();
+		}
+		ResolvedCharacterId = CachedCharacterId;
+	}
+	if (ResolvedCharacterId.IsEmpty() || AuthToken.IsEmpty())
+	{
+		EnsureCharacter([this](bool bSuccess, FString ResolvedCharacterId)
+		{
+			if (bSuccess)
+			{
+				RequestQuestList(ResolvedCharacterId);
+			}
+		});
+		return true;
 	}
 
-	const FString Path = FString::Printf(TEXT("/v1/quests?characterId=%s"), *CharacterId);
+	const FString Path = FString::Printf(TEXT("/v1/quests?characterId=%s"), *ResolvedCharacterId);
 	return Get(Path);
 }
 
 bool UApiClient::ReportQuestProgress(const FString& QuestId, const FString& CharacterId, int32 Amount)
 {
-	if (QuestId.IsEmpty() || CharacterId.IsEmpty() || Amount <= 0)
+	if (QuestId.IsEmpty() || Amount <= 0)
 	{
 		return false;
+	}
+	if (CharacterId.IsEmpty())
+	{
+		EnsureCharacter([this, QuestId, Amount](bool bSuccess, FString ResolvedCharacterId)
+		{
+			if (bSuccess)
+			{
+				ReportQuestProgress(QuestId, ResolvedCharacterId, Amount);
+			}
+		});
+		return true;
 	}
 
 	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
@@ -308,9 +335,20 @@ bool UApiClient::ReportQuestProgress(const FString& QuestId, const FString& Char
 
 bool UApiClient::ClaimQuestReward(const FString& QuestId, const FString& CharacterId)
 {
-	if (QuestId.IsEmpty() || CharacterId.IsEmpty())
+	if (QuestId.IsEmpty())
 	{
 		return false;
+	}
+	if (CharacterId.IsEmpty())
+	{
+		EnsureCharacter([this, QuestId](bool bSuccess, FString ResolvedCharacterId)
+		{
+			if (bSuccess)
+			{
+				ClaimQuestReward(QuestId, ResolvedCharacterId);
+			}
+		});
+		return true;
 	}
 
 	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
@@ -325,6 +363,17 @@ bool UApiClient::ClaimQuestReward(const FString& QuestId, const FString& Charact
 
 bool UApiClient::RequestPetList()
 {
+	if (AuthToken.IsEmpty())
+	{
+		RegisterGuest([this](bool bSuccess, FString)
+		{
+			if (bSuccess)
+			{
+				RequestPetList();
+			}
+		});
+		return true;
+	}
 	return Get(TEXT("/v1/pets"));
 }
 
@@ -333,6 +382,17 @@ bool UApiClient::EquipPet(const FString& PetId)
 	if (PetId.IsEmpty())
 	{
 		return false;
+	}
+	if (AuthToken.IsEmpty())
+	{
+		RegisterGuest([this, PetId](bool bSuccess, FString)
+		{
+			if (bSuccess)
+			{
+				EquipPet(PetId);
+			}
+		});
+		return true;
 	}
 
 	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
@@ -347,6 +407,17 @@ bool UApiClient::EquipPet(const FString& PetId)
 
 bool UApiClient::RequestSeasonState()
 {
+	if (AuthToken.IsEmpty())
+	{
+		RegisterGuest([this](bool bSuccess, FString)
+		{
+			if (bSuccess)
+			{
+				RequestSeasonState();
+			}
+		});
+		return true;
+	}
 	return Get(TEXT("/v1/season"));
 }
 
@@ -356,9 +427,25 @@ bool UApiClient::ClaimSeasonReward(int32 Tier)
 	{
 		return false;
 	}
+	if (CachedCharacterId.IsEmpty())
+	{
+		CachedCharacterId = LoadCachedCharacterId();
+	}
+	if (CachedCharacterId.IsEmpty() || AuthToken.IsEmpty())
+	{
+		EnsureCharacter([this, Tier](bool bSuccess, FString)
+		{
+			if (bSuccess)
+			{
+				ClaimSeasonReward(Tier);
+			}
+		});
+		return true;
+	}
 
 	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
 	JsonObject->SetNumberField(TEXT("tier"), Tier);
+	JsonObject->SetStringField(TEXT("characterId"), CachedCharacterId);
 
 	FString JsonBody;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);

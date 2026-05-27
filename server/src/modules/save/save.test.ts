@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../../core/errors.js";
 import { cumulativeExp } from "../../core/formulas/index.js";
@@ -198,6 +199,24 @@ describe("SaveService", () => {
       minimum: 0,
     });
     expect(payloadSchema.additionalProperties).toBe(true);
+  });
+
+  it("keeps character totalExp storage on the bigint path for level 1000 saves", () => {
+    const repoSource = readFileSync(
+      new URL("./save.repo.ts", import.meta.url),
+      "utf8",
+    );
+    const schemaSource = readFileSync(
+      new URL("../../db/schema.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(cumulativeExp(1000)).toBeGreaterThan(2_147_483_647);
+    expect(repoSource).toContain("totalExp')::bigint");
+    expect(repoSource).not.toContain("totalExp')::int");
+    expect(schemaSource).toContain(
+      'totalExp: bigint("total_exp", { mode: "number" })',
+    );
   });
 
   it("updates leaderboard after a successful upload", async () => {

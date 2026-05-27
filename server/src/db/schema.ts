@@ -35,7 +35,7 @@ export const characters = pgTable("characters", {
   skillTree: jsonb("skill_tree").notNull().default({}),
   inventory: jsonb("inventory").notNull().default([]),
   gold: integer("gold").notNull().default(0),
-  totalExp: integer("total_exp").notNull().default(0),
+  totalExp: bigint("total_exp", { mode: "number" }).notNull().default(0),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   lastSaveAt: timestamp("last_save_at", { withTimezone: true }),
 });

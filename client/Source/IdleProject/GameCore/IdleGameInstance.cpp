@@ -177,27 +177,41 @@ void UIdleGameInstance::SyncFromCloud()
 	}
 
 	SetCloudSyncState(ECloudSyncState::Syncing);
-	ApiClient->EnsureCharacter([this, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bCharacterOk, FString CharacterId) mutable
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bCharacterOk, FString CharacterId) mutable
 	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			return;
+		}
 		if (!bCharacterOk)
 		{
-			SetCloudSyncState(ECloudSyncState::Offline);
+			StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
 			return;
 		}
 
-		ApiClient->DownloadSave(CharacterId, [this, CharacterId, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bDownloadOk, FString ServerPayloadJson) mutable
+		StrongThis->ApiClient->DownloadSave(CharacterId, [WeakThis, CharacterId, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bDownloadOk, FString ServerPayloadJson) mutable
 		{
+			UIdleGameInstance* StrongThis = WeakThis.Get();
+			if (!StrongThis || !StrongThis->ApiClient)
+			{
+				return;
+			}
 			if (!bDownloadOk)
 			{
-				SetCloudSyncState(ECloudSyncState::Offline);
+				StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
 				return;
 			}
 
 			if (ServerPayloadJson.IsEmpty())
 			{
-				ApiClient->UploadSave(CharacterId, CloudSaveApiVersion, LocalPayloadJson, [this](bool bUploadOk, FString)
+				StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, LocalPayloadJson, [WeakThis](bool bUploadOk, FString)
 				{
-					SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+					if (UIdleGameInstance* StrongThis = WeakThis.Get())
+					{
+						StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+					}
 				});
 				return;
 			}
@@ -205,30 +219,33 @@ void UIdleGameInstance::SyncFromCloud()
 			FCloudSaveProgressSnapshot ServerSnapshot;
 			if (!FCloudSavePayloadMapper::ExtractSnapshot(ServerPayloadJson, ServerSnapshot))
 			{
-				SetCloudSyncState(ECloudSyncState::Offline);
+				StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
 				return;
 			}
 
 			if (FCloudSaveMergePolicy::Decide(LocalSnapshot, ServerSnapshot) == ECloudSaveMergeDecision::AdoptServer)
 			{
-				UIdleSaveGame* ServerSave = NewObject<UIdleSaveGame>(this);
-				if (FCloudSavePayloadMapper::PayloadJsonToSave(ServerPayloadJson, *ServerSave) && ApplyFromSave(ServerSave))
+				UIdleSaveGame* ServerSave = NewObject<UIdleSaveGame>(StrongThis);
+				if (FCloudSavePayloadMapper::PayloadJsonToSave(ServerPayloadJson, *ServerSave) && StrongThis->ApplyFromSave(ServerSave))
 				{
-					TGuardValue<bool> CloudUploadGuard(bCloudUploadSuppressed, true);
-					SaveProgress();
-					SetCloudSyncState(ECloudSyncState::Synced);
+					TGuardValue<bool> CloudUploadGuard(StrongThis->bCloudUploadSuppressed, true);
+					StrongThis->SaveProgress();
+					StrongThis->SetCloudSyncState(ECloudSyncState::Synced);
 				}
 				else
 				{
-					SetCloudSyncState(ECloudSyncState::Conflict);
+					StrongThis->SetCloudSyncState(ECloudSyncState::Conflict);
 				}
 				return;
 			}
 
-			SetCloudSyncState(ECloudSyncState::Conflict);
-			ApiClient->UploadSave(CharacterId, CloudSaveApiVersion, LocalPayloadJson, [this](bool bUploadOk, FString)
+			StrongThis->SetCloudSyncState(ECloudSyncState::Conflict);
+			StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, LocalPayloadJson, [WeakThis](bool bUploadOk, FString)
 			{
-				SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+				if (UIdleGameInstance* StrongThis = WeakThis.Get())
+				{
+					StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+				}
 			});
 		});
 	});
@@ -250,17 +267,26 @@ void UIdleGameInstance::UploadToCloud()
 	}
 
 	SetCloudSyncState(ECloudSyncState::Syncing);
-	ApiClient->EnsureCharacter([this, PayloadJson = MoveTemp(PayloadJson)](bool bCharacterOk, FString CharacterId) mutable
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, PayloadJson = MoveTemp(PayloadJson)](bool bCharacterOk, FString CharacterId) mutable
 	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			return;
+		}
 		if (!bCharacterOk)
 		{
-			SetCloudSyncState(ECloudSyncState::Offline);
+			StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
 			return;
 		}
 
-		ApiClient->UploadSave(CharacterId, CloudSaveApiVersion, PayloadJson, [this](bool bUploadOk, FString)
+		StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, PayloadJson, [WeakThis](bool bUploadOk, FString)
 		{
-			SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+			if (UIdleGameInstance* StrongThis = WeakThis.Get())
+			{
+				StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+			}
 		});
 	});
 }
@@ -358,7 +384,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	TGuardValue<bool> AutosaveGuard(bAutosaveSuppressed, true);
 
 	Gold = FMath::Max<int64>(0, SaveGame->Gold);
-	CharacterLevel = FMath::Max(1, SaveGame->CharacterLevel);
+	CharacterLevel = FMath::Clamp(SaveGame->CharacterLevel, 1, FLevelFormulas::LEVEL_CAP);
 	CurrentExp = FMath::Max<int64>(0, SaveGame->CurrentExp);
 	NextExp = SaveGame->NextExp > 0 ? SaveGame->NextExp : FLevelFormulas::ExpToNext(CharacterLevel);
 	RebirthCount = FMath::Max(0, SaveGame->RebirthCount);
