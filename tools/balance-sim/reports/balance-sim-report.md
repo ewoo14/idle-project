@@ -157,6 +157,30 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Achievement Multiplier Pressure
+
+- Soft cap starts at 100 points.
+- Soft-cap bonus budget: 50 effective points.
+- 100 points stays at x2 before the soft-cap slope decays toward x2.5.
+- Composite reference: transcend 10 (x3.5)
+  and tower floor 100 (x1.2).
+- Achievement tiers remain infinite for collection depth, but stat growth
+  is bounded enough that transcend and tower stay the primary prestige
+  multipliers.
+
+<!-- markdownlint-disable MD013 -->
+
+| Points | Legacy x | Soft-capped x | Composite x |
+| ---: | ---: | ---: | ---: |
+| 0 | 1 | 1 | 4.2 |
+| 3 | 1.03 | 1.03 | 4.326 |
+| 100 | 2 | 2 | 8.4 |
+| 125 | 2.25 | 2.197 | 9.226 |
+| 250 | 3.5 | 2.475 | 10.395 |
+| 500 | 6 | 2.5 | 10.499 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Formula Sources
 
 - server/src/core/formulas/level.ts
@@ -167,3 +191,4 @@
 - server/src/core/formulas/stage.ts
 - server/src/core/formulas/enhance.ts
 - server/src/core/formulas/petLevel.ts
+- server/src/core/formulas/achievement.ts

@@ -1,5 +1,7 @@
 export const ACHIEVEMENT_TIER_GROWTH_DEFAULT = 2;
 export const ACHIEVEMENT_POINTS_MULTIPLIER = 0.01;
+export const ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS = 100;
+export const ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS = 50;
 
 export type AchievementCategory =
   | "Combat"
@@ -293,11 +295,22 @@ export function getPointsForTiers(
 }
 
 export function getAchievementStatMultiplier(totalPoints: number): number {
+  const safePoints = Math.max(0, Math.trunc(totalPoints));
+  const effectivePoints =
+    safePoints <= ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS
+      ? safePoints
+      : ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS +
+        ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS *
+          (1 -
+            Math.exp(
+              -(
+                (safePoints - ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS) /
+                ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS
+              ),
+            ));
+
   return Math.fround(
     Math.fround(1) +
-      Math.fround(
-        Math.max(0, Math.trunc(totalPoints)) *
-          Math.fround(ACHIEVEMENT_POINTS_MULTIPLIER),
-      ),
+      Math.fround(effectivePoints * Math.fround(ACHIEVEMENT_POINTS_MULTIPLIER)),
   );
 }

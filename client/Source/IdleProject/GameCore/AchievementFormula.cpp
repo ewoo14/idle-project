@@ -74,5 +74,13 @@ int32 FAchievementFormula::GetPointsForTiers(const FAchievementDefinition& Defin
 
 float FAchievementFormula::GetStatMultiplier(int32 TotalPoints)
 {
-	return 1.0f + static_cast<float>(FMath::Max(0, TotalPoints)) * AchievementPointsMultiplier;
+	const int32 SafePoints = FMath::Max(0, TotalPoints);
+	const float EffectivePoints = SafePoints <= MultiplierSoftCapStartPoints
+		? static_cast<float>(SafePoints)
+		: static_cast<float>(MultiplierSoftCapStartPoints) +
+			MultiplierSoftCapBonusPoints *
+				(1.0f - FMath::Exp(
+					-static_cast<float>(SafePoints - MultiplierSoftCapStartPoints) /
+					MultiplierSoftCapBonusPoints));
+	return 1.0f + EffectivePoints * AchievementPointsMultiplier;
 }

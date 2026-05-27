@@ -62,6 +62,9 @@ bool FAchievementFormulaCatalogTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Third geometric threshold unlocks tier three"), FAchievementFormula::GetTierForValue(*MonsterKills, 40), 3);
 	TestEqual(TEXT("Three one-point tiers award three points"), FAchievementFormula::GetPointsForTiers(*MonsterKills, 3), 3);
 	TestEqual(TEXT("Three achievement points add three percent"), FAchievementFormula::GetStatMultiplier(3), 1.03f);
+	TestEqual(TEXT("Soft-cap start remains linear"), FAchievementFormula::GetStatMultiplier(100), 2.0f);
+	TestEqual(TEXT("Soft-cap reduces points after one hundred"), FAchievementFormula::GetStatMultiplier(125), 2.1967347f);
+	TestEqual(TEXT("Soft-cap approaches the achievement ceiling"), FAchievementFormula::GetStatMultiplier(500), 2.4998324f);
 	TestEqual(TEXT("Zero achievement points stay neutral"), FAchievementFormula::GetStatMultiplier(0), 1.0f);
 	TestEqual(TEXT("Negative achievement points stay neutral"), FAchievementFormula::GetStatMultiplier(-5), 1.0f);
 

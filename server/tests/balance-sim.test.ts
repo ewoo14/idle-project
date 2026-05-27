@@ -46,10 +46,64 @@ describe("balance simulator", () => {
     expect(report.json.model.formulas).toContain(
       "server/src/core/formulas/enhance.ts",
     );
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/achievement.ts",
+    );
     expect(report.markdown).toContain("# Balance Simulator V1");
     expect(report.markdown).toContain("median");
     expect(report.markdown).toContain("Sensitivity");
     expect(report.markdown).toContain("EXP curve");
+  });
+
+  it("reports achievement soft-cap pressure against transcend and tower multipliers", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.achievementPressure.softCapStartPoints).toBe(100);
+    expect(report.json.model.achievementPressure.softCapBonusPoints).toBe(50);
+    expect(report.json.model.achievementPressure.rows).toEqual([
+      {
+        totalPoints: 0,
+        legacyMultiplier: 1,
+        softCappedMultiplier: 1,
+        compositeWithTranscendAndTower: 4.2,
+      },
+      {
+        totalPoints: 3,
+        legacyMultiplier: 1.03,
+        softCappedMultiplier: 1.03,
+        compositeWithTranscendAndTower: 4.326,
+      },
+      {
+        totalPoints: 100,
+        legacyMultiplier: 2,
+        softCappedMultiplier: 2,
+        compositeWithTranscendAndTower: 8.4,
+      },
+      {
+        totalPoints: 125,
+        legacyMultiplier: 2.25,
+        softCappedMultiplier: 2.197,
+        compositeWithTranscendAndTower: 9.226,
+      },
+      {
+        totalPoints: 250,
+        legacyMultiplier: 3.5,
+        softCappedMultiplier: 2.475,
+        compositeWithTranscendAndTower: 10.395,
+      },
+      {
+        totalPoints: 500,
+        legacyMultiplier: 6,
+        softCappedMultiplier: 2.5,
+        compositeWithTranscendAndTower: 10.499,
+      },
+    ]);
+    expect(report.markdown).toContain("## Achievement Multiplier Pressure");
+    expect(report.markdown).toContain(
+      "100 points stays at x2 before the soft-cap slope decays",
+    );
+    expect(report.markdown).toContain("| 250 | 3.5 | 2.475 | 10.395 |");
   });
 
   it("samples kill rewards through the shared stage reward formula", () => {

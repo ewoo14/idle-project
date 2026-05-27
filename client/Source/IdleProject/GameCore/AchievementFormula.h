@@ -138,6 +138,8 @@ struct IDLEPROJECT_API FAchievementSaveEntry
 struct IDLEPROJECT_API FAchievementFormula
 {
 	static constexpr float AchievementPointsMultiplier = 0.01f;
+	static constexpr int32 MultiplierSoftCapStartPoints = 100;
+	static constexpr float MultiplierSoftCapBonusPoints = 50.0f;
 	static constexpr float DefaultTierGrowth = 2.0f;
 
 	static const TArray<FAchievementDefinition>& GetDefinitions();
