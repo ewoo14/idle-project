@@ -2448,7 +2448,7 @@ void AIdleHUD::SelectClassFromHitBox(FName BoxName)
 	FString RawClassId = BoxName.ToString();
 	RawClassId.RightChopInline(ClassSelectionHitBoxPrefix.Len());
 	const int32 ClassIdValue = FCString::Atoi(*RawClassId);
-	if (ClassIdValue < static_cast<int32>(EClassId::Warrior) || ClassIdValue > static_cast<int32>(EClassId::Cleric))
+	if (ClassIdValue < static_cast<int32>(EClassId::Warrior) || ClassIdValue > static_cast<int32>(EClassId::Summoner))
 	{
 		return;
 	}

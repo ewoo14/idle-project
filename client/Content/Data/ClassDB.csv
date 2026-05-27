@@ -4,3 +4,6 @@ ClassId,NameKr,NameEn,PrimaryStat1,PrimaryStat2,Mvp
 3,??,Archer,Dex,Luk,0
 4,??,Thief,Dex,Luk,0
 5,??,Cleric,Wis,Int,0
+6,???,Paladin,Con,Str,0
+7,????,Berserker,Str,Luk,0
+8,???,Summoner,Int,Wis,0

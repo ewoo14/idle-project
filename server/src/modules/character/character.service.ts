@@ -3,7 +3,11 @@ import {
   NotFoundError,
   ValidationError,
 } from "../../core/errors.js";
-import { defaultPrimaryStats, deriveStats } from "../../core/formulas/index.js";
+import {
+  type ClassId,
+  defaultPrimaryStats,
+  deriveStats,
+} from "../../core/formulas/index.js";
 
 export type CharacterCreateInput = {
   userId: string;
@@ -51,15 +55,15 @@ export class CharacterService {
   constructor(private readonly repo: CharacterRepo) {}
 
   async create(userId: string, input: { classId: number }) {
-    if (input.classId !== 1) {
-      throw new ValidationError("MVP 단계는 전사 (classId=1) 만 지원합니다.", {
+    if (!isSupportedClassId(input.classId)) {
+      throw new ValidationError("Unsupported character class.", {
         code: "CHARACTER_CLASS_UNAVAILABLE",
       });
     }
-    const primary = defaultPrimaryStats(1, 1);
+    const primary = defaultPrimaryStats(input.classId, 1);
     return this.repo.createCharacter({
       userId,
-      classId: 1,
+      classId: input.classId,
       level: 1,
       rebirthCount: 0,
       rebirthBonusPoints: 0,
@@ -135,6 +139,10 @@ export class CharacterService {
     }
     return rebirthed;
   }
+}
+
+function isSupportedClassId(classId: number): classId is ClassId {
+  return Number.isInteger(classId) && classId >= 1 && classId <= 8;
 }
 
 function isChapter1BossDefeated(stats: Record<string, unknown>) {
