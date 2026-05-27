@@ -128,6 +128,52 @@ bool UQuestService::GetQuestState(const FString& QuestId, FQuestState& OutState)
 	return false;
 }
 
+void UQuestService::CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset) const
+{
+	OutEntries.Reset();
+	OutDailyReset = DailyResetDate;
+
+	TArray<FQuestState> States = GetActiveQuestStates();
+	for (const FQuestState& State : States)
+	{
+		FQuestSaveEntry Entry;
+		Entry.QuestId = State.QuestId;
+		Entry.Type = State.Type;
+		Entry.Progress = State.Progress;
+		Entry.bCompleted = State.bCompleted;
+		Entry.bClaimed = State.bClaimed;
+		Entry.DailyResetDate = State.DailyResetDate;
+		OutEntries.Add(Entry);
+	}
+}
+
+void UQuestService::RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset)
+{
+	const FString RestoreDate = InDailyReset.IsEmpty() ? GetCurrentUtcDateString() : InDailyReset;
+	InitializeDefaultQuests(RestoreDate);
+
+	for (const FQuestSaveEntry& Entry : InEntries)
+	{
+		const FQuestDefinition* Definition = DefinitionById.Find(Entry.QuestId);
+		if (!Definition)
+		{
+			continue;
+		}
+		if (!IsQuestActive(Entry.QuestId))
+		{
+			AddActiveQuest(*Definition, RestoreDate);
+		}
+
+		FQuestState& State = ActiveStates.FindChecked(Entry.QuestId);
+		State.Progress = FMath::Clamp(Entry.Progress, 0, State.TargetCount);
+		State.bCompleted = Entry.bCompleted || State.Progress >= State.TargetCount;
+		State.bClaimed = Entry.bClaimed && State.bCompleted;
+		State.DailyResetDate = State.Type == EQuestType::Daily
+			? (Entry.DailyResetDate.IsEmpty() ? RestoreDate : Entry.DailyResetDate)
+			: FString();
+	}
+}
+
 FString UQuestService::GetCurrentUtcDateString()
 {
 	return FDateTime::UtcNow().ToString(TEXT("%Y-%m-%d"));

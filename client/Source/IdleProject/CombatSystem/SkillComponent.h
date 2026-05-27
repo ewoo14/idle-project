@@ -147,6 +147,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill|Rank")
 	float GetEffectiveCooldown(FName SkillId) const;
 
+	void CaptureRankState(TMap<FName, int32>& OutRanks, int32& OutPoints) const;
+	void RestoreRankState(const TMap<FName, int32>& InRanks, int32 InPoints);
+
 	/** 테스트/스킬 실행에서 마지막 발동 시간을 기록합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
 	bool MarkSkillCast(FName SkillId, float Now);

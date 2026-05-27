@@ -62,6 +62,33 @@ int32 USeasonService::GetReachedTier() const
 	return ReachedTier;
 }
 
+void USeasonService::CaptureState(int32& OutSeasonId, int32& OutTokens, TArray<int32>& OutClaimedTiers) const
+{
+	OutSeasonId = CurrentSeasonId;
+	OutTokens = SeasonTokens;
+	OutClaimedTiers = ClaimedTiers.Array();
+	OutClaimedTiers.Sort();
+}
+
+void USeasonService::RestoreState(int32 InSeasonId, int32 InTokens, const TArray<int32>& InClaimedTiers)
+{
+	InitializeDefaultSeason();
+	if (InSeasonId != CurrentSeasonId)
+	{
+		return;
+	}
+
+	SeasonTokens = FMath::Max(0, InTokens);
+	for (const int32 Tier : InClaimedTiers)
+	{
+		const FSeasonTierDefinition* Definition = TierByNumber.Find(Tier);
+		if (Definition && SeasonTokens >= Definition->RequiredTokens)
+		{
+			ClaimedTiers.Add(Tier);
+		}
+	}
+}
+
 void USeasonService::BuildDefaultTiers()
 {
 	if (!Tiers.IsEmpty())

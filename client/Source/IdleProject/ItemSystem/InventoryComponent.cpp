@@ -148,3 +148,56 @@ int32 UInventoryComponent::GetEquippedEnhanceLevel(EItemSlot Slot) const
 	const FItemInstance* Item = GetEquippedItem(Slot);
 	return Item ? Item->EnhanceLevel : INDEX_NONE;
 }
+
+void UInventoryComponent::CaptureState(TArray<FItemInstance>& OutItems, TMap<EItemSlot, int32>& OutEquipped) const
+{
+	OutItems = Items;
+	OutEquipped = EquippedIndex;
+}
+
+void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, const TMap<EItemSlot, int32>& InEquipped)
+{
+	Items.Reset();
+	for (const FItemInstance& SourceItem : InItems)
+	{
+		if (Items.Num() >= MaxItems)
+		{
+			break;
+		}
+		if (SourceItem.Slot == EItemSlot::None || SourceItem.Rarity == EItemRarity::None)
+		{
+			continue;
+		}
+
+		FItemInstance RestoredItem = SourceItem;
+		RestoredItem.EnhanceLevel = FMath::Clamp(RestoredItem.EnhanceLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
+		Items.Add(RestoredItem);
+	}
+
+	EquippedIndex.Empty();
+	const EItemSlot Slots[] = {
+		EItemSlot::Weapon,
+		EItemSlot::Helmet,
+		EItemSlot::Top,
+		EItemSlot::Bottom,
+		EItemSlot::Shoes,
+		EItemSlot::Gloves,
+		EItemSlot::Cloak,
+		EItemSlot::Accessory
+	};
+
+	for (const EItemSlot Slot : Slots)
+	{
+		const int32* SavedIndex = InEquipped.Find(Slot);
+		const int32 CandidateIndex = SavedIndex ? *SavedIndex : INDEX_NONE;
+		if (Items.IsValidIndex(CandidateIndex) && Items[CandidateIndex].Slot == Slot)
+		{
+			EquippedIndex.Add(Slot, CandidateIndex);
+		}
+		else
+		{
+			EquippedIndex.Add(Slot, INDEX_NONE);
+		}
+		OnEquippedChanged.Broadcast(Slot);
+	}
+}

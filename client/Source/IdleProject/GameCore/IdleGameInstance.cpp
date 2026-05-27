@@ -2,6 +2,7 @@
 
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
+#include "CombatSystem/SkillComponent.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
@@ -160,8 +161,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureStageService();
 	EnsureTowerService();
 	EnsurePetService();
+	EnsureQuestService();
+	EnsureSeasonService();
 
-	SaveGame->SaveVersion = 1;
+	SaveGame->SaveVersion = 2;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->CharacterLevel = CharacterLevel;
@@ -193,6 +196,29 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	{
 		SaveGame->EquippedPetId = PetService->GetEquippedPetId();
 		SaveGame->PetLevels = PetService->GetPetLevels();
+	}
+
+	if (UInventoryComponent* Inventory = FindPlayerInventory())
+	{
+		Inventory->CaptureState(SaveGame->InventoryItems, SaveGame->EquippedSlotIndex);
+	}
+
+	if (AIdleCharacter* Character = FindPlayerCharacter())
+	{
+		if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
+		{
+			Skills->CaptureRankState(SaveGame->SkillRanks, SaveGame->SkillPoints);
+		}
+	}
+
+	if (QuestService)
+	{
+		QuestService->CaptureState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+	}
+
+	if (SeasonService)
+	{
+		SeasonService->CaptureState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
 	}
 
 	return true;
@@ -240,6 +266,41 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (PetService)
 	{
 		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->PetLevels);
+	}
+
+	if (SaveGame->SaveVersion >= 2)
+	{
+		AIdleCharacter* Character = FindPlayerCharacter();
+		if (UInventoryComponent* Inventory = FindPlayerInventory())
+		{
+			Inventory->RestoreState(SaveGame->InventoryItems, SaveGame->EquippedSlotIndex);
+		}
+		if (Character)
+		{
+			if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
+			{
+				Skills->RestoreRankState(SaveGame->SkillRanks, SaveGame->SkillPoints);
+			}
+			Character->RefreshDerivedStats();
+		}
+
+		EnsureQuestService();
+		if (QuestService)
+		{
+			QuestService->RestoreState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+			QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+		}
+
+		EnsureSeasonService();
+		if (SeasonService)
+		{
+			SeasonService->RestoreState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
+		}
+	}
+	else
+	{
+		EnsureQuestService();
+		EnsureSeasonService();
 	}
 
 	OnGoldChanged.Broadcast(Gold);

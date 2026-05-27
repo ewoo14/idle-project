@@ -99,6 +99,30 @@ struct FQuestState
 };
 
 USTRUCT(BlueprintType)
+struct FQuestSaveEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString QuestId;
+
+	UPROPERTY()
+	EQuestType Type = EQuestType::Main;
+
+	UPROPERTY()
+	int32 Progress = 0;
+
+	UPROPERTY()
+	bool bCompleted = false;
+
+	UPROPERTY()
+	bool bClaimed = false;
+
+	UPROPERTY()
+	FString DailyResetDate;
+};
+
+USTRUCT(BlueprintType)
 struct FQuestClaimResult
 {
 	GENERATED_BODY()
@@ -146,6 +170,9 @@ public:
 	const TArray<FQuestDefinition>& GetQuestDefinitions() const;
 
 	bool GetQuestState(const FString& QuestId, FQuestState& OutState) const;
+
+	void CaptureState(TArray<FQuestSaveEntry>& OutEntries, FString& OutDailyReset) const;
+	void RestoreState(const TArray<FQuestSaveEntry>& InEntries, const FString& InDailyReset);
 
 	static FString GetCurrentUtcDateString();
 
