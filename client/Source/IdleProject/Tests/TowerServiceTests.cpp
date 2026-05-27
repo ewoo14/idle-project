@@ -175,6 +175,10 @@ bool FTowerHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Floor 10 multiplier is exposed numerically"), Milestone.MilestoneMultiplier, 1.02f);
 	TestEqual(TEXT("Floor 10 next milestone is exposed numerically"), Milestone.NextMilestoneFloor, 20);
 
+	const FIdleHUDTowerViewModel ExplicitNeutral = IdleProject::UI::BuildTowerViewModel(0, 100, 100, 0.0f);
+	TestEqual(TEXT("Explicit zero multiplier falls back to neutral formula"), ExplicitNeutral.MilestoneMultiplier, 1.0f);
+	TestEqual(TEXT("Explicit zero multiplier still renders neutral label"), ExplicitNeutral.MilestoneMultiplierLabel.ToString(), FString(TEXT("Permanent Bonus x1.00")));
+
 	const FText Feedback = IdleProject::UI::BuildTowerClimbFeedbackLabel(7, 12'500);
 	TestEqual(TEXT("Climb feedback includes highest floor and reward"), Feedback.ToString(), FString(TEXT("Floor 7 cleared! Gold +12,500")));
 

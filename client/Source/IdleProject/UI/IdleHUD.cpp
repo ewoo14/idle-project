@@ -1010,7 +1010,7 @@ FIdleHUDTowerViewModel IdleProject::UI::BuildTowerViewModel(int32 HighestFloor, 
 	ViewModel.NextMilestoneFloor = ((ViewModel.HighestFloor / FTowerMilestoneFormula::MilestoneStep) + 1) * FTowerMilestoneFormula::MilestoneStep;
 	ViewModel.NextRequiredPower = FMath::Max<int64>(0, NextRequiredPower);
 	ViewModel.CombatPower = FMath::Max<int64>(0, CombatPower);
-	ViewModel.MilestoneMultiplier = MilestoneMultiplier >= 0.0f
+	ViewModel.MilestoneMultiplier = MilestoneMultiplier > 0.0f
 		? MilestoneMultiplier
 		: FTowerMilestoneFormula::GetTowerMilestoneMultiplier(ViewModel.HighestFloor);
 	ViewModel.bCanClimb = ViewModel.NextRequiredPower > 0 && ViewModel.CombatPower >= ViewModel.NextRequiredPower;
