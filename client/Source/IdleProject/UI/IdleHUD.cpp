@@ -27,6 +27,7 @@ namespace
 const FName OfflineRewardClaimHitBoxName(TEXT("OfflineRewardClaim"));
 const FName RebirthHitBoxName(TEXT("RebirthAction"));
 const FName TranscendHitBoxName(TEXT("TranscendAction"));
+const FName TowerClimbHitBoxName(TEXT("TowerClimb"));
 const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
@@ -47,6 +48,7 @@ constexpr float BossSpecialWarningDurationSeconds = 1.6f;
 constexpr float StageFeedbackDurationSeconds = 2.2f;
 constexpr float PetFeedbackDurationSeconds = 2.2f;
 constexpr float TranscendFeedbackDurationSeconds = 2.4f;
+constexpr float TowerFeedbackDurationSeconds = 2.4f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -1000,6 +1002,40 @@ FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimary
 	return ViewModel;
 }
 
+FIdleHUDTowerViewModel IdleProject::UI::BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower)
+{
+	FIdleHUDTowerViewModel ViewModel;
+	ViewModel.HighestFloor = FMath::Max(0, HighestFloor);
+	ViewModel.NextRequiredPower = FMath::Max<int64>(0, NextRequiredPower);
+	ViewModel.CombatPower = FMath::Max<int64>(0, CombatPower);
+	ViewModel.bCanClimb = ViewModel.NextRequiredPower > 0 && ViewModel.CombatPower >= ViewModel.NextRequiredPower;
+	ViewModel.ClimbHitBoxName = TowerClimbHitBoxName;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("TOWER_PANEL_TITLE"));
+	ViewModel.HighestFloorLabel = FormatLocalizedUI(TEXT("TOWER_HIGHEST_FLOOR_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Floor"), FText::AsNumber(ViewModel.HighestFloor));
+	});
+	ViewModel.NextRequiredPowerLabel = FormatLocalizedUI(TEXT("TOWER_NEXT_CP_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(ViewModel.NextRequiredPower)));
+	});
+	ViewModel.CombatPowerLabel = FormatLocalizedUIWithInt64(TEXT("HUD_COMBAT_POWER_FORMAT"), TEXT("Amount"), ViewModel.CombatPower);
+	ViewModel.StatusLabel = IdleProject::Localization::UI(ViewModel.bCanClimb ? TEXT("TOWER_STATUS_READY") : TEXT("TOWER_STATUS_NEED_CP"));
+	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("TOWER_CLIMB_BUTTON"));
+	return ViewModel;
+}
+
+FText IdleProject::UI::BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward)
+{
+	const int32 SafeFloor = FMath::Max(0, NewHighestFloor);
+	const int64 SafeReward = FMath::Max<int64>(0, TotalReward);
+	return FormatLocalizedUI(TEXT("TOWER_CLIMB_FEEDBACK_FORMAT"), [SafeFloor, SafeReward](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Floor"), FText::AsNumber(SafeFloor));
+		Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(SafeReward)));
+	});
+}
+
 FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
 {
 	FIdleHUDOfflineRewardViewModel ViewModel;
@@ -1364,6 +1400,7 @@ void AIdleHUD::PostInitializeComponents()
 	BindPlayerCombat();
 	BindPlayerInventory();
 	BindStageService();
+	BindTowerService();
 }
 
 void AIdleHUD::BeginPlay()
@@ -1372,6 +1409,7 @@ void AIdleHUD::BeginPlay()
 	BindPlayerCombat();
 	BindPlayerInventory();
 	BindStageService();
+	BindTowerService();
 	PreviewOfflineRewardModal();
 }
 
@@ -1386,6 +1424,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	UnbindPlayerCombat();
 	UnbindBossSpecialAttack();
 	UnbindStageService();
+	UnbindTowerService();
 
 	if (IdleGameInstance)
 	{
@@ -1428,6 +1467,7 @@ void AIdleHUD::DrawHUD()
 	DrawBossBar();
 	DrawRebirthPanel();
 	DrawTranscendPanel();
+	DrawTowerPanel();
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
@@ -1505,6 +1545,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == TranscendHitBoxName)
 	{
 		TryTranscend();
+		return;
+	}
+	if (BoxName == TowerClimbHitBoxName)
+	{
+		TryClimbTower();
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -1705,6 +1750,16 @@ void AIdleHUD::HandleChapterBossDefeated(int32 ClearedChapter)
 	}
 }
 
+void AIdleHUD::HandleTowerClimbed(int32 NewHighestFloor, int64 TotalReward)
+{
+	TowerFeedbackLabel = IdleProject::UI::BuildTowerClimbFeedbackLabel(NewHighestFloor, TotalReward);
+	if (const UWorld* World = GetWorld())
+	{
+		TowerFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
 void AIdleHUD::BindStageService()
 {
 	if (!IdleGameInstance)
@@ -1738,6 +1793,39 @@ void AIdleHUD::UnbindStageService()
 		StageService->OnChapterBossDefeated.RemoveDynamic(this, &AIdleHUD::HandleChapterBossDefeated);
 	}
 	BoundStageService.Reset();
+}
+
+void AIdleHUD::BindTowerService()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+
+	UTowerService* TowerService = IdleGameInstance ? IdleGameInstance->GetTowerService() : nullptr;
+	if (!TowerService)
+	{
+		UnbindTowerService();
+		return;
+	}
+
+	if (BoundTowerService.Get() == TowerService)
+	{
+		return;
+	}
+
+	UnbindTowerService();
+	BoundTowerService = TowerService;
+	TowerService->OnTowerClimbed.AddUniqueDynamic(this, &AIdleHUD::HandleTowerClimbed);
+}
+
+void AIdleHUD::UnbindTowerService()
+{
+	if (UTowerService* TowerService = BoundTowerService.Get())
+	{
+		TowerService->OnTowerClimbed.RemoveDynamic(this, &AIdleHUD::HandleTowerClimbed);
+	}
+	BoundTowerService.Reset();
 }
 
 void AIdleHUD::BindPlayerCombat()
@@ -3080,6 +3168,98 @@ void AIdleHUD::TryTranscend()
 	if (AIdleCharacter* IdleCharacter = PlayerOwner ? Cast<AIdleCharacter>(PlayerOwner->GetPawn()) : nullptr)
 	{
 		IdleCharacter->RefreshDerivedStats();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawTowerPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindTowerService();
+	const UTowerService* TowerService = BoundTowerService.Get();
+	const AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!TowerService || !IdleCharacter)
+	{
+		return;
+	}
+
+	const FIdleHUDTowerViewModel ViewModel = BuildTowerViewModel(
+		TowerService->GetHighestFloor(),
+		TowerService->GetNextFloorRequiredPower(),
+		IdleCharacter->GetCombatPower());
+
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - TowerFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !TowerFeedbackLabel.IsEmpty() && FeedbackElapsed <= TowerFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
+	const float PanelHeight = 150.0f * Scale + FeedbackHeight;
+	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
+	const float Y = 214.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const FLinearColor StateColor = ViewModel.bCanClimb ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.72f);
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(StateColor, X, Y, PanelWidth, Border);
+	DrawRect(StateColor, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(StateColor, X, Y, Border, PanelHeight);
+	DrawRect(StateColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanClimb ? Theme::AccentGold : Theme::AccentRed, X + PanelWidth - 128.0f * Scale, Y + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(ViewModel.HighestFloorLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+	DrawText(ViewModel.NextRequiredPowerLabel.ToString(), ViewModel.bCanClimb ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 76.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 102.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+
+	const float ButtonWidth = 94.0f * Scale;
+	const float ButtonHeight = 32.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + 94.0f * Scale;
+	DrawRect(ViewModel.bCanClimb ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanClimb ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 24.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	if (ViewModel.bCanClimb)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ClimbHitBoxName, true, 82);
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(TowerFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, Y + 140.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryClimbTower()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const int64 Reward = IdleGameInstance->ClimbTower();
+	if (Reward <= 0)
+	{
+		TowerFeedbackLabel = IdleProject::Localization::UI(TEXT("TOWER_CLIMB_BLOCKED"));
+		if (const UWorld* World = GetWorld())
+		{
+			TowerFeedbackStartTime = World->GetTimeSeconds();
+		}
 	}
 	RefreshMouseInteraction();
 }

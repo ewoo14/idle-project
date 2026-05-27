@@ -3,7 +3,9 @@
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/TowerFormula.h"
 #include "GameCore/TowerService.h"
+#include "Internationalization/IdleLocalization.h"
 #include "Tests/TowerEventTestReceiver.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -98,6 +100,37 @@ bool FIdleGameInstanceTowerHooksTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Climb without a player character is safely ignored"), GameInstance->ClimbTower(), static_cast<int64>(0));
 	TestEqual(TEXT("Ignored climb leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FTowerHudViewModelTest,
+	"IdleProject.UI.HUD.TowerPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTowerHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FIdleHUDTowerViewModel Ready = IdleProject::UI::BuildTowerViewModel(3, 152, 200);
+	TestEqual(TEXT("Tower title uses localized copy"), Ready.Title.ToString(), FString(TEXT("Infinity Tower")));
+	TestEqual(TEXT("Highest floor formats through localization"), Ready.HighestFloorLabel.ToString(), FString(TEXT("Best Floor 3")));
+	TestEqual(TEXT("Next required CP formats with separators"), Ready.NextRequiredPowerLabel.ToString(), FString(TEXT("Next CP 152")));
+	TestEqual(TEXT("Current CP formats with separators"), Ready.CombatPowerLabel.ToString(), FString(TEXT("Combat Power 200")));
+	TestEqual(TEXT("Ready status uses localized copy"), Ready.StatusLabel.ToString(), FString(TEXT("Ready to climb")));
+	TestEqual(TEXT("Ready button uses localized copy"), Ready.ButtonLabel.ToString(), FString(TEXT("Climb")));
+	TestEqual(TEXT("Tower climb hitbox is stable"), Ready.ClimbHitBoxName, FName(TEXT("TowerClimb")));
+	TestTrue(TEXT("Enough CP can climb"), Ready.bCanClimb);
+
+	const FIdleHUDTowerViewModel Blocked = IdleProject::UI::BuildTowerViewModel(3, 1'234'567, 999);
+	TestEqual(TEXT("Large next required CP uses comma formatting"), Blocked.NextRequiredPowerLabel.ToString(), FString(TEXT("Next CP 1,234,567")));
+	TestEqual(TEXT("Blocked status uses localized copy"), Blocked.StatusLabel.ToString(), FString(TEXT("Need more CP")));
+	TestFalse(TEXT("Insufficient CP blocks climb"), Blocked.bCanClimb);
+
+	const FText Feedback = IdleProject::UI::BuildTowerClimbFeedbackLabel(7, 12'500);
+	TestEqual(TEXT("Climb feedback includes highest floor and reward"), Feedback.ToString(), FString(TEXT("Floor 7 cleared! Gold +12,500")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
