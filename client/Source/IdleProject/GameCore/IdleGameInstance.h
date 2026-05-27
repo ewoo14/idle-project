@@ -26,6 +26,18 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStatPointsChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTranscend);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProgressSaved);
 
+UENUM(BlueprintType)
+enum class ECloudSyncState : uint8
+{
+	Idle,
+	Syncing,
+	Synced,
+	Offline,
+	Conflict
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCloudSyncStateChanged, ECloudSyncState, NewState);
+
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FEnhanceAttemptResult
 {
@@ -132,6 +144,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
 	void LoadProgress();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Cloud")
+	void SyncFromCloud();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Cloud")
+	void UploadToCloud();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Cloud")
+	ECloudSyncState GetCloudSyncState() const { return CloudSyncState; }
 
 	bool CaptureToSave(UIdleSaveGame* SaveGame);
 	bool ApplyFromSave(const UIdleSaveGame* SaveGame);
@@ -317,6 +338,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Save")
 	FOnProgressSaved OnProgressSaved;
 
+	UPROPERTY(BlueprintAssignable, Category = "Idle|Cloud")
+	FOnCloudSyncStateChanged OnCloudSyncStateChanged;
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UApiClient> ApiClient;
@@ -378,6 +402,7 @@ private:
 
 	bool bAutosaveSuppressed = false;
 	bool bAutosavePending = false;
+	bool bCloudUploadSuppressed = false;
 	bool bHasPendingCharacterSaveV2 = false;
 	TArray<FItemInstance> PendingInventoryItems;
 	TMap<EItemSlot, int32> PendingEquippedSlotIndex;
@@ -386,9 +411,11 @@ private:
 	FTimerHandle AutosaveTimerHandle;
 
 	FRandomStream EnhanceRandomStream;
+	ECloudSyncState CloudSyncState = ECloudSyncState::Idle;
 
 	static const TCHAR* SaveSlotName;
 	static constexpr float AutosaveDebounceSeconds = 1.0f;
+	static constexpr int32 CloudSaveApiVersion = 3;
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
@@ -400,6 +427,7 @@ private:
 		int32 SkillPoints);
 	void RequestAutosave();
 	void FlushPendingAutosave();
+	void SetCloudSyncState(ECloudSyncState NewState);
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();

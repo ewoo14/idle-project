@@ -24,6 +24,9 @@ public:
 	bool Post(const FString& Path, const FString& JsonBody);
 
 	void RegisterGuest(TFunction<void(bool, FString)> Callback);
+	void EnsureCharacter(TFunction<void(bool, FString)> Callback);
+	void UploadSave(const FString& CharacterId, int32 Version, const FString& PayloadJson, TFunction<void(bool, FString)> Callback);
+	void DownloadSave(const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool RequestQuestList(const FString& CharacterId);
@@ -43,11 +46,19 @@ public:
 private:
 	FString BuildUrl(const FString& Path) const;
 	bool SendRequest(const FString& Verb, const FString& Path, const FString& JsonBody);
+	bool SendRequestWithCallback(const FString& Verb, const FString& Path, const FString& JsonBody, TFunction<void(bool, FString)> Callback);
 	void HandleResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+	void CreateCharacter(TFunction<void(bool, FString)> Callback);
+	void VerifyCharacterOrCreate(const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void CacheCharacterId(const FString& CharacterId);
+	FString LoadCachedCharacterId() const;
 
 	UPROPERTY()
 	FString BaseUrl = TEXT("http://localhost:3000");
 
 	UPROPERTY()
 	FString AuthToken;
+
+	UPROPERTY()
+	FString CachedCharacterId;
 };

@@ -6,6 +6,35 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
+namespace
+{
+bool TryGetResponseDataObject(const TSharedPtr<FJsonObject>& ResponseJson, TSharedPtr<FJsonObject>& OutData)
+{
+	const TSharedPtr<FJsonObject>* DataObject = nullptr;
+	if (ResponseJson.IsValid() && ResponseJson->TryGetObjectField(TEXT("data"), DataObject) && DataObject && DataObject->IsValid())
+	{
+		OutData = *DataObject;
+		return true;
+	}
+	return false;
+}
+
+bool IsOkEnvelope(const TSharedPtr<FJsonObject>& ResponseJson)
+{
+	bool bOk = false;
+	return ResponseJson.IsValid() && ResponseJson->TryGetBoolField(TEXT("ok"), bOk) && bOk;
+}
+
+FString SerializeJsonObject(const TSharedRef<FJsonObject>& JsonObject)
+{
+	FString JsonBody;
+	TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer =
+		TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&JsonBody);
+	FJsonSerializer::Serialize(JsonObject, Writer);
+	return JsonBody;
+}
+}
+
 void UApiClient::Initialize(const FString& InBaseUrl)
 {
 	BaseUrl = InBaseUrl.IsEmpty() ? TEXT("http://localhost:3000") : InBaseUrl;
@@ -31,10 +60,9 @@ void UApiClient::RegisterGuest(TFunction<void(bool, FString)> Callback)
 	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
 	JsonObject->SetStringField(TEXT("email"), Email);
 	JsonObject->SetStringField(TEXT("password"), Password);
+	JsonObject->SetStringField(TEXT("nickname"), FString::Printf(TEXT("Guest%s"), *GuestId.Left(8)));
 
-	FString JsonBody;
-	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&JsonBody);
-	FJsonSerializer::Serialize(JsonObject, Writer);
+	const FString JsonBody = SerializeJsonObject(JsonObject);
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(BuildUrl(TEXT("/v1/auth/register")));
@@ -60,6 +88,18 @@ void UApiClient::RegisterGuest(TFunction<void(bool, FString)> Callback)
 				{
 					ResponseJson->TryGetStringField(TEXT("token"), AuthToken);
 				}
+				if (AuthToken.IsEmpty())
+				{
+					TSharedPtr<FJsonObject> DataJson;
+					if (TryGetResponseDataObject(ResponseJson, DataJson))
+					{
+						DataJson->TryGetStringField(TEXT("accessToken"), AuthToken);
+						if (AuthToken.IsEmpty())
+						{
+							DataJson->TryGetStringField(TEXT("token"), AuthToken);
+						}
+					}
+				}
 			}
 		}
 
@@ -83,6 +123,132 @@ void UApiClient::RegisterGuest(TFunction<void(bool, FString)> Callback)
 			Callback(false, Message);
 		}
 	}
+}
+
+void UApiClient::EnsureCharacter(TFunction<void(bool, FString)> Callback)
+{
+	if (AuthToken.IsEmpty())
+	{
+		RegisterGuest([this, Callback = MoveTemp(Callback)](bool bSuccess, FString Message) mutable
+		{
+			if (!bSuccess)
+			{
+				if (Callback)
+				{
+					Callback(false, Message);
+				}
+				return;
+			}
+
+			EnsureCharacter(MoveTemp(Callback));
+		});
+		return;
+	}
+
+	if (CachedCharacterId.IsEmpty())
+	{
+		CachedCharacterId = LoadCachedCharacterId();
+	}
+
+	if (!CachedCharacterId.IsEmpty())
+	{
+		VerifyCharacterOrCreate(CachedCharacterId, MoveTemp(Callback));
+		return;
+	}
+
+	CreateCharacter(MoveTemp(Callback));
+}
+
+void UApiClient::UploadSave(const FString& CharacterId, int32 Version, const FString& PayloadJson, TFunction<void(bool, FString)> Callback)
+{
+	if (CharacterId.IsEmpty() || Version <= 0 || PayloadJson.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid save upload input"));
+		}
+		return;
+	}
+
+	TSharedPtr<FJsonObject> PayloadObject;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(PayloadJson);
+	if (!FJsonSerializer::Deserialize(Reader, PayloadObject) || !PayloadObject.IsValid())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid save payload json"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	JsonObject->SetNumberField(TEXT("version"), Version);
+	JsonObject->SetObjectField(TEXT("payload"), PayloadObject);
+
+	SendRequestWithCallback(TEXT("PUT"), TEXT("/v1/save/"), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::DownloadSave(const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid character id"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(TEXT("/v1/save/?characterId=%s"), *CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), [Callback = MoveTemp(Callback)](bool bSuccess, FString Body) mutable
+	{
+		if (!bSuccess)
+		{
+			if (Callback)
+			{
+				Callback(false, Body);
+			}
+			return;
+		}
+
+		TSharedPtr<FJsonObject> ResponseJson;
+		TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+		if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !IsOkEnvelope(ResponseJson))
+		{
+			if (Callback)
+			{
+				Callback(false, TEXT("invalid save response"));
+			}
+			return;
+		}
+
+		const TSharedPtr<FJsonValue> DataValue = ResponseJson->TryGetField(TEXT("data"));
+		if (!DataValue.IsValid() || DataValue->Type == EJson::Null)
+		{
+			if (Callback)
+			{
+				Callback(true, FString());
+			}
+			return;
+		}
+
+		const TSharedPtr<FJsonObject> DataObject = DataValue->AsObject();
+		const TSharedPtr<FJsonObject>* PayloadObject = nullptr;
+		if (!DataObject.IsValid() || !DataObject->TryGetObjectField(TEXT("payload"), PayloadObject) || !PayloadObject || !PayloadObject->IsValid())
+		{
+			if (Callback)
+			{
+				Callback(false, TEXT("missing save payload"));
+			}
+			return;
+		}
+
+		if (Callback)
+		{
+			Callback(true, SerializeJsonObject((*PayloadObject).ToSharedRef()));
+		}
+	});
 }
 
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
@@ -228,7 +394,7 @@ bool UApiClient::SendRequest(const FString& Verb, const FString& Path, const FSt
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
 	}
 
-	if (Verb == TEXT("POST"))
+	if (Verb == TEXT("POST") || Verb == TEXT("PUT"))
 	{
 		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 		Request->SetContentAsString(JsonBody);
@@ -236,6 +402,52 @@ bool UApiClient::SendRequest(const FString& Verb, const FString& Path, const FSt
 
 	Request->OnProcessRequestComplete().BindUObject(this, &UApiClient::HandleResponse);
 	return Request->ProcessRequest();
+}
+
+bool UApiClient::SendRequestWithCallback(const FString& Verb, const FString& Path, const FString& JsonBody, TFunction<void(bool, FString)> Callback)
+{
+	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(BuildUrl(Path));
+	Request->SetVerb(Verb);
+	Request->SetHeader(TEXT("Accept"), TEXT("application/json"));
+	if (!AuthToken.IsEmpty())
+	{
+		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
+	}
+
+	if (Verb == TEXT("POST") || Verb == TEXT("PUT"))
+	{
+		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
+		Request->SetContentAsString(JsonBody);
+	}
+
+	Request->SetTimeout(5.0f);
+	Request->OnProcessRequestComplete().BindWeakLambda(this, [Callback = MoveTemp(Callback)](FHttpRequestPtr RequestPtr, FHttpResponsePtr Response, bool bWasSuccessful) mutable
+	{
+		const int32 StatusCode = Response.IsValid() ? Response->GetResponseCode() : 0;
+		const FString Body = Response.IsValid() ? Response->GetContentAsString() : FString();
+		const bool bOk = bWasSuccessful && StatusCode >= 200 && StatusCode < 300;
+		UE_LOG(LogTemp, Display, TEXT("ApiClient %s %s -> %d success=%s"),
+			RequestPtr.IsValid() ? *RequestPtr->GetVerb() : TEXT("UNKNOWN"),
+			RequestPtr.IsValid() ? *RequestPtr->GetURL() : TEXT("UNKNOWN"),
+			StatusCode,
+			bWasSuccessful ? TEXT("true") : TEXT("false"));
+
+		if (Callback)
+		{
+			Callback(bOk, Body);
+		}
+	});
+
+	if (!Request->ProcessRequest())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("request could not start"));
+		}
+		return false;
+	}
+	return true;
 }
 
 void UApiClient::HandleResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
@@ -246,4 +458,99 @@ void UApiClient::HandleResponse(FHttpRequestPtr Request, FHttpResponsePtr Respon
 		Request.IsValid() ? *Request->GetURL() : TEXT("UNKNOWN"),
 		StatusCode,
 		bWasSuccessful ? TEXT("true") : TEXT("false"));
+}
+
+void UApiClient::CreateCharacter(TFunction<void(bool, FString)> Callback)
+{
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetNumberField(TEXT("classId"), 1);
+
+	SendRequestWithCallback(TEXT("POST"), TEXT("/v1/characters/"), SerializeJsonObject(JsonObject), [this, Callback = MoveTemp(Callback)](bool bSuccess, FString Body) mutable
+	{
+		if (!bSuccess)
+		{
+			if (Callback)
+			{
+				Callback(false, Body);
+			}
+			return;
+		}
+
+		TSharedPtr<FJsonObject> ResponseJson;
+		TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+		TSharedPtr<FJsonObject> DataJson;
+		FString CharacterId;
+		if (FJsonSerializer::Deserialize(Reader, ResponseJson)
+			&& IsOkEnvelope(ResponseJson)
+			&& TryGetResponseDataObject(ResponseJson, DataJson)
+			&& DataJson->TryGetStringField(TEXT("id"), CharacterId)
+			&& !CharacterId.IsEmpty())
+		{
+			CacheCharacterId(CharacterId);
+			if (Callback)
+			{
+				Callback(true, CharacterId);
+			}
+			return;
+		}
+
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid character response"));
+		}
+	});
+}
+
+void UApiClient::VerifyCharacterOrCreate(const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	SendRequestWithCallback(TEXT("GET"), FString::Printf(TEXT("/v1/characters/%s"), *CharacterId), FString(), [this, CharacterId, Callback = MoveTemp(Callback)](bool bSuccess, FString Body) mutable
+	{
+		if (bSuccess)
+		{
+			TSharedPtr<FJsonObject> ResponseJson;
+			TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Body);
+			if (FJsonSerializer::Deserialize(Reader, ResponseJson) && IsOkEnvelope(ResponseJson))
+			{
+				if (Callback)
+				{
+					Callback(true, CharacterId);
+				}
+				return;
+			}
+		}
+
+		CreateCharacter(MoveTemp(Callback));
+	});
+}
+
+void UApiClient::CacheCharacterId(const FString& CharacterId)
+{
+	CachedCharacterId = CharacterId;
+	if (!GConfig || CharacterId.IsEmpty())
+	{
+		return;
+	}
+
+	GConfig->SetString(
+		TEXT("/Script/IdleProject.ApiClient"),
+		TEXT("CloudCharacterId"),
+		*CharacterId,
+		GGameUserSettingsIni);
+	GConfig->Flush(false, GGameUserSettingsIni);
+}
+
+FString UApiClient::LoadCachedCharacterId() const
+{
+	if (!GConfig)
+	{
+		return FString();
+	}
+
+	FString CharacterId;
+	GConfig->GetString(
+		TEXT("/Script/IdleProject.ApiClient"),
+		TEXT("CloudCharacterId"),
+		CharacterId,
+		GGameUserSettingsIni);
+	return CharacterId;
 }

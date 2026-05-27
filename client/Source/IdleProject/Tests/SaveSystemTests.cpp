@@ -2,6 +2,8 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/CloudSaveMergePolicy.h"
+#include "GameCore/CloudSavePayloadMapper.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -546,6 +548,96 @@ bool FIdleSaveSystemInvalidLoadIsNoOpTest::RunTest(const FString& Parameters)
 	UGameplayStatics::DeleteGameInSlot(TEXT("IdleSave"), 0);
 	GameInstance->LoadProgress();
 	TestEqual(TEXT("Missing slot load keeps current gold unchanged"), GameInstance->GetGold(), static_cast<int64>(500));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCloudSaveMergePolicyTest,
+	"IdleProject.GameCore.SaveSystem.CloudMergePolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCloudSaveMergePolicyTest::RunTest(const FString& Parameters)
+{
+	FCloudSaveProgressSnapshot Local;
+	Local.RebirthCount = 2;
+	Local.Level = 80;
+	Local.Gold = 5000;
+	Local.LastSeenUnixSec = 100;
+
+	FCloudSaveProgressSnapshot Server = Local;
+	Server.RebirthCount = 3;
+	TestEqual(TEXT("Higher server rebirth is adopted"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::AdoptServer);
+
+	Server = Local;
+	Server.Level = 90;
+	TestEqual(TEXT("Higher server level is adopted when rebirth ties"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::AdoptServer);
+
+	Server = Local;
+	Server.Gold = 6000;
+	TestEqual(TEXT("Higher server gold is adopted when rebirth and level tie"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::AdoptServer);
+
+	Server = Local;
+	Server.LastSeenUnixSec = 101;
+	TestEqual(TEXT("Newer server timestamp is adopted when progress ties"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::AdoptServer);
+
+	Server = Local;
+	Server.Level = 79;
+	Server.Gold = 999999;
+	TestEqual(TEXT("Lower server level keeps local even if gold is higher"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::KeepLocal);
+
+	Server = Local;
+	TestEqual(TEXT("Exact ties keep local to avoid needless overwrite"), FCloudSaveMergePolicy::Decide(Local, Server), ECloudSaveMergeDecision::KeepLocal);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCloudSavePayloadMapperRoundTripTest,
+	"IdleProject.GameCore.SaveSystem.CloudPayloadRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* SourceSave = NewObject<UIdleSaveGame>();
+	SourceSave->bHasSave = true;
+	SourceSave->Gold = 987654;
+	SourceSave->CharacterLevel = 1000;
+	SourceSave->CurrentExp = 12345;
+	SourceSave->NextExp = 0;
+	SourceSave->RebirthCount = 7;
+	SourceSave->TranscendCount = 2;
+	SourceSave->LastSeenUnixSec = 1234567890;
+	SourceSave->TowerHighestFloor = 42;
+	SourceSave->SkillPoints = 9;
+	SourceSave->InventoryItems.Add(MakeSaveTestItem(TEXT("mythic_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 100.0f, 0.0f, 0.0f));
+
+	FString PayloadJson;
+	TestTrue(TEXT("Cloud payload serializes populated local save"), FCloudSavePayloadMapper::SaveToPayloadJson(*SourceSave, PayloadJson));
+	TestTrue(TEXT("Payload includes level cap accepted by backend"), PayloadJson.Contains(TEXT("\"level\":1000")));
+	TestTrue(TEXT("Payload includes Mythic max equipment grade"), PayloadJson.Contains(TEXT("\"maxEquipmentGrade\":6")));
+	TestTrue(TEXT("Payload includes transcend extension field"), PayloadJson.Contains(TEXT("\"transcendCount\":2")));
+	TestTrue(TEXT("Payload includes tower extension field"), PayloadJson.Contains(TEXT("\"towerHighestFloor\":42")));
+	TestTrue(TEXT("Payload includes skill point extension field"), PayloadJson.Contains(TEXT("\"skillPoints\":9")));
+
+	UIdleSaveGame* RestoredSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Cloud payload deserializes into local save"), FCloudSavePayloadMapper::PayloadJsonToSave(PayloadJson, *RestoredSave));
+	TestTrue(TEXT("Restored cloud save is marked populated"), RestoredSave->bHasSave);
+	TestEqual(TEXT("Gold round trips through cloud payload"), RestoredSave->Gold, SourceSave->Gold);
+	TestEqual(TEXT("Level round trips through cloud payload"), RestoredSave->CharacterLevel, SourceSave->CharacterLevel);
+	TestEqual(TEXT("Rebirth round trips through cloud payload"), RestoredSave->RebirthCount, SourceSave->RebirthCount);
+	TestEqual(TEXT("Transcend count round trips through cloud payload"), RestoredSave->TranscendCount, SourceSave->TranscendCount);
+	TestEqual(TEXT("Tower floor round trips through cloud payload"), RestoredSave->TowerHighestFloor, SourceSave->TowerHighestFloor);
+	TestEqual(TEXT("Skill points round trips through cloud payload"), RestoredSave->SkillPoints, SourceSave->SkillPoints);
+	TestEqual(TEXT("Inventory item round trips through cloud payload"), RestoredSave->InventoryItems.Num(), 1);
+	TestEqual(TEXT("Mythic rarity survives cloud payload"), RestoredSave->InventoryItems[0].Rarity, EItemRarity::Mythic);
+
+	FCloudSaveProgressSnapshot Snapshot;
+	TestTrue(TEXT("Snapshot extracts from payload"), FCloudSavePayloadMapper::ExtractSnapshot(PayloadJson, Snapshot));
+	TestEqual(TEXT("Snapshot level uses cloud level"), Snapshot.Level, SourceSave->CharacterLevel);
+	TestEqual(TEXT("Snapshot rebirth uses cloud rebirth"), Snapshot.RebirthCount, SourceSave->RebirthCount);
+	TestEqual(TEXT("Snapshot gold uses cloud gold"), Snapshot.Gold, SourceSave->Gold);
+	TestEqual(TEXT("Snapshot timestamp uses cloud last seen"), Snapshot.LastSeenUnixSec, SourceSave->LastSeenUnixSec);
 
 	return true;
 }
