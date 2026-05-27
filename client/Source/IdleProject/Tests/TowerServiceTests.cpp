@@ -2,6 +2,7 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/TowerFormula.h"
+#include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TowerService.h"
 #include "Internationalization/IdleLocalization.h"
 #include "Tests/TowerEventTestReceiver.h"
@@ -29,6 +30,23 @@ bool FTowerFormulaScalingTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("One CP below requirement cannot clear"), FTowerFormula::CanClearFloor(114, 2));
 	TestEqual(TEXT("Floor zero reward clamps to first floor"), FTowerFormula::GetFloorReward(0), static_cast<int64>(50));
 	TestEqual(TEXT("Floor three reward is linear gold"), FTowerFormula::GetFloorReward(3), static_cast<int64>(150));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FTowerMilestoneFormulaTest,
+	"IdleProject.GameCore.Tower.MilestoneFormula",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FTowerMilestoneFormulaTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Negative floors keep neutral milestone multiplier"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(-1), 1.0f);
+	TestEqual(TEXT("Floor zero keeps neutral milestone multiplier"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(0), 1.0f);
+	TestEqual(TEXT("Floor nine stays below first milestone"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(9), 1.0f);
+	TestEqual(TEXT("Floor ten applies first milestone bonus"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10), 1.02f);
+	TestEqual(TEXT("Floor twenty five applies two milestone bonuses"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(25), 1.04f);
+	TestEqual(TEXT("Floor one hundred applies ten milestone bonuses"), FTowerMilestoneFormula::GetTowerMilestoneMultiplier(100), 1.20f);
 
 	return true;
 }
@@ -62,6 +80,11 @@ bool FTowerServiceClimbTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Same CP cannot claim already cleared rewards"), Tower->TryClimbTower(132), static_cast<int64>(0));
 	TestEqual(TEXT("No-new-floor call does not rebroadcast"), Receiver->Count, 1);
+	TestEqual(TEXT("Highest floor below first milestone keeps neutral multiplier"), Tower->GetMilestoneMultiplier(), 1.0f);
+
+	Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	TestEqual(TEXT("Highest floor ten applies first milestone multiplier through service"), Tower->GetHighestFloor(), 10);
+	TestEqual(TEXT("Tower service exposes milestone multiplier"), Tower->GetMilestoneMultiplier(), 1.02f);
 
 	return true;
 }
@@ -101,8 +124,15 @@ bool FIdleGameInstanceTowerHooksTest::RunTest(const FString& Parameters)
 	UTowerService* Tower = GameInstance->GetTowerService();
 	TestNotNull(TEXT("Game instance creates tower service for tests"), Tower);
 	TestEqual(TEXT("Game instance tower starts before floor one"), Tower ? Tower->GetHighestFloor() : INDEX_NONE, 0);
+	TestEqual(TEXT("Game instance tower starts with neutral milestone multiplier"), GameInstance->GetTowerMilestoneMultiplier(), 1.0f);
 	TestEqual(TEXT("Climb without a player character is safely ignored"), GameInstance->ClimbTower(), static_cast<int64>(0));
 	TestEqual(TEXT("Ignored climb leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	if (Tower)
+	{
+		Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	}
+	TestEqual(TEXT("Game instance proxies tower milestone multiplier"), GameInstance->GetTowerMilestoneMultiplier(), 1.02f);
 
 	GameInstance->AddGold(MAX_int64);
 	GameInstance->AddGold(1);

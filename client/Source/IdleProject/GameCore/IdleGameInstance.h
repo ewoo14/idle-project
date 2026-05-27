@@ -216,6 +216,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	float GetTranscendStatMultiplier() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
+	float GetTowerMilestoneMultiplier() const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	float PreviewTranscendMultiplier() const;
 

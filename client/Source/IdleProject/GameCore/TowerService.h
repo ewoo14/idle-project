@@ -26,6 +26,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
 	int64 GetNextFloorRequiredPower() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
+	float GetMilestoneMultiplier() const;
+
 	UPROPERTY(BlueprintAssignable, Category = "Idle|Tower")
 	FOnTowerClimbed OnTowerClimbed;
 

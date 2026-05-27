@@ -14,6 +14,9 @@
 #include "DamageReceivedTestReceiver.h"
 #include "Engine/World.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/TowerFormula.h"
+#include "GameCore/TowerMilestoneFormula.h"
+#include "GameCore/TowerService.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -1526,6 +1529,145 @@ bool FIdleCharacterTranscendDerivedStatsTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Combat component exists"), Combat);
 	TestEqual(TEXT("Combat max HP uses transcended derived stats"), Combat ? Combat->MaxHp : 0.0f, CurrentDerived.Hp);
 	TestEqual(TEXT("Combat physical attack uses transcended derived stats"), Combat ? Combat->Atk : 0.0f, CurrentDerived.PhysAtk);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterTowerMilestoneDerivedStatsTest,
+	"IdleProject.Character.Stats.TowerMilestoneMultiplier",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterTowerMilestoneDerivedStatsTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+	GameInstance->InitializeTowerServiceForTests();
+	UTowerService* Tower = GameInstance->GetTowerService();
+	if (Tower)
+	{
+		Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+
+	const FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1);
+	FDerivedStats BaseDerived = FStatFormulas::DeriveStats(ExpectedPrimary, 1);
+	const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	if (Skills)
+	{
+		Skills->ApplyPassivesToStats(BaseDerived);
+	}
+
+	const float TowerMultiplier = FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10);
+	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
+	const UCombatComponent* Combat = Character->FindComponentByClass<UCombatComponent>();
+
+	TestEqual(TEXT("Floor ten milestone multiplies HP"), CurrentDerived.Hp, BaseDerived.Hp * TowerMultiplier);
+	TestEqual(TEXT("Floor ten milestone multiplies physical attack"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * TowerMultiplier);
+	TestEqual(TEXT("Floor ten milestone multiplies magic attack"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * TowerMultiplier);
+	TestEqual(TEXT("Floor ten milestone multiplies physical defense"), CurrentDerived.PhysDef, BaseDerived.PhysDef * TowerMultiplier);
+	TestEqual(TEXT("Floor ten milestone multiplies magic defense"), CurrentDerived.MagicDef, BaseDerived.MagicDef * TowerMultiplier);
+	TestEqual(TEXT("Tower milestone multiplier does not alter attack speed"), CurrentDerived.AtkSpeed, BaseDerived.AtkSpeed);
+	TestEqual(TEXT("Tower milestone multiplier does not alter crit rate"), CurrentDerived.CritRate, BaseDerived.CritRate);
+	TestEqual(TEXT("Cached derived stats expose tower multiplier result"), Character->GetCurrentDerivedStats().Hp, CurrentDerived.Hp);
+	TestNotNull(TEXT("Combat component exists"), Combat);
+	TestEqual(TEXT("Combat max HP uses tower milestone derived stats"), Combat ? Combat->MaxHp : 0.0f, CurrentDerived.Hp);
+	TestEqual(TEXT("Combat physical attack uses tower milestone derived stats"), Combat ? Combat->Atk : 0.0f, CurrentDerived.PhysAtk);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterTranscendAndTowerMilestoneDerivedStatsTest,
+	"IdleProject.Character.Stats.TranscendAndTowerMilestoneMultiplier",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterTranscendAndTowerMilestoneDerivedStatsTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+	GameInstance->InitializeTowerServiceForTests();
+	UTowerService* Tower = GameInstance->GetTowerService();
+	if (Tower)
+	{
+		Tower->TryClimbTower(FTowerFormula::GetFloorRequiredPower(10));
+	}
+
+	for (int32 Index = 0; Index < 5; ++Index)
+	{
+		GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+		GameInstance->MarkChapter1BossDefeated();
+		TestTrue(TEXT("Test setup rebirth succeeds"), GameInstance->Rebirth());
+	}
+	TestTrue(TEXT("Test setup transcend succeeds"), GameInstance->Transcend());
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+
+	const FPrimaryStats ExpectedPrimary = FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1);
+	FDerivedStats BaseDerived = FStatFormulas::DeriveStats(ExpectedPrimary, 1);
+	const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	if (Skills)
+	{
+		Skills->ApplyPassivesToStats(BaseDerived);
+	}
+
+	const float CombinedMultiplier = GameInstance->GetTranscendStatMultiplier() * FTowerMilestoneFormula::GetTowerMilestoneMultiplier(10);
+	const FDerivedStats CurrentDerived = Character->GetCurrentDerivedStats();
+
+	TestEqual(TEXT("Transcend and tower milestone multiply HP together"), CurrentDerived.Hp, BaseDerived.Hp * CombinedMultiplier);
+	TestEqual(TEXT("Transcend and tower milestone multiply physical attack together"), CurrentDerived.PhysAtk, BaseDerived.PhysAtk * CombinedMultiplier);
+	TestEqual(TEXT("Transcend and tower milestone multiply magic attack together"), CurrentDerived.MagicAtk, BaseDerived.MagicAtk * CombinedMultiplier);
+	TestEqual(TEXT("Combined multipliers do not alter attack speed"), CurrentDerived.AtkSpeed, BaseDerived.AtkSpeed);
+	TestEqual(TEXT("Combined multipliers do not alter crit rate"), CurrentDerived.CritRate, BaseDerived.CritRate);
 
 	World->DestroyWorld(false);
 	return true;

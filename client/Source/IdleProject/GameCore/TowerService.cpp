@@ -1,6 +1,7 @@
 #include "GameCore/TowerService.h"
 
 #include "GameCore/TowerFormula.h"
+#include "GameCore/TowerMilestoneFormula.h"
 
 void UTowerService::InitializeTower()
 {
@@ -37,4 +38,9 @@ int64 UTowerService::TryClimbTower(int64 CombatPower)
 int64 UTowerService::GetNextFloorRequiredPower() const
 {
 	return FTowerFormula::GetFloorRequiredPower(HighestFloor + 1);
+}
+
+float UTowerService::GetMilestoneMultiplier() const
+{
+	return FTowerMilestoneFormula::GetTowerMilestoneMultiplier(HighestFloor);
 }
