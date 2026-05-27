@@ -84,7 +84,20 @@ void UIdleGameInstance::AddGold(int64 Amount)
 		return;
 	}
 
-	Gold = FMath::Max<int64>(0, Gold + Amount);
+	if (Amount > 0 && Gold > MAX_int64 - Amount)
+	{
+		Gold = MAX_int64;
+		OnGoldChanged.Broadcast(Gold);
+		return;
+	}
+	if (Amount < 0 && (Amount == MIN_int64 || Gold < -Amount))
+	{
+		Gold = 0;
+		OnGoldChanged.Broadcast(Gold);
+		return;
+	}
+
+	Gold = Gold + Amount;
 	OnGoldChanged.Broadcast(Gold);
 }
 

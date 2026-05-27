@@ -11,6 +11,7 @@ describe("tower formula", () => {
     [2, 115],
     [10, 352],
     [50, 94231],
+    [100, 102114213],
   ])("matches the client required combat power anchor for floor %i", (floor, expectedRequiredPower) => {
     expect(getFloorRequiredPower(floor)).toBe(expectedRequiredPower);
   });

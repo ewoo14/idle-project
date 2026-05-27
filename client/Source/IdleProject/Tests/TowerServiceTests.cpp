@@ -20,6 +20,10 @@ bool FTowerFormulaScalingTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Floor one starts at 100 CP"), FTowerFormula::GetFloorRequiredPower(1), static_cast<int64>(100));
 	TestEqual(TEXT("Floor two rounds 15 percent growth"), FTowerFormula::GetFloorRequiredPower(2), static_cast<int64>(115));
 	TestEqual(TEXT("Floor three rounds compounded growth"), FTowerFormula::GetFloorRequiredPower(3), static_cast<int64>(132));
+	TestEqual(TEXT("Floor ten matches backend parity anchor"), FTowerFormula::GetFloorRequiredPower(10), static_cast<int64>(352));
+	TestEqual(TEXT("Floor fifty matches backend parity anchor"), FTowerFormula::GetFloorRequiredPower(50), static_cast<int64>(94231));
+	TestEqual(TEXT("Floor one hundred matches backend parity anchor"), FTowerFormula::GetFloorRequiredPower(100), static_cast<int64>(102114213));
+	TestEqual(TEXT("Oversized floor requirement clamps to int64 max"), FTowerFormula::GetFloorRequiredPower(500), MAX_int64);
 
 	TestTrue(TEXT("Exact CP clears required floor"), FTowerFormula::CanClearFloor(115, 2));
 	TestFalse(TEXT("One CP below requirement cannot clear"), FTowerFormula::CanClearFloor(114, 2));
@@ -99,6 +103,10 @@ bool FIdleGameInstanceTowerHooksTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Game instance tower starts before floor one"), Tower ? Tower->GetHighestFloor() : INDEX_NONE, 0);
 	TestEqual(TEXT("Climb without a player character is safely ignored"), GameInstance->ClimbTower(), static_cast<int64>(0));
 	TestEqual(TEXT("Ignored climb leaves gold unchanged"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	GameInstance->AddGold(MAX_int64);
+	GameInstance->AddGold(1);
+	TestEqual(TEXT("Gold grant saturates at int64 max instead of overflowing"), GameInstance->GetGold(), MAX_int64);
 
 	return true;
 }

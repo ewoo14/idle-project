@@ -84,6 +84,19 @@ And English copy renders the approved `Infinity Tower`, `Climb`, and
 Automation: `IdleProject.Localization.CsvIntegrity`,
 `IdleProject.UI.HUD.TowerPanelViewModel`
 
+## Scenario 6: Tower rewards do not overflow gold
+
+Given the player gold is already at the signed 64-bit maximum.
+
+When another positive tower reward is applied through the shared gold grant
+path.
+
+Then gold remains capped at the signed 64-bit maximum.
+
+And it never wraps to zero or a negative value.
+
+Automation: `IdleProject.GameCore.IdleGameInstance.TowerHooks`
+
 ## Manual Viewport Checks
 
 - 1080p: confirm the tower panel is centered below the stage and boss HUD and

@@ -1138,6 +1138,9 @@ Representative client anchors:
 | 1 | 100 | 50 |
 | 2 | 115 | 100 |
 | 3 | 132 | 150 |
+| 10 | 352 | 500 |
+| 50 | 94,231 | 2,500 |
+| 100 | 102,114,213 | 5,000 |
 
 Guardrails:
 
@@ -1146,5 +1149,9 @@ Guardrails:
 - Rewards are granted only for newly cleared floors; calling again with the same
   CP cannot reclaim previous rewards.
 - CP shortage leaves `HighestFloor` unchanged and pays zero gold.
-- HUD/server follow-up work must preserve these anchors or explicitly update
-  client/server parity tests together.
+- Client and server mirrors use double precision `pow(1.15, floor - 1)` before
+  the final round. Do not introduce float-step rounding or lookup drift unless
+  both client and server parity anchors are intentionally updated together.
+- Oversized required-power calculations clamp to int64 max, and gold grants
+  saturate rather than wrapping when tower rewards are applied near the int64
+  boundary.
