@@ -2,18 +2,22 @@
 
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
+#include "GameCore/IdleSaveGame.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameCore/TranscendFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
+
+const TCHAR* UIdleGameInstance::SaveSlotName = TEXT("IdleSave");
 
 void UIdleGameInstance::Init()
 {
@@ -45,6 +49,7 @@ void UIdleGameInstance::Init()
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	LoadLanguage();
 	LoadLastSeenUnixSec();
+	LoadProgress();
 
 	ApiClient->RegisterGuest([](bool bSuccess, FString Message)
 	{
@@ -59,6 +64,7 @@ void UIdleGameInstance::Init()
 void UIdleGameInstance::Shutdown()
 {
 	LastSeenUnixSec = GetCurrentUnixSeconds();
+	SaveProgress();
 	SaveLanguage();
 	SaveLastSeenUnixSec();
 	ApiClient = nullptr;
@@ -88,17 +94,140 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	{
 		Gold = MAX_int64;
 		OnGoldChanged.Broadcast(Gold);
+		RequestAutosave();
 		return;
 	}
 	if (Amount < 0 && (Amount == MIN_int64 || Gold < -Amount))
 	{
 		Gold = 0;
 		OnGoldChanged.Broadcast(Gold);
+		RequestAutosave();
 		return;
 	}
 
 	Gold = Gold + Amount;
 	OnGoldChanged.Broadcast(Gold);
+	RequestAutosave();
+}
+
+void UIdleGameInstance::SaveProgress() const
+{
+	UIdleSaveGame* SaveGame = Cast<UIdleSaveGame>(UGameplayStatics::CreateSaveGameObject(UIdleSaveGame::StaticClass()));
+	if (!CaptureToSave(SaveGame))
+	{
+		return;
+	}
+
+	UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, 0);
+}
+
+void UIdleGameInstance::LoadProgress()
+{
+	if (!UGameplayStatics::DoesSaveGameExist(SaveSlotName, 0))
+	{
+		return;
+	}
+
+	UIdleSaveGame* SaveGame = Cast<UIdleSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, 0));
+	ApplyFromSave(SaveGame);
+}
+
+bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame) const
+{
+	if (!SaveGame)
+	{
+		return false;
+	}
+
+	SaveGame->SaveVersion = 1;
+	SaveGame->bHasSave = true;
+	SaveGame->Gold = Gold;
+	SaveGame->CharacterLevel = CharacterLevel;
+	SaveGame->CurrentExp = CurrentExp;
+	SaveGame->NextExp = NextExp;
+	SaveGame->RebirthCount = RebirthCount;
+	SaveGame->RebirthBonusPoints = RebirthBonusPoints;
+	SaveGame->TranscendCount = TranscendCount;
+	SaveGame->AvailableStatPoints = AvailableStatPoints;
+	SaveGame->AllocatedStats = AllocatedStats;
+	SaveGame->bChapter1BossDefeated = bChapter1BossDefeated;
+	SaveGame->LastSeenUnixSec = LastSeenUnixSec;
+
+	if (StageService)
+	{
+		SaveGame->StageChapter = StageService->GetCurrentChapter();
+		SaveGame->StageStage = StageService->GetCurrentStage();
+		SaveGame->StageKillsThisStage = StageService->GetKillsThisStage();
+		SaveGame->bStageFinalChapterCleared = StageService->HasFinalChapterCleared();
+		SaveGame->StageHighestClearedChapter = StageService->GetHighestClearedChapter();
+	}
+
+	if (TowerService)
+	{
+		SaveGame->TowerHighestFloor = TowerService->GetHighestFloor();
+	}
+
+	if (PetService)
+	{
+		SaveGame->EquippedPetId = PetService->GetEquippedPetId();
+		SaveGame->PetLevels = PetService->GetPetLevels();
+	}
+
+	return true;
+}
+
+bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
+{
+	if (!SaveGame || SaveGame->SaveVersion <= 0 || !SaveGame->bHasSave)
+	{
+		return false;
+	}
+
+	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
+	bAutosaveSuppressed = true;
+
+	Gold = FMath::Max<int64>(0, SaveGame->Gold);
+	CharacterLevel = FMath::Max(1, SaveGame->CharacterLevel);
+	CurrentExp = FMath::Max<int64>(0, SaveGame->CurrentExp);
+	NextExp = SaveGame->NextExp > 0 ? SaveGame->NextExp : FLevelFormulas::ExpToNext(CharacterLevel);
+	RebirthCount = FMath::Max(0, SaveGame->RebirthCount);
+	RebirthBonusPoints = FMath::Max(0, SaveGame->RebirthBonusPoints);
+	TranscendCount = FMath::Max(0, SaveGame->TranscendCount);
+	AvailableStatPoints = FMath::Max(0, SaveGame->AvailableStatPoints);
+	AllocatedStats = SaveGame->AllocatedStats;
+	bChapter1BossDefeated = SaveGame->bChapter1BossDefeated;
+	LastSeenUnixSec = FMath::Max<int64>(0, SaveGame->LastSeenUnixSec);
+
+	EnsureStageService();
+	if (StageService)
+	{
+		StageService->RestoreState(
+			SaveGame->StageChapter,
+			SaveGame->StageStage,
+			SaveGame->StageKillsThisStage,
+			SaveGame->bStageFinalChapterCleared,
+			SaveGame->StageHighestClearedChapter);
+	}
+
+	EnsureTowerService();
+	if (TowerService)
+	{
+		TowerService->SetHighestFloor(SaveGame->TowerHighestFloor);
+	}
+
+	EnsurePetService();
+	if (PetService)
+	{
+		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->PetLevels);
+	}
+
+	OnGoldChanged.Broadcast(Gold);
+	OnExpChanged.Broadcast(CurrentExp, NextExp);
+	OnStatPointsChanged.Broadcast();
+	OnLevelUp.Broadcast(CharacterLevel);
+
+	bAutosaveSuppressed = bWasAutosaveSuppressed;
+	return true;
 }
 
 int64 UIdleGameInstance::ClimbTower()
@@ -114,6 +243,7 @@ int64 UIdleGameInstance::ClimbTower()
 	if (Reward > 0)
 	{
 		AddGold(Reward);
+		RequestAutosave();
 	}
 	return Reward;
 }
@@ -162,6 +292,7 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 
 	RecordGearEnhanced();
 	OnEnhanceResult.Broadcast(Result);
+	RequestAutosave();
 	return Result;
 }
 
@@ -204,6 +335,7 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	Result.Slot = Item.Slot;
 	Result.ItemName = Item.DisplayName;
 	OnShopPurchase.Broadcast(Result);
+	RequestAutosave();
 	return Result;
 }
 
@@ -220,13 +352,17 @@ void UIdleGameInstance::AddExp(int64 Amount)
 	}
 
 	CurrentExp += Amount;
+	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
+	bAutosaveSuppressed = true;
 	while (NextExp > 0 && CurrentExp >= NextExp && CharacterLevel < FLevelFormulas::LEVEL_CAP)
 	{
 		CurrentExp -= NextExp;
 		LevelUp();
 	}
+	bAutosaveSuppressed = bWasAutosaveSuppressed;
 
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
+	RequestAutosave();
 }
 
 void UIdleGameInstance::LevelUp()
@@ -241,6 +377,7 @@ void UIdleGameInstance::LevelUp()
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	GrantStatPoints(FStatPointFormula::GetStatPointsForLevelUp(CharacterLevel));
 	OnLevelUp.Broadcast(CharacterLevel);
+	RequestAutosave();
 }
 
 void UIdleGameInstance::GrantStatPoints(int32 Points)
@@ -252,6 +389,7 @@ void UIdleGameInstance::GrantStatPoints(int32 Points)
 
 	AvailableStatPoints += Points;
 	OnStatPointsChanged.Broadcast();
+	RequestAutosave();
 }
 
 bool UIdleGameInstance::AllocateStatPoint(EPrimaryStat Stat)
@@ -287,6 +425,7 @@ bool UIdleGameInstance::AllocateStatPoint(EPrimaryStat Stat)
 
 	--AvailableStatPoints;
 	OnStatPointsChanged.Broadcast();
+	RequestAutosave();
 	return true;
 }
 
@@ -308,6 +447,7 @@ void UIdleGameInstance::ResetStatPoints()
 	AvailableStatPoints += SpentPoints;
 	AllocatedStats = FPrimaryStats();
 	OnStatPointsChanged.Broadcast();
+	RequestAutosave();
 }
 
 bool UIdleGameInstance::CanRebirth() const
@@ -341,6 +481,7 @@ bool UIdleGameInstance::Rebirth()
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
 	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
+	RequestAutosave();
 	return true;
 }
 
@@ -381,6 +522,7 @@ bool UIdleGameInstance::Transcend()
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
 	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
+	RequestAutosave();
 	return true;
 }
 
@@ -407,6 +549,7 @@ void UIdleGameInstance::MarkChapter1BossDefeated()
 	}
 
 	bChapter1BossDefeated = true;
+	RequestAutosave();
 }
 
 FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewards()
@@ -432,6 +575,7 @@ FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, 
 	AddExp(Reward.Exp);
 	RecordQuestProgress(EQuestObjective::ClaimOffline, 1);
 	LastSeenUnixSec = FMath::Max(LastSeenUnixSec, NowUnixSec);
+	RequestAutosave();
 	return Reward;
 }
 
@@ -444,6 +588,7 @@ FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, 
 void UIdleGameInstance::SetLastSeenUnixSec(int64 UnixSec)
 {
 	LastSeenUnixSec = FMath::Max<int64>(0, UnixSec);
+	RequestAutosave();
 }
 
 void UIdleGameInstance::RecordQuestProgress(EQuestObjective Objective, int32 Amount)
@@ -496,6 +641,7 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 	{
 		ApiClient->ClaimQuestReward(QuestId, FString());
 	}
+	RequestAutosave();
 	return Result;
 }
 
@@ -548,6 +694,7 @@ bool UIdleGameInstance::EquipPet(const FString& PetId)
 	{
 		ApiClient->EquipPet(PetId);
 	}
+	RequestAutosave();
 	return true;
 }
 
@@ -598,6 +745,7 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 	Result.GoldSpent = Cost;
 	Result.NewLevel = CurrentLevel + 1;
 	OnPetFed.Broadcast(Result);
+	RequestAutosave();
 	return Result;
 }
 
@@ -660,12 +808,21 @@ FSeasonClaimResult UIdleGameInstance::ClaimSeasonReward(int32 Tier)
 	{
 		ApiClient->ClaimSeasonReward(Tier);
 	}
+	RequestAutosave();
 	return Result;
 }
 
 int64 UIdleGameInstance::GetCurrentUnixSeconds()
 {
 	return FDateTime::UtcNow().ToUnixTimestamp();
+}
+
+void UIdleGameInstance::RequestAutosave() const
+{
+	if (!bAutosaveSuppressed)
+	{
+		SaveProgress();
+	}
 }
 
 UInventoryComponent* UIdleGameInstance::FindPlayerInventory() const

@@ -112,3 +112,13 @@ FStageInfo UStageService::GetCurrentStageInfo() const
 	Info.WeakElement = FStageFormula::GetStageWeakElement(Info.GlobalStageIndex);
 	return Info;
 }
+
+void UStageService::RestoreState(int32 Chapter, int32 Stage, int32 Kills, bool bFinalCleared, int32 HighestCleared)
+{
+	CurrentChapter = FMath::Clamp(Chapter, 1, TotalChapters);
+	CurrentStage = FMath::Clamp(Stage, 1, StagesPerChapter);
+	bFinalChapterCleared = bFinalCleared;
+	HighestClearedChapter = FMath::Clamp(HighestCleared, 0, TotalChapters);
+	KillsThisStage = FMath::Clamp(Kills, 0, GetKillsToAdvance());
+	OnStageChanged.Broadcast(GetCurrentStageInfo());
+}

@@ -35,6 +35,11 @@ int64 UTowerService::TryClimbTower(int64 CombatPower)
 	return TotalReward;
 }
 
+void UTowerService::SetHighestFloor(int32 Floor)
+{
+	HighestFloor = FMath::Max(0, Floor);
+}
+
 int64 UTowerService::GetNextFloorRequiredPower() const
 {
 	return FTowerFormula::GetFloorRequiredPower(HighestFloor + 1);

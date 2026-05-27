@@ -16,6 +16,7 @@
 class UApiClient;
 class UInventoryComponent;
 class AIdleCharacter;
+class UIdleSaveGame;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
@@ -123,6 +124,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Progression")
 	void AddGold(int64 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
+	void SaveProgress() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Save")
+	void LoadProgress();
+
+	bool CaptureToSave(UIdleSaveGame* SaveGame) const;
+	bool ApplyFromSave(const UIdleSaveGame* SaveGame);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
 	int64 ClimbTower();
@@ -360,11 +370,15 @@ private:
 	UPROPERTY()
 	int64 LastSeenUnixSec = 0;
 
+	bool bAutosaveSuppressed = false;
+
 	FRandomStream EnhanceRandomStream;
 
+	static const TCHAR* SaveSlotName;
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
+	void RequestAutosave() const;
 	void EnsureQuestService();
 	void EnsurePetService();
 	void EnsureSeasonService();

@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
 	int32 GetHighestFloor() const { return HighestFloor; }
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
+	void SetHighestFloor(int32 Floor);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Tower")
 	int64 GetNextFloorRequiredPower() const;
 
