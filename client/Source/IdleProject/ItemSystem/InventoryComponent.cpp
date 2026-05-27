@@ -94,11 +94,13 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		EquippedItems.Add(Item);
 		const float EnhanceMultiplier = 1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f;
 		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier;
-		Bonus.PhysDef += Item.BonusDef * EnhanceMultiplier;
-		Bonus.Hp += Item.BonusHp * EnhanceMultiplier;
+		Bonus.PhysDef += (Item.BonusDef + Item.BonusPhysDef) * EnhanceMultiplier;
+		Bonus.Hp += (Item.BonusHp + Item.BonusAffixHp) * EnhanceMultiplier;
 		Bonus.CritRate += Item.BonusCritRate * EnhanceMultiplier;
 		Bonus.AtkSpeed += Item.BonusAtkSpeed * EnhanceMultiplier;
 		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier;
+		Bonus.MagicDef += Item.BonusMagicDef * EnhanceMultiplier;
+		Bonus.CritDmg += Item.BonusCritDmg * EnhanceMultiplier;
 	}
 
 	const FDerivedStats SetBonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);

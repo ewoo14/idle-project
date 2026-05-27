@@ -36,6 +36,18 @@ FDerivedStats FSetBonusFormula::GetTwoPieceBonus(EItemSet ItemSet)
 	case EItemSet::Arcane:
 		Bonus.MagicAtk = 20.0f;
 		break;
+	case EItemSet::Assassin:
+		Bonus.CritRate = 0.03f;
+		break;
+	case EItemSet::Hunter:
+		Bonus.AtkSpeed = 0.05f;
+		break;
+	case EItemSet::Holy:
+		Bonus.Hp = 120.0f;
+		break;
+	case EItemSet::Berserker:
+		Bonus.PhysAtk = 30.0f;
+		break;
 	case EItemSet::None:
 	default:
 		break;
@@ -58,6 +70,21 @@ FDerivedStats FSetBonusFormula::GetFourPieceBonus(EItemSet ItemSet)
 		break;
 	case EItemSet::Arcane:
 		Bonus.MagicAtk = 50.0f;
+		Bonus.CritDmg = 0.10f;
+		break;
+	case EItemSet::Assassin:
+		Bonus.CritDmg = 0.15f;
+		break;
+	case EItemSet::Hunter:
+		Bonus.PhysAtk = 35.0f;
+		Bonus.AtkSpeed = 0.03f;
+		break;
+	case EItemSet::Holy:
+		Bonus.PhysDef = 20.0f;
+		Bonus.MagicDef = 30.0f;
+		break;
+	case EItemSet::Berserker:
+		Bonus.CritRate = 0.04f;
 		Bonus.CritDmg = 0.10f;
 		break;
 	case EItemSet::None:

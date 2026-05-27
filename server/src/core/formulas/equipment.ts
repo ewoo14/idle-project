@@ -15,10 +15,18 @@ export type ItemSet =
   | 1
   | 2
   | 3
+  | 4
+  | 5
+  | 6
+  | 7
   | "None"
   | "Warrior"
   | "Guardian"
-  | "Arcane";
+  | "Arcane"
+  | "Assassin"
+  | "Hunter"
+  | "Holy"
+  | "Berserker";
 
 export interface ItemInstance {
   itemId: string;
@@ -31,6 +39,10 @@ export interface ItemInstance {
   bonusCritRate?: number;
   bonusAtkSpeed?: number;
   bonusMagicAtk?: number;
+  bonusPhysDef?: number;
+  bonusMagicDef?: number;
+  bonusAffixHp?: number;
+  bonusCritDmg?: number;
   enhanceLevel: number;
 }
 
@@ -41,7 +53,11 @@ export function computeItemPowerScore(item: ItemInstance): number {
     item.bonusHp / 10 +
     (item.bonusCritRate ?? 0) * 1000 +
     (item.bonusAtkSpeed ?? 0) * 100 +
-    (item.bonusMagicAtk ?? 0);
+    (item.bonusMagicAtk ?? 0) +
+    (item.bonusPhysDef ?? 0) +
+    (item.bonusMagicDef ?? 0) +
+    (item.bonusAffixHp ?? 0) / 10 +
+    (item.bonusCritDmg ?? 0) * 100;
 
   return Math.round(baseScore * (1 + item.enhanceLevel * 0.1));
 }
@@ -66,13 +82,19 @@ export function computeInventoryBonus(
 
       return {
         bonusAtk: acc.bonusAtk + item.bonusAtk * enhanceMultiplier,
-        bonusDef: acc.bonusDef + item.bonusDef * enhanceMultiplier,
-        bonusHp: acc.bonusHp + item.bonusHp * enhanceMultiplier,
+        bonusDef:
+          acc.bonusDef +
+          (item.bonusDef + (item.bonusPhysDef ?? 0)) * enhanceMultiplier,
+        bonusHp:
+          acc.bonusHp +
+          (item.bonusHp + (item.bonusAffixHp ?? 0)) * enhanceMultiplier,
         critRate: acc.critRate + (item.bonusCritRate ?? 0) * enhanceMultiplier,
         atkSpeed: acc.atkSpeed + (item.bonusAtkSpeed ?? 0) * enhanceMultiplier,
         magicAtk: acc.magicAtk + (item.bonusMagicAtk ?? 0) * enhanceMultiplier,
-        magicDef: acc.magicDef,
-        critDmg: acc.critDmg,
+        magicDef:
+          (acc.magicDef ?? 0) + (item.bonusMagicDef ?? 0) * enhanceMultiplier,
+        critDmg:
+          (acc.critDmg ?? 0) + (item.bonusCritDmg ?? 0) * enhanceMultiplier,
       };
     },
     {

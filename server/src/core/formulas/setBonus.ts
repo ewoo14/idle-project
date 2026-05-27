@@ -9,7 +9,15 @@ export type ItemSet = EquipmentItemSet;
 
 const SET_PIECE_THRESHOLDS = [2, 4] as const;
 
-const ITEM_SET_NAMES = ["Warrior", "Guardian", "Arcane"] as const;
+const ITEM_SET_NAMES = [
+  "Warrior",
+  "Guardian",
+  "Arcane",
+  "Assassin",
+  "Hunter",
+  "Holy",
+  "Berserker",
+] as const;
 type CountedItemSet = (typeof ITEM_SET_NAMES)[number];
 
 function zeroBonus(): Required<EquipmentBonus> {
@@ -50,6 +58,18 @@ function normalizeItemSet(itemSet: ItemSet | undefined): CountedItemSet | null {
     case 3:
     case "Arcane":
       return "Arcane";
+    case 4:
+    case "Assassin":
+      return "Assassin";
+    case 5:
+    case "Hunter":
+      return "Hunter";
+    case 6:
+    case "Holy":
+      return "Holy";
+    case 7:
+    case "Berserker":
+      return "Berserker";
     default:
       return null;
   }
@@ -76,6 +96,18 @@ export function getTwoPieceBonus(itemSet: ItemSet): Required<EquipmentBonus> {
     case "Arcane":
       bonus.magicAtk = 20;
       break;
+    case "Assassin":
+      bonus.critRate = 0.03;
+      break;
+    case "Hunter":
+      bonus.atkSpeed = 0.05;
+      break;
+    case "Holy":
+      bonus.bonusHp = 120;
+      break;
+    case "Berserker":
+      bonus.bonusAtk = 30;
+      break;
     case null:
       break;
   }
@@ -96,6 +128,21 @@ export function getFourPieceBonus(itemSet: ItemSet): Required<EquipmentBonus> {
       break;
     case "Arcane":
       bonus.magicAtk = 50;
+      bonus.critDmg = 0.1;
+      break;
+    case "Assassin":
+      bonus.critDmg = 0.15;
+      break;
+    case "Hunter":
+      bonus.bonusAtk = 35;
+      bonus.atkSpeed = 0.03;
+      break;
+    case "Holy":
+      bonus.bonusDef = 20;
+      bonus.magicDef = 30;
+      break;
+    case "Berserker":
+      bonus.critRate = 0.04;
       bonus.critDmg = 0.1;
       break;
     case null:
@@ -142,7 +189,7 @@ export function rollItemSet(
 
   const roll = Math.min(
     Math.max(Math.floor(rng() * ITEM_SET_NAMES.length), 0),
-    2,
+    ITEM_SET_NAMES.length - 1,
   );
   return ITEM_SET_NAMES[roll];
 }

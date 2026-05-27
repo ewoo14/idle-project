@@ -138,6 +138,40 @@ describe("set bonus formulas", () => {
       magicAtk: 50,
       critDmg: 0.1,
     });
+    expect(getTwoPieceBonus("Assassin")).toMatchObject({ critRate: 0.03 });
+    expect(getFourPieceBonus("Assassin")).toMatchObject({ critDmg: 0.15 });
+    expect(getTwoPieceBonus("Hunter")).toMatchObject({ atkSpeed: 0.05 });
+    expect(getFourPieceBonus("Hunter")).toMatchObject({ bonusAtk: 35 });
+    expect(getTwoPieceBonus("Holy")).toMatchObject({ bonusHp: 120 });
+    expect(getFourPieceBonus("Holy")).toMatchObject({
+      bonusDef: 20,
+      magicDef: 30,
+    });
+    expect(getTwoPieceBonus("Berserker")).toMatchObject({ bonusAtk: 30 });
+    expect(getFourPieceBonus("Berserker")).toMatchObject({
+      critRate: 0.04,
+      critDmg: 0.1,
+    });
+  });
+
+  it("applies new set bonuses at two and four pieces", () => {
+    expect(
+      computeSetBonus([
+        item("Holy", { slot: 1 }),
+        item("Holy", { slot: 2 }),
+        item("Holy", { slot: 3 }),
+        item("Holy", { slot: 4 }),
+      ]),
+    ).toEqual({
+      bonusAtk: 0,
+      bonusDef: 20,
+      bonusHp: 120,
+      critRate: 0,
+      atkSpeed: 0,
+      magicAtk: 0,
+      magicDef: 30,
+      critDmg: 0,
+    });
   });
 
   it("rolls no set for None and Common rarity items", () => {
@@ -147,8 +181,11 @@ describe("set bonus formulas", () => {
 
   it("rolls eligible item sets deterministically from the supplied rng", () => {
     expect(rollItemSet("Rare", () => 0)).toBe("Warrior");
-    expect(rollItemSet("Rare", () => 0.34)).toBe("Guardian");
-    expect(rollItemSet("Rare", () => 0.67)).toBe("Arcane");
-    expect(rollItemSet("Mythic", () => 0.67)).toBe("Arcane");
+    expect(rollItemSet("Rare", () => 0.15)).toBe("Guardian");
+    expect(rollItemSet("Rare", () => 0.3)).toBe("Arcane");
+    expect(rollItemSet("Rare", () => 0.45)).toBe("Assassin");
+    expect(rollItemSet("Rare", () => 0.6)).toBe("Hunter");
+    expect(rollItemSet("Rare", () => 0.75)).toBe("Holy");
+    expect(rollItemSet("Mythic", () => 0.99)).toBe("Berserker");
   });
 });

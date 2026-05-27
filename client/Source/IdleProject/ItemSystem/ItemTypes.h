@@ -35,7 +35,11 @@ enum class EItemSet : uint8
 	None = 0 UMETA(Hidden),
 	Warrior = 1 UMETA(DisplayName = "Warrior"),
 	Guardian = 2 UMETA(DisplayName = "Guardian"),
-	Arcane = 3 UMETA(DisplayName = "Arcane")
+	Arcane = 3 UMETA(DisplayName = "Arcane"),
+	Assassin = 4 UMETA(DisplayName = "Assassin"),
+	Hunter = 5 UMETA(DisplayName = "Hunter"),
+	Holy = 6 UMETA(DisplayName = "Holy"),
+	Berserker = 7 UMETA(DisplayName = "Berserker")
 };
 
 /** 장비 1개의 런타임 인스턴스입니다. */
@@ -46,6 +50,9 @@ struct IDLEPROJECT_API FItemInstance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	FName ItemId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	FName BaseItemId = NAME_None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	EItemSlot Slot = EItemSlot::None;
@@ -77,6 +84,18 @@ struct IDLEPROJECT_API FItemInstance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	float BonusMagicAtk = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusPhysDef = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusMagicDef = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusAffixHp = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	float BonusCritDmg = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item", meta = (ClampMin = "0", ClampMax = "50"))
 	int32 EnhanceLevel = 0;
 };
@@ -90,7 +109,11 @@ struct IDLEPROJECT_API FItemPowerScore
 			+ Item.BonusHp / 10.0f
 			+ Item.BonusCritRate * 1000.0f
 			+ Item.BonusAtkSpeed * 100.0f
-			+ Item.BonusMagicAtk;
+			+ Item.BonusMagicAtk
+			+ Item.BonusPhysDef
+			+ Item.BonusMagicDef
+			+ Item.BonusAffixHp / 10.0f
+			+ Item.BonusCritDmg * 100.0f;
 		const float RawScore = BaseScore
 			* (1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f);
 		return FMath::RoundToInt(RawScore);

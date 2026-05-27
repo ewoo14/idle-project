@@ -964,6 +964,44 @@ Automation coverage:
 - `server/src/core/formulas/setBonus.test.ts`
 - `server/src/core/formulas/equipment.test.ts`
 
+## PR #58 Item Variety Expansion
+
+PR #58 keeps the PR #40 affix count curve and PR #43 set thresholds, but expands
+the content pool used by those systems.
+
+Base item generation now chooses a deterministic slot-local base id before
+building `DisplayName` and `ItemId`. Weapons have six bases
+(`longsword`, `greatsword`, `dagger`, `bow`, `staff`, `wand`); every armor and
+accessory slot has three bases. Base definitions may apply small stat-bias
+multipliers, but rarity multiplier, level, variance, enhancement, and PowerScore
+remain the primary balance drivers.
+
+Additional set families:
+
+| Set | 2-piece bonus | Additional 4-piece bonus |
+| --- | --- | --- |
+| Assassin | CritRate +0.03 | CritDmg +0.15 |
+| Hunter | AtkSpeed +0.05 | PhysAtk +35, AtkSpeed +0.03 |
+| Holy | HP +120 | PhysDef +20, MagicDef +30 |
+| Berserker | PhysAtk +30 | CritRate +0.04, CritDmg +0.10 |
+
+Additional affixes:
+
+| Affix | Roll range |
+| --- | ---: |
+| PhysDef | round(Level times 0.3 to Level times 1.0) |
+| MagicDef | round(Level times 0.3 to Level times 1.0) |
+| Hp | round(Level times 2.0 to Level times 5.0) |
+| CritDmg | +0.05 to +0.20 |
+
+PowerScore now includes the expanded affixes:
+
+```text
+PowerScore = round((ATK + DEF + HP / 10 + CritRate times 1000 + AtkSpeed times 100
+  + MagicAtk + PhysDef + MagicDef + AffixHp / 10 + CritDmg times 100)
+  times (1 + EnhanceLevel times 0.1))
+```
+
 ## PR #35 Boss Patterns V1
 
 Boss phase thresholds are shared by client combat, HUD, and the server mirror:
