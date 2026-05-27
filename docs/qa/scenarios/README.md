@@ -26,3 +26,4 @@
 | M8 | [M8-save-system-v1.md](M8-save-system-v1.md) | Local save/load, autosave HUD feedback, restart, offline reward persistence, and server-down regression |
 | M8 | [M8-save-system-v2.md](M8-save-system-v2.md) | SaveGame V2 Inventory/Skill/Quest/Season 라운드트립, V1 마이그레이션, 손상 페이로드 새니타이즈 |
 | M8 | [M8-save-system-v3.md](M8-save-system-v3.md) | Cloud save upload/download, merge policy, offline fallback, schema regression, HUD sync states |
+| M9 | [M9-achievements-collection.md](M9-achievements-collection.md) | Achievement catalog, permanent stat multiplier, save/cloud restore, HUD panel, and soft-cap parity |
