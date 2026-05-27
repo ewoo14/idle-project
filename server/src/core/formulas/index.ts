@@ -1,3 +1,4 @@
+export * from "./achievement.js";
 export * from "./bossPhase.js";
 export * from "./combat.js";
 export * from "./combatPower.js";

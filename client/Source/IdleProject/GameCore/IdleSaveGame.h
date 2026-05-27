@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
+#include "GameCore/AchievementFormula.h"
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
@@ -102,4 +103,13 @@ public:
 
 	UPROPERTY()
 	TArray<int32> SeasonClaimedTiers;
+
+	UPROPERTY()
+	TArray<FAchievementMetricSaveEntry> AchievementMetrics;
+
+	UPROPERTY()
+	TArray<FAchievementSaveEntry> Achievements;
+
+	UPROPERTY()
+	TArray<FName> AchievementUniqueItemIds;
 };

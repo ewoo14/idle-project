@@ -50,6 +50,7 @@ constexpr float StageFeedbackDurationSeconds = 2.2f;
 constexpr float PetFeedbackDurationSeconds = 2.2f;
 constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 constexpr float TowerFeedbackDurationSeconds = 2.4f;
+constexpr float AchievementFeedbackDurationSeconds = 2.4f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
 
@@ -341,6 +342,72 @@ FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
 FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
 {
 	return FName(*(StatAllocationHitBoxPrefix + FString::FromInt(static_cast<int32>(Stat))));
+}
+
+const TCHAR* AchievementCategoryToLocalizationKey(EAchievementCategory Category)
+{
+	switch (Category)
+	{
+	case EAchievementCategory::Combat:
+		return TEXT("ACHIEVEMENT_CATEGORY_COMBAT");
+	case EAchievementCategory::Progression:
+		return TEXT("ACHIEVEMENT_CATEGORY_PROGRESSION");
+	case EAchievementCategory::Gear:
+		return TEXT("ACHIEVEMENT_CATEGORY_GEAR");
+	case EAchievementCategory::Economy:
+		return TEXT("ACHIEVEMENT_CATEGORY_ECONOMY");
+	case EAchievementCategory::Skill:
+		return TEXT("ACHIEVEMENT_CATEGORY_SKILL");
+	case EAchievementCategory::Pet:
+		return TEXT("ACHIEVEMENT_CATEGORY_PET");
+	case EAchievementCategory::Quest:
+		return TEXT("ACHIEVEMENT_CATEGORY_QUEST");
+	case EAchievementCategory::Collection:
+		return TEXT("ACHIEVEMENT_CATEGORY_COLLECTION");
+	case EAchievementCategory::Misc:
+	default:
+		return TEXT("ACHIEVEMENT_CATEGORY_MISC");
+	}
+}
+
+int64 GetAchievementThresholdForTier(const FAchievementDefinition& Definition, int32 Tier)
+{
+	if (Tier <= 0)
+	{
+		return Definition.BaseThreshold;
+	}
+
+	double Threshold = static_cast<double>(Definition.BaseThreshold);
+	for (int32 Index = 0; Index < Tier; ++Index)
+	{
+		Threshold *= static_cast<double>(Definition.Growth);
+		if (Threshold >= static_cast<double>(MAX_int64))
+		{
+			return MAX_int64;
+		}
+	}
+	return FMath::Max<int64>(Definition.BaseThreshold, FMath::RoundToInt64(Threshold));
+}
+
+const FAchievementDefinition* FindAchievementDefinitionById(const FString& AchievementId)
+{
+	return FAchievementFormula::GetDefinitions().FindByPredicate([&AchievementId](const FAchievementDefinition& Definition)
+	{
+		return Definition.AchievementId == AchievementId;
+	});
+}
+
+FText GetAchievementDisplayName(const FAchievementDefinition& Definition)
+{
+	if (!Definition.DisplayNameKey.IsEmpty())
+	{
+		const FText Localized = IdleProject::Localization::Text(TEXT("Achievement"), *Definition.DisplayNameKey);
+		if (Localized.ToString() != Definition.DisplayNameKey)
+		{
+			return Localized;
+		}
+	}
+	return Definition.DisplayName;
 }
 
 FText BuildShopResultLabel(const FShopPurchaseResult& Result)
@@ -1051,6 +1118,104 @@ FText IdleProject::UI::BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64
 	});
 }
 
+FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UAchievementService& AchievementService)
+{
+	FIdleHUDAchievementViewModel ViewModel;
+	ViewModel.TotalPoints = AchievementService.GetTotalPoints();
+	ViewModel.StatMultiplier = AchievementService.GetStatMultiplier();
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("ACHIEVEMENT_PANEL_TITLE"));
+	ViewModel.TotalPointsLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_TOTAL_POINTS_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Points"), FText::AsNumber(ViewModel.TotalPoints));
+	});
+	ViewModel.StatMultiplierLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_STAT_MULTIPLIER_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Multiplier"), FormatMultiplierLabel(ViewModel.StatMultiplier));
+	});
+
+	TMap<EAchievementCategory, FAchievementCategoryProgress> ProgressByCategory;
+	for (const FAchievementCategoryProgress& Progress : AchievementService.GetCategoryProgress())
+	{
+		ProgressByCategory.Add(Progress.Category, Progress);
+	}
+
+	const EAchievementCategory CategoryOrder[] = {
+		EAchievementCategory::Combat,
+		EAchievementCategory::Progression,
+		EAchievementCategory::Gear,
+		EAchievementCategory::Economy,
+		EAchievementCategory::Skill,
+		EAchievementCategory::Pet,
+		EAchievementCategory::Quest,
+		EAchievementCategory::Collection,
+		EAchievementCategory::Misc
+	};
+
+	for (const EAchievementCategory Category : CategoryOrder)
+	{
+		const FAchievementCategoryProgress Progress = ProgressByCategory.FindRef(Category);
+
+		int64 NextThreshold = MAX_int64;
+		for (const FAchievementDefinition& Definition : FAchievementFormula::GetDefinitions())
+		{
+			if (Definition.Category != Category)
+			{
+				continue;
+			}
+
+			const int64 MetricValue = AchievementService.GetMetricValue(Definition.Metric);
+			const int32 CurrentTier = FAchievementFormula::GetTierForValue(Definition, MetricValue);
+			NextThreshold = FMath::Min(NextThreshold, GetAchievementThresholdForTier(Definition, CurrentTier));
+		}
+		if (NextThreshold == MAX_int64)
+		{
+			NextThreshold = 0;
+		}
+
+		FIdleHUDAchievementRowViewModel Row;
+		Row.Category = Category;
+		Row.CategoryLabel = IdleProject::Localization::UI(AchievementCategoryToLocalizationKey(Category));
+		Row.Tier = Progress.HighestUnlockedTier;
+		Row.Points = Progress.UnlockedPoints;
+		Row.CurrentValue = Progress.CurrentValue;
+		Row.NextThreshold = NextThreshold;
+		Row.ProgressRatio = NextThreshold > 0
+			? FMath::Clamp(static_cast<float>(Row.CurrentValue) / static_cast<float>(NextThreshold), 0.0f, 1.0f)
+			: 0.0f;
+		Row.TierLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_TIER_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Tier"), FText::AsNumber(Row.Tier));
+		});
+		Row.PointsLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_POINTS_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Points"), FText::AsNumber(Row.Points));
+		});
+		Row.ValueLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_VALUE_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Value"), FText::FromString(FormatIntegerWithCommas(Row.CurrentValue)));
+		});
+		Row.NextThresholdLabel = FormatLocalizedUI(TEXT("ACHIEVEMENT_NEXT_THRESHOLD_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Value"), FText::FromString(FormatIntegerWithCommas(Row.NextThreshold)));
+		});
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
+FText IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier)
+{
+	const FAchievementDefinition* Definition = FindAchievementDefinitionById(AchievementId);
+	const FText AchievementName = Definition ? GetAchievementDisplayName(*Definition) : FText::FromString(AchievementId);
+	const int32 SafeTier = FMath::Max(1, Tier);
+	return FormatLocalizedUI(TEXT("ACHIEVEMENT_UNLOCKED_FORMAT"), [AchievementName, SafeTier](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Name"), AchievementName);
+		Args.Add(TEXT("Tier"), FText::AsNumber(SafeTier));
+	});
+}
+
 FText IdleProject::UI::BuildProgressSavedFeedbackLabel()
 {
 	return IdleProject::Localization::UI(TEXT("SAVE_PROGRESS_SAVED"));
@@ -1459,6 +1624,7 @@ void AIdleHUD::PostInitializeComponents()
 	BindPlayerInventory();
 	BindStageService();
 	BindTowerService();
+	BindAchievementService();
 }
 
 void AIdleHUD::BeginPlay()
@@ -1468,6 +1634,7 @@ void AIdleHUD::BeginPlay()
 	BindPlayerInventory();
 	BindStageService();
 	BindTowerService();
+	BindAchievementService();
 	PreviewOfflineRewardModal();
 }
 
@@ -1483,6 +1650,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	UnbindBossSpecialAttack();
 	UnbindStageService();
 	UnbindTowerService();
+	UnbindAchievementService();
 
 	if (IdleGameInstance)
 	{
@@ -1528,6 +1696,7 @@ void AIdleHUD::DrawHUD()
 	DrawRebirthPanel();
 	DrawTranscendPanel();
 	DrawTowerPanel();
+	DrawAchievementPanel();
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
@@ -1822,6 +1991,15 @@ void AIdleHUD::HandleTowerClimbed(int32 NewHighestFloor, int64 TotalReward)
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::HandleAchievementUnlocked(const FString& AchievementId, int32 Tier)
+{
+	AchievementFeedbackLabel = IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(AchievementId, Tier);
+	if (const UWorld* World = GetWorld())
+	{
+		AchievementFeedbackStartTime = World->GetTimeSeconds();
+	}
+}
+
 void AIdleHUD::HandleProgressSaved()
 {
 	ProgressSavedFeedbackLabel = IdleProject::UI::BuildProgressSavedFeedbackLabel();
@@ -1906,6 +2084,39 @@ void AIdleHUD::UnbindTowerService()
 		TowerService->OnTowerClimbed.RemoveDynamic(this, &AIdleHUD::HandleTowerClimbed);
 	}
 	BoundTowerService.Reset();
+}
+
+void AIdleHUD::BindAchievementService()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+
+	UAchievementService* AchievementService = IdleGameInstance ? IdleGameInstance->GetAchievementService() : nullptr;
+	if (!AchievementService)
+	{
+		UnbindAchievementService();
+		return;
+	}
+
+	if (BoundAchievementService.Get() == AchievementService)
+	{
+		return;
+	}
+
+	UnbindAchievementService();
+	BoundAchievementService = AchievementService;
+	AchievementService->OnAchievementUnlocked.AddUniqueDynamic(this, &AIdleHUD::HandleAchievementUnlocked);
+}
+
+void AIdleHUD::UnbindAchievementService()
+{
+	if (UAchievementService* AchievementService = BoundAchievementService.Get())
+	{
+		AchievementService->OnAchievementUnlocked.RemoveDynamic(this, &AIdleHUD::HandleAchievementUnlocked);
+	}
+	BoundAchievementService.Reset();
 }
 
 void AIdleHUD::BindPlayerCombat()
@@ -2906,7 +3117,20 @@ void AIdleHUD::RankUpSkillFromHitBox(FName BoxName)
 	SkillId.RightChopInline(SkillRankHitBoxPrefix.Len());
 	if (!SkillId.IsEmpty())
 	{
-		PlayerSkills->RankUpSkill(FName(*SkillId));
+		const FName SkillName(*SkillId);
+		if (PlayerSkills->RankUpSkill(SkillName))
+		{
+			if (!IdleGameInstance)
+			{
+				IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+			}
+			if (IdleGameInstance)
+			{
+				const int32 NewRank = PlayerSkills->GetSkillRank(SkillName);
+				IdleGameInstance->RecordAchievementMetric(EAchievementMetric::SkillRankUps, 1);
+				IdleGameInstance->RecordAchievementMetric(EAchievementMetric::HighestSkillRank, NewRank);
+			}
+		}
 	}
 	RefreshMouseInteraction();
 }
@@ -3345,6 +3569,72 @@ void AIdleHUD::TryClimbTower()
 		}
 	}
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawAchievementPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindAchievementService();
+	const UAchievementService* AchievementService = BoundAchievementService.Get();
+	if (!AchievementService)
+	{
+		return;
+	}
+
+	const FIdleHUDAchievementViewModel ViewModel = BuildAchievementViewModel(*AchievementService);
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - AchievementFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !AchievementFeedbackLabel.IsEmpty() && FeedbackElapsed <= AchievementFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	const float RowHeight = 28.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
+	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 5);
+	const float PanelHeight = 82.0f * Scale + VisibleRows * RowHeight + FeedbackHeight;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 722.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.TotalPointsLabel.ToString(), Theme::AccentGold, X + Padding, Y + 44.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(ViewModel.StatMultiplierLabel.ToString(), Theme::AccentBlue, X + 128.0f * Scale, Y + 44.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+
+	float RowY = Y + 72.0f * Scale;
+	for (int32 Index = 0; Index < VisibleRows; ++Index)
+	{
+		const FIdleHUDAchievementRowViewModel& Row = ViewModel.Rows[Index];
+		const float BarWidth = PanelWidth - Padding * 2.0f;
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X + Padding, RowY, BarWidth, RowHeight - 4.0f * Scale);
+		DrawRect(Theme::AccentBlue.CopyWithNewOpacity(0.62f), X + Padding, RowY + RowHeight - 9.0f * Scale, BarWidth, 4.0f * Scale);
+		DrawRect(Theme::AccentGold, X + Padding, RowY + RowHeight - 9.0f * Scale, BarWidth * Row.ProgressRatio, 4.0f * Scale);
+		DrawText(Row.CategoryLabel.ToString(), Theme::TextPrimary, X + Padding + 8.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+		DrawText(Row.TierLabel.ToString(), Theme::TextMuted, X + Padding + 92.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+		DrawText(Row.PointsLabel.ToString(), Theme::AccentGold, X + Padding + 154.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+		DrawText(Row.NextThresholdLabel.ToString(), Theme::TextMuted, X + PanelWidth - 108.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+		RowY += RowHeight;
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(AchievementFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, RowY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	}
 }
 
 void AIdleHUD::DrawPetPanel()

@@ -32,6 +32,7 @@ the rule source:
 - `server/src/core/formulas/reward.ts`
 - `server/src/core/formulas/stage.ts`
 - `server/src/core/formulas/enhance.ts`
+- `server/src/core/formulas/achievement.ts`
 
 Each run samples class, active play share, equipment multiplier, quest EXP
 variance, and offline efficiency. The summary reports p10, median, p90, and
@@ -56,6 +57,11 @@ estimates for high-rarity long-tail sink pressure.
 PR #42 adds pet feed pressure. The simulator imports `petLevel.ts`, reports the
 Lv0 to Lv10 feed-cost path, and compares the dog gold-bonus payback against the
 sampled median Lv50 gold/hour.
+
+PR #55 adds achievement multiplier pressure. The simulator imports
+`achievement.ts`, compares the legacy linear multiplier with the soft-capped
+multiplier, and reports the composite impact against the PR #47 transcend and
+PR #51 tower milestone reference multipliers.
 
 ## V1 Interpretation
 

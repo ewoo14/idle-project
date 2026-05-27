@@ -1,6 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS,
+  ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS,
+  ACHIEVEMENT_POINTS_MULTIPLIER,
+  getAchievementStatMultiplier,
+} from "../../server/src/core/formulas/achievement.js";
 import { computeDamage } from "../../server/src/core/formulas/combat.js";
 import {
   type EnhanceItemRarity,
@@ -37,6 +43,8 @@ import {
   defaultPrimaryStats,
   deriveStats,
 } from "../../server/src/core/formulas/stats.js";
+import { getTowerMilestoneMultiplier } from "../../server/src/core/formulas/towerMilestone.js";
+import { getTranscendStatMultiplier } from "../../server/src/core/formulas/transcend.js";
 
 export type SimulationOptions = {
   runs?: number;
@@ -104,6 +112,7 @@ export type BalanceReport = {
       rewardScaling: StageRewardComparison[];
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
+      achievementPressure: AchievementPressure;
     };
     distribution: SimulationDistribution;
     evaluation: BalanceEvaluation;
@@ -167,6 +176,23 @@ export type PetFeedPressure = {
   incrementalGoldPerHourAtMedian: number;
   paybackHoursAtMedianGoldPerHour: number;
   rows: PetFeedPressureRow[];
+};
+
+export type AchievementPressureRow = {
+  totalPoints: number;
+  legacyMultiplier: number;
+  softCappedMultiplier: number;
+  compositeWithTranscendAndTower: number;
+};
+
+export type AchievementPressure = {
+  softCapStartPoints: number;
+  softCapBonusPoints: number;
+  referenceTranscendCount: number;
+  referenceTowerFloor: number;
+  referenceTranscendMultiplier: number;
+  referenceTowerMultiplier: number;
+  rows: AchievementPressureRow[];
 };
 
 export type EnhancementRarityScenario = {
@@ -263,10 +289,12 @@ export function buildBalanceReport(
         "server/src/core/formulas/stage.ts",
         "server/src/core/formulas/enhance.ts",
         "server/src/core/formulas/petLevel.ts",
+        "server/src/core/formulas/achievement.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
+      achievementPressure: buildAchievementPressure(),
     },
     distribution,
     evaluation,
@@ -763,6 +791,46 @@ function buildPetFeedPressure(samples: SimulationSample[]): PetFeedPressure {
   };
 }
 
+function buildAchievementPressure(): AchievementPressure {
+  const referenceTranscendCount = 10;
+  const referenceTowerFloor = 100;
+  const referenceTranscendMultiplier = round(
+    getTranscendStatMultiplier(referenceTranscendCount),
+    3,
+  );
+  const referenceTowerMultiplier = round(
+    getTowerMilestoneMultiplier(referenceTowerFloor),
+    3,
+  );
+  const referenceBaseMultiplier =
+    referenceTranscendMultiplier * referenceTowerMultiplier;
+  const pointAnchors = [0, 3, 100, 125, 250, 500];
+
+  return {
+    softCapStartPoints: ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS,
+    softCapBonusPoints: ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS,
+    referenceTranscendCount,
+    referenceTowerFloor,
+    referenceTranscendMultiplier,
+    referenceTowerMultiplier,
+    rows: pointAnchors.map((totalPoints) => {
+      const softCappedMultiplier = getAchievementStatMultiplier(totalPoints);
+      return {
+        totalPoints,
+        legacyMultiplier: round(
+          1 + Math.max(0, totalPoints) * ACHIEVEMENT_POINTS_MULTIPLIER,
+          3,
+        ),
+        softCappedMultiplier: round(softCappedMultiplier, 3),
+        compositeWithTranscendAndTower: round(
+          referenceBaseMultiplier * softCappedMultiplier,
+          3,
+        ),
+      };
+    }),
+  };
+}
+
 function summarizeSamples(
   samples: SimulationSample[],
   targetLevel: number,
@@ -920,6 +988,28 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.petFeedPressure.rows.map(
       (row) =>
         `| Lv${row.currentLevel} | Lv${row.nextLevel} | ${row.feedCost} | ${row.cumulativeFeedCost} | ${row.dogGoldBonusPercentAfterFeed}% | ${row.birdDropBonusPercentAfterFeed}% |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Achievement Multiplier Pressure",
+    "",
+    `- Soft cap starts at ${report.model.achievementPressure.softCapStartPoints} points.`,
+    `- Soft-cap bonus budget: ${report.model.achievementPressure.softCapBonusPoints} effective points.`,
+    "- 100 points stays at x2 before the soft-cap slope decays toward x2.5.",
+    `- Composite reference: transcend ${report.model.achievementPressure.referenceTranscendCount} (x${report.model.achievementPressure.referenceTranscendMultiplier})`,
+    `  and tower floor ${report.model.achievementPressure.referenceTowerFloor} (x${report.model.achievementPressure.referenceTowerMultiplier}).`,
+    "- Achievement tiers remain infinite for collection depth, but stat growth",
+    "  is bounded enough that transcend and tower stay the primary prestige",
+    "  multipliers.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Points | Legacy x | Soft-capped x | Composite x |",
+    "| ---: | ---: | ---: | ---: |",
+    ...report.model.achievementPressure.rows.map(
+      (row) =>
+        `| ${row.totalPoints} | ${row.legacyMultiplier} | ${row.softCappedMultiplier} | ${row.compositeWithTranscendAndTower} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

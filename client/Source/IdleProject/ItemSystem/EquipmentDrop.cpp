@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
+#include "GameCore/IdleGameInstance.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
@@ -70,7 +71,13 @@ void AEquipmentDrop::Tick(float DeltaSeconds)
 	{
 		if (UInventoryComponent* Inventory = TargetCharacter->FindComponentByClass<UInventoryComponent>())
 		{
-			Inventory->AddItem(Payload);
+			if (Inventory->AddItem(Payload))
+			{
+				if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
+				{
+					GameInstance->RecordAchievementItemCollected(Payload);
+				}
+			}
 		}
 		Destroy();
 	}

@@ -176,7 +176,8 @@ void AIdleCharacter::RefreshDerivedStats()
 	}
 	const float TranscendMultiplier = IdleGameInstance ? IdleGameInstance->GetTranscendStatMultiplier() : 1.0f;
 	const float TowerMultiplier = IdleGameInstance ? IdleGameInstance->GetTowerMilestoneMultiplier() : 1.0f;
-	const float StatMultiplier = TranscendMultiplier * TowerMultiplier;
+	const float AchievementMultiplier = IdleGameInstance ? IdleGameInstance->GetAchievementStatMultiplier() : 1.0f;
+	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier;
 	Derived.Hp *= StatMultiplier;
 	Derived.PhysAtk *= StatMultiplier;
 	Derived.MagicAtk *= StatMultiplier;
