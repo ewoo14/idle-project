@@ -86,3 +86,9 @@ client/Plugins/VRM4U/
 
 # VRM 캐릭터 자산 — git LFS 또는 사용자 다운로드. binary 큼.
 client/Content/Characters/*.vrm
+
+# Codex 워크플로우 스크래치 (작업 프롬프트 _task-*, PR 코멘트/본문 초안 _pr*, 구 PR 작업파일 prN-*).
+# 역할 베이스(_base.md + character/designer/backend/qa/balance/story/quest/tm.md)만 추적.
+codex/prompts/_pr*.md
+codex/prompts/_task-*.md
+codex/prompts/pr[0-9]*.md
