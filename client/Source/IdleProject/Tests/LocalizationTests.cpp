@@ -92,6 +92,22 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 		{
 			TestTrue(*FString::Printf(TEXT("%s Korean contains key %s"), *TableName.ToString(), *EnglishKey), KoreanKeys.Contains(EnglishKey));
 		}
+
+		if (TableName == TEXT("UI"))
+		{
+			const TArray<FString> RequiredCloudSyncKeys = {
+				TEXT("CLOUD_SYNC_SYNCING"),
+				TEXT("CLOUD_SYNC_SYNCED"),
+				TEXT("CLOUD_SYNC_OFFLINE"),
+				TEXT("CLOUD_SYNC_CONFLICT"),
+			};
+
+			for (const FString& RequiredKey : RequiredCloudSyncKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("UI Korean contains required cloud sync key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("UI English contains required cloud sync key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+		}
 	}
 
 	return true;

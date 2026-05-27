@@ -3,6 +3,8 @@
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "GameCore/CloudSaveMergePolicy.h"
+#include "GameCore/CloudSavePayloadMapper.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
@@ -66,12 +68,7 @@ void UIdleGameInstance::Init()
 	LoadLastSeenUnixSec();
 	LoadProgress();
 
-	ApiClient->RegisterGuest([](bool bSuccess, FString Message)
-	{
-		UE_LOG(LogTemp, Display, TEXT("[NetworkClient] guest register callback success=%s message=%s"),
-			bSuccess ? TEXT("true") : TEXT("false"),
-			*Message);
-	});
+	SyncFromCloud();
 	ApiClient->RequestPetList();
 	ApiClient->RequestSeasonState();
 }
@@ -137,6 +134,10 @@ void UIdleGameInstance::SaveProgress()
 	if (UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, 0))
 	{
 		OnProgressSaved.Broadcast();
+		if (!bCloudUploadSuppressed)
+		{
+			UploadToCloud();
+		}
 	}
 }
 
@@ -149,6 +150,145 @@ void UIdleGameInstance::LoadProgress()
 
 	UIdleSaveGame* SaveGame = Cast<UIdleSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, 0));
 	ApplyFromSave(SaveGame);
+}
+
+void UIdleGameInstance::SyncFromCloud()
+{
+	if (!ApiClient)
+	{
+		SetCloudSyncState(ECloudSyncState::Offline);
+		return;
+	}
+
+	UIdleSaveGame* LocalSave = NewObject<UIdleSaveGame>(this);
+	if (!CaptureToSave(LocalSave))
+	{
+		SetCloudSyncState(ECloudSyncState::Offline);
+		return;
+	}
+
+	FString LocalPayloadJson;
+	FCloudSaveProgressSnapshot LocalSnapshot;
+	if (!FCloudSavePayloadMapper::SaveToPayloadJson(*LocalSave, LocalPayloadJson)
+		|| !FCloudSavePayloadMapper::ExtractSnapshot(LocalPayloadJson, LocalSnapshot))
+	{
+		SetCloudSyncState(ECloudSyncState::Offline);
+		return;
+	}
+
+	SetCloudSyncState(ECloudSyncState::Syncing);
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			return;
+		}
+		if (!bCharacterOk)
+		{
+			StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
+			return;
+		}
+
+		StrongThis->ApiClient->DownloadSave(CharacterId, [WeakThis, CharacterId, LocalPayloadJson = MoveTemp(LocalPayloadJson), LocalSnapshot](bool bDownloadOk, FString ServerPayloadJson) mutable
+		{
+			UIdleGameInstance* StrongThis = WeakThis.Get();
+			if (!StrongThis || !StrongThis->ApiClient)
+			{
+				return;
+			}
+			if (!bDownloadOk)
+			{
+				StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
+				return;
+			}
+
+			if (ServerPayloadJson.IsEmpty())
+			{
+				StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, LocalPayloadJson, [WeakThis](bool bUploadOk, FString)
+				{
+					if (UIdleGameInstance* StrongThis = WeakThis.Get())
+					{
+						StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+					}
+				});
+				return;
+			}
+
+			FCloudSaveProgressSnapshot ServerSnapshot;
+			if (!FCloudSavePayloadMapper::ExtractSnapshot(ServerPayloadJson, ServerSnapshot))
+			{
+				StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
+				return;
+			}
+
+			if (FCloudSaveMergePolicy::Decide(LocalSnapshot, ServerSnapshot) == ECloudSaveMergeDecision::AdoptServer)
+			{
+				UIdleSaveGame* ServerSave = NewObject<UIdleSaveGame>(StrongThis);
+				if (FCloudSavePayloadMapper::PayloadJsonToSave(ServerPayloadJson, *ServerSave) && StrongThis->ApplyFromSave(ServerSave))
+				{
+					TGuardValue<bool> CloudUploadGuard(StrongThis->bCloudUploadSuppressed, true);
+					StrongThis->SaveProgress();
+					StrongThis->SetCloudSyncState(ECloudSyncState::Synced);
+				}
+				else
+				{
+					StrongThis->SetCloudSyncState(ECloudSyncState::Conflict);
+				}
+				return;
+			}
+
+			StrongThis->SetCloudSyncState(ECloudSyncState::Conflict);
+			StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, LocalPayloadJson, [WeakThis](bool bUploadOk, FString)
+			{
+				if (UIdleGameInstance* StrongThis = WeakThis.Get())
+				{
+					StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+				}
+			});
+		});
+	});
+}
+
+void UIdleGameInstance::UploadToCloud()
+{
+	if (!ApiClient || bCloudUploadSuppressed)
+	{
+		return;
+	}
+
+	UIdleSaveGame* LocalSave = NewObject<UIdleSaveGame>(this);
+	FString PayloadJson;
+	if (!CaptureToSave(LocalSave) || !FCloudSavePayloadMapper::SaveToPayloadJson(*LocalSave, PayloadJson))
+	{
+		SetCloudSyncState(ECloudSyncState::Offline);
+		return;
+	}
+
+	SetCloudSyncState(ECloudSyncState::Syncing);
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, PayloadJson = MoveTemp(PayloadJson)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			return;
+		}
+		if (!bCharacterOk)
+		{
+			StrongThis->SetCloudSyncState(ECloudSyncState::Offline);
+			return;
+		}
+
+		StrongThis->ApiClient->UploadSave(CharacterId, UIdleGameInstance::CloudSaveApiVersion, PayloadJson, [WeakThis](bool bUploadOk, FString)
+		{
+			if (UIdleGameInstance* StrongThis = WeakThis.Get())
+			{
+				StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+			}
+		});
+	});
 }
 
 bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
@@ -244,7 +384,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	TGuardValue<bool> AutosaveGuard(bAutosaveSuppressed, true);
 
 	Gold = FMath::Max<int64>(0, SaveGame->Gold);
-	CharacterLevel = FMath::Max(1, SaveGame->CharacterLevel);
+	CharacterLevel = FMath::Clamp(SaveGame->CharacterLevel, 1, FLevelFormulas::LEVEL_CAP);
 	CurrentExp = FMath::Max<int64>(0, SaveGame->CurrentExp);
 	NextExp = SaveGame->NextExp > 0 ? SaveGame->NextExp : FLevelFormulas::ExpToNext(CharacterLevel);
 	RebirthCount = FMath::Max(0, SaveGame->RebirthCount);
@@ -1010,6 +1150,17 @@ void UIdleGameInstance::FlushPendingAutosave()
 
 	bAutosavePending = false;
 	SaveProgress();
+}
+
+void UIdleGameInstance::SetCloudSyncState(ECloudSyncState NewState)
+{
+	if (CloudSyncState == NewState)
+	{
+		return;
+	}
+
+	CloudSyncState = NewState;
+	OnCloudSyncStateChanged.Broadcast(CloudSyncState);
 }
 
 UInventoryComponent* UIdleGameInstance::FindPlayerInventory() const

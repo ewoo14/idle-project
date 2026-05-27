@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { ValidationError } from "../../core/errors.js";
 import { cumulativeExp } from "../../core/formulas/index.js";
+import { putSaveSchema } from "./save.schema.js";
 import { type SaveRepo, SaveService } from "./save.service.js";
 
 const character = {
@@ -12,6 +14,9 @@ const character = {
   stats: {},
   skillTree: {},
   inventory: [],
+  gold: 100,
+  totalExp: cumulativeExp(10),
+  lastSeenAt: null,
   lastSaveAt: null,
 };
 
@@ -33,6 +38,18 @@ describe("SaveService", () => {
     );
   });
 
+  it("accepts high-level cloud saves up to the infinite-growth server cap", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    const result = await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: { level: 1000, rebirthCount: 2, maxEquipmentGrade: 1 },
+    });
+
+    expect(result.id).toBe("save-1");
+  });
+
   it("rejects payloads outside level bounds", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
@@ -40,24 +57,36 @@ describe("SaveService", () => {
       service.upload(userId(), {
         characterId: character.id,
         version: 1,
-        payload: { level: 201, rebirthCount: 2, maxEquipmentGrade: 1 },
+        payload: { level: 1001, rebirthCount: 2, maxEquipmentGrade: 1 },
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("rejects maxEquipmentGrade 6", async () => {
+  it("accepts Mythic maxEquipmentGrade 6", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    const result = await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 6 },
+    });
+
+    expect(result.id).toBe("save-1");
+  });
+
+  it("rejects maxEquipmentGrade 7", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
     await expect(
       service.upload(userId(), {
         characterId: character.id,
         version: 1,
-        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 6 },
+        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 7 },
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("rejects totalExp that does not match level cumulative exp", async () => {
+  it("rejects totalExp below the cumulative exp required for the payload level", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
     await expect(
@@ -74,7 +103,7 @@ describe("SaveService", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("accepts totalExp within one percent of level cumulative exp", async () => {
+  it("accepts totalExp above the current level floor for rebirth and transcend history", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
     const result = await service.upload(userId(), {
@@ -84,11 +113,110 @@ describe("SaveService", () => {
         level: 10,
         rebirthCount: 2,
         maxEquipmentGrade: 1,
-        totalExp: cumulativeExp(10),
+        totalExp: cumulativeExp(10) * 3,
       },
     });
 
     expect(result.id).toBe("save-1");
+  });
+
+  it.each([
+    ["transcendCount", -1],
+    ["towerHighestFloor", -1],
+    ["skillPoints", -1],
+  ])("rejects negative %s extension fields", async (field, value) => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    await expect(
+      service.upload(userId(), {
+        characterId: character.id,
+        version: 1,
+        payload: {
+          level: 10,
+          rebirthCount: 2,
+          maxEquipmentGrade: 1,
+          [field]: value,
+        },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("accepts non-negative cloud progress extension fields", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    const result = await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: {
+        level: 10,
+        rebirthCount: 2,
+        maxEquipmentGrade: 1,
+        transcendCount: 3,
+        towerHighestFloor: 25,
+        skillPoints: 12,
+        customClientField: "kept",
+      },
+    });
+
+    expect(result.id).toBe("save-1");
+  });
+
+  it("rejects level or rebirth progress regression below the server character", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    await expect(
+      service.upload(userId(), {
+        characterId: character.id,
+        version: 1,
+        payload: { level: 9, rebirthCount: 2, maxEquipmentGrade: 1 },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    await expect(
+      service.upload(userId(), {
+        characterId: character.id,
+        version: 1,
+        payload: { level: 10, rebirthCount: 1, maxEquipmentGrade: 1 },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("keeps the Fastify save upload schema aligned with cloud payload bounds", () => {
+    const payloadSchema = putSaveSchema.body.properties.payload;
+
+    expect(payloadSchema.properties.level.maximum).toBe(1000);
+    expect(payloadSchema.properties.maxEquipmentGrade.maximum).toBe(6);
+    expect(payloadSchema.properties.transcendCount).toEqual({
+      type: "integer",
+      minimum: 0,
+    });
+    expect(payloadSchema.properties.towerHighestFloor).toEqual({
+      type: "integer",
+      minimum: 0,
+    });
+    expect(payloadSchema.properties.skillPoints).toEqual({
+      type: "integer",
+      minimum: 0,
+    });
+    expect(payloadSchema.additionalProperties).toBe(true);
+  });
+
+  it("keeps character totalExp storage on the bigint path for level 1000 saves", () => {
+    const repoSource = readFileSync(
+      new URL("./save.repo.ts", import.meta.url),
+      "utf8",
+    );
+    const schemaSource = readFileSync(
+      new URL("../../db/schema.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(cumulativeExp(1000)).toBeGreaterThan(2_147_483_647);
+    expect(repoSource).toContain("totalExp')::bigint");
+    expect(repoSource).not.toContain("totalExp')::int");
+    expect(schemaSource).toContain(
+      'totalExp: bigint("total_exp", { mode: "number" })',
+    );
   });
 
   it("updates leaderboard after a successful upload", async () => {

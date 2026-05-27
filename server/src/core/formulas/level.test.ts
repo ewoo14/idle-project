@@ -21,13 +21,17 @@ describe("level formulas", () => {
   });
 
   it("레벨 캡의 다음 레벨 필요 경험치는 Infinity이다", () => {
-    expect(LEVEL_CAP).toBe(200);
-    expect(expToNext(200)).toBe(Number.POSITIVE_INFINITY);
+    expect(LEVEL_CAP).toBe(1000);
+    expect(expToNext(1000)).toBe(Number.POSITIVE_INFINITY);
   });
 
   it("누적 경험치는 레벨 1에서 해당 레벨까지 필요한 경험치 합산이다", () => {
     expect(cumulativeExp(1)).toBe(0);
     expect(cumulativeExp(4)).toBe(expToNext(1) + expToNext(2) + expToNext(3));
+  });
+
+  it("continues cumulative exp growth beyond the former level 200 save cap", () => {
+    expect(cumulativeExp(201)).toBe(cumulativeExp(200) + expToNext(200));
   });
 
   it.each([

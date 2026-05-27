@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD013 -->
+
 # DB 스키마
 
 ## ERD
@@ -32,7 +34,7 @@ erDiagram
     jsonb skill_tree
     jsonb inventory
     int gold
-    int total_exp
+    bigint total_exp
     timestamptz last_seen_at
     timestamptz last_save_at
   }
@@ -91,7 +93,7 @@ erDiagram
 | 테이블 | 주요 컬럼 | 제약 / 인덱스 |
 | --- | --- | --- |
 | `users` | `id`, `email`, `password_hash`, `nickname`, `created_at`, `last_login_at` | `email` citext unique, `nickname` unique |
-| `characters` | `id`, `user_id`, `class_id`, `level`, `rebirth_count`, `rebirth_bonus_points`, `stats`, `skill_tree`, `inventory`, `gold`, `total_exp`, `last_seen_at`, `last_save_at` | `user_id` cascade FK, `class_id between 1 and 5`, `level between 1 and 200`, `rebirth_bonus_points >= 0`, `gold >= 0`, `total_exp >= 0` |
+| `characters` | `id`, `user_id`, `class_id`, `level`, `rebirth_count`, `rebirth_bonus_points`, `stats`, `skill_tree`, `inventory`, `gold`, `total_exp`, `last_seen_at`, `last_save_at` | `user_id` cascade FK, `class_id between 1 and 5`, `level between 1 and 1000`, `rebirth_bonus_points >= 0`, `gold >= 0`, `total_exp bigint >= 0` |
 | `saves` | `id`, `character_id`, `version`, `payload`, `server_validated`, `created_at` | `character_id` cascade FK, `saves_character_created(character_id, created_at desc)` |
 | `leaderboard_power` | `character_id`, `season_id`, `power_score`, `updated_at` | `leaderboard_power_season_score(season_id, power_score desc)` |
 | `leaderboard_rebirth` | `character_id`, `season_id`, `rebirth_count`, `updated_at` | `leaderboard_rebirth_season_count(season_id, rebirth_count desc)` |
@@ -99,9 +101,12 @@ erDiagram
 | `pet_state` | `user_id`, `owned_pet_ids`, `equipped_pet_id`, `updated_at` | PK(`user_id`), `user_id` cascade FK |
 | `season_state` | `user_id`, `season_id`, `tokens`, `claimed_tiers`, `updated_at` | PK(`user_id`, `season_id`), `user_id` cascade FK, `season_state_tokens_idx` |
 
-마이그레이션 파일은 `server/migrations/0001_init.sql`, 롤백은 `server/migrations/0001_init.down.sql`이다.
+마이그레이션 파일은 `server/migrations/0001_init.sql`부터 적용한다.
+PR #54는 `server/migrations/0006_character_total_exp_bigint.sql`에서
+level 1000 누적 경험치 저장을 위해 `characters.total_exp`를 bigint로 승격한다.
 
 ## SkillDB Mirror
+
 PR #15 keeps combat execution authoritative in the Unreal client, but the server now has a read-only SkillDB mirror at `server/src/core/data/skills.ts` for stable cross-reference. PR #30 extends the mirror with status and element fields.
 
 | Field | Meaning |

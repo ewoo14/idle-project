@@ -51,6 +51,7 @@ constexpr float PetFeedbackDurationSeconds = 2.2f;
 constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 constexpr float TowerFeedbackDurationSeconds = 2.4f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
+constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
 
 FString FormatIntegerWithCommas(int64 Value)
 {
@@ -1055,6 +1056,41 @@ FText IdleProject::UI::BuildProgressSavedFeedbackLabel()
 	return IdleProject::Localization::UI(TEXT("SAVE_PROGRESS_SAVED"));
 }
 
+FIdleHUDCloudSyncViewModel IdleProject::UI::BuildCloudSyncViewModel(ECloudSyncState State)
+{
+	FIdleHUDCloudSyncViewModel ViewModel;
+	ViewModel.State = State;
+
+	switch (State)
+	{
+	case ECloudSyncState::Syncing:
+		ViewModel.Label = IdleProject::Localization::UI(TEXT("CLOUD_SYNC_SYNCING"));
+		ViewModel.bVisible = true;
+		break;
+	case ECloudSyncState::Synced:
+		ViewModel.Label = IdleProject::Localization::UI(TEXT("CLOUD_SYNC_SYNCED"));
+		ViewModel.bVisible = true;
+		ViewModel.bTransient = true;
+		break;
+	case ECloudSyncState::Offline:
+		ViewModel.Label = IdleProject::Localization::UI(TEXT("CLOUD_SYNC_OFFLINE"));
+		ViewModel.bVisible = true;
+		ViewModel.bError = true;
+		break;
+	case ECloudSyncState::Conflict:
+		ViewModel.Label = IdleProject::Localization::UI(TEXT("CLOUD_SYNC_CONFLICT"));
+		ViewModel.bVisible = true;
+		ViewModel.bError = true;
+		break;
+	case ECloudSyncState::Idle:
+	default:
+		ViewModel.bVisible = false;
+		break;
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDOfflineRewardViewModel IdleProject::UI::BuildOfflineRewardViewModel(const FOfflineRewardResult& Reward)
 {
 	FIdleHUDOfflineRewardViewModel ViewModel;
@@ -1407,6 +1443,8 @@ void AIdleHUD::PostInitializeComponents()
 	IdleGameInstance->OnStatPointsChanged.AddDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 	IdleGameInstance->OnTranscend.AddDynamic(this, &AIdleHUD::HandleTranscend);
 	IdleGameInstance->OnProgressSaved.AddDynamic(this, &AIdleHUD::HandleProgressSaved);
+	IdleGameInstance->OnCloudSyncStateChanged.AddDynamic(this, &AIdleHUD::HandleCloudSyncStateChanged);
+	HandleCloudSyncStateChanged(IdleGameInstance->GetCloudSyncState());
 
 	RootWidget->UpdateGold(IdleGameInstance->GetGold());
 	RootWidget->UpdateExp(IdleGameInstance->GetCurrentExp(), IdleGameInstance->GetNextExp());
@@ -1457,6 +1495,7 @@ void AIdleHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		IdleGameInstance->OnStatPointsChanged.RemoveDynamic(this, &AIdleHUD::HandleStatPointsChanged);
 		IdleGameInstance->OnTranscend.RemoveDynamic(this, &AIdleHUD::HandleTranscend);
 		IdleGameInstance->OnProgressSaved.RemoveDynamic(this, &AIdleHUD::HandleProgressSaved);
+		IdleGameInstance->OnCloudSyncStateChanged.RemoveDynamic(this, &AIdleHUD::HandleCloudSyncStateChanged);
 	}
 
 	if (GEngine && GEngine->GameViewport && RootWidget)
@@ -1504,6 +1543,7 @@ void AIdleHUD::DrawHUD()
 		DrawFloatingDamageTexts(World->GetTimeSeconds());
 		DrawStatusIndicators(World->GetTimeSeconds());
 		DrawProgressSavedIndicator(World->GetTimeSeconds());
+		DrawCloudSyncIndicator(World->GetTimeSeconds());
 	}
 }
 
@@ -1788,6 +1828,15 @@ void AIdleHUD::HandleProgressSaved()
 	if (const UWorld* World = GetWorld())
 	{
 		ProgressSavedFeedbackStartTime = World->GetTimeSeconds();
+	}
+}
+
+void AIdleHUD::HandleCloudSyncStateChanged(ECloudSyncState NewState)
+{
+	CloudSyncViewModel = IdleProject::UI::BuildCloudSyncViewModel(NewState);
+	if (const UWorld* World = GetWorld())
+	{
+		CloudSyncFeedbackStartTime = World->GetTimeSeconds();
 	}
 }
 
@@ -3676,6 +3725,38 @@ void AIdleHUD::DrawProgressSavedIndicator(float Now)
 	DrawRect(BgPrimary.CopyWithNewOpacity(0.78f * Alpha), X, Y, Width, Height);
 	DrawRect(AccentGold.CopyWithNewOpacity(0.92f * Alpha), X, Y, 3.0f * Scale, Height);
 	DrawText(ProgressSavedFeedbackLabel.ToString(), AccentGold.CopyWithNewOpacity(Alpha), X + 14.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+}
+
+void AIdleHUD::DrawCloudSyncIndicator(float Now)
+{
+	using namespace IdleProject::UI::Theme;
+
+	if (!Canvas || !CloudSyncViewModel.bVisible || CloudSyncViewModel.Label.IsEmpty())
+	{
+		return;
+	}
+
+	const float Elapsed = Now - CloudSyncFeedbackStartTime;
+	if (CloudSyncViewModel.bTransient && (Elapsed < 0.0f || Elapsed > CloudSyncFeedbackDurationSeconds))
+	{
+		return;
+	}
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float Alpha = CloudSyncViewModel.bTransient
+		? FMath::Clamp(1.0f - (Elapsed / CloudSyncFeedbackDurationSeconds), 0.0f, 1.0f)
+		: 1.0f;
+	const float Width = 154.0f * Scale;
+	const float Height = 28.0f * Scale;
+	const float X = Canvas->SizeX - Width - 24.0f * Scale;
+	const float Y = 92.0f * Scale;
+	const FLinearColor AccentColor = CloudSyncViewModel.bError
+		? AccentRed
+		: (CloudSyncViewModel.State == ECloudSyncState::Syncing ? AccentBlue : AccentGold);
+
+	DrawRect(BgPrimary.CopyWithNewOpacity(0.78f * Alpha), X, Y, Width, Height);
+	DrawRect(AccentColor.CopyWithNewOpacity(0.92f * Alpha), X, Y, 3.0f * Scale, Height);
+	DrawText(CloudSyncViewModel.Label.ToString(), AccentColor.CopyWithNewOpacity(Alpha), X + 14.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
 }
 
 void AIdleHUD::RefreshMouseInteraction()
