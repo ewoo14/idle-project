@@ -757,7 +757,11 @@ bool FItemFactoryGuaranteedDropForLevelTest::RunTest(const FString& Parameters)
 	const FItemInstance LowLevelDrop = FItemFactory::GuaranteedDropForLevel(-20);
 	const FItemInstance HighLevelDrop = FItemFactory::GuaranteedDropForLevel(20);
 	TestTrue(TEXT("Guaranteed drop clamps invalid levels to playable stats"), FItemPowerScore::Compute(LowLevelDrop) > 0);
-	TestTrue(TEXT("Guaranteed drop level affects item stats"), FItemPowerScore::Compute(HighLevelDrop) > FItemPowerScore::Compute(LowLevelDrop));
+	TestTrue(TEXT("Guaranteed high-level drop clamps to playable stats"), FItemPowerScore::Compute(HighLevelDrop) > 0);
+
+	const FItemInstance LowFormulaItem = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, -20, EItemRarity::Common, 1.0f);
+	const FItemInstance HighFormulaItem = FDropFormula::ComputeItemBonus(EItemSlot::Weapon, 20, EItemRarity::Common, 1.0f);
+	TestTrue(TEXT("Level affects deterministic item stats"), FItemPowerScore::Compute(HighFormulaItem) > FItemPowerScore::Compute(LowFormulaItem));
 
 	return true;
 }

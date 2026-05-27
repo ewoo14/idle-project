@@ -84,6 +84,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Season")
 	bool IsTierClaimed(int32 Tier) const { return ClaimedTiers.Contains(Tier); }
 
+	void CaptureState(int32& OutSeasonId, int32& OutTokens, TArray<int32>& OutClaimedTiers) const;
+	void RestoreState(int32 InSeasonId, int32 InTokens, const TArray<int32>& InClaimedTiers);
+
 private:
 	TArray<FSeasonTierDefinition> Tiers;
 	TMap<int32, FSeasonTierDefinition> TierByNumber;

@@ -4,12 +4,51 @@
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/PetService.h"
+#include "GameCore/QuestService.h"
+#include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
+#include "CharacterSystem/IdleCharacter.h"
+#include "CombatSystem/SkillComponent.h"
+#include "Engine/World.h"
+#include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ItemTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "Tests/SaveProgressTestReceiver.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+FItemInstance MakeSaveTestItem(
+	FName ItemId,
+	EItemSlot Slot,
+	EItemRarity Rarity,
+	float Atk,
+	float Def,
+	float Hp,
+	int32 EnhanceLevel = 0,
+	float CritRate = 0.0f,
+	float AtkSpeed = 0.0f,
+	float MagicAtk = 0.0f,
+	EItemSet ItemSet = EItemSet::None)
+{
+	FItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Slot = Slot;
+	Item.Rarity = Rarity;
+	Item.ItemSet = ItemSet;
+	Item.DisplayName = FText::FromName(ItemId);
+	Item.BonusAtk = Atk;
+	Item.BonusDef = Def;
+	Item.BonusHp = Hp;
+	Item.EnhanceLevel = EnhanceLevel;
+	Item.BonusCritRate = CritRate;
+	Item.BonusAtkSpeed = AtkSpeed;
+	Item.BonusMagicAtk = MagicAtk;
+	return Item;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleSaveGameDefaultsTest,
@@ -25,10 +64,15 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V1"), SaveGame->SaveVersion, static_cast<int32>(1));
+	TestEqual(TEXT("SaveVersion starts at V2"), SaveGame->SaveVersion, static_cast<int32>(2));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
+	TestEqual(TEXT("Fresh save has no inventory payload"), SaveGame->InventoryItems.Num(), 0);
+	TestEqual(TEXT("Fresh save has no skill ranks"), SaveGame->SkillRanks.Num(), 0);
+	TestEqual(TEXT("Fresh save has no skill points"), SaveGame->SkillPoints, 0);
+	TestEqual(TEXT("Fresh save defaults to current season"), SaveGame->SeasonId, USeasonService::CurrentSeasonId);
+	TestEqual(TEXT("Fresh save has no season tokens"), SaveGame->SeasonTokens, 0);
 
 	return true;
 }
@@ -62,6 +106,17 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->EquippedPetId = TEXT("bird");
 	SourceSave->PetLevels.Add(TEXT("dog"), 2);
 	SourceSave->PetLevels.Add(TEXT("bird"), 4);
+	FQuestSaveEntry QuestEntry;
+	QuestEntry.QuestId = TEXT("main_ch1_001");
+	QuestEntry.Type = EQuestType::Main;
+	QuestEntry.Progress = 5;
+	QuestEntry.bCompleted = true;
+	QuestEntry.bClaimed = true;
+	SourceSave->Quests.Add(QuestEntry);
+	SourceSave->QuestDailyResetDate = UQuestService::GetCurrentUtcDateString();
+	SourceSave->SeasonId = USeasonService::CurrentSeasonId;
+	SourceSave->SeasonTokens = 50;
+	SourceSave->SeasonClaimedTiers.Add(1);
 
 	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
 	TestNotNull(TEXT("Game instance is created"), GameInstance);
@@ -101,6 +156,15 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Equipped pet round trips"), CapturedSave->EquippedPetId, SourceSave->EquippedPetId);
 	TestEqual(TEXT("Dog level round trips"), CapturedSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(2));
 	TestEqual(TEXT("Bird level round trips"), CapturedSave->PetLevels.FindRef(TEXT("bird")), static_cast<int32>(4));
+	TestEqual(TEXT("Quest payload round trips"), CapturedSave->Quests.Num(), 4);
+	const FQuestSaveEntry* CapturedQuest = CapturedSave->Quests.FindByPredicate([](const FQuestSaveEntry& Entry)
+	{
+		return Entry.QuestId == TEXT("main_ch1_001");
+	});
+	TestNotNull(TEXT("Captured quests include restored main quest"), CapturedQuest);
+	TestTrue(TEXT("Captured quest claimed flag round trips"), CapturedQuest ? CapturedQuest->bClaimed : false);
+	TestEqual(TEXT("Season tokens round trip through game instance"), CapturedSave->SeasonTokens, SourceSave->SeasonTokens);
+	TestTrue(TEXT("Season claimed tier round trips through game instance"), CapturedSave->SeasonClaimedTiers.Contains(1));
 
 	const UStageService* StageService = GameInstance->GetStageService();
 	TestNotNull(TEXT("ApplyFromSave ensures stage service"), StageService);
@@ -117,6 +181,276 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Pet restore applies equipped pet"), PetService ? PetService->GetEquippedPetId() : FString(), SourceSave->EquippedPetId);
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemInventoryRestoreRemapsEquippedIndexesTest,
+	"IdleProject.GameCore.SaveSystem.InventoryRestoreRemapsEquippedIndexes",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemInventoryRestoreRemapsEquippedIndexesTest::RunTest(const FString& Parameters)
+{
+	TArray<FItemInstance> SavedItems;
+	SavedItems.Add(MakeSaveTestItem(TEXT("bad_none"), EItemSlot::None, EItemRarity::Rare, 1.0f, 0.0f, 0.0f));
+	SavedItems.Add(MakeSaveTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 7, 0.03f, 0.10f, 4.0f, EItemSet::Warrior));
+	SavedItems.Add(MakeSaveTestItem(TEXT("bad_rarity"), EItemSlot::Helmet, EItemRarity::None, 0.0f, 8.0f, 30.0f));
+	SavedItems.Add(MakeSaveTestItem(TEXT("legendary_helmet"), EItemSlot::Helmet, EItemRarity::Legendary, 0.0f, 8.0f, 30.0f, 12, 0.04f, 0.12f, 9.0f, EItemSet::Guardian));
+
+	TMap<EItemSlot, int32> SavedEquipped;
+	SavedEquipped.Add(EItemSlot::Weapon, 1);
+	SavedEquipped.Add(EItemSlot::Helmet, 3);
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->RestoreState(SavedItems, SavedEquipped);
+
+	TArray<FItemInstance> RestoredItems;
+	TMap<EItemSlot, int32> RestoredEquipped;
+	Inventory->CaptureState(RestoredItems, RestoredEquipped);
+
+	TestEqual(TEXT("Restore keeps only valid items"), RestoredItems.Num(), 2);
+	TestEqual(TEXT("Weapon equipped index is remapped after invalid item drop"), RestoredEquipped.FindRef(EItemSlot::Weapon), 0);
+	TestEqual(TEXT("Helmet equipped index is remapped after invalid item drop"), RestoredEquipped.FindRef(EItemSlot::Helmet), 1);
+
+	const FItemInstance* EquippedWeapon = Inventory->GetEquippedItem(EItemSlot::Weapon);
+	const FItemInstance* EquippedHelmet = Inventory->GetEquippedItem(EItemSlot::Helmet);
+	TestNotNull(TEXT("Restored weapon remains equipped"), EquippedWeapon);
+	TestNotNull(TEXT("Restored helmet remains equipped"), EquippedHelmet);
+	TestEqual(TEXT("Equipped weapon payload survives remap"), EquippedWeapon ? EquippedWeapon->ItemId : NAME_None, FName(TEXT("rare_sword")));
+	TestEqual(TEXT("Equipped helmet payload survives remap"), EquippedHelmet ? EquippedHelmet->ItemId : NAME_None, FName(TEXT("legendary_helmet")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemPendingCharacterStateAppliesAfterPawnSpawnTest,
+	"IdleProject.GameCore.SaveSystem.PendingCharacterStateAppliesAfterPawnSpawn",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemPendingCharacterStateAppliesAfterPawnSpawnTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* SourceSave = NewObject<UIdleSaveGame>();
+	SourceSave->bHasSave = true;
+	SourceSave->InventoryItems.Add(MakeSaveTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 7, 0.03f, 0.10f, 4.0f, EItemSet::Warrior));
+	SourceSave->EquippedSlotIndex.Add(EItemSlot::Weapon, 0);
+	SourceSave->SkillRanks.Add(TEXT("heavy_strike"), 3);
+	SourceSave->SkillPoints = 2;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave queues v2 character state when no pawn exists"), GameInstance->ApplyFromSave(SourceSave));
+
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>();
+	TestNotNull(TEXT("Character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+	GameInstance->ApplyPendingCharacterSaveToCharacter(Character);
+
+	UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>();
+	USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>();
+	TestNotNull(TEXT("Character has inventory"), Inventory);
+	TestNotNull(TEXT("Character has skills"), Skills);
+	TestEqual(TEXT("Pending inventory item is restored"), Inventory ? Inventory->GetItemCount() : INDEX_NONE, 1);
+	TestEqual(TEXT("Pending equipped weapon is restored"), Inventory && Inventory->GetEquippedItem(EItemSlot::Weapon) ? Inventory->GetEquippedItem(EItemSlot::Weapon)->ItemId : NAME_None, FName(TEXT("rare_sword")));
+	TestEqual(TEXT("Pending skill rank is restored"), Skills ? Skills->GetSkillRank(TEXT("heavy_strike")) : INDEX_NONE, 3);
+	TestEqual(TEXT("Pending skill points are restored"), Skills ? Skills->GetSkillPoints() : INDEX_NONE, 2);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemInventoryStateRoundTripTest,
+	"IdleProject.GameCore.SaveSystem.InventoryStateRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemInventoryStateRoundTripTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* SourceInventory = NewObject<UInventoryComponent>();
+	SourceInventory->AddItem(MakeSaveTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 7, 0.03f, 0.10f, 4.0f, EItemSet::Warrior));
+	SourceInventory->AddItem(MakeSaveTestItem(TEXT("legendary_helmet"), EItemSlot::Helmet, EItemRarity::Legendary, 0.0f, 8.0f, 30.0f, 12, 0.04f, 0.12f, 9.0f, EItemSet::Guardian));
+
+	TArray<FItemInstance> CapturedItems;
+	TMap<EItemSlot, int32> CapturedEquipped;
+	SourceInventory->CaptureState(CapturedItems, CapturedEquipped);
+
+	UInventoryComponent* RestoredInventory = NewObject<UInventoryComponent>();
+	RestoredInventory->RestoreState(CapturedItems, CapturedEquipped);
+
+	TArray<FItemInstance> RestoredItems;
+	TMap<EItemSlot, int32> RestoredEquipped;
+	RestoredInventory->CaptureState(RestoredItems, RestoredEquipped);
+
+	TestEqual(TEXT("Inventory item count round trips"), RestoredItems.Num(), 2);
+	TestEqual(TEXT("ItemId round trips"), RestoredItems[0].ItemId, FName(TEXT("rare_sword")));
+	TestEqual(TEXT("Rarity round trips"), static_cast<int32>(RestoredItems[1].Rarity), static_cast<int32>(EItemRarity::Legendary));
+	TestEqual(TEXT("Item set round trips"), static_cast<int32>(RestoredItems[0].ItemSet), static_cast<int32>(EItemSet::Warrior));
+	TestEqual(TEXT("Enhance level round trips"), RestoredItems[1].EnhanceLevel, 12);
+	TestEqual(TEXT("Affix crit round trips"), RestoredItems[0].BonusCritRate, 0.03f);
+	TestEqual(TEXT("Affix speed round trips"), RestoredItems[0].BonusAtkSpeed, 0.10f);
+	TestEqual(TEXT("Affix magic attack round trips"), RestoredItems[1].BonusMagicAtk, 9.0f);
+	TestEqual(TEXT("Weapon equipped index round trips"), RestoredEquipped.FindRef(EItemSlot::Weapon), 0);
+	TestEqual(TEXT("Helmet equipped index round trips"), RestoredEquipped.FindRef(EItemSlot::Helmet), 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemSkillRankStateRoundTripTest,
+	"IdleProject.GameCore.SaveSystem.SkillRankStateRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemSkillRankStateRoundTripTest::RunTest(const FString& Parameters)
+{
+	USkillComponent* SourceSkills = NewObject<USkillComponent>();
+	SourceSkills->LoadDefaultWarriorSkills();
+	SourceSkills->GrantSkillPoint(5);
+	TestTrue(TEXT("Rank up setup succeeds"), SourceSkills->RankUpSkill(TEXT("heavy_strike")));
+	TestTrue(TEXT("Second rank up setup succeeds"), SourceSkills->RankUpSkill(TEXT("heavy_strike")));
+	TestTrue(TEXT("Passive rank up setup succeeds"), SourceSkills->RankUpSkill(TEXT("weapon_mastery")));
+
+	TMap<FName, int32> CapturedRanks;
+	int32 CapturedPoints = 0;
+	SourceSkills->CaptureRankState(CapturedRanks, CapturedPoints);
+
+	USkillComponent* RestoredSkills = NewObject<USkillComponent>();
+	RestoredSkills->LoadDefaultWarriorSkills();
+	RestoredSkills->RestoreRankState(CapturedRanks, CapturedPoints);
+
+	TestEqual(TEXT("Skill points round trip"), RestoredSkills->GetSkillPoints(), 2);
+	TestEqual(TEXT("Active skill rank round trips"), RestoredSkills->GetSkillRank(TEXT("heavy_strike")), 2);
+	TestEqual(TEXT("Passive skill rank round trips"), RestoredSkills->GetSkillRank(TEXT("weapon_mastery")), 1);
+	TestEqual(TEXT("Unknown skill rank remains zero"), RestoredSkills->GetSkillRank(TEXT("unknown_skill")), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemQuestSeasonRoundTripTest,
+	"IdleProject.GameCore.SaveSystem.QuestSeasonRoundTrip",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemQuestSeasonRoundTripTest::RunTest(const FString& Parameters)
+{
+	UQuestService* SourceQuests = NewObject<UQuestService>();
+	SourceQuests->InitializeDefaultQuests(TEXT("2026-05-27"));
+	SourceQuests->RecordProgress(EQuestObjective::KillMonster, 5);
+	SourceQuests->ClaimQuest(TEXT("main_ch1_001"));
+
+	TArray<FQuestSaveEntry> CapturedQuests;
+	FString CapturedDailyReset;
+	SourceQuests->CaptureState(CapturedQuests, CapturedDailyReset);
+
+	UQuestService* RestoredQuests = NewObject<UQuestService>();
+	RestoredQuests->RestoreState(CapturedQuests, CapturedDailyReset);
+
+	FQuestState RestoredMainQuest;
+	TestTrue(TEXT("Restored quest service contains main quest"), RestoredQuests->GetQuestState(TEXT("main_ch1_001"), RestoredMainQuest));
+	TestEqual(TEXT("Quest progress round trips"), RestoredMainQuest.Progress, 5);
+	TestTrue(TEXT("Quest completed flag round trips"), RestoredMainQuest.bCompleted);
+	TestTrue(TEXT("Quest claimed flag round trips"), RestoredMainQuest.bClaimed);
+
+	USeasonService* SourceSeason = NewObject<USeasonService>();
+	SourceSeason->InitializeDefaultSeason();
+	SourceSeason->AddSeasonTokens(50);
+	SourceSeason->ClaimSeasonReward(1);
+
+	int32 CapturedSeasonId = 0;
+	int32 CapturedTokens = 0;
+	TArray<int32> CapturedClaimedTiers;
+	SourceSeason->CaptureState(CapturedSeasonId, CapturedTokens, CapturedClaimedTiers);
+
+	USeasonService* RestoredSeason = NewObject<USeasonService>();
+	RestoredSeason->RestoreState(CapturedSeasonId, CapturedTokens, CapturedClaimedTiers);
+
+	TestEqual(TEXT("Season id round trips"), CapturedSeasonId, USeasonService::CurrentSeasonId);
+	TestEqual(TEXT("Season tokens round trip"), RestoredSeason->GetSeasonTokens(), 50);
+	TestTrue(TEXT("Season claimed tier round trips"), RestoredSeason->IsTierClaimed(1));
+	TestFalse(TEXT("Unclaimed tier stays unclaimed"), RestoredSeason->IsTierClaimed(2));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemMalformedV2PayloadIsSanitizedTest,
+	"IdleProject.GameCore.SaveSystem.MalformedV2PayloadIsSanitized",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemMalformedV2PayloadIsSanitizedTest::RunTest(const FString& Parameters)
+{
+	TArray<FItemInstance> Items;
+	Items.Add(MakeSaveTestItem(TEXT("bad_none"), EItemSlot::None, EItemRarity::Rare, 1.0f, 0.0f, 0.0f));
+	Items.Add(MakeSaveTestItem(TEXT("bad_rarity"), EItemSlot::Weapon, EItemRarity::None, 1.0f, 0.0f, 0.0f));
+	Items.Add(MakeSaveTestItem(TEXT("over_enhanced"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 99));
+	TMap<EItemSlot, int32> Equipped;
+	Equipped.Add(EItemSlot::Weapon, 50);
+	Equipped.Add(EItemSlot::Helmet, 0);
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->RestoreState(Items, Equipped);
+	TArray<FItemInstance> RestoredItems;
+	TMap<EItemSlot, int32> RestoredEquipped;
+	Inventory->CaptureState(RestoredItems, RestoredEquipped);
+	TestEqual(TEXT("Malformed inventory drops invalid items"), RestoredItems.Num(), 1);
+	TestEqual(TEXT("Enhance level is clamped"), RestoredItems[0].EnhanceLevel, 50);
+	TestEqual(TEXT("Invalid equipped index is cleared"), RestoredEquipped.FindRef(EItemSlot::Weapon), INDEX_NONE);
+	TestEqual(TEXT("Mismatched equipped slot is cleared"), RestoredEquipped.FindRef(EItemSlot::Helmet), INDEX_NONE);
+
+	USkillComponent* Skills = NewObject<USkillComponent>();
+	Skills->LoadDefaultWarriorSkills();
+	TMap<FName, int32> Ranks;
+	Ranks.Add(TEXT("heavy_strike"), 999);
+	Ranks.Add(TEXT("unknown_skill"), 10);
+	Skills->RestoreRankState(Ranks, -5);
+	TestEqual(TEXT("Known skill rank clamps to max"), Skills->GetSkillRank(TEXT("heavy_strike")), Skills->MaxRank);
+	TestEqual(TEXT("Unknown skill rank is ignored"), Skills->GetSkillRank(TEXT("unknown_skill")), 0);
+	TestEqual(TEXT("Negative skill points clamp to zero"), Skills->GetSkillPoints(), 0);
+
+	UQuestService* Quests = NewObject<UQuestService>();
+	TArray<FQuestSaveEntry> QuestEntries;
+	FQuestSaveEntry UnknownQuest;
+	UnknownQuest.QuestId = TEXT("unknown_quest");
+	UnknownQuest.Progress = 999;
+	QuestEntries.Add(UnknownQuest);
+	FQuestSaveEntry KnownQuest;
+	KnownQuest.QuestId = TEXT("main_ch1_001");
+	KnownQuest.Progress = 999;
+	KnownQuest.bClaimed = true;
+	QuestEntries.Add(KnownQuest);
+	Quests->RestoreState(QuestEntries, TEXT("2026-05-27"));
+	FQuestState KnownState;
+	TestFalse(TEXT("Unknown quest is ignored"), Quests->GetQuestState(TEXT("unknown_quest"), KnownState));
+	TestTrue(TEXT("Known quest restores"), Quests->GetQuestState(TEXT("main_ch1_001"), KnownState));
+	TestEqual(TEXT("Quest progress clamps to target"), KnownState.Progress, KnownState.TargetCount);
+	TestTrue(TEXT("Claimed quest is completed after clamp"), KnownState.bCompleted);
+	TestTrue(TEXT("Claimed quest survives when completed"), KnownState.bClaimed);
+
+	USeasonService* Season = NewObject<USeasonService>();
+	TArray<int32> MismatchedClaimedTiers;
+	MismatchedClaimedTiers.Add(1);
+	MismatchedClaimedTiers.Add(2);
+	Season->RestoreState(USeasonService::CurrentSeasonId + 1, 500, MismatchedClaimedTiers);
+	TestEqual(TEXT("Mismatched season id resets tokens"), Season->GetSeasonTokens(), 0);
+	TestFalse(TEXT("Mismatched season id resets claimed tiers"), Season->IsTierClaimed(1));
+	TArray<int32> ClaimedTiers;
+	ClaimedTiers.Add(1);
+	ClaimedTiers.Add(999);
+	Season->RestoreState(USeasonService::CurrentSeasonId, 20, ClaimedTiers);
+	TestEqual(TEXT("Matching season restores tokens"), Season->GetSeasonTokens(), 20);
+	TestTrue(TEXT("Valid reached tier is restored"), Season->IsTierClaimed(1));
+	TestFalse(TEXT("Unknown tier is ignored"), Season->IsTierClaimed(999));
 
 	return true;
 }

@@ -276,6 +276,32 @@ float USkillComponent::GetEffectiveCooldown(FName SkillId) const
 	return FMath::Max(0.1f, ReducedCooldown);
 }
 
+void USkillComponent::CaptureRankState(TMap<FName, int32>& OutRanks, int32& OutPoints) const
+{
+	OutRanks = SkillRanks;
+	OutPoints = SkillPoints;
+}
+
+void USkillComponent::RestoreRankState(const TMap<FName, int32>& InRanks, int32 InPoints)
+{
+	SkillRanks.Reset();
+	for (const TPair<FName, int32>& Pair : InRanks)
+	{
+		if (!FindSkill(Pair.Key))
+		{
+			continue;
+		}
+
+		const int32 ClampedRank = FMath::Clamp(Pair.Value, 0, MaxRank);
+		if (ClampedRank > 0)
+		{
+			SkillRanks.Add(Pair.Key, ClampedRank);
+		}
+	}
+
+	SkillPoints = FMath::Max(0, InPoints);
+}
+
 bool USkillComponent::MarkSkillCast(FName SkillId, float Now)
 {
 	if (!FindSkill(SkillId))

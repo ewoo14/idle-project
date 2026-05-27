@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "GameFramework/SaveGame.h"
+#include "GameCore/QuestService.h"
+#include "ItemSystem/ItemTypes.h"
 #include "IdleSaveGame.generated.h"
 
 UCLASS()
@@ -12,7 +14,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 1;
+	int32 SaveVersion = 2;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -73,4 +75,31 @@ public:
 
 	UPROPERTY()
 	TMap<FString, int32> PetLevels;
+
+	UPROPERTY()
+	TArray<FItemInstance> InventoryItems;
+
+	UPROPERTY()
+	TMap<EItemSlot, int32> EquippedSlotIndex;
+
+	UPROPERTY()
+	TMap<FName, int32> SkillRanks;
+
+	UPROPERTY()
+	int32 SkillPoints = 0;
+
+	UPROPERTY()
+	TArray<FQuestSaveEntry> Quests;
+
+	UPROPERTY()
+	FString QuestDailyResetDate;
+
+	UPROPERTY()
+	int32 SeasonId = 1;
+
+	UPROPERTY()
+	int32 SeasonTokens = 0;
+
+	UPROPERTY()
+	TArray<int32> SeasonClaimedTiers;
 };

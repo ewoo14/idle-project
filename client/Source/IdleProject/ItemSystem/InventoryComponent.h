@@ -28,6 +28,8 @@ public:
 	const FItemInstance* GetEquippedItem(EItemSlot Slot) const;
 	bool EnhanceEquippedItem(EItemSlot Slot);
 	int32 GetEquippedEnhanceLevel(EItemSlot Slot) const;
+	void CaptureState(TArray<FItemInstance>& OutItems, TMap<EItemSlot, int32>& OutEquipped) const;
+	void RestoreState(const TArray<FItemInstance>& InItems, const TMap<EItemSlot, int32>& InEquipped);
 
 private:
 	static constexpr int32 MaxItems = 100;

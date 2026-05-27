@@ -2,6 +2,7 @@
 
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
+#include "CombatSystem/SkillComponent.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
@@ -160,8 +161,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureStageService();
 	EnsureTowerService();
 	EnsurePetService();
+	EnsureQuestService();
+	EnsureSeasonService();
 
-	SaveGame->SaveVersion = 1;
+	SaveGame->SaveVersion = 2;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->CharacterLevel = CharacterLevel;
@@ -193,6 +196,39 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	{
 		SaveGame->EquippedPetId = PetService->GetEquippedPetId();
 		SaveGame->PetLevels = PetService->GetPetLevels();
+	}
+
+	if (UInventoryComponent* Inventory = FindPlayerInventory())
+	{
+		Inventory->CaptureState(SaveGame->InventoryItems, SaveGame->EquippedSlotIndex);
+	}
+	else if (bHasPendingCharacterSaveV2)
+	{
+		SaveGame->InventoryItems = PendingInventoryItems;
+		SaveGame->EquippedSlotIndex = PendingEquippedSlotIndex;
+	}
+
+	if (AIdleCharacter* Character = FindPlayerCharacter())
+	{
+		if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
+		{
+			Skills->CaptureRankState(SaveGame->SkillRanks, SaveGame->SkillPoints);
+		}
+	}
+	else if (bHasPendingCharacterSaveV2)
+	{
+		SaveGame->SkillRanks = PendingSkillRanks;
+		SaveGame->SkillPoints = PendingSkillPoints;
+	}
+
+	if (QuestService)
+	{
+		QuestService->CaptureState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+	}
+
+	if (SeasonService)
+	{
+		SeasonService->CaptureState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
 	}
 
 	return true;
@@ -242,12 +278,108 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->PetLevels);
 	}
 
+	if (SaveGame->SaveVersion >= 2)
+	{
+		AIdleCharacter* Character = FindPlayerCharacter();
+		PendingInventoryItems = SaveGame->InventoryItems;
+		PendingEquippedSlotIndex = SaveGame->EquippedSlotIndex;
+		PendingSkillRanks = SaveGame->SkillRanks;
+		PendingSkillPoints = SaveGame->SkillPoints;
+		bHasPendingCharacterSaveV2 = true;
+
+		if (ApplyCharacterSaveState(
+			Character,
+			SaveGame->InventoryItems,
+			SaveGame->EquippedSlotIndex,
+			SaveGame->SkillRanks,
+			SaveGame->SkillPoints))
+		{
+			bHasPendingCharacterSaveV2 = false;
+			PendingInventoryItems.Reset();
+			PendingEquippedSlotIndex.Reset();
+			PendingSkillRanks.Reset();
+			PendingSkillPoints = 0;
+		}
+
+		EnsureQuestService();
+		if (QuestService)
+		{
+			QuestService->RestoreState(SaveGame->Quests, SaveGame->QuestDailyResetDate);
+			QuestService->ResetDailyQuestsIfNeeded(UQuestService::GetCurrentUtcDateString());
+		}
+
+		EnsureSeasonService();
+		if (SeasonService)
+		{
+			SeasonService->RestoreState(SaveGame->SeasonId, SaveGame->SeasonTokens, SaveGame->SeasonClaimedTiers);
+		}
+	}
+	else
+	{
+		EnsureQuestService();
+		EnsureSeasonService();
+	}
+
 	OnGoldChanged.Broadcast(Gold);
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
 	OnStatPointsChanged.Broadcast();
 	OnLevelUp.Broadcast(CharacterLevel);
 
 	return true;
+}
+
+void UIdleGameInstance::ApplyPendingCharacterSaveToCharacter(AIdleCharacter* Character)
+{
+	if (!bHasPendingCharacterSaveV2)
+	{
+		return;
+	}
+
+	if (ApplyCharacterSaveState(
+		Character,
+		PendingInventoryItems,
+		PendingEquippedSlotIndex,
+		PendingSkillRanks,
+		PendingSkillPoints))
+	{
+		bHasPendingCharacterSaveV2 = false;
+		PendingInventoryItems.Reset();
+		PendingEquippedSlotIndex.Reset();
+		PendingSkillRanks.Reset();
+		PendingSkillPoints = 0;
+	}
+}
+
+bool UIdleGameInstance::ApplyCharacterSaveState(
+	AIdleCharacter* Character,
+	const TArray<FItemInstance>& InventoryItems,
+	const TMap<EItemSlot, int32>& EquippedSlotIndex,
+	const TMap<FName, int32>& SkillRanks,
+	int32 SkillPoints)
+{
+	if (!Character)
+	{
+		return false;
+	}
+
+	bool bAppliedAnyState = false;
+	if (UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>())
+	{
+		Inventory->RestoreState(InventoryItems, EquippedSlotIndex);
+		bAppliedAnyState = true;
+	}
+
+	if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
+	{
+		Skills->RestoreRankState(SkillRanks, SkillPoints);
+		bAppliedAnyState = true;
+	}
+
+	if (bAppliedAnyState)
+	{
+		Character->RefreshDerivedStats();
+	}
+	return bAppliedAnyState;
 }
 
 int64 UIdleGameInstance::ClimbTower()
