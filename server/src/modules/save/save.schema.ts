@@ -1,3 +1,6 @@
+export const SAVE_LEVEL_MAX = 1000;
+export const SAVE_MAX_EQUIPMENT_GRADE = 6;
+
 export const getSaveSchema = {
   querystring: {
     type: "object",
@@ -21,12 +24,19 @@ export const putSaveSchema = {
         required: ["level", "rebirthCount", "maxEquipmentGrade"],
         additionalProperties: true,
         properties: {
-          level: { type: "integer", minimum: 1, maximum: 200 },
+          level: { type: "integer", minimum: 1, maximum: SAVE_LEVEL_MAX },
           rebirthCount: { type: "integer", minimum: 0 },
-          maxEquipmentGrade: { type: "integer", minimum: 0, maximum: 5 },
+          maxEquipmentGrade: {
+            type: "integer",
+            minimum: 0,
+            maximum: SAVE_MAX_EQUIPMENT_GRADE,
+          },
           totalExp: { type: "number", minimum: 0 },
           gold: { type: "integer", minimum: 0 },
           lastSeenUnixSec: { type: "integer", minimum: 0 },
+          transcendCount: { type: "integer", minimum: 0 },
+          towerHighestFloor: { type: "integer", minimum: 0 },
+          skillPoints: { type: "integer", minimum: 0 },
         },
       },
     },

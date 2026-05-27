@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from "../../core/errors.js";
 import { cumulativeExp } from "../../core/formulas/index.js";
 import type { LeaderboardService } from "../leaderboard/leaderboard.service.js";
+import { SAVE_LEVEL_MAX, SAVE_MAX_EQUIPMENT_GRADE } from "./save.schema.js";
 
 export type CharacterRecord = {
   id: string;
@@ -24,6 +25,9 @@ export type SavePayload = {
   totalExp?: number;
   gold?: number;
   lastSeenUnixSec?: number;
+  transcendCount?: number;
+  towerHighestFloor?: number;
+  skillPoints?: number;
   [key: string]: unknown;
 };
 
@@ -120,9 +124,13 @@ export function validateSavePayload(
   if (
     !Number.isInteger(payload.level) ||
     payload.level < 1 ||
-    payload.level > 200
+    payload.level > SAVE_LEVEL_MAX
   ) {
-    rejectSave(context, payload, "level must be between 1 and 200");
+    rejectSave(
+      context,
+      payload,
+      `level must be between 1 and ${SAVE_LEVEL_MAX}`,
+    );
   }
   if (!Number.isInteger(payload.rebirthCount) || payload.rebirthCount < 0) {
     rejectSave(context, payload, "rebirthCount must be >= 0");
@@ -130,21 +138,28 @@ export function validateSavePayload(
   if (
     !Number.isInteger(payload.maxEquipmentGrade) ||
     payload.maxEquipmentGrade < 0 ||
-    payload.maxEquipmentGrade > 5
+    payload.maxEquipmentGrade > SAVE_MAX_EQUIPMENT_GRADE
   ) {
-    rejectSave(context, payload, "maxEquipmentGrade must be between 0 and 5");
+    rejectSave(
+      context,
+      payload,
+      `maxEquipmentGrade must be between 0 and ${SAVE_MAX_EQUIPMENT_GRADE}`,
+    );
   }
   if (payload.totalExp !== undefined) {
-    const expected = cumulativeExp(payload.level);
-    const tolerance = Math.max(expected * 0.01, 1);
+    const minimum = cumulativeExp(payload.level);
+    const tolerance = Math.max(minimum * 0.01, 1);
     if (
       typeof payload.totalExp !== "number" ||
       !Number.isFinite(payload.totalExp) ||
-      Math.abs(payload.totalExp - expected) > tolerance
+      payload.totalExp < minimum - tolerance
     ) {
-      rejectSave(context, payload, "totalExp does not match level");
+      rejectSave(context, payload, "totalExp is below the level floor");
     }
   }
+  validateNonNegativeIntegerExtension(payload, "transcendCount", context);
+  validateNonNegativeIntegerExtension(payload, "towerHighestFloor", context);
+  validateNonNegativeIntegerExtension(payload, "skillPoints", context);
   if (
     payload.gold !== undefined &&
     (!Number.isInteger(payload.gold) || payload.gold < character.gold)
@@ -195,6 +210,9 @@ function rejectSave(
         totalExp: payload.totalExp,
         gold: payload.gold,
         lastSeenUnixSec: payload.lastSeenUnixSec,
+        transcendCount: payload.transcendCount,
+        towerHighestFloor: payload.towerHighestFloor,
+        skillPoints: payload.skillPoints,
       },
     },
     "save payload rejected",
@@ -202,4 +220,21 @@ function rejectSave(
   throw new ValidationError("세이브 payload 검증에 실패했습니다.", {
     code: "SAVE_VALIDATION_FAILED",
   });
+}
+
+function validateNonNegativeIntegerExtension(
+  payload: SavePayload,
+  field: "transcendCount" | "towerHighestFloor" | "skillPoints",
+  context:
+    | {
+        userId: string;
+        characterId: string;
+        logger: SaveLogger;
+      }
+    | undefined,
+) {
+  const value = payload[field];
+  if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+    rejectSave(context, payload, `${field} must be >= 0`);
+  }
 }

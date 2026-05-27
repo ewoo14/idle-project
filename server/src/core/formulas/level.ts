@@ -1,4 +1,4 @@
-export const LEVEL_CAP = 200;
+export const LEVEL_CAP = 1000;
 
 export type EnhanceResourceCost = {
   gold: number;

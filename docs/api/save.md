@@ -14,7 +14,10 @@ curl "http://localhost:3000/v1/save?characterId=$CHARACTER_ID" -H "authorization
 
 ## PUT `/`
 
-서버가 `level`, `rebirthCount`, `maxEquipmentGrade`의 경계를 검증한 뒤 저장한다. PR #2에서는 정밀 공식 검증 대신 boundary 검증을 수행한다.
+서버가 `level`, `rebirthCount`, `maxEquipmentGrade`와 클라우드 확장 필드의 경계를 검증한 뒤 저장한다.
+PR #54부터 현재 클라 성장 상태를 반영해 `level`은 1~1000, `maxEquipmentGrade`는
+0~6(Mythic)을 허용한다. `totalExp`는 `cumulativeExp(level)`의 1% 또는 1 중 큰 값만큼
+하한 오차를 허용하며, 환생/초월 누적 이력 때문에 상한은 두지 않는다.
 
 ```json
 {
@@ -23,12 +26,23 @@ curl "http://localhost:3000/v1/save?characterId=$CHARACTER_ID" -H "authorization
   "payload": {
     "level": 10,
     "rebirthCount": 0,
-    "maxEquipmentGrade": 2
+    "maxEquipmentGrade": 6,
+    "totalExp": 12345,
+    "gold": 1000,
+    "lastSeenUnixSec": 1760000000,
+    "transcendCount": 1,
+    "towerHighestFloor": 25,
+    "skillPoints": 12
   }
 }
 ```
 
-조작된 payload는 `400 VALIDATION_ERROR`.
+필수 필드는 `level`, `rebirthCount`, `maxEquipmentGrade`이다. payload는 향후 클라 필드를
+보존하기 위해 `additionalProperties: true`이며, 서버가 아는 확장 필드
+`transcendCount`, `towerHighestFloor`, `skillPoints`는 정수 0 이상이어야 한다.
+
+서버 캐릭터보다 낮은 `level` 또는 `rebirthCount`, 서버 보유량보다 낮은 `gold`, 범위를 벗어난
+payload는 `400 SAVE_VALIDATION_FAILED`.
 
 ## GET `/history`
 
