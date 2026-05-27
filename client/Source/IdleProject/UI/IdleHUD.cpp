@@ -501,6 +501,12 @@ const TCHAR* ClassToLocalizationKey(EClassId ClassId)
 		return TEXT("CLASS_THIEF_NAME");
 	case EClassId::Cleric:
 		return TEXT("CLASS_CLERIC_NAME");
+	case EClassId::Paladin:
+		return TEXT("CLASS_PALADIN_NAME");
+	case EClassId::Berserker:
+		return TEXT("CLASS_BERSERKER_NAME");
+	case EClassId::Summoner:
+		return TEXT("CLASS_SUMMONER_NAME");
 	default:
 		return TEXT("NONE_DASH");
 	}
@@ -1455,7 +1461,10 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 		{ EClassId::Mage, TEXT("CLASS_MAGE_NAME"), TEXT("CLASS_MAGE_ROLE"), TEXT("INT/WIS") },
 		{ EClassId::Archer, TEXT("CLASS_ARCHER_NAME"), TEXT("CLASS_ARCHER_ROLE"), TEXT("DEX/LUK") },
 		{ EClassId::Thief, TEXT("CLASS_THIEF_NAME"), TEXT("CLASS_THIEF_ROLE"), TEXT("DEX/LUK") },
-		{ EClassId::Cleric, TEXT("CLASS_CLERIC_NAME"), TEXT("CLASS_CLERIC_ROLE"), TEXT("WIS/INT") }
+		{ EClassId::Cleric, TEXT("CLASS_CLERIC_NAME"), TEXT("CLASS_CLERIC_ROLE"), TEXT("WIS/INT") },
+		{ EClassId::Paladin, TEXT("CLASS_PALADIN_NAME"), TEXT("CLASS_PALADIN_ROLE"), TEXT("CON/STR") },
+		{ EClassId::Berserker, TEXT("CLASS_BERSERKER_NAME"), TEXT("CLASS_BERSERKER_ROLE"), TEXT("STR/LUK") },
+		{ EClassId::Summoner, TEXT("CLASS_SUMMONER_NAME"), TEXT("CLASS_SUMMONER_ROLE"), TEXT("INT/WIS") }
 	};
 
 	TArray<FIdleHUDClassSelectionOptionViewModel> Options;

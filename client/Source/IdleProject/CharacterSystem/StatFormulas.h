@@ -16,7 +16,10 @@ enum class EClassId : uint8
 	Mage = 2 UMETA(DisplayName = "Mage"),
 	Archer = 3 UMETA(DisplayName = "Archer"),
 	Thief = 4 UMETA(DisplayName = "Thief"),
-	Cleric = 5 UMETA(DisplayName = "Cleric")
+	Cleric = 5 UMETA(DisplayName = "Cleric"),
+	Paladin = 6 UMETA(DisplayName = "Paladin"),
+	Berserker = 7 UMETA(DisplayName = "Berserker"),
+	Summoner = 8 UMETA(DisplayName = "Summoner")
 };
 
 /** 서버 PrimaryStats를 결정적으로 미러링하는 1차 능력치입니다. */

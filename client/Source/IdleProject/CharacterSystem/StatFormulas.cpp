@@ -30,6 +30,18 @@ const FClassGrowth& GetClassGrowth(EClassId ClassId)
 		{2.0f, 3.0f, 7.0f, 11.0f, 5.0f, 4.0f},
 		{0.15f, 0.2f, 1.0f, 1.4f, 0.45f, 0.3f}
 	};
+	static const FClassGrowth Paladin{
+		{10.0f, 4.0f, 3.0f, 5.0f, 12.0f, 2.0f},
+		{1.2f, 0.35f, 0.2f, 0.6f, 1.65f, 0.2f}
+	};
+	static const FClassGrowth Berserker{
+		{13.0f, 5.0f, 1.0f, 1.0f, 6.0f, 6.0f},
+		{1.8f, 0.55f, 0.1f, 0.1f, 0.7f, 0.65f}
+	};
+	static const FClassGrowth Summoner{
+		{2.0f, 4.0f, 12.0f, 10.0f, 4.0f, 3.0f},
+		{0.15f, 0.3f, 1.7f, 1.3f, 0.3f, 0.3f}
+	};
 
 	switch (ClassId)
 	{
@@ -41,6 +53,12 @@ const FClassGrowth& GetClassGrowth(EClassId ClassId)
 		return Thief;
 	case EClassId::Cleric:
 		return Cleric;
+	case EClassId::Paladin:
+		return Paladin;
+	case EClassId::Berserker:
+		return Berserker;
+	case EClassId::Summoner:
+		return Summoner;
 	case EClassId::Warrior:
 	default:
 		return Warrior;
