@@ -313,6 +313,21 @@ struct IDLEPROJECT_API FIdleHUDSetSummaryViewModel
 	TArray<FIdleHUDSetSummaryRowViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDTowerViewModel
+{
+	FText Title;
+	FText HighestFloorLabel;
+	FText NextRequiredPowerLabel;
+	FText CombatPowerLabel;
+	FText StatusLabel;
+	FText ButtonLabel;
+	FName ClimbHitBoxName;
+	int32 HighestFloor = 0;
+	int64 NextRequiredPower = 0;
+	int64 CombatPower = 0;
+	bool bCanClimb = false;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -338,6 +353,8 @@ IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const U
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
+IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower);
+IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
 }
 
 /** Slate HUD 구현을 붙이기 위한 최소 AHUD 베이스입니다. */
@@ -397,9 +414,14 @@ protected:
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 
+	UFUNCTION()
+	void HandleTowerClimbed(int32 NewHighestFloor, int64 TotalReward);
+
 private:
 	void BindStageService();
 	void UnbindStageService();
+	void BindTowerService();
+	void UnbindTowerService();
 	void BindPlayerCombat();
 	void UnbindPlayerCombat();
 	void BindPlayerInventory();
@@ -441,6 +463,8 @@ private:
 	void TryRebirth();
 	void DrawTranscendPanel();
 	void TryTranscend();
+	void DrawTowerPanel();
+	void TryClimbTower();
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipPetFromHitBox(FName BoxName);
@@ -479,9 +503,12 @@ private:
 	TWeakObjectPtr<UBattleAIComponent> BoundBossBattleAI;
 	TWeakObjectPtr<AActor> BossSpecialAttackActor;
 	TWeakObjectPtr<UStageService> BoundStageService;
+	TWeakObjectPtr<UTowerService> BoundTowerService;
 	FText StageFeedbackLabel;
+	FText TowerFeedbackLabel;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
+	float TowerFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 	bool bStatInfoVisible = false;
 };
