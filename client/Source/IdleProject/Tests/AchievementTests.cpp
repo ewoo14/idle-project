@@ -43,6 +43,7 @@ bool FAchievementFormulaCatalogTest::RunTest(const FString& Parameters)
 	{
 		Categories.Add(Definition.Category);
 		TestFalse(TEXT("Achievement id is populated"), Definition.AchievementId.IsEmpty());
+		TestFalse(TEXT("Achievement display key is populated"), Definition.DisplayNameKey.IsEmpty());
 		TestTrue(TEXT("Achievement base threshold is positive"), Definition.BaseThreshold > 0);
 		TestTrue(TEXT("Achievement growth is above one"), Definition.Growth > 1.0f);
 		TestTrue(TEXT("Achievement points per tier are positive"), Definition.PointsPerTier > 0);
@@ -67,6 +68,11 @@ bool FAchievementFormulaCatalogTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Soft-cap approaches the achievement ceiling"), FAchievementFormula::GetStatMultiplier(500), 2.4998324f);
 	TestEqual(TEXT("Zero achievement points stay neutral"), FAchievementFormula::GetStatMultiplier(0), 1.0f);
 	TestEqual(TEXT("Negative achievement points stay neutral"), FAchievementFormula::GetStatMultiplier(-5), 1.0f);
+
+	FAchievementDefinition UnsafeGrowth(TEXT("test_growth"), EAchievementCategory::Misc, EAchievementMetric::DaysPlayed, EAchievementMetricMode::Cumulative, 1, 1.0f, 1, TEXT("ACHIEVEMENT_NAME_MISC_DAYS_PLAYED"), TEXT("Daily Rhythm"));
+	TestEqual(TEXT("Constructor clamps unsafe growth above one"), UnsafeGrowth.Growth, 1.01f);
+	FAchievementDefinition HugeThreshold(TEXT("test_huge"), EAchievementCategory::Misc, EAchievementMetric::DaysPlayed, EAchievementMetricMode::Cumulative, MAX_int64, 2.0f, 1, TEXT("ACHIEVEMENT_NAME_MISC_DAYS_PLAYED"), TEXT("Daily Rhythm"));
+	TestEqual(TEXT("Max int threshold unlocks once without overflow"), FAchievementFormula::GetTierForValue(HugeThreshold, MAX_int64), 1);
 
 	return true;
 }
@@ -96,16 +102,28 @@ bool FAchievementServiceProgressTest::RunTest(const FString& Parameters)
 	Service->RecordMetric(EAchievementMetric::MonstersKilled, 30);
 	TestEqual(TEXT("Cumulative metric adds later progress"), Service->GetMetricValue(EAchievementMetric::MonstersKilled), static_cast<int64>(40));
 	TestTrue(TEXT("Additional tiers increase total points"), Service->GetTotalPoints() > 1);
+	Service->RecordItemCollected(TEXT("sword_001"));
+	Service->RecordItemCollected(TEXT("sword_001"));
+	Service->RecordItemCollected(TEXT("axe_001"));
+	TestEqual(TEXT("Item collection counts every collected item"), Service->GetMetricValue(EAchievementMetric::ItemsCollected), static_cast<int64>(3));
+	TestEqual(TEXT("Unique item collection counts each id once"), Service->GetMetricValue(EAchievementMetric::UniqueItemsFound), static_cast<int64>(2));
 
 	TArray<FAchievementMetricSaveEntry> SavedMetrics;
 	TArray<FAchievementSaveEntry> SavedAchievements;
-	Service->CaptureState(SavedMetrics, SavedAchievements);
+	TArray<FName> SavedUniqueItemIds;
+	Service->CaptureState(SavedMetrics, SavedAchievements, &SavedUniqueItemIds);
+	FAchievementSaveEntry UnknownAchievement;
+	UnknownAchievement.AchievementId = TEXT("unknown_achievement");
+	UnknownAchievement.Tier = 99;
+	SavedAchievements.Add(UnknownAchievement);
 
 	UAchievementService* Restored = NewObject<UAchievementService>();
-	Restored->RestoreState(SavedMetrics, SavedAchievements);
+	Restored->RestoreState(SavedMetrics, SavedAchievements, &SavedUniqueItemIds);
+	Restored->RecordItemCollected(TEXT("sword_001"));
 
 	TestEqual(TEXT("Restored kill metric round trips"), Restored->GetMetricValue(EAchievementMetric::MonstersKilled), Service->GetMetricValue(EAchievementMetric::MonstersKilled));
 	TestEqual(TEXT("Restored max metric round trips"), Restored->GetMetricValue(EAchievementMetric::HighestLevelReached), Service->GetMetricValue(EAchievementMetric::HighestLevelReached));
+	TestEqual(TEXT("Restored unique ids prevent duplicate unique credit"), Restored->GetMetricValue(EAchievementMetric::UniqueItemsFound), Service->GetMetricValue(EAchievementMetric::UniqueItemsFound));
 	TestEqual(TEXT("Restored points round trip"), Restored->GetTotalPoints(), Service->GetTotalPoints());
 	TestEqual(TEXT("Restored multiplier round trips"), Restored->GetStatMultiplier(), Service->GetStatMultiplier());
 
@@ -152,6 +170,11 @@ bool FAchievementHudViewModelTest::RunTest(const FString& Parameters)
 		FString(TEXT("Achievement Unlocked: Monster Slayer (Tier 2)")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	TestEqual(TEXT("Unlock feedback uses Korean achievement name"),
+		IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(TEXT("combat_monster_slayer"), 2).ToString(),
+		FString(TEXT("업적 달성: 몬스터 사냥꾼 (티어 2)")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
@@ -181,6 +204,14 @@ bool FIdleGameInstanceAchievementHooksTest::RunTest(const FString& Parameters)
 
 	GameInstance->RecordGearEnhanced();
 	TestEqual(TEXT("Gear enhancement hook records achievement metric"), GameInstance->GetAchievementMetricValue(EAchievementMetric::GearEnhanced), static_cast<int64>(1));
+	FItemInstance Item;
+	Item.ItemId = TEXT("test_sword");
+	Item.Slot = EItemSlot::Weapon;
+	Item.Rarity = EItemRarity::Common;
+	GameInstance->RecordAchievementItemCollected(Item);
+	GameInstance->RecordAchievementItemCollected(Item);
+	TestEqual(TEXT("Item collected hook records all collections"), GameInstance->GetAchievementMetricValue(EAchievementMetric::ItemsCollected), static_cast<int64>(2));
+	TestEqual(TEXT("Item collected hook records unique item ids once"), GameInstance->GetAchievementMetricValue(EAchievementMetric::UniqueItemsFound), static_cast<int64>(1));
 
 	UIdleSaveGame* Captured = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture includes achievement state"), GameInstance->CaptureToSave(Captured));

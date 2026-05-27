@@ -20,6 +20,9 @@ describe("achievement formulas", () => {
     expect(ACHIEVEMENT_POINTS_MULTIPLIER).toBe(0.01);
     expect(ACHIEVEMENT_MULTIPLIER_SOFT_CAP_START_POINTS).toBe(100);
     expect(ACHIEVEMENT_MULTIPLIER_SOFT_CAP_BONUS_POINTS).toBe(50);
+    for (const achievement of ACHIEVEMENTS) {
+      expect(achievement.displayNameKey).toMatch(/^ACHIEVEMENT_NAME_/);
+    }
   });
 
   it("uses geometric tier thresholds matching FAchievementFormula", () => {
@@ -35,6 +38,16 @@ describe("achievement formulas", () => {
     expect(getTierForValue(monsterKills, 10)).toBe(1);
     expect(getTierForValue(monsterKills, 20)).toBe(2);
     expect(getTierForValue(monsterKills, 40)).toBe(3);
+    expect(
+      getTierForValue(
+        {
+          ...monsterKills,
+          baseThreshold: Number.MAX_SAFE_INTEGER,
+          growth: 2,
+        },
+        Number.MAX_SAFE_INTEGER,
+      ),
+    ).toBe(1);
     expect(getPointsForTiers(monsterKills, 3)).toBe(3);
   });
 

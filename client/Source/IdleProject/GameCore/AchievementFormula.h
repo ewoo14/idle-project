@@ -78,6 +78,9 @@ struct IDLEPROJECT_API FAchievementDefinition
 	int32 PointsPerTier = 1;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Achievement")
+	FString DisplayNameKey;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Achievement")
 	FText DisplayName;
 
 	FAchievementDefinition() = default;
@@ -90,6 +93,7 @@ struct IDLEPROJECT_API FAchievementDefinition
 		int64 InBaseThreshold,
 		float InGrowth,
 		int32 InPointsPerTier,
+		const TCHAR* InDisplayNameKey,
 		const TCHAR* InDisplayName);
 };
 

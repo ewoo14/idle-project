@@ -177,7 +177,18 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 	{
 		if (UStageService* StageService = GameInstance->GetStageService())
 		{
+			const int32 PreviousGlobalStageIndex = StageService->GetGlobalStageIndex();
+			const bool bHadFinalChapterCleared = StageService->HasFinalChapterCleared();
 			StageService->RecordKill(bWasBoss);
+			if (StageService->GetGlobalStageIndex() != PreviousGlobalStageIndex
+				|| (!bHadFinalChapterCleared && StageService->HasFinalChapterCleared()))
+			{
+				GameInstance->RecordAchievementMetric(EAchievementMetric::StagesCleared, 1);
+			}
+		}
+		if (bWasBoss)
+		{
+			GameInstance->RecordAchievementMetric(EAchievementMetric::BossesKilled, 1);
 		}
 		GameInstance->RecordMonsterKilled();
 	}

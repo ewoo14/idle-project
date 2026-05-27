@@ -284,6 +284,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Achievement")
 	void RecordAchievementMetric(EAchievementMetric Metric, int64 AmountOrValue);
 
+	void RecordAchievementItemCollected(const FItemInstance& Item);
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
 	FQuestClaimResult ClaimQuest(const FString& QuestId);
 

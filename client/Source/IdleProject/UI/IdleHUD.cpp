@@ -397,6 +397,19 @@ const FAchievementDefinition* FindAchievementDefinitionById(const FString& Achie
 	});
 }
 
+FText GetAchievementDisplayName(const FAchievementDefinition& Definition)
+{
+	if (!Definition.DisplayNameKey.IsEmpty())
+	{
+		const FText Localized = IdleProject::Localization::Text(TEXT("Achievement"), *Definition.DisplayNameKey);
+		if (Localized.ToString() != Definition.DisplayNameKey)
+		{
+			return Localized;
+		}
+	}
+	return Definition.DisplayName;
+}
+
 FText BuildShopResultLabel(const FShopPurchaseResult& Result)
 {
 	if (!Result.bPurchased)
@@ -1194,7 +1207,7 @@ FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UA
 FText IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier)
 {
 	const FAchievementDefinition* Definition = FindAchievementDefinitionById(AchievementId);
-	const FText AchievementName = Definition ? Definition->DisplayName : FText::FromString(AchievementId);
+	const FText AchievementName = Definition ? GetAchievementDisplayName(*Definition) : FText::FromString(AchievementId);
 	const int32 SafeTier = FMath::Max(1, Tier);
 	return FormatLocalizedUI(TEXT("ACHIEVEMENT_UNLOCKED_FORMAT"), [AchievementName, SafeTier](FFormatNamedArguments& Args)
 	{
@@ -3104,7 +3117,20 @@ void AIdleHUD::RankUpSkillFromHitBox(FName BoxName)
 	SkillId.RightChopInline(SkillRankHitBoxPrefix.Len());
 	if (!SkillId.IsEmpty())
 	{
-		PlayerSkills->RankUpSkill(FName(*SkillId));
+		const FName SkillName(*SkillId);
+		if (PlayerSkills->RankUpSkill(SkillName))
+		{
+			if (!IdleGameInstance)
+			{
+				IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+			}
+			if (IdleGameInstance)
+			{
+				const int32 NewRank = PlayerSkills->GetSkillRank(SkillName);
+				IdleGameInstance->RecordAchievementMetric(EAchievementMetric::SkillRankUps, 1);
+				IdleGameInstance->RecordAchievementMetric(EAchievementMetric::HighestSkillRank, NewRank);
+			}
+		}
 	}
 	RefreshMouseInteraction();
 }

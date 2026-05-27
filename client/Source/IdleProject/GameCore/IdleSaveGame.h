@@ -109,4 +109,7 @@ public:
 
 	UPROPERTY()
 	TArray<FAchievementSaveEntry> Achievements;
+
+	UPROPERTY()
+	TArray<FName> AchievementUniqueItemIds;
 };

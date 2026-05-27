@@ -386,7 +386,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 
 	if (AchievementService)
 	{
-		AchievementService->CaptureState(SaveGame->AchievementMetrics, SaveGame->Achievements);
+		AchievementService->CaptureState(SaveGame->AchievementMetrics, SaveGame->Achievements, &SaveGame->AchievementUniqueItemIds);
 	}
 
 	return true;
@@ -475,7 +475,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		EnsureAchievementService();
 		if (AchievementService)
 		{
-			AchievementService->RestoreState(SaveGame->AchievementMetrics, SaveGame->Achievements);
+			AchievementService->RestoreState(SaveGame->AchievementMetrics, SaveGame->Achievements, &SaveGame->AchievementUniqueItemIds);
 		}
 	}
 	else
@@ -648,7 +648,7 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	AddGold(-Cost);
 	RecordAchievementMetric(EAchievementMetric::GearRollsPurchased, 1);
 	Inventory->AddItem(Item);
-	RecordAchievementMetric(EAchievementMetric::ItemsCollected, 1);
+	RecordAchievementItemCollected(Item);
 
 	Result.bPurchased = true;
 	Result.GoldSpent = Cost;
@@ -961,6 +961,15 @@ void UIdleGameInstance::RecordAchievementMetric(EAchievementMetric Metric, int64
 	if (AchievementService)
 	{
 		AchievementService->RecordMetric(Metric, AmountOrValue);
+	}
+}
+
+void UIdleGameInstance::RecordAchievementItemCollected(const FItemInstance& Item)
+{
+	EnsureAchievementService();
+	if (AchievementService)
+	{
+		AchievementService->RecordItemCollected(Item.ItemId);
 	}
 }
 

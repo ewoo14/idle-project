@@ -48,6 +48,7 @@ export type AchievementDefinition = {
   baseThreshold: number;
   growth: number;
   pointsPerTier: number;
+  displayNameKey: string;
   displayName: string;
 };
 
@@ -59,6 +60,7 @@ type AchievementDefinitionSeed = readonly [
   number,
   number,
   string,
+  string,
 ];
 
 const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
@@ -69,6 +71,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     10,
     1,
+    "ACHIEVEMENT_NAME_COMBAT_MONSTER_SLAYER",
     "Monster Slayer",
   ],
   [
@@ -78,6 +81,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     1,
     2,
+    "ACHIEVEMENT_NAME_COMBAT_BOSS_BREAKER",
     "Boss Breaker",
   ],
   [
@@ -87,6 +91,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     10,
     2,
+    "ACHIEVEMENT_NAME_COMBAT_TOWER_CLIMBER",
     "Tower Climber",
   ],
   [
@@ -96,6 +101,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     10,
     1,
+    "ACHIEVEMENT_NAME_PROGRESS_LEVEL_PEAK",
     "Level Peak",
   ],
   [
@@ -105,6 +111,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     5,
     1,
+    "ACHIEVEMENT_NAME_PROGRESS_STAGE_CLEAR",
     "Stage Clear",
   ],
   [
@@ -114,6 +121,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     1,
     3,
+    "ACHIEVEMENT_NAME_PROGRESS_REBIRTH_CYCLE",
     "Rebirth Cycle",
   ],
   [
@@ -123,6 +131,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     1,
     5,
+    "ACHIEVEMENT_NAME_PROGRESS_TRANSCEND_PATH",
     "Transcend Path",
   ],
   [
@@ -132,6 +141,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     5,
     1,
+    "ACHIEVEMENT_NAME_GEAR_ENHANCER",
     "Gear Enhancer",
   ],
   [
@@ -141,6 +151,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     5,
     2,
+    "ACHIEVEMENT_NAME_GEAR_PEAK_LEVEL",
     "Peak Enhancement",
   ],
   [
@@ -150,6 +161,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     10,
     1,
+    "ACHIEVEMENT_NAME_GEAR_COLLECTOR",
     "Gear Collector",
   ],
   [
@@ -159,6 +171,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     1000,
     1,
+    "ACHIEVEMENT_NAME_ECONOMY_GOLD_EARNER",
     "Gold Earner",
   ],
   [
@@ -168,6 +181,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     1000,
     1,
+    "ACHIEVEMENT_NAME_ECONOMY_GOLD_SINK",
     "Gold Sink",
   ],
   [
@@ -177,6 +191,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     5,
     1,
+    "ACHIEVEMENT_NAME_ECONOMY_SHOP_ROLLS",
     "Shop Regular",
   ],
   [
@@ -186,6 +201,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     5,
     1,
+    "ACHIEVEMENT_NAME_SKILL_RANK_UPS",
     "Skill Training",
   ],
   [
@@ -195,10 +211,29 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Maximum",
     5,
     2,
+    "ACHIEVEMENT_NAME_SKILL_RANK_PEAK",
     "Skill Mastery",
   ],
-  ["pet_feeder", "Pet", "PetsFed", "Cumulative", 5, 1, "Pet Care"],
-  ["pet_level_peak", "Pet", "HighestPetLevel", "Maximum", 5, 2, "Pet Bond"],
+  [
+    "pet_feeder",
+    "Pet",
+    "PetsFed",
+    "Cumulative",
+    5,
+    1,
+    "ACHIEVEMENT_NAME_PET_FEEDER",
+    "Pet Care",
+  ],
+  [
+    "pet_level_peak",
+    "Pet",
+    "HighestPetLevel",
+    "Maximum",
+    5,
+    2,
+    "ACHIEVEMENT_NAME_PET_LEVEL_PEAK",
+    "Pet Bond",
+  ],
   [
     "quest_helper",
     "Quest",
@@ -206,6 +241,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     3,
     1,
+    "ACHIEVEMENT_NAME_QUEST_HELPER",
     "Quest Helper",
   ],
   [
@@ -215,6 +251,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     3,
     1,
+    "ACHIEVEMENT_NAME_QUEST_SEASON_REWARDS",
     "Season Claimer",
   ],
   [
@@ -224,6 +261,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     5,
     2,
+    "ACHIEVEMENT_NAME_COLLECTION_UNIQUE_ITEMS",
     "Unique Finds",
   ],
   [
@@ -233,6 +271,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     3,
     1,
+    "ACHIEVEMENT_NAME_MISC_OFFLINE_CLAIMS",
     "Welcome Back",
   ],
   [
@@ -242,6 +281,7 @@ const ACHIEVEMENT_SEEDS: AchievementDefinitionSeed[] = [
     "Cumulative",
     1,
     1,
+    "ACHIEVEMENT_NAME_MISC_DAYS_PLAYED",
     "Daily Rhythm",
   ],
 ];
@@ -254,6 +294,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = ACHIEVEMENT_SEEDS.map(
     metricMode,
     baseThreshold,
     pointsPerTier,
+    displayNameKey,
     displayName,
   ]) => ({
     id,
@@ -263,6 +304,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = ACHIEVEMENT_SEEDS.map(
     baseThreshold,
     growth: ACHIEVEMENT_TIER_GROWTH_DEFAULT,
     pointsPerTier,
+    displayNameKey,
     displayName,
   }),
 );
@@ -279,6 +321,9 @@ export function getTierForValue(
   let threshold = definition.baseThreshold;
   while (threshold <= value && Number.isFinite(threshold)) {
     tier += 1;
+    if (threshold > Number.MAX_SAFE_INTEGER / definition.growth) {
+      break;
+    }
     threshold *= definition.growth;
   }
   return tier;

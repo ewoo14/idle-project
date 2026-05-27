@@ -4,11 +4,12 @@ void UAchievementService::InitializeDefaultAchievements()
 {
 	MetricValues.Reset();
 	UnlockedTiers.Reset();
+	UniqueItemIds.Reset();
 }
 
 void UAchievementService::RecordMetric(EAchievementMetric Metric, int64 AmountOrValue)
 {
-	if (AmountOrValue <= 0)
+	if (AmountOrValue <= 0 || !IsKnownMetric(Metric))
 	{
 		return;
 	}
@@ -46,6 +47,21 @@ void UAchievementService::RecordMetric(EAchievementMetric Metric, int64 AmountOr
 	MetricValues.Add(Metric, NewValue);
 	RecomputeUnlockedTiers(true);
 	OnAchievementProgress.Broadcast(Metric, NewValue, GetTotalPoints());
+}
+
+void UAchievementService::RecordItemCollected(FName ItemId)
+{
+	if (ItemId.IsNone())
+	{
+		return;
+	}
+
+	RecordMetric(EAchievementMetric::ItemsCollected, 1);
+	if (!UniqueItemIds.Contains(ItemId))
+	{
+		UniqueItemIds.Add(ItemId);
+		RecordMetric(EAchievementMetric::UniqueItemsFound, 1);
+	}
 }
 
 int64 UAchievementService::GetMetricValue(EAchievementMetric Metric) const
@@ -86,12 +102,12 @@ TArray<FAchievementCategoryProgress> UAchievementService::GetCategoryProgress() 
 	return Result;
 }
 
-void UAchievementService::CaptureState(TArray<FAchievementMetricSaveEntry>& OutMetrics, TArray<FAchievementSaveEntry>& OutAchievements) const
+void UAchievementService::CaptureState(TArray<FAchievementMetricSaveEntry>& OutMetrics, TArray<FAchievementSaveEntry>& OutAchievements, TArray<FName>* OutUniqueItemIds) const
 {
 	OutMetrics.Reset();
 	for (const TPair<EAchievementMetric, int64>& Pair : MetricValues)
 	{
-		if (Pair.Value <= 0)
+		if (Pair.Value <= 0 || !IsKnownMetric(Pair.Key))
 		{
 			continue;
 		}
@@ -115,14 +131,26 @@ void UAchievementService::CaptureState(TArray<FAchievementMetricSaveEntry>& OutM
 		Entry.Tier = Pair.Value;
 		OutAchievements.Add(Entry);
 	}
+
+	if (OutUniqueItemIds)
+	{
+		OutUniqueItemIds->Reset();
+		for (const FName& ItemId : UniqueItemIds)
+		{
+			if (!ItemId.IsNone())
+			{
+				OutUniqueItemIds->Add(ItemId);
+			}
+		}
+	}
 }
 
-void UAchievementService::RestoreState(const TArray<FAchievementMetricSaveEntry>& InMetrics, const TArray<FAchievementSaveEntry>& InAchievements)
+void UAchievementService::RestoreState(const TArray<FAchievementMetricSaveEntry>& InMetrics, const TArray<FAchievementSaveEntry>& InAchievements, const TArray<FName>* InUniqueItemIds)
 {
 	MetricValues.Reset();
 	for (const FAchievementMetricSaveEntry& Entry : InMetrics)
 	{
-		if (Entry.Value > 0)
+		if (Entry.Value > 0 && IsKnownMetric(Entry.Metric))
 		{
 			MetricValues.Add(Entry.Metric, Entry.Value);
 		}
@@ -137,7 +165,27 @@ void UAchievementService::RestoreState(const TArray<FAchievementMetricSaveEntry>
 		}
 	}
 
+	UniqueItemIds.Reset();
+	if (InUniqueItemIds)
+	{
+		for (const FName& ItemId : *InUniqueItemIds)
+		{
+			if (!ItemId.IsNone())
+			{
+				UniqueItemIds.Add(ItemId);
+			}
+		}
+	}
+
 	RecomputeUnlockedTiers(false);
+}
+
+bool UAchievementService::IsKnownMetric(EAchievementMetric Metric)
+{
+	return FAchievementFormula::GetDefinitions().ContainsByPredicate([Metric](const FAchievementDefinition& Definition)
+	{
+		return Definition.Metric == Metric;
+	});
 }
 
 const FAchievementDefinition* UAchievementService::FindDefinitionById(const FString& AchievementId)
