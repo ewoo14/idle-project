@@ -1814,3 +1814,60 @@ Balance simulator evidence for PR #66:
 - The 1000-run first-rebirth distribution remains at p10 4.919h, median
   5.328h, p90 5.751h, min 4.564h, and max 6.144h. Median remains inside the
   5-10h target and every sampled run remains inside the 3-20h review band.
+
+---
+
+## PR #71 Equipment Depth Balance Review
+
+PR #71 keeps the first-rebirth timing model unchanged while adding enhancement
+risk pressure reporting to `tools/balance-sim`. Seed `23`, 1000 sampled
+first-rebirth runs, remains inside the target band:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.919 |
+| median | 5.328 |
+| p90 | 5.751 |
+| min | 4.564 |
+| max | 6.144 |
+
+The simulator now imports `resolveEnhanceAttempt` from
+`server/src/core/formulas/enhance.ts` for downgrade, protection, and pity
+pressure instead of only using `cost / successRate`. The old expected-cost table
+is still kept as a pre-risk floor. The risk model uses 1000 runs per scenario
+with safe range +0 to +9, risk range +10 to +49, and a 12 consecutive-risk-fail
+pity threshold.
+
+| Rarity | Protection | Target | Median attempts | P90 attempts | Median gold | P90 gold | Median hours | P90 hours | Downgrades | Protections | Pity |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Common | none | +20 | 34 | 54 | 599,400 | 1,099,600 | 0.916 | 1.680 | 6 | 0 | 0 |
+| Common | risk-level | +50 | 137 | 158 | 18,808,000 | 22,520,700 | 28.728 | 34.399 | 0 | 86 | 2 |
+| Legendary | risk-level | +50 | 138 | 159 | 301,953,600 | 367,728,000 | 461.217 | 561.683 | 0 | 86 | 2 |
+| Mythic | risk-level | +50 | 139 | 159 | 1,213,024,000 | 1,465,433,600 | 1852.825 | 2238.366 | 0 | 87 | 2 |
+
+Protection item sourcing is not priced yet, so protected rows report gold only
+and separately expose consumed protection counts. Treat the protected +50 rows
+as sink-pressure evidence, not a complete acquisition-cost model.
+
+PowerScore remains intentionally unchanged:
+
+```text
+PowerScore = (ATK + DEF + HP / 10) * (1 + EnhanceLevel * 0.1)
+```
+
+Potential and unique trait pressure must feed PowerScore through their own
+stat/trait paths when those systems are wired, but this balance pass does not
+change the enhancement payoff multiplier.
+
+Guardrails:
+
+- Do not tune the first-rebirth EXP curve from protected +50 costs; enhancement
+  depth is a post-baseline long-tail sink.
+- If protection items become directly purchasable, add their gold-equivalent
+  price to the risk model before using protected rows for economy tuning.
+- Keep `resolveEnhanceAttempt`, `FEnhanceFormula::ResolveAttempt`, and
+  `tools/balance-sim` aligned whenever safe range, downgrade, protection, or
+  pity rules change.
+- Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
+  after changing enhancement success rates, rarity cost multipliers, or
+  protection sourcing.

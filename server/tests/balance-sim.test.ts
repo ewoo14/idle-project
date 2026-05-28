@@ -421,6 +421,55 @@ describe("balance simulator", () => {
     );
   });
 
+  it("models enhancement downgrade, protection, and pity through resolveEnhanceAttempt", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+    const model = report.json.model.enhancementPressure.riskAttemptModel;
+
+    expect(model.runsPerScenario).toBe(1000);
+    expect(model.safeMaxLevel).toBe(9);
+    expect(model.pityThreshold).toBe(12);
+    expect(model.scenarios).toEqual([
+      expect.objectContaining({
+        rarity: "Common",
+        protectionStrategy: "none",
+        targetLevel: 20,
+        medianFinalLevel: 20,
+        medianDowngradesToMax: expect.any(Number),
+        medianPityTriggersToMax: expect.any(Number),
+      }),
+      expect.objectContaining({
+        rarity: "Common",
+        protectionStrategy: "risk-level",
+        targetLevel: 50,
+        medianFinalLevel: 50,
+        medianProtectionsConsumedToMax: expect.any(Number),
+        medianPityTriggersToMax: expect.any(Number),
+      }),
+      expect.objectContaining({
+        rarity: "Legendary",
+        protectionStrategy: "risk-level",
+        targetLevel: 50,
+        medianFinalLevel: 50,
+      }),
+      expect.objectContaining({
+        rarity: "Mythic",
+        protectionStrategy: "risk-level",
+        targetLevel: 50,
+        medianFinalLevel: 50,
+      }),
+    ]);
+
+    const unprotected = model.scenarios[0];
+    const protectedCommon = model.scenarios[1];
+    expect(unprotected.medianDowngradesToMax).toBeGreaterThan(0);
+    expect(protectedCommon.medianDowngradesToMax).toBe(0);
+    expect(protectedCommon.medianProtectionsConsumedToMax).toBeGreaterThan(0);
+    expect(protectedCommon.medianPityTriggersToMax).toBeGreaterThan(0);
+    expect(report.markdown).toContain("## Enhancement Attempt Risk Model");
+    expect(report.markdown).toContain("resolveEnhanceAttempt");
+  });
+
   it("reports pet feed cost pressure and gold-bonus payback", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);
