@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "GameCore/QuestService.h"
+#include "GameCore/DungeonService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
@@ -26,6 +27,50 @@ FItemInstance MakeHudTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, 
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDungeonHudViewModelTest,
+	"IdleProject.UI.HUD.DungeonPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDungeonHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UDungeonService* Dungeons = NewObject<UDungeonService>();
+	Dungeons->EnsureDailyReset(TEXT("2026-05-28"));
+	Dungeons->TryRunDungeon(EDungeonType::Gold, 350, TEXT("2026-05-28"));
+	Dungeons->TryRunDungeon(EDungeonType::Exp, 750, TEXT("2026-05-28"));
+	Dungeons->TryRunDungeon(EDungeonType::Exp, 750, TEXT("2026-05-28"));
+	Dungeons->TryRunDungeon(EDungeonType::Exp, 750, TEXT("2026-05-28"));
+
+	const FIdleHUDDungeonPanelViewModel ViewModel = IdleProject::UI::BuildDungeonPanelViewModel(*Dungeons, 350, TEXT("2026-05-28"));
+	TestEqual(TEXT("Dungeon panel title uses localized copy"), ViewModel.Title.ToString(), FString(TEXT("Dungeons")));
+	TestEqual(TEXT("Dungeon panel exposes the three dungeon rows"), ViewModel.Rows.Num(), 3);
+
+	const FIdleHUDDungeonRowViewModel& GoldRow = ViewModel.Rows[0];
+	TestEqual(TEXT("Gold dungeon row is first"), GoldRow.Type, EDungeonType::Gold);
+	TestEqual(TEXT("Gold dungeon name is localized"), GoldRow.NameLabel.ToString(), FString(TEXT("Gold Dungeon")));
+	TestEqual(TEXT("Gold remaining entries are formatted"), GoldRow.EntriesLabel.ToString(), FString(TEXT("Entries 2/3")));
+	TestEqual(TEXT("Gold CP requirement is shown"), GoldRow.RequiredPowerLabel.ToString(), FString(TEXT("CP 350 / 100")));
+	TestEqual(TEXT("Gold reward preview uses combat power formula"), GoldRow.RewardLabel.ToString(), FString(TEXT("Reward Gold +37,417")));
+	TestEqual(TEXT("Gold ready row uses enter action copy"), GoldRow.ActionLabel.ToString(), FString(TEXT("Enter")));
+	TestTrue(TEXT("Gold ready row enables hitbox"), GoldRow.bCanEnter);
+
+	const FIdleHUDDungeonRowViewModel& ExpRow = ViewModel.Rows[1];
+	TestEqual(TEXT("Sold out row keeps entry count at zero"), ExpRow.EntriesLabel.ToString(), FString(TEXT("Entries 0/3")));
+	TestEqual(TEXT("Sold out row exposes sold out status"), ExpRow.StatusLabel.ToString(), FString(TEXT("No Entries")));
+	TestFalse(TEXT("Sold out row disables hitbox"), ExpRow.bCanEnter);
+
+	const FIdleHUDDungeonRowViewModel& EssenceRow = ViewModel.Rows[2];
+	TestEqual(TEXT("Essence dungeon row is third"), EssenceRow.Type, EDungeonType::Essence);
+	TestEqual(TEXT("Essence CP requirement is shown"), EssenceRow.RequiredPowerLabel.ToString(), FString(TEXT("CP 350 / 500")));
+	TestEqual(TEXT("Low CP row exposes need CP status"), EssenceRow.StatusLabel.ToString(), FString(TEXT("Need CP")));
+	TestFalse(TEXT("Low CP row disables hitbox"), EssenceRow.bCanEnter);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

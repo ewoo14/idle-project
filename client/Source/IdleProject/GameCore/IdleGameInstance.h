@@ -5,6 +5,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/AchievementService.h"
+#include "GameCore/DungeonService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -131,6 +132,9 @@ public:
 	UTowerService* GetTowerService() const { return TowerService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UDungeonService* GetDungeonService() const { return DungeonService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	URuneService* GetRuneService() const { return RuneService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
@@ -169,6 +173,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Tower")
 	int64 ClimbTower();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Dungeon")
+	FDungeonRunResult TryRunDungeon(EDungeonType Type);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot);
@@ -345,6 +352,8 @@ public:
 
 	void InitializeTowerServiceForTests();
 
+	void InitializeDungeonServiceForTests(const FString& CurrentUtcDate);
+
 	void InitializeRuneServiceForTests();
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -430,6 +439,9 @@ private:
 	TObjectPtr<UTowerService> TowerService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UDungeonService> DungeonService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<URuneService> RuneService;
 
 	UPROPERTY(Transient)
@@ -513,6 +525,7 @@ private:
 	void EnsureSeasonService();
 	void EnsureStageService();
 	void EnsureTowerService();
+	void EnsureDungeonService();
 	void EnsureRuneService();
 	void EnsureAchievementService();
 	void RefreshPlayerCharacterStats();

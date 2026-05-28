@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "GameCore/AchievementFormula.h"
+#include "GameCore/DungeonTypes.h"
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
@@ -17,7 +18,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 9;
+	int32 SaveVersion = 10;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -72,6 +73,12 @@ public:
 
 	UPROPERTY()
 	int32 TowerHighestFloor = 0;
+
+	UPROPERTY()
+	TArray<int32> DungeonEntriesUsed;
+
+	UPROPERTY()
+	FString DungeonDailyResetDate;
 
 	UPROPERTY()
 	FString EquippedPetId;

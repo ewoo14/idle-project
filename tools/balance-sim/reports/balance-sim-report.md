@@ -388,6 +388,28 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Dungeon Daily Reward Pressure
+
+- Daily entry limit: 3 per dungeon.
+- Median sampled Lv50 gold/hour: 654689.
+- Median sampled Lv50 EXP/hour: 730254.
+- Dungeon rewards use `getDungeonReward` from `server/src/core/formulas/dungeon.ts`.
+- Dungeon acquisition is not injected into the sampled first-rebirth run;
+  the 1000-run median remains the PR #61 baseline guard.
+- Essence rows are reported as resource quantity because the simulator has
+  no baseline rune-essence/hour source yet.
+
+<!-- markdownlint-disable MD013 -->
+
+| Dungeon | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Gold | 100 | 100 | 20000 gold | 60000 gold | 0.092 |
+| Gold | 5500 | 100 | 148324 gold | 444972 gold | 0.68 |
+| Exp | 5500 | 250 | 93808 exp | 281424 exp | 0.385 |
+| Essence | 5500 | 500 | 40 essence | 120 essence | n/a |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Rune Codex Collection Pressure
 
 - Total cells: 63
@@ -454,6 +476,7 @@
 - server/src/core/formulas/offline.ts
 - server/src/core/formulas/reward.ts
 - server/src/core/formulas/stage.ts
+- server/src/core/formulas/dungeon.ts
 - server/src/core/formulas/drop.ts
 - server/src/core/formulas/enhance.ts
 - server/src/core/formulas/petLevel.ts
