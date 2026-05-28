@@ -107,3 +107,19 @@
 | §7 매트릭스 정의 | 정의 슬라이스 머지 이전 N/A — 정의 머지 후엔 [권장] (선택) |
 
 → 블로커 처리는 **§0 + 해당 슬라이스 후 활성화된 카테고리** 에 한정. 비활성 카테고리의 미체크는 N/A 로 통과.
+
+## PR #71 QA Checklist Addendum (Section 7)
+
+- [ ] `docs/qa/scenarios/M11-equipment-depth-v1.md` covers enhancement risk,
+  protection, pity, potential gating/cubes, PowerScore, lock, and v11-to-v12
+  migration in Given / When / Then format.
+- [ ] QA scenario classification includes normal, boundary, and regression rows.
+- [ ] UE Automation scope includes `IdleProject.Inventory.EnhanceFormula`,
+  `IdleProject.Inventory.PotentialFormula`, `IdleProject.Inventory.Bonus.Potential`,
+  `IdleProject.Inventory.AutoEquip.LockedItem`, and
+  `IdleProject.GameCore.SaveSystem.ExpandedItemFieldsRoundTrip`.
+- [ ] Server vitest scope includes `enhance.test.ts`, `potential.test.ts`,
+  `equipment.test.ts`, `drop.test.ts`, and `balance-sim.test.ts`.
+- [ ] Regression evidence captures +9 failure keep, +10 failure downgrade,
+  protection-scroll single consumption, 12-failure pity success, locked auto-equip
+  exclusion, potential PowerScore contribution, and v12 save defaults.
