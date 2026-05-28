@@ -1,6 +1,7 @@
 #include "Misc/AutomationTest.h"
 
 #include "Internationalization/IdleLocalization.h"
+#include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
 #include "UI/IdleHUD.h"
@@ -16,6 +17,13 @@ FRuneInstance MakeHudRune(FName RuneId, ERuneType Type, EItemRarity Rarity, int3
 	Rune.RuneType = Type;
 	Rune.Rarity = Rarity;
 	Rune.EnhanceLevel = EnhanceLevel;
+	return Rune;
+}
+
+FRuneInstance MakeHudClassRune(FName RuneId, EClassId ClassId, EItemRarity Rarity, int32 EnhanceLevel = 0)
+{
+	FRuneInstance Rune = MakeHudRune(RuneId, ERuneType::ClassMastery, Rarity, EnhanceLevel);
+	Rune.ClassRestriction = ClassId;
 	return Rune;
 }
 }
@@ -65,6 +73,54 @@ bool FRuneHudViewModelTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Rune shop roll is available with enough gold"), ViewModel.bCanBuyRuneRoll);
 	TestEqual(TEXT("Rune shop cost uses progress index"), ViewModel.ShopCost, FRuneFormula::GetShopRuneRollCost(12));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneClassSlotHudViewModelTest,
+	"IdleProject.Rune.ClassSlot.HUD.ViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneClassSlotHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::ResetCacheForTests();
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	URuneService* RuneService = NewObject<URuneService>();
+	RuneService->SetOwnerClassId(EClassId::Warrior);
+	RuneService->AddRune(MakeHudClassRune(TEXT("warrior_class"), EClassId::Warrior, EItemRarity::Rare, 1));
+	TestTrue(TEXT("Matching class rune equips into class slot"), RuneService->TryEquipRune(FClassRuneFormula::ClassRuneSlotIndex, 0));
+
+	const FIdleHUDRuneViewModel ViewModel = IdleProject::UI::BuildRuneViewModel(
+		*RuneService,
+		150,
+		0,
+		12,
+		INDEX_NONE);
+
+	TestEqual(TEXT("Class craft button label is localized"), ViewModel.ClassCraftButtonLabel.ToString(), FString(TEXT("Craft Class Rune")));
+	TestEqual(TEXT("Class craft cost label is localized"), ViewModel.ClassCraftCostLabel.ToString(), FString(TEXT("Craft: Essence 25")));
+	TestTrue(TEXT("Class craft is available with enough essence"), ViewModel.bCanCraftClassRune);
+	TestEqual(TEXT("Class craft hitbox is exposed"), ViewModel.ClassCraftHitBoxName, FName(TEXT("CraftClassRune")));
+
+	const FIdleHUDRuneSlotViewModel& ClassSlot = ViewModel.Slots[FClassRuneFormula::ClassRuneSlotIndex];
+	TestEqual(TEXT("Class slot label uses class copy"), ClassSlot.SlotLabel.ToString(), FString(TEXT("Class Rune")));
+	TestEqual(TEXT("Class slot mastery label includes owner class"), ClassSlot.TypeLabel.ToString(), FString(TEXT("Warrior Mastery")));
+	TestEqual(TEXT("Class slot value surfaces mastery bonus"), ClassSlot.ValueLabel.ToString(), FString(TEXT("+6%")));
+
+	RuneService->UnequipRune(FClassRuneFormula::ClassRuneSlotIndex);
+	const FIdleHUDRuneViewModel EmptyViewModel = IdleProject::UI::BuildRuneViewModel(
+		*RuneService,
+		10,
+		0,
+		12,
+		0);
+	const FIdleHUDRuneSlotViewModel& EmptyClassSlot = EmptyViewModel.Slots[FClassRuneFormula::ClassRuneSlotIndex];
+	TestEqual(TEXT("Empty class slot uses class empty copy"), EmptyClassSlot.TypeLabel.ToString(), FString(TEXT("No class rune")));
+	TestEqual(TEXT("Selected class rune can equip into class slot"), EmptyClassSlot.ActionHitBoxName, FName(TEXT("RuneEquip_6")));
+	TestFalse(TEXT("Class craft disabled without essence"), EmptyViewModel.bCanCraftClassRune);
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;

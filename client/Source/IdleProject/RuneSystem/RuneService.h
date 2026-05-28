@@ -32,6 +32,7 @@ public:
 	FRuneUtilValues GetEquippedUtilValues() const;
 	const TArray<FRuneInstance>& GetOwnedRunes() const { return OwnedRunes; }
 	const TArray<FRuneCodexEntry>& GetOwnedCodex() const { return OwnedCodex; }
+	EClassId GetOwnerClassId() const { return OwnerClassId; }
 	int32 GetEquippedOwnedIndex(int32 SlotIndex) const;
 	void UnlockCodexCell(ERuneType Type, EItemRarity Rarity);
 	FRuneCodexCompletion GetCodexCompletion() const;

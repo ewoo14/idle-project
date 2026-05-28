@@ -329,12 +329,17 @@ struct IDLEPROJECT_API FIdleHUDRuneViewModel
 	FText ShopButtonLabel;
 	FText ShopStatusLabel;
 	FText EmptyOwnedLabel;
+	FText ClassCraftCostLabel;
+	FText ClassCraftButtonLabel;
 	FName ShopHitBoxName;
+	FName ClassCraftHitBoxName;
 	int32 SelectedOwnedIndex = INDEX_NONE;
 	int64 RuneEssence = 0;
 	int64 Gold = 0;
 	int64 ShopCost = 0;
+	int64 ClassCraftCost = 0;
 	bool bCanBuyRuneRoll = false;
+	bool bCanCraftClassRune = false;
 	TArray<FIdleHUDRuneSlotViewModel> Slots;
 	TArray<FIdleHUDRuneOwnedRowViewModel> OwnedRows;
 };
@@ -628,6 +633,7 @@ private:
 	void TryEnhanceRuneFromHitBox(FName BoxName);
 	void TryDisenchantRuneFromHitBox(FName BoxName);
 	void TryBuyRuneRoll();
+	void TryCraftClassRune();
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
