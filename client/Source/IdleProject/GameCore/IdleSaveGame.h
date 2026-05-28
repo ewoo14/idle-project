@@ -6,6 +6,7 @@
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "RuneSystem/RuneCodexTypes.h"
 #include "RuneSystem/RuneTypes.h"
 #include "IdleSaveGame.generated.h"
 
@@ -16,7 +17,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 3;
+	int32 SaveVersion = 4;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -122,6 +123,9 @@ public:
 
 	UPROPERTY()
 	TArray<int32> EquippedRuneSlots;
+
+	UPROPERTY()
+	TArray<FRuneCodexEntry> RuneCodex;
 
 	UPROPERTY()
 	int64 RuneEssence = 0;

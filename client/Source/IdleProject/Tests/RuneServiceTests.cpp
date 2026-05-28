@@ -2,6 +2,7 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
 
@@ -18,6 +19,118 @@ FRuneInstance MakeRune(FName RuneId, ERuneType Type, EItemRarity Rarity, int32 E
 	Rune.EnhanceLevel = EnhanceLevel;
 	return Rune;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneServiceCodexUnlockTest,
+	"IdleProject.Rune.Service.CodexUnlock",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneServiceCodexUnlockTest::RunTest(const FString& Parameters)
+{
+	URuneService* RuneService = NewObject<URuneService>();
+	TestEqual(TEXT("New codex has all fifty four cells modeled"), RuneService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
+	TestEqual(TEXT("New codex has no unlocked cells"), RuneService->GetCodexCompletion().UnlockedCells, 0);
+	TestEqual(TEXT("New codex has no core bonus"), RuneService->GetCodexBonus().CoreStatAdd, 0.0f);
+
+	RuneService->AddRune(MakeRune(TEXT("phys_common_1"), ERuneType::PhysAtk, EItemRarity::Common, 0));
+	TestEqual(TEXT("AddRune unlocks the matching codex cell"), RuneService->GetCodexCompletion().UnlockedCells, 1);
+	TestEqual(TEXT("One codex cell adds per-cell core bonus"), RuneService->GetCodexBonus().CoreStatAdd, FRuneCodexFormula::PerCellCoreBonus);
+
+	RuneService->AddRune(MakeRune(TEXT("phys_common_2"), ERuneType::PhysAtk, EItemRarity::Common, 10));
+	TestEqual(TEXT("Duplicate rune type and rarity does not unlock another cell"), RuneService->GetCodexCompletion().UnlockedCells, 1);
+
+	int64 Refund = 0;
+	TestTrue(TEXT("Unlocked rune can be disenchanted"), RuneService->TryDisenchantRune(1, Refund));
+	TestEqual(TEXT("Codex unlock persists after disenchant"), RuneService->GetCodexCompletion().UnlockedCells, 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneServiceCodexCompletionAndRestoreTest,
+	"IdleProject.Rune.Service.CodexCompletionAndRestore",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneServiceCodexCompletionAndRestoreTest::RunTest(const FString& Parameters)
+{
+	URuneService* RuneService = NewObject<URuneService>();
+	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+	{
+		RuneService->AddRune(MakeRune(
+			*FString::Printf(TEXT("common_%d"), TypeValue),
+			static_cast<ERuneType>(TypeValue),
+			EItemRarity::Common));
+	}
+
+	FRuneCodexCompletion Completion = RuneService->GetCodexCompletion();
+	TestEqual(TEXT("One full rarity row unlocks nine cells"), Completion.UnlockedCells, 9);
+	TestTrue(TEXT("Common row is complete"), Completion.RowComplete[0]);
+	TestEqual(TEXT("Common row bonus is included"), RuneService->GetCodexBonus().CoreStatAdd, 9.0f * FRuneCodexFormula::PerCellCoreBonus + 0.01f);
+
+	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::Hp); ++TypeValue)
+	{
+		for (int32 RarityValue = static_cast<int32>(EItemRarity::Uncommon); RarityValue <= static_cast<int32>(EItemRarity::Mythic); ++RarityValue)
+		{
+			RuneService->AddRune(MakeRune(
+				*FString::Printf(TEXT("core_%d_%d"), TypeValue, RarityValue),
+				static_cast<ERuneType>(TypeValue),
+				static_cast<EItemRarity>(RarityValue)));
+		}
+	}
+
+	Completion = RuneService->GetCodexCompletion();
+	TestTrue(TEXT("All core type and rarity cells complete the core category"), Completion.bCoreCategoryComplete);
+	TestFalse(TEXT("Partial util cells do not complete util category"), Completion.bUtilCategoryComplete);
+
+	TArray<FRuneSaveEntry> CapturedRunes;
+	TArray<int32> CapturedSlots;
+	TArray<FRuneCodexEntry> CapturedCodex;
+	RuneService->CaptureState(CapturedRunes, CapturedSlots, CapturedCodex);
+
+	URuneService* RestoredService = NewObject<URuneService>();
+	RestoredService->RestoreState(CapturedRunes, CapturedSlots, CapturedCodex);
+	TestEqual(TEXT("Codex completion round trips through capture restore"), RestoredService->GetCodexCompletion().UnlockedCells, Completion.UnlockedCells);
+	TestTrue(TEXT("Core category completion round trips"), RestoredService->GetCodexCompletion().bCoreCategoryComplete);
+
+	TArray<FRuneCodexEntry> InvalidCodex = CapturedCodex;
+	InvalidCodex.Add(FRuneCodexEntry());
+	InvalidCodex[0].RuneType = ERuneType::None;
+	InvalidCodex[0].Rarity = EItemRarity::None;
+	InvalidCodex[0].bUnlocked = true;
+	RestoredService->RestoreState(CapturedRunes, CapturedSlots, InvalidCodex);
+	TestEqual(TEXT("Restore sanitizes invalid codex cells back to a fifty four cell grid"), RestoredService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
+	TestFalse(TEXT("Invalid codex entry does not unlock None/None"), RestoredService->GetOwnedCodex()[0].RuneType == ERuneType::None);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneServiceCodexUtilCapTest,
+	"IdleProject.Rune.Service.CodexUtilCap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneServiceCodexUtilCapTest::RunTest(const FString& Parameters)
+{
+	URuneService* RuneService = NewObject<URuneService>();
+	RuneService->AddRune(MakeRune(TEXT("gold_cap"), ERuneType::GoldFind, EItemRarity::Mythic, 10000));
+	RuneService->AddRune(MakeRune(TEXT("gold_cap_2"), ERuneType::GoldFind, EItemRarity::Mythic, 10000));
+	TestTrue(TEXT("High util rune equips"), RuneService->TryEquipRune(0, 0));
+	TestTrue(TEXT("Second high util rune equips"), RuneService->TryEquipRune(1, 1));
+	TestEqual(TEXT("Util cap starts at base formula cap"), RuneService->GetEquippedUtilValues().GoldFind, FRuneFormula::GetUtilCap(ERuneType::GoldFind));
+
+	for (int32 TypeValue = static_cast<int32>(ERuneType::CritDamage); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+	{
+		for (int32 RarityValue = static_cast<int32>(EItemRarity::Common); RarityValue <= static_cast<int32>(EItemRarity::Mythic); ++RarityValue)
+		{
+			RuneService->UnlockCodexCell(static_cast<ERuneType>(TypeValue), static_cast<EItemRarity>(RarityValue));
+		}
+	}
+
+	TestTrue(TEXT("Util category is complete"), RuneService->GetCodexCompletion().bUtilCategoryComplete);
+	TestEqual(TEXT("Completed util category extends equipped util cap"), RuneService->GetEquippedUtilValues().GoldFind, FRuneFormula::GetUtilCap(ERuneType::GoldFind) + FRuneCodexFormula::UtilCategoryCapExtension);
+
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -183,8 +296,9 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes rune state"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Rune save bumps version to three"), CapturedSave->SaveVersion, 3);
+	TestEqual(TEXT("Rune codex save bumps version to four"), CapturedSave->SaveVersion, 4);
 	TestEqual(TEXT("Captured rune count round trips"), CapturedSave->Runes.Num(), 2);
+	TestEqual(TEXT("Captured rune codex has fifty four cells"), CapturedSave->RuneCodex.Num(), FRuneCodexFormula::TotalCells);
 	TestEqual(TEXT("Captured rune essence round trips"), CapturedSave->RuneEssence, GameInstance->GetRuneEssence());
 	TestEqual(TEXT("Captured equipped rune slots have six entries"), CapturedSave->EquippedRuneSlots.Num(), FRuneFormula::RuneSlotCount);
 
@@ -192,6 +306,16 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Apply accepts captured rune save"), RestoredGameInstance->ApplyFromSave(CapturedSave));
 	TestEqual(TEXT("Restored rune essence round trips"), RestoredGameInstance->GetRuneEssence(), GameInstance->GetRuneEssence());
 	TestEqual(TEXT("Restored equipped gold find bonus round trips"), RestoredGameInstance->GetRuneGoldFindBonus(), GameInstance->GetRuneGoldFindBonus());
+
+	UIdleSaveGame* LegacyV3Save = NewObject<UIdleSaveGame>();
+	LegacyV3Save->bHasSave = true;
+	LegacyV3Save->SaveVersion = 3;
+	LegacyV3Save->RuneEssence = 123;
+	LegacyV3Save->Runes = CapturedSave->Runes;
+	LegacyV3Save->EquippedRuneSlots = CapturedSave->EquippedRuneSlots;
+	TestTrue(TEXT("Apply accepts legacy v3 rune save without codex field"), RestoredGameInstance->ApplyFromSave(LegacyV3Save));
+	TestEqual(TEXT("Legacy v3 save keeps rune essence"), RestoredGameInstance->GetRuneEssence(), static_cast<int64>(123));
+	TestEqual(TEXT("Legacy v3 save starts with empty rune codex bonus"), RestoredGameInstance->GetRuneService()->GetCodexBonus().CoreStatAdd, 0.0f);
 
 	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
 	LegacySave->bHasSave = true;

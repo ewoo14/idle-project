@@ -18,6 +18,7 @@ export * from "./petLevel.js";
 export * from "./rebirth.js";
 export * from "./reward.js";
 export * from "./rune.js";
+export * from "./runeCodex.js";
 export {
   computeSetBonus,
   getFourPieceBonus,

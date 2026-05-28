@@ -325,7 +325,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 3;
+	SaveGame->SaveVersion = 4;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -356,7 +356,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 
 	if (RuneService)
 	{
-		RuneService->CaptureState(SaveGame->Runes, SaveGame->EquippedRuneSlots);
+		RuneService->CaptureState(SaveGame->Runes, SaveGame->EquippedRuneSlots, SaveGame->RuneCodex);
 	}
 
 	if (PetService)
@@ -450,7 +450,14 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	{
 		if (SaveGame->SaveVersion >= 3)
 		{
-			RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots);
+			if (SaveGame->SaveVersion >= 4)
+			{
+				RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots, SaveGame->RuneCodex);
+			}
+			else
+			{
+				RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots, {});
+			}
 		}
 		else
 		{

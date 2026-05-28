@@ -20,6 +20,7 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
+#include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
 #include "UI/IdleHUDWidget.h"
@@ -232,6 +233,35 @@ const TCHAR* RuneTypeToLocalizationKey(ERuneType Type)
 FText RuneTypeToLabel(ERuneType Type)
 {
 	return RuneText(RuneTypeToLocalizationKey(Type));
+}
+
+EItemRarity RarityFromCodexRow(int32 RowIndex)
+{
+	return static_cast<EItemRarity>(static_cast<int32>(EItemRarity::Common) + RowIndex);
+}
+
+bool IsCodexRuneType(ERuneType Type)
+{
+	return FRuneFormula::IsCoreType(Type) || FRuneFormula::IsUtilType(Type);
+}
+
+int32 GetCodexColumnIndex(ERuneType Type)
+{
+	return static_cast<int32>(Type) - static_cast<int32>(ERuneType::PhysAtk);
+}
+
+int32 GetCodexCellKey(ERuneType Type, EItemRarity Rarity)
+{
+	return GetCodexColumnIndex(Type) * 6 + (static_cast<int32>(Rarity) - static_cast<int32>(EItemRarity::Common));
+}
+
+FText FormatRuneCodexPercentLabel(const TCHAR* Key, float Value)
+{
+	const int32 Percent = FMath::RoundToInt(FMath::Max(0.0f, Value) * 100.0f);
+	return FormatLocalizedRune(Key, [Percent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
 }
 
 float GetRuneDisplayValue(const FRuneInstance& Rune)
@@ -1262,6 +1292,114 @@ FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& Ru
 	return ViewModel;
 }
 
+FIdleHUDRuneCodexViewModel IdleProject::UI::BuildRuneCodexViewModel(const URuneService& RuneService)
+{
+	FIdleHUDRuneCodexViewModel ViewModel;
+	ViewModel.Title = RuneText(TEXT("RUNE_CODEX_TITLE"));
+
+	const FRuneCodexCompletion Completion = RuneService.GetCodexCompletion();
+	const FRuneCodexBonus Bonus = RuneService.GetCodexBonus();
+	ViewModel.UnlockedCells = FMath::Clamp(Completion.UnlockedCells, 0, FRuneCodexFormula::TotalCells);
+	ViewModel.TotalCells = FRuneCodexFormula::TotalCells;
+	ViewModel.ProgressRatio = static_cast<float>(ViewModel.UnlockedCells) / static_cast<float>(ViewModel.TotalCells);
+	ViewModel.bCoreCategoryComplete = Completion.bCoreCategoryComplete;
+	ViewModel.bUtilCategoryComplete = Completion.bUtilCategoryComplete;
+	ViewModel.ProgressLabel = FormatLocalizedRune(TEXT("RUNE_CODEX_PROGRESS_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Unlocked"), FText::AsNumber(ViewModel.UnlockedCells));
+		Args.Add(TEXT("Total"), FText::AsNumber(ViewModel.TotalCells));
+	});
+	ViewModel.CoreBonusLabel = FormatRuneCodexPercentLabel(TEXT("RUNE_CODEX_CORE_BONUS_FORMAT"), Bonus.CoreStatAdd);
+	ViewModel.UtilCapLabel = FormatRuneCodexPercentLabel(TEXT("RUNE_CODEX_UTIL_CAP_FORMAT"), Bonus.UtilCapExtension);
+
+	TMap<int32, bool> UnlockedByCellKey;
+	for (const FRuneCodexEntry& Entry : RuneService.GetOwnedCodex())
+	{
+		if (!Entry.bUnlocked || !IsCodexRuneType(Entry.RuneType) || Entry.Rarity < EItemRarity::Common || Entry.Rarity > EItemRarity::Mythic)
+		{
+			continue;
+		}
+		UnlockedByCellKey.Add(GetCodexCellKey(Entry.RuneType, Entry.Rarity), true);
+	}
+
+	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+	{
+		ViewModel.ColumnLabels.Add(RuneTypeToLabel(static_cast<ERuneType>(TypeValue)));
+	}
+
+	TArray<int32> RowUnlocked;
+	RowUnlocked.Init(0, 6);
+	for (int32 RowIndex = 0; RowIndex < 6; ++RowIndex)
+	{
+		const EItemRarity Rarity = RarityFromCodexRow(RowIndex);
+		for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+		{
+			const ERuneType RuneType = static_cast<ERuneType>(TypeValue);
+			const bool bUnlocked = UnlockedByCellKey.Contains(GetCodexCellKey(RuneType, Rarity));
+			if (bUnlocked)
+			{
+				++RowUnlocked[RowIndex];
+				if (FRuneFormula::IsCoreType(RuneType))
+				{
+					++ViewModel.CoreUnlockedCells;
+				}
+				else
+				{
+					++ViewModel.UtilUnlockedCells;
+				}
+			}
+
+			FIdleHUDRuneCodexCellViewModel Cell;
+			Cell.RuneType = RuneType;
+			Cell.Rarity = Rarity;
+			Cell.RowIndex = RowIndex;
+			Cell.ColumnIndex = GetCodexColumnIndex(RuneType);
+			Cell.bUnlocked = bUnlocked;
+			Cell.bCoreType = FRuneFormula::IsCoreType(RuneType);
+			Cell.TypeLabel = RuneTypeToLabel(RuneType);
+			Cell.RarityLabel = RarityToLabel(Rarity);
+			Cell.StatusLabel = RuneText(bUnlocked ? TEXT("RUNE_CODEX_CELL_UNLOCKED") : TEXT("RUNE_CODEX_CELL_LOCKED"));
+			Cell.AccentColor = bUnlocked ? RarityToColor(Rarity) : Theme::TextMuted.CopyWithNewOpacity(0.42f);
+			ViewModel.Cells.Add(Cell);
+		}
+	}
+
+	for (int32 RowIndex = 0; RowIndex < 6; ++RowIndex)
+	{
+		const EItemRarity Rarity = RarityFromCodexRow(RowIndex);
+		FIdleHUDRuneCodexRowViewModel Row;
+		Row.Rarity = Rarity;
+		Row.RowIndex = RowIndex;
+		Row.RarityLabel = RarityToLabel(Rarity);
+		Row.AccentColor = RarityToColor(Rarity);
+		Row.UnlockedCount = RowUnlocked[RowIndex];
+		Row.bComplete = Completion.RowComplete.IsValidIndex(RowIndex) && Completion.RowComplete[RowIndex];
+		Row.BonusLabel = FormatLocalizedRune(TEXT("RUNE_CODEX_ROW_BONUS_FORMAT"), [Rarity](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Rarity"), RarityToLabel(Rarity));
+			Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(FRuneCodexFormula::GetRowCompletionBonus(Rarity) * 100.0f)));
+		});
+		ViewModel.Rows.Add(Row);
+	}
+
+	ViewModel.CoreCategoryLabel = ViewModel.bCoreCategoryComplete
+		? RuneText(TEXT("RUNE_CODEX_CORE_CATEGORY_COMPLETE"))
+		: FormatLocalizedRune(TEXT("RUNE_CODEX_CORE_CATEGORY_PROGRESS_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Unlocked"), FText::AsNumber(ViewModel.CoreUnlockedCells));
+			Args.Add(TEXT("Total"), FText::AsNumber(FRuneCodexFormula::CoreCategoryCells));
+		});
+	ViewModel.UtilCategoryLabel = ViewModel.bUtilCategoryComplete
+		? RuneText(TEXT("RUNE_CODEX_UTIL_CATEGORY_COMPLETE"))
+		: FormatLocalizedRune(TEXT("RUNE_CODEX_UTIL_CATEGORY_PROGRESS_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Unlocked"), FText::AsNumber(ViewModel.UtilUnlockedCells));
+			Args.Add(TEXT("Total"), FText::AsNumber(FRuneCodexFormula::UtilCategoryCells));
+		});
+
+	return ViewModel;
+}
+
 FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints)
 {
 	FIdleHUDStatPanelViewModel ViewModel;
@@ -2018,6 +2156,7 @@ void AIdleHUD::DrawHUD()
 	DrawStatInfoPanel();
 	DrawShopPanel();
 	DrawRunePanel();
+	DrawRuneCodexPanel();
 	DrawEnhancePanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
@@ -3085,6 +3224,97 @@ void AIdleHUD::DrawRunePanel()
 	}
 
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawRuneCodexPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const URuneService* RuneService = IdleGameInstance ? IdleGameInstance->GetRuneService() : nullptr;
+	if (!RuneService)
+	{
+		return;
+	}
+
+	const FIdleHUDRuneCodexViewModel ViewModel = BuildRuneCodexViewModel(*RuneService);
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 328.0f * Scale;
+	const float Padding = 12.0f * Scale;
+	const float HeaderHeight = 76.0f * Scale;
+	const float CellSize = 23.0f * Scale;
+	const float CellGap = 4.0f * Scale;
+	const float RowLabelWidth = 72.0f * Scale;
+	const float FooterHeight = 116.0f * Scale;
+	const float PanelHeight = HeaderHeight + 6.0f * CellSize + 5.0f * CellGap + FooterHeight + Padding;
+	const float RunePanelWidth = FMath::Clamp(Canvas->SizeX * 0.26f, 380.0f * Scale, 500.0f * Scale);
+	const float RunePanelX = Canvas->SizeX - RunePanelWidth - 28.0f * Scale;
+	const float X = FMath::Max(28.0f * Scale, RunePanelX - PanelWidth - 12.0f * Scale);
+	const float Y = 282.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.90f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::RarityMythicStart, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::RarityMythicStart, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.ProgressLabel.ToString(), Theme::AccentGold, X + Padding, Y + 36.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), X + Padding, Y + 60.0f * Scale, PanelWidth - Padding * 2.0f, 5.0f * Scale);
+	DrawRect(Theme::AccentGold, X + Padding, Y + 60.0f * Scale, (PanelWidth - Padding * 2.0f) * ViewModel.ProgressRatio, 5.0f * Scale);
+
+	const float GridX = X + Padding + RowLabelWidth;
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDRuneCodexRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawText(Row.RarityLabel.ToString(), Row.bComplete ? Row.AccentColor : Theme::TextMuted, X + Padding, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		DrawText(Row.bComplete ? TEXT("*") : TEXT(""), Row.AccentColor, X + Padding + 56.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+		RowY += CellSize + CellGap;
+	}
+
+	for (const FIdleHUDRuneCodexCellViewModel& Cell : ViewModel.Cells)
+	{
+		const float CellX = GridX + Cell.ColumnIndex * (CellSize + CellGap);
+		const float CellY = Y + HeaderHeight + Cell.RowIndex * (CellSize + CellGap);
+		DrawRuneCodexCell(Cell, CellX, CellY, CellSize);
+	}
+
+	const float FooterY = Y + HeaderHeight + 6.0f * CellSize + 5.0f * CellGap + 10.0f * Scale;
+	DrawText(ViewModel.CoreCategoryLabel.ToString(), ViewModel.bCoreCategoryComplete ? Theme::AccentGold : Theme::TextMuted, X + Padding, FooterY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(ViewModel.UtilCategoryLabel.ToString(), ViewModel.bUtilCategoryComplete ? Theme::AccentGold : Theme::TextMuted, X + 128.0f * Scale, FooterY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(ViewModel.CoreBonusLabel.ToString(), Theme::AccentBlue, X + Padding, FooterY + 20.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(ViewModel.UtilCapLabel.ToString(), Theme::RarityMythicEnd, X + 128.0f * Scale, FooterY + 20.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+
+	for (int32 Index = 0; Index < ViewModel.Rows.Num(); ++Index)
+	{
+		const FIdleHUDRuneCodexRowViewModel& Row = ViewModel.Rows[Index];
+		DrawText(Row.BonusLabel.ToString(), Row.bComplete ? Row.AccentColor : Theme::TextMuted, X + Padding, FooterY + (40.0f + Index * 12.0f) * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.48f * Scale);
+	}
+}
+
+void AIdleHUD::DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size)
+{
+	using namespace IdleProject::UI;
+
+	const float Inner = FMath::Max(2.0f, Size - 4.0f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), X, Y, Size, Size);
+	DrawRect(Cell.AccentColor.CopyWithNewOpacity(Cell.bUnlocked ? 0.95f : 0.34f), X + 2.0f, Y + 2.0f, Inner, Inner);
+	if (Cell.bCoreType)
+	{
+		DrawRect(Theme::AccentBlue.CopyWithNewOpacity(Cell.bUnlocked ? 0.88f : 0.30f), X + 4.0f, Y + Size - 6.0f, Size - 8.0f, 2.0f);
+	}
+	else
+	{
+		DrawRect(Theme::AccentGold.CopyWithNewOpacity(Cell.bUnlocked ? 0.88f : 0.30f), X + 4.0f, Y + Size - 6.0f, Size - 8.0f, 2.0f);
+	}
 }
 
 void AIdleHUD::DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height)

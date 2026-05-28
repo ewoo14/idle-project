@@ -189,11 +189,12 @@ void AIdleCharacter::RefreshDerivedStats()
 		if (const URuneService* RuneService = IdleGameInstance->GetRuneService())
 		{
 			const FRuneCoreMultipliers RuneMultipliers = RuneService->GetEquippedCoreMultipliers();
-			Derived.PhysAtk *= RuneMultipliers.PhysAtk;
-			Derived.MagicAtk *= RuneMultipliers.MagicAtk;
-			Derived.PhysDef *= RuneMultipliers.PhysDef;
-			Derived.MagicDef *= RuneMultipliers.MagicDef;
-			Derived.Hp *= RuneMultipliers.Hp;
+			const float CodexCore = RuneService->GetCodexBonus().CoreStatAdd;
+			Derived.PhysAtk *= RuneMultipliers.PhysAtk + CodexCore;
+			Derived.MagicAtk *= RuneMultipliers.MagicAtk + CodexCore;
+			Derived.PhysDef *= RuneMultipliers.PhysDef + CodexCore;
+			Derived.MagicDef *= RuneMultipliers.MagicDef + CodexCore;
+			Derived.Hp *= RuneMultipliers.Hp + CodexCore;
 			Derived.CritDmg += RuneService->GetEquippedUtilValues().CritDamage;
 		}
 	}

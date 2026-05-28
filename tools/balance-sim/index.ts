@@ -45,6 +45,14 @@ import {
   RUNE_SLOT_COUNT,
 } from "../../server/src/core/formulas/rune.js";
 import {
+  CORE_CATEGORY_BONUS,
+  computeRuneCodexBonus,
+  getRowCompletionBonus,
+  PER_CELL_CORE_BONUS,
+  RUNE_CODEX_TOTAL_CELLS,
+  UTIL_CATEGORY_CAP_EXTENSION,
+} from "../../server/src/core/formulas/runeCodex.js";
+import {
   computeMonsterStatMultiplier,
   computeRewardMultiplier,
   DEFAULT_STAGES_PER_CHAPTER,
@@ -126,6 +134,7 @@ export type BalanceReport = {
       petFeedPressure: PetFeedPressure;
       achievementPressure: AchievementPressure;
       runePressure: RunePressure;
+      runeCodexPressure: RuneCodexPressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -292,6 +301,20 @@ export type RunePressure = {
   utilRows: RuneUtilPressureRow[];
 };
 
+export type RuneCodexPressure = {
+  totalCells: number;
+  perCellCoreBonusPercent: number;
+  allCellsCoreBonusPercent: number;
+  allRowsCoreBonusPercent: number;
+  coreCategoryBonusPercent: number;
+  utilCategoryCapExtensionPercent: number;
+  fullCodexCoreStatAddPercent: number;
+  baseMedianRebirthHours: number;
+  projectedFullCodexMedianHours: number;
+  projectedMedianDeltaPercent: number;
+  injectedIntoSampledRun: boolean;
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -385,12 +408,16 @@ export function buildBalanceReport(
         "server/src/core/formulas/petLevel.ts",
         "server/src/core/formulas/achievement.ts",
         "server/src/core/formulas/rune.ts",
+        "server/src/core/formulas/runeCodex.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
       achievementPressure: buildAchievementPressure(),
       runePressure: buildRunePressure(),
+      runeCodexPressure: buildRuneCodexPressure(
+        distribution.summary.medianHours,
+      ),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -1033,6 +1060,48 @@ function buildRunePressure(): RunePressure {
   };
 }
 
+function buildRuneCodexPressure(
+  baseMedianRebirthHours: number,
+): RuneCodexPressure {
+  const rowBonus = [1, 2, 3, 4, 5, 6].reduce(
+    (sum, rarity) => sum + getRowCompletionBonus(rarity),
+    0,
+  );
+  const fullCodexBonus = computeRuneCodexBonus({
+    unlockedCells: RUNE_CODEX_TOTAL_CELLS,
+    rowComplete: [true, true, true, true, true, true],
+    coreCategoryComplete: true,
+    utilCategoryComplete: true,
+  });
+  const projectedFullCodexMedianHours =
+    baseMedianRebirthHours / (1 + fullCodexBonus.coreStatAdd);
+
+  return {
+    totalCells: RUNE_CODEX_TOTAL_CELLS,
+    perCellCoreBonusPercent: round(PER_CELL_CORE_BONUS * 100, 3),
+    allCellsCoreBonusPercent: round(
+      RUNE_CODEX_TOTAL_CELLS * PER_CELL_CORE_BONUS * 100,
+      3,
+    ),
+    allRowsCoreBonusPercent: round(rowBonus * 100, 3),
+    coreCategoryBonusPercent: round(CORE_CATEGORY_BONUS * 100, 3),
+    utilCategoryCapExtensionPercent: round(
+      UTIL_CATEGORY_CAP_EXTENSION * 100,
+      3,
+    ),
+    fullCodexCoreStatAddPercent: round(fullCodexBonus.coreStatAdd * 100, 3),
+    baseMedianRebirthHours,
+    projectedFullCodexMedianHours: round(projectedFullCodexMedianHours, 3),
+    projectedMedianDeltaPercent: round(
+      ((projectedFullCodexMedianHours - baseMedianRebirthHours) /
+        baseMedianRebirthHours) *
+        100,
+      1,
+    ),
+    injectedIntoSampledRun: false,
+  };
+}
+
 function buildRuneCorePressureRow(
   rarity: number,
   enhanceLevel: number,
@@ -1397,6 +1466,21 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Rune Codex Collection Pressure",
+    "",
+    `- Total cells: ${report.model.runeCodexPressure.totalCells}`,
+    `- Per-cell core bonus: +${report.model.runeCodexPressure.perCellCoreBonusPercent}%`,
+    `- All-cell core bonus: +${report.model.runeCodexPressure.allCellsCoreBonusPercent}%`,
+    `- All row-completion bonuses: +${report.model.runeCodexPressure.allRowsCoreBonusPercent}%`,
+    `- Core category completion bonus: +${report.model.runeCodexPressure.coreCategoryBonusPercent}%`,
+    `- Util category cap extension: +${report.model.runeCodexPressure.utilCategoryCapExtensionPercent}%`,
+    `- Full codex core bonus: +${report.model.runeCodexPressure.fullCodexCoreStatAddPercent}%`,
+    `- Base median first-rebirth time: ${report.model.runeCodexPressure.baseMedianRebirthHours}h`,
+    `- Projected full-codex median if applied directly to first rebirth DPS: ${report.model.runeCodexPressure.projectedFullCodexMedianHours}h (${report.model.runeCodexPressure.projectedMedianDeltaPercent}%).`,
+    "- Not injected into the sampled first-rebirth run. The 1000-run median",
+    "  remains the baseline guard until rune acquisition/drop rates are wired",
+    "  into the simulation model.",
     "",
     "## Class Balance Snapshot",
     "",

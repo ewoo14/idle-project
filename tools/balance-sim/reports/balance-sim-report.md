@@ -224,6 +224,21 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Rune Codex Collection Pressure
+
+- Total cells: 54
+- Per-cell core bonus: +0.4%
+- All-cell core bonus: +21.6%
+- All row-completion bonuses: +31%
+- Core category completion bonus: +5%
+- Util category cap extension: +10%
+- Full codex core bonus: +57.6%
+- Base median first-rebirth time: 5.328h
+- Projected full-codex median if applied directly to first rebirth DPS: 3.381h (-36.5%).
+- Not injected into the sampled first-rebirth run. The 1000-run median
+  remains the baseline guard until rune acquisition/drop rates are wired
+  into the simulation model.
+
 ## Class Balance Snapshot
 
 - Effective DPS uses the class attack route through `computeClassDamage`,
@@ -279,3 +294,4 @@
 - server/src/core/formulas/petLevel.ts
 - server/src/core/formulas/achievement.ts
 - server/src/core/formulas/rune.ts
+- server/src/core/formulas/runeCodex.ts
