@@ -1694,6 +1694,31 @@ Guardrails:
 
 ---
 
+## PR #70 Chapter 4 Quest Reward Review
+
+PR #70 extends the main quest chain with six chapter 4 quests. Rewards continue
+the chapter 3 curve without changing daily or weekly quest pressure:
+
+| Quest | Objective | Target | Gold | EXP | Map |
+| --- | --- | ---: | ---: | ---: | --- |
+| main_ch4_001 | KillMonster | 65 | 18,400 | 13,800 | 4-1 |
+| main_ch4_002 | ClearMap | 1 | 21,000 | 15,800 | 4-2 |
+| main_ch4_003 | ReachLevel | 40 | 24,000 | 18,000 | 4-4 |
+| main_ch4_004 | ClimbTower | 25 | 27,500 | 20,500 | 4-5 |
+| main_ch4_005 | KillMonster | 80 | 31,500 | 23,600 | 4-8 |
+| main_ch4_006 | DefeatBoss | 1 | 38,000 | 28,500 | 4-10 |
+
+Guardrails:
+
+- Keep chapter 4 main quests chained after `main_ch3_006`; no new daily or
+  weekly reset behavior is introduced.
+- `ReachLevel` remains maximum-observed progress, while `KillMonster`,
+  `ClimbTower`, and `DefeatBoss` remain cumulative objective hooks.
+- Re-run quest definition parity on both client and server after changing
+  quest IDs, objective names, target counts, rewards, or chapter-map IDs.
+
+---
+
 ## PR #66 Chapter 3 Stage/Element Balance Addendum
 
 PR #66 expands the stage model to 3 chapters with 10 stages per chapter. The

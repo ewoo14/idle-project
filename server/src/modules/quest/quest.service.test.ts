@@ -206,6 +206,66 @@ describe("QuestService", () => {
         chapterMapId: "3-10",
       },
       {
+        questId: "main_ch4_001",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 65,
+        rewardGold: 18400,
+        rewardExp: 13800,
+        prerequisiteQuestId: "main_ch3_006",
+        chapterMapId: "4-1",
+      },
+      {
+        questId: "main_ch4_002",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 21000,
+        rewardExp: 15800,
+        prerequisiteQuestId: "main_ch4_001",
+        chapterMapId: "4-2",
+      },
+      {
+        questId: "main_ch4_003",
+        type: "main",
+        objective: "reach_level",
+        targetCount: 40,
+        rewardGold: 24000,
+        rewardExp: 18000,
+        prerequisiteQuestId: "main_ch4_002",
+        chapterMapId: "4-4",
+      },
+      {
+        questId: "main_ch4_004",
+        type: "main",
+        objective: "climb_tower",
+        targetCount: 25,
+        rewardGold: 27500,
+        rewardExp: 20500,
+        prerequisiteQuestId: "main_ch4_003",
+        chapterMapId: "4-5",
+      },
+      {
+        questId: "main_ch4_005",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 80,
+        rewardGold: 31500,
+        rewardExp: 23600,
+        prerequisiteQuestId: "main_ch4_004",
+        chapterMapId: "4-8",
+      },
+      {
+        questId: "main_ch4_006",
+        type: "main",
+        objective: "defeat_boss",
+        targetCount: 1,
+        rewardGold: 38000,
+        rewardExp: 28500,
+        prerequisiteQuestId: "main_ch4_005",
+        chapterMapId: "4-10",
+      },
+      {
         questId: "daily_kill_monsters",
         type: "daily",
         objective: "kill_monster",
@@ -648,6 +708,130 @@ describe("QuestService", () => {
       dailyResetDate: null,
       weeklyResetId: null,
     });
+  });
+
+  it("unlocks and progresses chapter four main quests through level, tower, and boss hooks", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch3_006",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const service = new QuestService(repo);
+
+    const killResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "kill_monster", amount: 65 },
+    );
+
+    expect(killResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch4_001",
+        progress: 65,
+        completed: true,
+        chapterMapId: "4-1",
+      }),
+    );
+
+    const levelRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch3_006",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+        progressRecord({
+          questId: "main_ch4_001",
+          progress: 65,
+          completed: true,
+          claimed: true,
+        }),
+        progressRecord({
+          questId: "main_ch4_002",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const levelService = new QuestService(levelRepo);
+
+    const towerRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch4_003",
+          progress: 40,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const towerService = new QuestService(towerRepo);
+
+    const bossRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch4_004",
+          progress: 25,
+          completed: true,
+          claimed: true,
+        }),
+        progressRecord({
+          questId: "main_ch4_005",
+          progress: 80,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const bossService = new QuestService(bossRepo);
+
+    const levelResults = await levelService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 40 },
+    );
+    const towerResults = await towerService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "climb_tower", amount: 25 },
+    );
+    const bossResults = await bossService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "defeat_boss", amount: 1 },
+    );
+
+    expect(levelResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch4_003",
+        progress: 40,
+        completed: true,
+        chapterMapId: "4-4",
+      }),
+    );
+    expect(towerResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch4_004",
+        progress: 25,
+        completed: true,
+        chapterMapId: "4-5",
+      }),
+    );
+    expect(bossResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch4_006",
+        progress: 1,
+        completed: true,
+        chapterMapId: "4-10",
+      }),
+    );
   });
 
   it("keeps listed quest data aligned with the canonical quest definitions", async () => {
