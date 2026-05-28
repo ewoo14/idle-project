@@ -6,6 +6,7 @@
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/AchievementService.h"
 #include "GameCore/DungeonService.h"
+#include "GameCore/MasteryService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -160,6 +161,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UAchievementService* GetAchievementService() const { return AchievementService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UMasteryService* GetMasteryService() const { return MasteryService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -346,6 +350,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
 	float GetAchievementStatMultiplier() const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
+	float GetMasteryCoreStatMultiplier() const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
 	int32 GetAchievementTotalPoints() const;
 
@@ -504,6 +511,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAchievementService> AchievementService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UMasteryService> MasteryService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -595,6 +605,7 @@ private:
 	void EnsureDungeonService();
 	void EnsureRuneService();
 	void EnsureAchievementService();
+	void EnsureMasteryService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	UFUNCTION()

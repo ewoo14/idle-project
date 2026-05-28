@@ -4,6 +4,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "GameCore/AchievementFormula.h"
 #include "GameCore/DungeonTypes.h"
+#include "GameCore/MasteryTypes.h"
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
@@ -18,7 +19,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 12;
+	int32 SaveVersion = 13;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -127,6 +128,9 @@ public:
 
 	UPROPERTY()
 	TArray<FName> AchievementUniqueItemIds;
+
+	UPROPERTY()
+	TArray<FMasterySaveEntry> Mastery;
 
 	UPROPERTY()
 	TArray<FRuneSaveEntry> Runes;
