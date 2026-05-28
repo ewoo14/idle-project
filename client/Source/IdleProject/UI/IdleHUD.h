@@ -516,6 +516,7 @@ namespace IdleProject::UI
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
 IDLEPROJECT_API FLinearColor RarityToColor(EItemRarity Rarity);
 IDLEPROJECT_API FText BuildAffixSummary(const FItemInstance& Item);
+IDLEPROJECT_API FText BuildUniqueTraitSummary(const FItemInstance& Item);
 IDLEPROJECT_API FIdleHUDSetSummaryViewModel BuildSetSummaryViewModel(const TArray<FItemInstance>& EquippedItems);
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);

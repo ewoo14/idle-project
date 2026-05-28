@@ -20,6 +20,7 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
+#include "ItemSystem/UniqueTraitFormula.h"
 #include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
@@ -193,6 +194,64 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 	default:
 		return TEXT("RARITY_NONE");
 	}
+}
+
+const TCHAR* UniqueTraitToLocalizationKey(EUniqueTrait Trait)
+{
+	switch (Trait)
+	{
+	case EUniqueTrait::AllStatSurge:
+		return TEXT("UNIQUE_TRAIT_ALL_STAT_SURGE");
+	case EUniqueTrait::CritDamageSurge:
+		return TEXT("UNIQUE_TRAIT_CRIT_DAMAGE_SURGE");
+	case EUniqueTrait::CritRateSurge:
+		return TEXT("UNIQUE_TRAIT_CRIT_RATE_SURGE");
+	case EUniqueTrait::LifeSurge:
+		return TEXT("UNIQUE_TRAIT_LIFE_SURGE");
+	case EUniqueTrait::SwiftSurge:
+		return TEXT("UNIQUE_TRAIT_SWIFT_SURGE");
+	case EUniqueTrait::PhysMastery:
+		return TEXT("UNIQUE_TRAIT_PHYS_MASTERY");
+	case EUniqueTrait::MagicMastery:
+		return TEXT("UNIQUE_TRAIT_MAGIC_MASTERY");
+	case EUniqueTrait::GuardMastery:
+		return TEXT("UNIQUE_TRAIT_GUARD_MASTERY");
+	case EUniqueTrait::None:
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+bool UniqueTraitUsesFlatValue(EUniqueTrait Trait)
+{
+	return Trait == EUniqueTrait::SwiftSurge;
+}
+
+FText FormatUniqueTraitLabel(EUniqueTrait Trait, EItemRarity Rarity)
+{
+	const float Value = FUniqueTraitFormula::GetTraitValue(Trait, Rarity);
+	if (Value <= 0.0f)
+	{
+		return FText::GetEmpty();
+	}
+
+	const FText TraitLabel = IdleProject::Localization::UI(UniqueTraitToLocalizationKey(Trait));
+	if (UniqueTraitUsesFlatValue(Trait))
+	{
+		const FString FormattedValue = FString::Printf(TEXT("%.2f"), Value);
+		return FormatLocalizedUI(TEXT("UNIQUE_TRAIT_FLAT_FORMAT"), [&TraitLabel, &FormattedValue](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Trait"), TraitLabel);
+			Args.Add(TEXT("Value"), FText::FromString(FormattedValue));
+		});
+	}
+
+	const int32 Percent = FMath::RoundToInt(Value * 100.0f);
+	return FormatLocalizedUI(TEXT("UNIQUE_TRAIT_PERCENT_FORMAT"), [&TraitLabel, Percent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Trait"), TraitLabel);
+		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
 }
 
 FText RuneText(const TCHAR* Key)
@@ -1059,6 +1118,26 @@ FText IdleProject::UI::BuildAffixSummary(const FItemInstance& Item)
 	if (Item.BonusCritDmg > 0.0f)
 	{
 		Parts.Add(FormatAffixRateLabel(TEXT("AFFIX_CRIT_DMG_FORMAT"), Item.BonusCritDmg).ToString());
+	}
+
+	return Parts.IsEmpty()
+		? FText::GetEmpty()
+		: FText::FromString(FString::Join(Parts, TEXT(" / ")));
+}
+
+FText IdleProject::UI::BuildUniqueTraitSummary(const FItemInstance& Item)
+{
+	TArray<FString> Parts;
+	const FText Trait1 = FormatUniqueTraitLabel(Item.UniqueTrait1, Item.Rarity);
+	if (!Trait1.IsEmpty())
+	{
+		Parts.Add(Trait1.ToString());
+	}
+
+	const FText Trait2 = FormatUniqueTraitLabel(Item.UniqueTrait2, Item.Rarity);
+	if (!Trait2.IsEmpty())
+	{
+		Parts.Add(Trait2.ToString());
 	}
 
 	return Parts.IsEmpty()
@@ -2965,6 +3044,11 @@ void AIdleHUD::RefreshEquipmentSummary()
 		{
 			WeaponLine = FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponLine, AffixSummary);
 		}
+		const FText TraitSummary = IdleProject::UI::BuildUniqueTraitSummary(*Weapon);
+		if (!TraitSummary.IsEmpty())
+		{
+			WeaponLine = FText::Format(FText::FromString(TEXT("{0}\n{1}")), WeaponLine, TraitSummary);
+		}
 		WeaponColor = IdleProject::UI::RarityToColor(Weapon->Rarity);
 	}
 
@@ -2981,6 +3065,7 @@ void AIdleHUD::RefreshEquipmentSummary()
 	int32 EquippedArmorCount = 0;
 	float BonusDef = 0.0f;
 	float BonusHp = 0.0f;
+	TArray<FString> ArmorTraitLines;
 
 	for (EItemSlot Slot : ArmorSlots)
 	{
@@ -2990,15 +3075,27 @@ void AIdleHUD::RefreshEquipmentSummary()
 			++EquippedArmorCount;
 			BonusDef += Item->BonusDef;
 			BonusHp += Item->BonusHp;
+			const FText TraitSummary = IdleProject::UI::BuildUniqueTraitSummary(*Item);
+			if (!TraitSummary.IsEmpty())
+			{
+				ArmorTraitLines.Add(FString::Printf(TEXT("%s: %s"), *Item->DisplayName.ToString(), *TraitSummary.ToString()));
+			}
 		}
 	}
 
-	const FText ArmorLine = FormatLocalizedUI(TEXT("HUD_ARMOR_SUMMARY_FORMAT"), [EquippedArmorCount, BonusDef, BonusHp](FFormatNamedArguments& Args)
+	FText ArmorLine = FormatLocalizedUI(TEXT("HUD_ARMOR_SUMMARY_FORMAT"), [EquippedArmorCount, BonusDef, BonusHp](FFormatNamedArguments& Args)
 	{
 		Args.Add(TEXT("Count"), FText::AsNumber(EquippedArmorCount));
 		Args.Add(TEXT("Defense"), FText::AsNumber(FMath::RoundToInt(BonusDef)));
 		Args.Add(TEXT("Hp"), FText::AsNumber(FMath::RoundToInt(BonusHp)));
 	});
+	if (!ArmorTraitLines.IsEmpty())
+	{
+		ArmorLine = FText::Format(
+			FText::FromString(TEXT("{0}\n{1}")),
+			ArmorLine,
+			FText::FromString(FString::Join(ArmorTraitLines, TEXT("\n"))));
+	}
 
 	TArray<FString> SetLines;
 	const FIdleHUDSetSummaryViewModel SetViewModel = IdleProject::UI::BuildSetSummaryViewModel(EquippedItems);
