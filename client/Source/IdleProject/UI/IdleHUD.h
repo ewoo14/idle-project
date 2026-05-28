@@ -18,6 +18,7 @@ class AIdleCharacter;
 class AIdleMonster;
 class UBattleAIComponent;
 class UInventoryComponent;
+class URuneService;
 class USkillComponent;
 class SIdleHUDWidget;
 
@@ -272,6 +273,71 @@ struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
 	bool bLastResultError = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDRuneSlotViewModel
+{
+	int32 SlotIndex = INDEX_NONE;
+	int32 OwnedIndex = INDEX_NONE;
+	FText SlotLabel;
+	FText TypeLabel;
+	FText RarityLabel;
+	FText LevelLabel;
+	FText ValueLabel;
+	FText StatusLabel;
+	FText ActionLabel;
+	FLinearColor RarityColor = FLinearColor::White;
+	FName ActionHitBoxName;
+	bool bEquipped = false;
+	bool bCanEquipSelected = false;
+	bool bCanUnequip = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDRuneOwnedRowViewModel
+{
+	int32 OwnedIndex = INDEX_NONE;
+	ERuneType RuneType = ERuneType::None;
+	EItemRarity Rarity = EItemRarity::None;
+	FText TypeLabel;
+	FText RarityLabel;
+	FText LevelLabel;
+	FText ValueLabel;
+	FText EnhanceCostLabel;
+	FText EnhancePreviewLabel;
+	FText DisenchantLabel;
+	FText SelectActionLabel;
+	FText EnhanceActionLabel;
+	FText DisenchantActionLabel;
+	FLinearColor RarityColor = FLinearColor::White;
+	FName SelectHitBoxName;
+	FName EnhanceHitBoxName;
+	FName DisenchantHitBoxName;
+	int64 EnhanceEssenceCost = 0;
+	int64 EnhanceGoldCost = 0;
+	int64 DisenchantEssence = 0;
+	bool bEquipped = false;
+	bool bSelected = false;
+	bool bCanEnhance = false;
+	bool bCanDisenchant = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDRuneViewModel
+{
+	FText Title;
+	FText EssenceLabel;
+	FText GoldLabel;
+	FText ShopCostLabel;
+	FText ShopButtonLabel;
+	FText ShopStatusLabel;
+	FText EmptyOwnedLabel;
+	FName ShopHitBoxName;
+	int32 SelectedOwnedIndex = INDEX_NONE;
+	int64 RuneEssence = 0;
+	int64 Gold = 0;
+	int64 ShopCost = 0;
+	bool bCanBuyRuneRoll = false;
+	TArray<FIdleHUDRuneSlotViewModel> Slots;
+	TArray<FIdleHUDRuneOwnedRowViewModel> OwnedRows;
+};
+
 struct IDLEPROJECT_API FIdleHUDStatRowViewModel
 {
 	EPrimaryStat Stat = EPrimaryStat::Str;
@@ -397,6 +463,7 @@ IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(con
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
+IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
@@ -503,6 +570,15 @@ private:
 	void DrawBossSpecialWarning(float Now);
 	void DrawShopPanel();
 	void TryBuyGearRoll();
+	void DrawRunePanel();
+	void DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height);
+	void DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float X, float Y, float Width, float Height);
+	void SelectRuneFromHitBox(FName BoxName);
+	void EquipSelectedRuneFromHitBox(FName BoxName);
+	void UnequipRuneFromHitBox(FName BoxName);
+	void TryEnhanceRuneFromHitBox(FName BoxName);
+	void TryDisenchantRuneFromHitBox(FName BoxName);
+	void TryBuyRuneRoll();
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
@@ -574,6 +650,7 @@ private:
 	FText AchievementFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
+	int32 SelectedRuneOwnedIndex = INDEX_NONE;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;
