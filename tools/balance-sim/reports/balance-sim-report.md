@@ -239,6 +239,35 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Rune Set Bonus Pressure
+
+- Set bonuses apply only to the six regular rune slots; the ClassMastery
+  slot remains outside set counting.
+- Rows compare 2/4/6 same-set tiers on the shared Lv100 Warrior review
+  loadout. Utility economy lanes are listed as pressure signals, while
+  only combat-facing lanes change CP or DPS in this table.
+- Rune set acquisition is not injected into the sampled first-rebirth run;
+  the 1000-run median remains the PR #61 baseline guard.
+
+<!-- markdownlint-disable MD013 -->
+
+| Rune set | Count | Bonus | Bonus lanes | Base CP | Set CP | CP x | Base DPS | Set DPS | DPS x |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Offense | 2 | 5% | PhysAtk, MagicAtk | 5444 | 5632 | x1.035 | 4295 | 4537 | x1.056 |
+| Offense | 4 | 12% | PhysAtk, MagicAtk | 5444 | 5896 | x1.083 | 4295 | 4876 | x1.135 |
+| Offense | 6 | 25% | PhysAtk, MagicAtk | 5444 | 6386 | x1.173 | 4295 | 5505 | x1.282 |
+| Bastion | 2 | 5% | PhysDef, MagicDef | 5444 | 5484 | x1.007 | 4295 | 4295 | x1 |
+| Bastion | 4 | 12% | PhysDef, MagicDef | 5444 | 5538 | x1.017 | 4295 | 4295 | x1 |
+| Bastion | 6 | 25% | PhysDef, MagicDef | 5444 | 5642 | x1.036 | 4295 | 4295 | x1 |
+| Vitality | 2 | 5% | Hp, OfflineEff | 5444 | 5462 | x1.003 | 4295 | 4295 | x1 |
+| Vitality | 4 | 12% | Hp, OfflineEff | 5444 | 5488 | x1.008 | 4295 | 4295 | x1 |
+| Vitality | 6 | 25% | Hp, OfflineEff | 5444 | 5536 | x1.017 | 4295 | 4295 | x1 |
+| Fortune | 2 | 5% | GoldFind, ExpBoost, CritDamage | 5444 | 5449 | x1.001 | 4295 | 4314 | x1.004 |
+| Fortune | 4 | 12% | GoldFind, ExpBoost, CritDamage | 5444 | 5456 | x1.002 | 4295 | 4341 | x1.011 |
+| Fortune | 6 | 25% | GoldFind, ExpBoost, CritDamage | 5444 | 5469 | x1.005 | 4295 | 4391 | x1.022 |
+
+<!-- markdownlint-enable MD013 -->
+
 | Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |
 | --- | --- | ---: | ---: | ---: | ---: |
 | CritDamage | Mythic | +177 | 100% | 600% | x2 |
@@ -319,4 +348,5 @@
 - server/src/core/formulas/achievement.ts
 - server/src/core/formulas/rune.ts
 - server/src/core/formulas/classRune.ts
+- server/src/core/formulas/runeSet.ts
 - server/src/core/formulas/runeCodex.ts
