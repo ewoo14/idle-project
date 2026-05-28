@@ -12,6 +12,7 @@
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "RuneSystem/RuneTypes.h"
 #include "TimerManager.h"
 #include "IdleGameInstance.generated.h"
 
@@ -19,6 +20,7 @@ class UApiClient;
 class UInventoryComponent;
 class AIdleCharacter;
 class UIdleSaveGame;
+class URuneService;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
@@ -129,6 +131,9 @@ public:
 	UTowerService* GetTowerService() const { return TowerService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	URuneService* GetRuneService() const { return RuneService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UAchievementService* GetAchievementService() const { return AchievementService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
@@ -174,6 +179,24 @@ public:
 	FShopPurchaseResult TryBuyGearRoll();
 
 	FShopPurchaseResult TryBuyGearRoll(UInventoryComponent* Inventory);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	void AddRune(const FRuneInstance& Rune);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryEnhanceRune(int32 OwnedIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryDisenchantRune(int32 OwnedIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryBuyRuneRoll();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryEquipRune(int32 SlotIndex, int32 OwnedIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool UnequipRune(int32 SlotIndex);
 
 	void SetEnhanceRandomSeed(int32 Seed);
 
@@ -227,6 +250,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int64 GetGold() const { return Gold; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
+	int64 GetRuneEssence() const { return RuneEssence; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int32 GetCharacterLevel() const { return CharacterLevel; }
 
@@ -266,6 +292,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
 	int64 GetAchievementMetricValue(EAchievementMetric Metric) const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
+	float GetRuneGoldFindBonus() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
+	float GetRuneExpBoostBonus() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
+	float GetRuneOfflineEffBonus() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
+	float GetRuneCritDamageBonus() const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	float PreviewTranscendMultiplier() const;
 
@@ -301,6 +339,13 @@ public:
 	void InitializeStageServiceForTests();
 
 	void InitializeTowerServiceForTests();
+
+	void InitializeRuneServiceForTests();
+
+#if WITH_DEV_AUTOMATION_TESTS
+	void AddRuneForTests(const FRuneInstance& Rune);
+	void AddRuneEssenceForTests(int64 Amount);
+#endif
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool EquipPet(const FString& PetId);
@@ -379,6 +424,9 @@ private:
 	TObjectPtr<UTowerService> TowerService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<URuneService> RuneService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UAchievementService> AchievementService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
@@ -390,6 +438,9 @@ private:
 
 	UPROPERTY()
 	int64 Gold = 0;
+
+	UPROPERTY()
+	int64 RuneEssence = 0;
 
 	UPROPERTY()
 	int32 CharacterLevel = 1;
@@ -432,11 +483,12 @@ private:
 	FTimerHandle AutosaveTimerHandle;
 
 	FRandomStream EnhanceRandomStream;
+	FRandomStream RuneRandomStream;
 	ECloudSyncState CloudSyncState = ECloudSyncState::Idle;
 
 	static const TCHAR* SaveSlotName;
 	static constexpr float AutosaveDebounceSeconds = 1.0f;
-	static constexpr int32 CloudSaveApiVersion = 3;
+	static constexpr int32 CloudSaveApiVersion = 4;
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
@@ -454,7 +506,9 @@ private:
 	void EnsureSeasonService();
 	void EnsureStageService();
 	void EnsureTowerService();
+	void EnsureRuneService();
 	void EnsureAchievementService();
+	void RefreshPlayerCharacterStats();
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();

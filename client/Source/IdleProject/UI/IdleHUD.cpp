@@ -20,6 +20,8 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
+#include "RuneSystem/RuneFormula.h"
+#include "RuneSystem/RuneService.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
 
@@ -36,8 +38,14 @@ const FString PetFeedHitBoxPrefix(TEXT("PetFeed_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
+const FString RuneSelectHitBoxPrefix(TEXT("RuneSelect_"));
+const FString RuneEquipHitBoxPrefix(TEXT("RuneEquip_"));
+const FString RuneUnequipHitBoxPrefix(TEXT("RuneUnequip_"));
+const FString RuneEnhanceHitBoxPrefix(TEXT("RuneEnhance_"));
+const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
+const FName ShopRuneRollHitBoxName(TEXT("ShopRuneRoll"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
 constexpr int32 RebirthRequiredLevel = 100;
@@ -179,6 +187,86 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 	default:
 		return TEXT("RARITY_NONE");
 	}
+}
+
+FText RuneText(const TCHAR* Key)
+{
+	return IdleProject::Localization::Text(TEXT("Rune"), Key);
+}
+
+FText FormatLocalizedRune(const TCHAR* Key, TFunctionRef<void(FFormatNamedArguments&)> BuildArgs)
+{
+	FFormatNamedArguments Args;
+	BuildArgs(Args);
+	return IdleProject::Localization::Text(TEXT("Rune"), Key, Args);
+}
+
+const TCHAR* RuneTypeToLocalizationKey(ERuneType Type)
+{
+	switch (Type)
+	{
+	case ERuneType::PhysAtk:
+		return TEXT("RUNE_TYPE_PHYS_ATK");
+	case ERuneType::MagicAtk:
+		return TEXT("RUNE_TYPE_MAGIC_ATK");
+	case ERuneType::PhysDef:
+		return TEXT("RUNE_TYPE_PHYS_DEF");
+	case ERuneType::MagicDef:
+		return TEXT("RUNE_TYPE_MAGIC_DEF");
+	case ERuneType::Hp:
+		return TEXT("RUNE_TYPE_HP");
+	case ERuneType::CritDamage:
+		return TEXT("RUNE_TYPE_CRIT_DAMAGE");
+	case ERuneType::GoldFind:
+		return TEXT("RUNE_TYPE_GOLD_FIND");
+	case ERuneType::ExpBoost:
+		return TEXT("RUNE_TYPE_EXP_BOOST");
+	case ERuneType::OfflineEff:
+		return TEXT("RUNE_TYPE_OFFLINE_EFF");
+	case ERuneType::None:
+	default:
+		return TEXT("RUNE_TYPE_NONE");
+	}
+}
+
+FText RuneTypeToLabel(ERuneType Type)
+{
+	return RuneText(RuneTypeToLocalizationKey(Type));
+}
+
+float GetRuneDisplayValue(const FRuneInstance& Rune)
+{
+	if (FRuneFormula::IsCoreType(Rune.RuneType))
+	{
+		return FRuneFormula::GetCoreRuneMultiplier(Rune.Rarity, Rune.EnhanceLevel);
+	}
+	if (FRuneFormula::IsUtilType(Rune.RuneType))
+	{
+		return FRuneFormula::GetUtilRuneValue(Rune.RuneType, Rune.Rarity, Rune.EnhanceLevel);
+	}
+	return 0.0f;
+}
+
+FText FormatRuneValueLabel(const FRuneInstance& Rune)
+{
+	const int32 Percent = FMath::RoundToInt(GetRuneDisplayValue(Rune) * 100.0f);
+	return FormatLocalizedRune(TEXT("RUNE_VALUE_PERCENT_FORMAT"), [Percent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+	});
+}
+
+FText FormatRuneEnhancePreviewLabel(const FRuneInstance& Rune)
+{
+	FRuneInstance NextRune = Rune;
+	NextRune.EnhanceLevel = FMath::Max(0, Rune.EnhanceLevel) + 1;
+	const int32 CurrentPercent = FMath::RoundToInt(GetRuneDisplayValue(Rune) * 100.0f);
+	const int32 NextPercent = FMath::RoundToInt(GetRuneDisplayValue(NextRune) * 100.0f);
+	return FormatLocalizedRune(TEXT("RUNE_ENHANCE_PREVIEW_FORMAT"), [CurrentPercent, NextPercent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("CurrentPercent"), FText::AsNumber(CurrentPercent));
+		Args.Add(TEXT("NextPercent"), FText::AsNumber(NextPercent));
+	});
 }
 
 FText QuestTypeToLabel(EQuestType Type)
@@ -358,6 +446,31 @@ FName MakeSkillRankHitBoxName(FName SkillId)
 FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
 {
 	return FName(*(EnhanceSlotHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakeRuneSelectHitBoxName(int32 OwnedIndex)
+{
+	return FName(*(RuneSelectHitBoxPrefix + FString::FromInt(OwnedIndex)));
+}
+
+FName MakeRuneEquipHitBoxName(int32 SlotIndex)
+{
+	return FName(*(RuneEquipHitBoxPrefix + FString::FromInt(SlotIndex)));
+}
+
+FName MakeRuneUnequipHitBoxName(int32 SlotIndex)
+{
+	return FName(*(RuneUnequipHitBoxPrefix + FString::FromInt(SlotIndex)));
+}
+
+FName MakeRuneEnhanceHitBoxName(int32 OwnedIndex)
+{
+	return FName(*(RuneEnhanceHitBoxPrefix + FString::FromInt(OwnedIndex)));
+}
+
+FName MakeRuneDisenchantHitBoxName(int32 OwnedIndex)
+{
+	return FName(*(RuneDisenchantHitBoxPrefix + FString::FromInt(OwnedIndex)));
 }
 
 FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
@@ -1024,6 +1137,126 @@ FIdleHUDShopPanelViewModel IdleProject::UI::BuildShopPanelViewModel(int64 GearRo
 	if (ViewModel.bHasLastResult)
 	{
 		ViewModel.LastResultLabel = BuildShopResultLabel(LastResult);
+	}
+
+	return ViewModel;
+}
+
+FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex)
+{
+	FIdleHUDRuneViewModel ViewModel;
+	ViewModel.Title = RuneText(TEXT("RUNE_PANEL_TITLE"));
+	ViewModel.RuneEssence = FMath::Max<int64>(0, RuneEssence);
+	ViewModel.Gold = FMath::Max<int64>(0, Gold);
+	ViewModel.SelectedOwnedIndex = SelectedOwnedIndex;
+	ViewModel.ShopCost = FRuneFormula::GetShopRuneRollCost(ProgressIndex);
+	ViewModel.ShopHitBoxName = ShopRuneRollHitBoxName;
+	ViewModel.EssenceLabel = FormatLocalizedRune(TEXT("RUNE_ESSENCE_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(ViewModel.RuneEssence)));
+	});
+	ViewModel.GoldLabel = FormatLocalizedUIWithInt64(TEXT("HUD_GOLD_FORMAT"), TEXT("Amount"), ViewModel.Gold);
+	ViewModel.ShopCostLabel = FormatLocalizedRune(TEXT("RUNE_SHOP_COST_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Cost"), FText::FromString(FormatIntegerWithCommas(ViewModel.ShopCost)));
+	});
+	ViewModel.ShopButtonLabel = RuneText(TEXT("RUNE_SHOP_ROLL_BUTTON"));
+	ViewModel.bCanBuyRuneRoll = ViewModel.ShopCost > 0 && ViewModel.Gold >= ViewModel.ShopCost;
+	ViewModel.ShopStatusLabel = ViewModel.bCanBuyRuneRoll ? RuneText(TEXT("RUNE_STATUS_READY")) : RuneText(TEXT("RUNE_STATUS_NEED_GOLD"));
+	ViewModel.EmptyOwnedLabel = RuneText(TEXT("RUNE_OWNED_EMPTY"));
+
+	const TArray<FRuneInstance>& OwnedRunes = RuneService.GetOwnedRunes();
+	TSet<int32> EquippedOwnedIndexes;
+	for (int32 SlotIndex = 0; SlotIndex < FRuneFormula::RuneSlotCount; ++SlotIndex)
+	{
+		const int32 OwnedIndex = RuneService.GetEquippedOwnedIndex(SlotIndex);
+		if (OwnedRunes.IsValidIndex(OwnedIndex))
+		{
+			EquippedOwnedIndexes.Add(OwnedIndex);
+		}
+	}
+
+	for (int32 SlotIndex = 0; SlotIndex < FRuneFormula::RuneSlotCount; ++SlotIndex)
+	{
+		FIdleHUDRuneSlotViewModel Slot;
+		Slot.SlotIndex = SlotIndex;
+		Slot.SlotLabel = FormatLocalizedRune(TEXT("RUNE_SLOT_FORMAT"), [SlotIndex](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Slot"), FText::AsNumber(SlotIndex + 1));
+		});
+
+		Slot.OwnedIndex = RuneService.GetEquippedOwnedIndex(SlotIndex);
+		if (OwnedRunes.IsValidIndex(Slot.OwnedIndex))
+		{
+			const FRuneInstance& Rune = OwnedRunes[Slot.OwnedIndex];
+			Slot.bEquipped = true;
+			Slot.TypeLabel = RuneTypeToLabel(Rune.RuneType);
+			Slot.RarityLabel = IdleProject::UI::RarityToLabel(Rune.Rarity);
+			Slot.RarityColor = IdleProject::UI::RarityToColor(Rune.Rarity);
+			Slot.LevelLabel = FormatLocalizedRune(TEXT("RUNE_LEVEL_FORMAT"), [&Rune](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Level"), FText::AsNumber(FMath::Max(0, Rune.EnhanceLevel)));
+			});
+			Slot.ValueLabel = FormatRuneValueLabel(Rune);
+			Slot.StatusLabel = RuneText(TEXT("RUNE_STATUS_EQUIPPED"));
+			Slot.ActionLabel = RuneText(TEXT("RUNE_ACTION_UNEQUIP"));
+			Slot.ActionHitBoxName = MakeRuneUnequipHitBoxName(SlotIndex);
+			Slot.bCanUnequip = true;
+		}
+		else
+		{
+			Slot.TypeLabel = RuneText(TEXT("RUNE_SLOT_EMPTY"));
+			Slot.RarityLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Slot.RarityColor = IdleProject::UI::Theme::TextMuted;
+			Slot.LevelLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Slot.ValueLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Slot.bCanEquipSelected = OwnedRunes.IsValidIndex(SelectedOwnedIndex);
+			Slot.StatusLabel = Slot.bCanEquipSelected ? RuneText(TEXT("RUNE_STATUS_SELECT_READY")) : RuneText(TEXT("RUNE_STATUS_SELECT_REQUIRED"));
+			Slot.ActionLabel = RuneText(TEXT("RUNE_ACTION_EQUIP"));
+			Slot.ActionHitBoxName = MakeRuneEquipHitBoxName(SlotIndex);
+		}
+		ViewModel.Slots.Add(Slot);
+	}
+
+	for (int32 OwnedIndex = 0; OwnedIndex < OwnedRunes.Num(); ++OwnedIndex)
+	{
+		const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
+		FIdleHUDRuneOwnedRowViewModel Row;
+		Row.OwnedIndex = OwnedIndex;
+		Row.RuneType = Rune.RuneType;
+		Row.Rarity = Rune.Rarity;
+		Row.TypeLabel = RuneTypeToLabel(Rune.RuneType);
+		Row.RarityLabel = IdleProject::UI::RarityToLabel(Rune.Rarity);
+		Row.RarityColor = IdleProject::UI::RarityToColor(Rune.Rarity);
+		Row.LevelLabel = FormatLocalizedRune(TEXT("RUNE_LEVEL_FORMAT"), [&Rune](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(FMath::Max(0, Rune.EnhanceLevel)));
+		});
+		Row.ValueLabel = FormatRuneValueLabel(Rune);
+		Row.EnhanceEssenceCost = FRuneFormula::GetEnhanceEssenceCost(Rune.EnhanceLevel);
+		Row.EnhanceGoldCost = FRuneFormula::GetEnhanceGoldCost(Rune.EnhanceLevel);
+		Row.DisenchantEssence = FRuneFormula::GetDisenchantEssence(Rune.Rarity, Rune.EnhanceLevel);
+		Row.EnhanceCostLabel = FormatLocalizedRune(TEXT("RUNE_ENHANCE_COST_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Row.EnhanceEssenceCost)));
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Row.EnhanceGoldCost)));
+		});
+		Row.EnhancePreviewLabel = FormatRuneEnhancePreviewLabel(Rune);
+		Row.DisenchantLabel = FormatLocalizedRune(TEXT("RUNE_DISENCHANT_REFUND_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Row.DisenchantEssence)));
+		});
+		Row.SelectActionLabel = RuneText(OwnedIndex == SelectedOwnedIndex ? TEXT("RUNE_ACTION_SELECTED") : TEXT("RUNE_ACTION_SELECT"));
+		Row.EnhanceActionLabel = RuneText(TEXT("RUNE_ACTION_ENHANCE"));
+		Row.DisenchantActionLabel = RuneText(TEXT("RUNE_ACTION_DISENCHANT"));
+		Row.SelectHitBoxName = MakeRuneSelectHitBoxName(OwnedIndex);
+		Row.EnhanceHitBoxName = MakeRuneEnhanceHitBoxName(OwnedIndex);
+		Row.DisenchantHitBoxName = MakeRuneDisenchantHitBoxName(OwnedIndex);
+		Row.bEquipped = EquippedOwnedIndexes.Contains(OwnedIndex);
+		Row.bSelected = OwnedIndex == SelectedOwnedIndex;
+		Row.bCanEnhance = ViewModel.RuneEssence >= Row.EnhanceEssenceCost && ViewModel.Gold >= Row.EnhanceGoldCost;
+		Row.bCanDisenchant = !Row.bEquipped && Row.DisenchantEssence > 0;
+		ViewModel.OwnedRows.Add(Row);
 	}
 
 	return ViewModel;
@@ -1784,6 +2017,7 @@ void AIdleHUD::DrawHUD()
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
+	DrawRunePanel();
 	DrawEnhancePanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
@@ -1837,6 +2071,31 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		TryEnhanceFromHitBox(BoxName);
 		return;
 	}
+	if (BoxName.ToString().StartsWith(RuneSelectHitBoxPrefix))
+	{
+		SelectRuneFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RuneEquipHitBoxPrefix))
+	{
+		EquipSelectedRuneFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RuneUnequipHitBoxPrefix))
+	{
+		UnequipRuneFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RuneEnhanceHitBoxPrefix))
+	{
+		TryEnhanceRuneFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RuneDisenchantHitBoxPrefix))
+	{
+		TryDisenchantRuneFromHitBox(BoxName);
+		return;
+	}
 	if (BoxName.ToString().StartsWith(StatAllocationHitBoxPrefix))
 	{
 		AllocateStatFromHitBox(BoxName);
@@ -1870,6 +2129,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == ShopGearRollHitBoxName)
 	{
 		TryBuyGearRoll();
+		return;
+	}
+	if (BoxName == ShopRuneRollHitBoxName)
+	{
+		TryBuyRuneRoll();
 		return;
 	}
 	if (BoxName.ToString().StartsWith(ClassSelectionHitBoxPrefix))
@@ -2731,6 +2995,267 @@ void AIdleHUD::TryBuyGearRoll()
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::DrawRunePanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const URuneService* RuneService = IdleGameInstance->GetRuneService();
+	if (!RuneService)
+	{
+		return;
+	}
+
+	const UStageService* StageService = IdleGameInstance->GetStageService();
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const FIdleHUDRuneViewModel ViewModel = BuildRuneViewModel(
+		*RuneService,
+		IdleGameInstance->GetRuneEssence(),
+		IdleGameInstance->GetGold(),
+		GlobalStageIndex,
+		SelectedRuneOwnedIndex);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.26f, 380.0f * Scale, 500.0f * Scale);
+	const float HeaderHeight = 62.0f * Scale;
+	const float SlotHeight = 24.0f * Scale;
+	const float RowHeight = 48.0f * Scale;
+	const float RowGap = 6.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const int32 VisibleRows = FMath::Min(ViewModel.OwnedRows.Num(), 2);
+	const float PanelHeight = HeaderHeight + FRuneFormula::RuneSlotCount * SlotHeight + 10.0f * Scale + FMath::Max(1, VisibleRows) * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 282.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const FLinearColor StateColor = ViewModel.bCanBuyRuneRoll ? Theme::RarityMythicStart : Theme::TextMuted.CopyWithNewOpacity(0.68f);
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(StateColor, X, Y, PanelWidth, Border);
+	DrawRect(Theme::RarityMythicEnd, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(StateColor, X, Y, Border, PanelHeight);
+	DrawRect(Theme::RarityMythicEnd, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 9.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.86f * Scale);
+	DrawText(ViewModel.EssenceLabel.ToString(), Theme::RarityMythicEnd, X + Padding, Y + 35.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.ShopCostLabel.ToString(), ViewModel.bCanBuyRuneRoll ? Theme::TextPrimary : Theme::AccentRed, X + 144.0f * Scale, Y + 35.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+
+	const float ShopButtonWidth = 92.0f * Scale;
+	const float ShopButtonHeight = 25.0f * Scale;
+	const float ShopButtonX = X + PanelWidth - Padding - ShopButtonWidth;
+	const float ShopButtonY = Y + 32.0f * Scale;
+	DrawRect(ViewModel.bCanBuyRuneRoll ? Theme::RarityMythicStart : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ShopButtonX, ShopButtonY, ShopButtonWidth, ShopButtonHeight);
+	DrawText(ViewModel.ShopButtonLabel.ToString(), ViewModel.bCanBuyRuneRoll ? Theme::BgPrimary : Theme::TextMuted, ShopButtonX + 10.0f * Scale, ShopButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	if (ViewModel.bCanBuyRuneRoll)
+	{
+		AddHitBox(FVector2D(ShopButtonX, ShopButtonY), FVector2D(ShopButtonWidth, ShopButtonHeight), ViewModel.ShopHitBoxName, true, 85);
+	}
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDRuneSlotViewModel& Slot : ViewModel.Slots)
+	{
+		DrawRuneSlot(Slot, X + Padding, RowY, PanelWidth - Padding * 2.0f, SlotHeight);
+		RowY += SlotHeight;
+	}
+
+	RowY += 8.0f * Scale;
+	if (ViewModel.OwnedRows.IsEmpty())
+	{
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		DrawText(ViewModel.EmptyOwnedLabel.ToString(), Theme::TextMuted, X + Padding + 10.0f * Scale, RowY + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	}
+	else
+	{
+		for (int32 Index = 0; Index < VisibleRows; ++Index)
+		{
+			DrawRuneOwnedRow(ViewModel.OwnedRows[Index], X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+			RowY += RowHeight + RowGap;
+		}
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 30.0f;
+	const FLinearColor StateColor = Slot.bEquipped ? Slot.RarityColor : (Slot.bCanEquipSelected ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.50f));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height - 3.0f * Scale);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height - 3.0f * Scale);
+
+	DrawText(Slot.SlotLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Slot.TypeLabel.ToString(), Slot.bEquipped ? Theme::TextPrimary : Theme::TextMuted, X + 54.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Slot.RarityLabel.ToString(), Slot.bEquipped ? Slot.RarityColor : Theme::TextMuted, X + 146.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Slot.LevelLabel.ToString(), Theme::TextMuted, X + 216.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Slot.ValueLabel.ToString(), Slot.bEquipped ? Theme::RarityMythicEnd : Theme::TextMuted, X + 264.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+
+	const bool bActionEnabled = Slot.bCanEquipSelected || Slot.bCanUnequip;
+	const float ButtonWidth = 58.0f * Scale;
+	const float ButtonHeight = 21.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 7.0f * Scale;
+	const float ButtonY = Y + 3.0f * Scale;
+	DrawRect(bActionEnabled ? StateColor : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Slot.ActionLabel.ToString(), bActionEnabled ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	if (bActionEnabled)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Slot.ActionHitBoxName, true, 87);
+	}
+}
+
+void AIdleHUD::DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 54.0f;
+	const FLinearColor StateColor = Row.bSelected ? Theme::RarityMythicEnd : (Row.bEquipped ? Row.RarityColor : Theme::TextMuted.CopyWithNewOpacity(0.58f));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Row.TypeLabel.ToString(), Row.bSelected ? Theme::RarityMythicEnd : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.RarityLabel.ToString(), Row.RarityColor, X + 94.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, X + 158.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.ValueLabel.ToString(), Theme::RarityMythicEnd, X + 208.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.EnhanceCostLabel.ToString(), Row.bCanEnhance ? Theme::TextMuted : Theme::AccentRed, X + 10.0f * Scale, Y + 25.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.EnhancePreviewLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 39.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+
+	const float ButtonWidth = 58.0f * Scale;
+	const float ButtonHeight = 20.0f * Scale;
+	const float SelectX = X + Width - ButtonWidth * 3.0f - 20.0f * Scale;
+	const float EnhanceX = X + Width - ButtonWidth * 2.0f - 14.0f * Scale;
+	const float DisenchantX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 17.0f * Scale;
+
+	DrawRect(Row.bSelected ? Theme::RarityMythicEnd : Theme::BgPanel, SelectX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.SelectActionLabel.ToString(), Row.bSelected ? Theme::BgPrimary : Theme::TextMuted, SelectX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	AddHitBox(FVector2D(SelectX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.SelectHitBoxName, true, 88);
+
+	DrawRect(Row.bCanEnhance ? Theme::AccentGold : Theme::BgPanel, EnhanceX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.EnhanceActionLabel.ToString(), Row.bCanEnhance ? Theme::BgPrimary : Theme::TextMuted, EnhanceX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	if (Row.bCanEnhance)
+	{
+		AddHitBox(FVector2D(EnhanceX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.EnhanceHitBoxName, true, 89);
+	}
+
+	DrawRect(Row.bCanDisenchant ? Theme::AccentRed : Theme::BgPanel, DisenchantX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.DisenchantActionLabel.ToString(), Row.bCanDisenchant ? Theme::BgPrimary : Theme::TextMuted, DisenchantX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	if (Row.bCanDisenchant)
+	{
+		AddHitBox(FVector2D(DisenchantX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.DisenchantHitBoxName, true, 90);
+	}
+}
+
+void AIdleHUD::SelectRuneFromHitBox(FName BoxName)
+{
+	FString RawIndex = BoxName.ToString();
+	RawIndex.RightChopInline(RuneSelectHitBoxPrefix.Len());
+	SelectedRuneOwnedIndex = FCString::Atoi(*RawIndex);
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::EquipSelectedRuneFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	FString RawSlot = BoxName.ToString();
+	RawSlot.RightChopInline(RuneEquipHitBoxPrefix.Len());
+	IdleGameInstance->TryEquipRune(FCString::Atoi(*RawSlot), SelectedRuneOwnedIndex);
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::UnequipRuneFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawSlot = BoxName.ToString();
+	RawSlot.RightChopInline(RuneUnequipHitBoxPrefix.Len());
+	IdleGameInstance->UnequipRune(FCString::Atoi(*RawSlot));
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryEnhanceRuneFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawIndex = BoxName.ToString();
+	RawIndex.RightChopInline(RuneEnhanceHitBoxPrefix.Len());
+	IdleGameInstance->TryEnhanceRune(FCString::Atoi(*RawIndex));
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryDisenchantRuneFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawIndex = BoxName.ToString();
+	RawIndex.RightChopInline(RuneDisenchantHitBoxPrefix.Len());
+	const int32 OwnedIndex = FCString::Atoi(*RawIndex);
+	if (IdleGameInstance->TryDisenchantRune(OwnedIndex) && SelectedRuneOwnedIndex == OwnedIndex)
+	{
+		SelectedRuneOwnedIndex = INDEX_NONE;
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryBuyRuneRoll()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const int32 PreviousOwnedCount = IdleGameInstance->GetRuneService() ? IdleGameInstance->GetRuneService()->GetOwnedRunes().Num() : 0;
+	if (IdleGameInstance->TryBuyRuneRoll())
+	{
+		SelectedRuneOwnedIndex = PreviousOwnedCount;
+	}
+	RefreshMouseInteraction();
+}
+
 void AIdleHUD::DrawEnhancePanel()
 {
 	using namespace IdleProject::UI;
@@ -2758,13 +3283,13 @@ void AIdleHUD::DrawEnhancePanel()
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.25f, 360.0f * Scale, 460.0f * Scale);
 	const float HeaderHeight = 52.0f * Scale;
-	const float RowHeight = 40.0f * Scale;
+	const float RowHeight = 34.0f * Scale;
 	const float RowGap = 6.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = ViewModel.FeedbackLabel.IsEmpty() ? 0.0f : 24.0f * Scale;
 	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 526.0f * Scale;
+	const float Y = 628.0f * Scale;
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -4164,7 +4689,8 @@ void AIdleHUD::RefreshMouseInteraction()
 
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
 	const bool bTranscendReady = IdleGameInstance && IdleGameInstance->CanTranscend();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
+	const bool bHasRunePanel = IdleGameInstance && IdleGameInstance->GetRuneService();
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

@@ -287,4 +287,65 @@ describe("balance simulator", () => {
       "payback at median Lv50 gold/hour: 1.47h",
     );
   });
+
+  it("reports rune growth pressure against CP, DPS, and economy caps", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/rune.ts",
+    );
+    expect(report.json.model.runePressure.slotCount).toBe(6);
+    expect(report.json.model.runePressure.coreRows).toContainEqual({
+      rarity: "Mythic",
+      enhanceLevel: 50,
+      singleRuneBonusPercent: 168,
+      sixSlotMultiplier: 11.08,
+    });
+    expect(report.json.model.runePressure.coreRows).toContainEqual({
+      rarity: "Mythic",
+      enhanceLevel: 100,
+      singleRuneBonusPercent: 318,
+      sixSlotMultiplier: 20.08,
+    });
+    expect(
+      report.json.model.runePressure.combatRows.find(
+        (row) => row.runeSet === "6x Mythic +50 PhysAtk",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        className: "Warrior",
+        level: 100,
+        cpMultiplier: expect.any(Number),
+        dpsMultiplier: expect.any(Number),
+      }),
+    );
+    expect(
+      report.json.model.runePressure.combatRows.find(
+        (row) => row.runeSet === "6x Mythic +50 PhysAtk",
+      )?.dpsMultiplier,
+    ).toBeGreaterThan(5);
+    expect(report.json.model.runePressure.utilRows).toContainEqual({
+      runeType: "GoldFind",
+      rarity: "Mythic",
+      enhanceLevel: 377,
+      singleRuneValuePercent: 200,
+      sixSlotUncappedTotalPercent: 1200,
+      effectiveEconomicMultiplier: 3,
+    });
+    expect(report.json.model.runePressure.utilRows).toContainEqual({
+      runeType: "OfflineEff",
+      rarity: "Mythic",
+      enhanceLevel: 127,
+      singleRuneValuePercent: 50,
+      sixSlotUncappedTotalPercent: 300,
+      effectiveEconomicMultiplier: 1.5,
+    });
+    expect(report.markdown).toContain("## Rune Growth Pressure");
+    expect(report.markdown).toContain("6x Mythic +50 PhysAtk");
+    expect(report.markdown).toContain("GoldFind");
+    expect(report.markdown).toContain(
+      "Core rune growth is intentionally uncapped",
+    );
+  });
 });

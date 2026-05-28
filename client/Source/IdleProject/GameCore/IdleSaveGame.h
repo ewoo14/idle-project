@@ -6,6 +6,7 @@
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "RuneSystem/RuneTypes.h"
 #include "IdleSaveGame.generated.h"
 
 UCLASS()
@@ -15,7 +16,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 2;
+	int32 SaveVersion = 3;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -115,4 +116,13 @@ public:
 
 	UPROPERTY()
 	TArray<FName> AchievementUniqueItemIds;
+
+	UPROPERTY()
+	TArray<FRuneSaveEntry> Runes;
+
+	UPROPERTY()
+	TArray<int32> EquippedRuneSlots;
+
+	UPROPERTY()
+	int64 RuneEssence = 0;
 };

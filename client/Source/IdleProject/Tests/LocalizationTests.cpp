@@ -68,6 +68,7 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 		TEXT("Skill"),
 		TEXT("Quest"),
 		TEXT("Achievement"),
+		TEXT("Rune"),
 	};
 
 	for (const FName TableName : TableNames)

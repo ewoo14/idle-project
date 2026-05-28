@@ -24,6 +24,7 @@
 #include "InputModifiers.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "Misc/ConfigCacheIni.h"
+#include "RuneSystem/RuneService.h"
 #include "UI/IdleHUD.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -183,6 +184,19 @@ void AIdleCharacter::RefreshDerivedStats()
 	Derived.MagicAtk *= StatMultiplier;
 	Derived.PhysDef *= StatMultiplier;
 	Derived.MagicDef *= StatMultiplier;
+	if (IdleGameInstance)
+	{
+		if (const URuneService* RuneService = IdleGameInstance->GetRuneService())
+		{
+			const FRuneCoreMultipliers RuneMultipliers = RuneService->GetEquippedCoreMultipliers();
+			Derived.PhysAtk *= RuneMultipliers.PhysAtk;
+			Derived.MagicAtk *= RuneMultipliers.MagicAtk;
+			Derived.PhysDef *= RuneMultipliers.PhysDef;
+			Derived.MagicDef *= RuneMultipliers.MagicDef;
+			Derived.Hp *= RuneMultipliers.Hp;
+			Derived.CritDmg += RuneService->GetEquippedUtilValues().CritDamage;
+		}
+	}
 
 	CachedPrimaryStats = Primary;
 	CachedDerivedStats = Derived;

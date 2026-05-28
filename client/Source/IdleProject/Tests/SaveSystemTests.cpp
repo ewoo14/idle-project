@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V2"), SaveGame->SaveVersion, static_cast<int32>(2));
+	TestEqual(TEXT("SaveVersion starts at V3"), SaveGame->SaveVersion, static_cast<int32>(3));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
