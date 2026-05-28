@@ -106,23 +106,23 @@ FRuneCoreMultipliers URuneService::GetEquippedCoreMultipliers() const
 		}
 
 		const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
-		const float Multiplier = 1.0f + FRuneFormula::GetCoreRuneMultiplier(Rune.Rarity, Rune.EnhanceLevel);
+		const float Bonus = FRuneFormula::GetCoreRuneMultiplier(Rune.Rarity, Rune.EnhanceLevel);
 		switch (Rune.RuneType)
 		{
 		case ERuneType::PhysAtk:
-			Result.PhysAtk *= Multiplier;
+			Result.PhysAtk += Bonus;
 			break;
 		case ERuneType::MagicAtk:
-			Result.MagicAtk *= Multiplier;
+			Result.MagicAtk += Bonus;
 			break;
 		case ERuneType::PhysDef:
-			Result.PhysDef *= Multiplier;
+			Result.PhysDef += Bonus;
 			break;
 		case ERuneType::MagicDef:
-			Result.MagicDef *= Multiplier;
+			Result.MagicDef += Bonus;
 			break;
 		case ERuneType::Hp:
-			Result.Hp *= Multiplier;
+			Result.Hp += Bonus;
 			break;
 		default:
 			break;

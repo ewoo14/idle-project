@@ -217,10 +217,10 @@
 
 | Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |
 | --- | --- | ---: | ---: | ---: | ---: |
-| CritDamage | Mythic | +177 | 100% | 600% | x7 |
-| GoldFind | Mythic | +377 | 200% | 1200% | x13 |
-| ExpBoost | Mythic | +377 | 200% | 1200% | x13 |
-| OfflineEff | Mythic | +127 | 50% | 300% | x4 |
+| CritDamage | Mythic | +177 | 100% | 600% | x2 |
+| GoldFind | Mythic | +377 | 200% | 1200% | x3 |
+| ExpBoost | Mythic | +377 | 200% | 1200% | x3 |
+| OfflineEff | Mythic | +127 | 50% | 300% | x1.5 |
 
 <!-- markdownlint-enable MD013 -->
 

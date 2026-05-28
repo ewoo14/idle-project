@@ -1103,10 +1103,7 @@ function buildRuneUtilPressureRow(
     enhanceLevel,
     singleRuneValuePercent: round(singleRuneValue * 100, 3),
     sixSlotUncappedTotalPercent: round(sixSlotTotal * 100, 3),
-    effectiveEconomicMultiplier: round(
-      1 + Math.min(sixSlotTotal, cap * RUNE_SLOT_COUNT),
-      3,
-    ),
+    effectiveEconomicMultiplier: round(1 + Math.min(sixSlotTotal, cap), 3),
   };
 }
 

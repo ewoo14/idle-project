@@ -1333,18 +1333,19 @@ sidegrade. The risk is acceptable only while essence and gold costs remain the
 primary throttle and while early drop/shop rates do not inject high-rarity,
 high-enhance runes into the first-rebirth window.
 
-Utility runes keep per-rune caps but stack across the six slots:
+Utility runes keep per-rune caps and then apply an aggregate cap after summing
+the equipped six-slot pressure:
 
 | Utility | Mythic cap enhance | One-rune cap | Six-slot total | Effective multiplier |
 | --- | ---: | ---: | ---: | ---: |
-| CritDamage | +177 | 100% | 600% | x7 |
-| GoldFind | +377 | 200% | 1200% | x13 |
-| ExpBoost | +377 | 200% | 1200% | x13 |
-| OfflineEff | +127 | 50% | 300% | x4 |
+| CritDamage | +177 | 100% | 600% | x2 |
+| GoldFind | +377 | 200% | 1200% | x3 |
+| ExpBoost | +377 | 200% | 1200% | x3 |
+| OfflineEff | +127 | 50% | 300% | x1.5 |
 
-GoldFind, ExpBoost, and OfflineEff caps are economically explosive when a player
-specializes all six slots. Keep them as aspirational late-game builds unless
-future telemetry shows a need for account-level aggregate caps. If first-rebirth
-median time drops below 5h after rune acquisition is wired into the simulator,
-the first tuning candidates are rune drop rate, shop roll cost, and essence
-income rather than the level curve.
+GoldFind, ExpBoost, and OfflineEff aggregate bonuses are capped after summing
+all equipped rune slots, matching `URuneService::GetEquippedUtilValues`. Keep
+them as aspirational late-game builds unless future telemetry shows a need for
+lower account-level caps. If first-rebirth median time drops below 5h after rune
+acquisition is wired into the simulator, the first tuning candidates are rune
+drop rate, shop roll cost, and essence income rather than the level curve.

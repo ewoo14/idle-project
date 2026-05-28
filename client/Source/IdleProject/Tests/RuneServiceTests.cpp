@@ -44,16 +44,19 @@ bool FRuneServiceEquipAndMultiplierTest::RunTest(const FString& Parameters)
 
 	RuneService->AddRune(MakeRune(TEXT("phys_rare"), ERuneType::PhysAtk, EItemRarity::Rare, 10));
 	RuneService->AddRune(MakeRune(TEXT("gold_mythic"), ERuneType::GoldFind, EItemRarity::Mythic, 0));
-	TestEqual(TEXT("AddRune increases owned count"), RuneService->GetOwnedRunes().Num(), 2);
+	RuneService->AddRune(MakeRune(TEXT("phys_epic"), ERuneType::PhysAtk, EItemRarity::Epic, 5));
+	TestEqual(TEXT("AddRune increases owned count"), RuneService->GetOwnedRunes().Num(), 3);
 
 	TestTrue(TEXT("Core rune equips into slot zero"), RuneService->TryEquipRune(0, 0));
 	TestTrue(TEXT("Util rune equips into slot one"), RuneService->TryEquipRune(1, 1));
+	TestTrue(TEXT("Second core rune equips into slot two"), RuneService->TryEquipRune(2, 2));
 	TestEqual(TEXT("Slot zero points at first owned rune"), RuneService->GetEquippedOwnedIndex(0), 0);
 	TestEqual(TEXT("Slot one points at second owned rune"), RuneService->GetEquippedOwnedIndex(1), 1);
+	TestEqual(TEXT("Slot two points at third owned rune"), RuneService->GetEquippedOwnedIndex(2), 2);
 
 	const FRuneCoreMultipliers Core = RuneService->GetEquippedCoreMultipliers();
 	const FRuneUtilValues Util = RuneService->GetEquippedUtilValues();
-	TestEqual(TEXT("Equipped phys attack rune adds one plus formula multiplier"), Core.PhysAtk, 1.0f + FRuneFormula::GetCoreRuneMultiplier(EItemRarity::Rare, 10));
+	TestEqual(TEXT("Equipped phys attack runes add flat bonuses to one multiplier"), Core.PhysAtk, 1.0f + FRuneFormula::GetCoreRuneMultiplier(EItemRarity::Rare, 10) + FRuneFormula::GetCoreRuneMultiplier(EItemRarity::Epic, 5));
 	TestEqual(TEXT("Other core stats remain neutral"), Core.MagicAtk, 1.0f);
 	TestEqual(TEXT("Equipped gold find uses util formula"), Util.GoldFind, FRuneFormula::GetUtilRuneValue(ERuneType::GoldFind, EItemRarity::Mythic, 0));
 

@@ -331,7 +331,7 @@ describe("balance simulator", () => {
       enhanceLevel: 377,
       singleRuneValuePercent: 200,
       sixSlotUncappedTotalPercent: 1200,
-      effectiveEconomicMultiplier: 13,
+      effectiveEconomicMultiplier: 3,
     });
     expect(report.json.model.runePressure.utilRows).toContainEqual({
       runeType: "OfflineEff",
@@ -339,7 +339,7 @@ describe("balance simulator", () => {
       enhanceLevel: 127,
       singleRuneValuePercent: 50,
       sixSlotUncappedTotalPercent: 300,
-      effectiveEconomicMultiplier: 4,
+      effectiveEconomicMultiplier: 1.5,
     });
     expect(report.markdown).toContain("## Rune Growth Pressure");
     expect(report.markdown).toContain("6x Mythic +50 PhysAtk");
