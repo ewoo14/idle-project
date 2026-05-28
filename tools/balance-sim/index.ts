@@ -38,8 +38,8 @@ import {
   getEnhanceCost,
   getEnhanceSuccessRate,
   getRarityCostMultiplier,
-  resolveEnhanceAttempt,
   MAX_ENHANCE_LEVEL,
+  resolveEnhanceAttempt,
 } from "../../server/src/core/formulas/enhance.js";
 import {
   cumulativeExp,
