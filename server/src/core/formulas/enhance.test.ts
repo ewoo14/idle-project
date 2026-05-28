@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  ENHANCE_PITY_THRESHOLD,
+  ENHANCE_SAFE_MAX_LEVEL,
   getEnhanceCost,
   getEnhanceSuccessRate,
   getRarityCostMultiplier,
+  isRiskLevel,
   MAX_ENHANCE_LEVEL,
+  resolveEnhanceAttempt,
   rollEnhanceSuccess,
 } from "./enhance.js";
 
@@ -114,5 +118,86 @@ describe("enhance formulas", () => {
     expect(rollEnhanceSuccess(0.4, () => 0.4)).toBe(false);
     expect(rollEnhanceSuccess(2, () => 0.999)).toBe(true);
     expect(rollEnhanceSuccess(-1, () => 0)).toBe(false);
+  });
+
+  it("exposes safe and pity thresholds for client parity", () => {
+    expect(ENHANCE_SAFE_MAX_LEVEL).toBe(9);
+    expect(ENHANCE_PITY_THRESHOLD).toBe(12);
+    expect(isRiskLevel(9)).toBe(false);
+    expect(isRiskLevel(10)).toBe(true);
+    expect(isRiskLevel(49)).toBe(true);
+    expect(isRiskLevel(50)).toBe(false);
+  });
+
+  it("keeps safe-level failures at the same level and increments fail streak", () => {
+    expect(
+      resolveEnhanceAttempt({
+        currentLevel: 5,
+        failStreak: 2,
+        useProtection: false,
+        hasProtection: false,
+        roll: 0.999,
+      }),
+    ).toEqual({
+      attempted: true,
+      success: false,
+      consumedProtection: false,
+      newLevel: 5,
+      newFailStreak: 3,
+      pityTriggered: false,
+    });
+  });
+
+  it("downgrades risk-level failures unless protection is consumed", () => {
+    expect(
+      resolveEnhanceAttempt({
+        currentLevel: 20,
+        failStreak: 4,
+        useProtection: false,
+        hasProtection: false,
+        roll: 0.999,
+      }),
+    ).toMatchObject({
+      attempted: true,
+      success: false,
+      consumedProtection: false,
+      newLevel: 19,
+      newFailStreak: 5,
+    });
+
+    expect(
+      resolveEnhanceAttempt({
+        currentLevel: 20,
+        failStreak: 4,
+        useProtection: true,
+        hasProtection: true,
+        roll: 0.999,
+      }),
+    ).toMatchObject({
+      attempted: true,
+      success: false,
+      consumedProtection: true,
+      newLevel: 20,
+      newFailStreak: 5,
+    });
+  });
+
+  it("forces success on a risk-level pity attempt", () => {
+    expect(
+      resolveEnhanceAttempt({
+        currentLevel: 20,
+        failStreak: 12,
+        useProtection: false,
+        hasProtection: false,
+        roll: 0.999,
+      }),
+    ).toEqual({
+      attempted: true,
+      success: true,
+      consumedProtection: false,
+      newLevel: 21,
+      newFailStreak: 0,
+      pityTriggered: true,
+    });
   });
 });

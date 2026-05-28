@@ -2,6 +2,7 @@
 
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/DropFormula.h"
+#include "ItemSystem/PotentialFormula.h"
 
 namespace
 {
@@ -159,6 +160,11 @@ FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem, FRandomStream&
 	Item.ItemSet = FDropFormula::RollItemSet(Rarity, Rng);
 	FDropFormula::RollAffixes(Rarity, SafeLevel, Rng, Item);
 	FDropFormula::RollUniqueTraits(Rarity, Rng, Item);
+	Item.PotentialGrade = FPotentialFormula::GetMaxPotentialGrade(Rarity) == EPotentialGrade::None ? EPotentialGrade::None : EPotentialGrade::Rare;
+	const TArray<FPotentialLine> PotentialLines = FPotentialFormula::RollPotentialLines(Item.PotentialGrade, Rng);
+	Item.PotentialLine1 = PotentialLines.IsValidIndex(0) ? PotentialLines[0] : FPotentialLine();
+	Item.PotentialLine2 = PotentialLines.IsValidIndex(1) ? PotentialLines[1] : FPotentialLine();
+	Item.PotentialLine3 = PotentialLines.IsValidIndex(2) ? PotentialLines[2] : FPotentialLine();
 	Item.DisplayName = BuildLocalizedItemDisplayName(Rarity, BaseItem);
 	Item.ItemId = FName(*FString::Printf(TEXT("%s_%s_L%d"), *BaseItem.BaseItemId.ToString(), *UEnum::GetValueAsString(Rarity), SafeLevel));
 

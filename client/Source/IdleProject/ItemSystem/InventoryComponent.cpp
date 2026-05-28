@@ -37,7 +37,7 @@ bool UInventoryComponent::AddItem(const FItemInstance& NewItem)
 
 	const int32 NewIndex = Items.Add(NewItem);
 	const FItemInstance* Current = GetEquippedItem(NewItem.Slot);
-	if (!Current || FItemPowerScore::Compute(*Current) < FItemPowerScore::Compute(NewItem))
+	if (!Current || (!Current->bLocked && FItemPowerScore::Compute(*Current) < FItemPowerScore::Compute(NewItem)))
 	{
 		EquipItem(NewIndex);
 	}
@@ -94,14 +94,55 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		const FItemInstance& Item = Items[Pair.Value];
 		EquippedItems.Add(Item);
 		const float EnhanceMultiplier = 1.0f + static_cast<float>(Item.EnhanceLevel) * 0.1f;
-		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier;
-		Bonus.PhysDef += (Item.BonusDef + Item.BonusPhysDef) * EnhanceMultiplier;
-		Bonus.Hp += (Item.BonusHp + Item.BonusAffixHp) * EnhanceMultiplier;
-		Bonus.CritRate += Item.BonusCritRate * EnhanceMultiplier;
-		Bonus.AtkSpeed += Item.BonusAtkSpeed * EnhanceMultiplier;
-		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier;
-		Bonus.MagicDef += Item.BonusMagicDef * EnhanceMultiplier;
-		Bonus.CritDmg += Item.BonusCritDmg * EnhanceMultiplier;
+		float PhysAtkMultiplier = 0.0f;
+		float MagicAtkMultiplier = 0.0f;
+		float HpMultiplier = 0.0f;
+		float PhysDefMultiplier = 0.0f;
+		float MagicDefMultiplier = 0.0f;
+		float PotentialCritRate = 0.0f;
+		float PotentialAtkSpeed = 0.0f;
+		float PotentialCritDmg = 0.0f;
+		for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3 })
+		{
+			switch (Line.Stat)
+			{
+			case EPotentialStat::PhysAtkPercent:
+				PhysAtkMultiplier += Line.Value;
+				break;
+			case EPotentialStat::MagicAtkPercent:
+				MagicAtkMultiplier += Line.Value;
+				break;
+			case EPotentialStat::HpPercent:
+				HpMultiplier += Line.Value;
+				break;
+			case EPotentialStat::PhysDefPercent:
+				PhysDefMultiplier += Line.Value;
+				break;
+			case EPotentialStat::MagicDefPercent:
+				MagicDefMultiplier += Line.Value;
+				break;
+			case EPotentialStat::CritRatePercent:
+				PotentialCritRate += Line.Value;
+				break;
+			case EPotentialStat::AtkSpeedPercent:
+				PotentialAtkSpeed += Line.Value;
+				break;
+			case EPotentialStat::CritDmgPercent:
+				PotentialCritDmg += Line.Value;
+				break;
+			case EPotentialStat::None:
+			default:
+				break;
+			}
+		}
+		Bonus.PhysAtk += Item.BonusAtk * EnhanceMultiplier * (1.0f + PhysAtkMultiplier);
+		Bonus.PhysDef += (Item.BonusDef + Item.BonusPhysDef) * EnhanceMultiplier * (1.0f + PhysDefMultiplier);
+		Bonus.Hp += (Item.BonusHp + Item.BonusAffixHp) * EnhanceMultiplier * (1.0f + HpMultiplier);
+		Bonus.CritRate += Item.BonusCritRate * EnhanceMultiplier + PotentialCritRate;
+		Bonus.AtkSpeed += Item.BonusAtkSpeed * EnhanceMultiplier + PotentialAtkSpeed;
+		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier * (1.0f + MagicAtkMultiplier);
+		Bonus.MagicDef += Item.BonusMagicDef * EnhanceMultiplier * (1.0f + MagicDefMultiplier);
+		Bonus.CritDmg += Item.BonusCritDmg * EnhanceMultiplier + PotentialCritDmg;
 		FUniqueTraitFormula::AccumulateTraitBonus(Item, Bonus);
 	}
 
@@ -162,6 +203,51 @@ bool UInventoryComponent::EnhanceEquippedItem(EItemSlot Slot)
 	return true;
 }
 
+bool UInventoryComponent::ApplyEnhanceOutcome(EItemSlot Slot, const FEnhanceAttemptOutcome& Outcome)
+{
+	const int32* Index = EquippedIndex.Find(Slot);
+	if (!Index || !Items.IsValidIndex(*Index) || !Outcome.bAttempted)
+	{
+		return false;
+	}
+
+	FItemInstance& Item = Items[*Index];
+	Item.EnhanceLevel = FMath::Clamp(Outcome.NewLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
+	Item.EnhanceFailStreak = FMath::Max(0, Outcome.NewFailStreak);
+	OnEquippedChanged.Broadcast(Slot);
+	return true;
+}
+
+bool UInventoryComponent::SetItemLocked(EItemSlot Slot, bool bLocked)
+{
+	const int32* Index = EquippedIndex.Find(Slot);
+	if (!Index || !Items.IsValidIndex(*Index))
+	{
+		return false;
+	}
+
+	Items[*Index].bLocked = bLocked;
+	OnEquippedChanged.Broadcast(Slot);
+	return true;
+}
+
+bool UInventoryComponent::SetEquippedPotential(EItemSlot Slot, EPotentialGrade Grade, const TArray<FPotentialLine>& Lines)
+{
+	const int32* Index = EquippedIndex.Find(Slot);
+	if (!Index || !Items.IsValidIndex(*Index))
+	{
+		return false;
+	}
+
+	FItemInstance& Item = Items[*Index];
+	Item.PotentialGrade = Grade;
+	Item.PotentialLine1 = Lines.IsValidIndex(0) ? Lines[0] : FPotentialLine();
+	Item.PotentialLine2 = Lines.IsValidIndex(1) ? Lines[1] : FPotentialLine();
+	Item.PotentialLine3 = Lines.IsValidIndex(2) ? Lines[2] : FPotentialLine();
+	OnEquippedChanged.Broadcast(Slot);
+	return true;
+}
+
 int32 UInventoryComponent::GetEquippedEnhanceLevel(EItemSlot Slot) const
 {
 	const FItemInstance* Item = GetEquippedItem(Slot);
@@ -192,6 +278,7 @@ void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, con
 
 		FItemInstance RestoredItem = SourceItem;
 		RestoredItem.EnhanceLevel = FMath::Clamp(RestoredItem.EnhanceLevel, 0, FEnhanceFormula::MaxEnhanceLevel);
+		RestoredItem.EnhanceFailStreak = FMath::Max(0, RestoredItem.EnhanceFailStreak);
 		const int32 RestoredIndex = Items.Add(RestoredItem);
 		RestoredIndexBySavedIndex.Add(SavedIndex, RestoredIndex);
 	}

@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V11"), SaveGame->SaveVersion, static_cast<int32>(11));
+	TestEqual(TEXT("SaveVersion starts at V12"), SaveGame->SaveVersion, static_cast<int32>(12));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -137,7 +137,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V11"), CapturedSave->SaveVersion, static_cast<int32>(11));
+	TestEqual(TEXT("Captured save writes V12"), CapturedSave->SaveVersion, static_cast<int32>(12));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -222,15 +222,15 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V11"), CapturedSave->SaveVersion, static_cast<int32>(11));
+	TestEqual(TEXT("Capture after legacy migration writes V12"), CapturedSave->SaveVersion, static_cast<int32>(12));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
 	TestTrue(TEXT("Reapplying captured v11 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V11 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V11 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V12 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V12 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }
@@ -371,6 +371,13 @@ bool FIdleSaveSystemExpandedItemFieldsRoundTripTest::RunTest(const FString& Para
 	SourceItem.BonusMagicDef = 13.0f;
 	SourceItem.BonusAffixHp = 75.0f;
 	SourceItem.BonusCritDmg = 0.18f;
+	SourceItem.PotentialGrade = EPotentialGrade::Unique;
+	SourceItem.PotentialLine1.Stat = EPotentialStat::PhysAtkPercent;
+	SourceItem.PotentialLine1.Value = 0.10f;
+	SourceItem.PotentialLine2.Stat = EPotentialStat::HpPercent;
+	SourceItem.PotentialLine2.Value = 0.08f;
+	SourceItem.EnhanceFailStreak = 5;
+	SourceItem.bLocked = true;
 	SourceInventory->AddItem(SourceItem);
 
 	TArray<FItemInstance> CapturedItems;
@@ -392,6 +399,11 @@ bool FIdleSaveSystemExpandedItemFieldsRoundTripTest::RunTest(const FString& Para
 	TestEqual(TEXT("Magic defense affix round trips"), RestoredItem.BonusMagicDef, 13.0f);
 	TestEqual(TEXT("HP affix round trips"), RestoredItem.BonusAffixHp, 75.0f);
 	TestEqual(TEXT("Crit damage affix round trips"), RestoredItem.BonusCritDmg, 0.18f);
+	TestEqual(TEXT("Potential grade round trips"), RestoredItem.PotentialGrade, EPotentialGrade::Unique);
+	TestEqual(TEXT("Potential line stat round trips"), RestoredItem.PotentialLine1.Stat, EPotentialStat::PhysAtkPercent);
+	TestEqual(TEXT("Potential line value round trips"), RestoredItem.PotentialLine2.Value, 0.08f);
+	TestEqual(TEXT("Enhance fail streak round trips"), RestoredItem.EnhanceFailStreak, 5);
+	TestTrue(TEXT("Locked item flag round trips"), RestoredItem.bLocked);
 	TestEqual(TEXT("Expanded item stays equipped"), RestoredEquipped.FindRef(EItemSlot::Weapon), 0);
 
 	return true;

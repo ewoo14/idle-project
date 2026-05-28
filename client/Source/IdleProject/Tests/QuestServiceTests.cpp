@@ -173,8 +173,8 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Failed roll reports failure"), Failure.bSuccess);
 	TestEqual(TEXT("Failed roll spends exactly one rarity-scaled attempt cost"), Failure.GoldSpent, FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel - 1, EItemRarity::Rare));
 	TestEqual(TEXT("Failed roll deducts gold once"), GameInstance->GetGold(), GoldBeforeFailure - Failure.GoldSpent);
-	TestEqual(TEXT("Failed roll keeps current level"), Failure.NewLevel, FEnhanceFormula::MaxEnhanceLevel - 1);
-	TestEqual(TEXT("Failed roll does not mutate item level"), FailInventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel - 1);
+	TestEqual(TEXT("Risk failure downgrades one level"), Failure.NewLevel, FEnhanceFormula::MaxEnhanceLevel - 2);
+	TestEqual(TEXT("Risk failure mutates item level"), FailInventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), FEnhanceFormula::MaxEnhanceLevel - 2);
 
 	TestTrue(TEXT("Enhance daily still exists after failed roll"), GameInstance->GetQuestState(TEXT("daily_enhance_gear"), EnhanceDaily));
 	TestEqual(TEXT("Failed roll also records quest progress"), EnhanceDaily.Progress, 2);

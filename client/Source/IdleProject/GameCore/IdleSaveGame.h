@@ -18,7 +18,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 11;
+	int32 SaveVersion = 12;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -139,4 +139,13 @@ public:
 
 	UPROPERTY()
 	int64 RuneEssence = 0;
+
+	UPROPERTY()
+	int64 ProtectionScrolls = 0;
+
+	UPROPERTY()
+	int64 ResetCubes = 0;
+
+	UPROPERTY()
+	int64 RankCubes = 0;
 };

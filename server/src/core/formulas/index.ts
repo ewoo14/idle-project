@@ -24,6 +24,7 @@ export {
   type PetDefinition,
 } from "./petBonus.js";
 export * from "./petLevel.js";
+export * from "./potential.js";
 export * from "./rebirth.js";
 export * from "./reward.js";
 export * from "./rune.js";

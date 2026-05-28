@@ -5,6 +5,7 @@
 #include "ItemSystem/DropFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/PotentialFormula.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/ItemTypes.h"
@@ -72,6 +73,69 @@ void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, co
 		break;
 	}
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEnhanceFormulaRiskOutcomeTest,
+	"IdleProject.Inventory.EnhanceFormula.RiskOutcome",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEnhanceFormulaRiskOutcomeTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Safe max level"), FEnhanceFormula::SafeMaxLevel, 9);
+	TestEqual(TEXT("Pity threshold"), FEnhanceFormula::PityThreshold, 12);
+	TestFalse(TEXT("+9 is safe"), FEnhanceFormula::IsRiskLevel(9));
+	TestTrue(TEXT("+10 is risk"), FEnhanceFormula::IsRiskLevel(10));
+
+	const FEnhanceAttemptOutcome SafeFailure = FEnhanceFormula::ResolveAttempt(5, 2, false, false, 0.999f);
+	TestFalse(TEXT("Safe failure does not succeed"), SafeFailure.bSuccess);
+	TestEqual(TEXT("Safe failure keeps level"), SafeFailure.NewLevel, 5);
+	TestEqual(TEXT("Safe failure increments streak"), SafeFailure.NewFailStreak, 3);
+
+	const FEnhanceAttemptOutcome RiskFailure = FEnhanceFormula::ResolveAttempt(20, 4, false, false, 0.999f);
+	TestFalse(TEXT("Risk failure does not succeed"), RiskFailure.bSuccess);
+	TestEqual(TEXT("Risk failure downgrades"), RiskFailure.NewLevel, 19);
+	TestEqual(TEXT("Risk failure increments streak"), RiskFailure.NewFailStreak, 5);
+
+	const FEnhanceAttemptOutcome ProtectedFailure = FEnhanceFormula::ResolveAttempt(20, 4, true, true, 0.999f);
+	TestTrue(TEXT("Protection is consumed"), ProtectedFailure.bConsumedProtection);
+	TestEqual(TEXT("Protection keeps risk level"), ProtectedFailure.NewLevel, 20);
+
+	const FEnhanceAttemptOutcome Pity = FEnhanceFormula::ResolveAttempt(20, 12, false, false, 0.999f);
+	TestTrue(TEXT("Pity succeeds"), Pity.bSuccess);
+	TestTrue(TEXT("Pity flag set"), Pity.bPityTriggered);
+	TestEqual(TEXT("Pity advances level"), Pity.NewLevel, 21);
+	TestEqual(TEXT("Pity resets streak"), Pity.NewFailStreak, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialFormulaRulesTest,
+	"IdleProject.Inventory.PotentialFormula.Rules",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialFormulaRulesTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Common has no potential cap"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Common), EPotentialGrade::None);
+	TestEqual(TEXT("Rare caps at Epic"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Rare), EPotentialGrade::Epic);
+	TestEqual(TEXT("Unique caps at Legendary"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Unique), EPotentialGrade::Legendary);
+	TestEqual(TEXT("Legendary has three lines"), FPotentialFormula::GetPotentialLineCount(EPotentialGrade::Legendary), 3);
+
+	float MinValue = 0.0f;
+	float MaxValue = 0.0f;
+	FPotentialFormula::GetPotentialRollRange(EPotentialGrade::Unique, MinValue, MaxValue);
+	TestEqual(TEXT("Unique min roll"), MinValue, 0.06f);
+	TestEqual(TEXT("Unique max roll"), MaxValue, 0.10f);
+
+	FRandomStream Rng(7101);
+	const TArray<FPotentialLine> Lines = FPotentialFormula::RollPotentialLines(EPotentialGrade::Unique, Rng);
+	TestEqual(TEXT("Unique rolls three potential lines"), Lines.Num(), 3);
+	for (const FPotentialLine& Line : Lines)
+	{
+		TestTrue(TEXT("Potential stat is populated"), Line.Stat != EPotentialStat::None);
+		TestTrue(TEXT("Potential value stays in range"), Line.Value >= 0.06f && Line.Value <= 0.10f);
+	}
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -898,6 +962,52 @@ bool FInventoryEquipmentBonusAffixTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Enhanced item increases magic defense affix"), Bonus.MagicDef, 7.2f);
 	TestEqual(TEXT("Enhanced item increases HP affix"), Bonus.Hp, 36.0f);
 	TestEqual(TEXT("Enhanced item increases crit damage affix"), Bonus.CritDmg, 0.144f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryEquipmentBonusPotentialTest,
+	"IdleProject.Inventory.Bonus.Potential",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryEquipmentBonusPotentialTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	FItemInstance Item = MakeTestItem(TEXT("potential_sword"), EItemSlot::Weapon, EItemRarity::Rare, 100.0f, 0.0f, 50.0f, 2);
+	Item.PotentialGrade = EPotentialGrade::Unique;
+	Item.PotentialLine1.Stat = EPotentialStat::PhysAtkPercent;
+	Item.PotentialLine1.Value = 0.10f;
+	Item.PotentialLine2.Stat = EPotentialStat::HpPercent;
+	Item.PotentialLine2.Value = 0.08f;
+	Item.PotentialLine3.Stat = EPotentialStat::CritRatePercent;
+	Item.PotentialLine3.Value = 0.02f;
+	Inventory->AddItem(Item);
+
+	const FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("Potential physical attack percent applies after enhance"), Bonus.PhysAtk, 132.0f);
+	TestEqual(TEXT("Potential HP percent applies after enhance"), Bonus.Hp, 64.8f);
+	TestEqual(TEXT("Potential crit rate percent adds flat derived crit"), Bonus.CritRate, 0.02f);
+	TestEqual(TEXT("Potential contributes to PowerScore"), FItemPowerScore::Compute(Item), 158);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FInventoryLockedAutoEquipTest,
+	"IdleProject.Inventory.AutoEquip.LockedItem",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FInventoryLockedAutoEquipTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeTestItem(TEXT("locked_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f));
+	TestTrue(TEXT("Equipped item can be locked"), Inventory->SetItemLocked(EItemSlot::Weapon, true));
+
+	Inventory->AddItem(MakeTestItem(TEXT("better_sword"), EItemSlot::Weapon, EItemRarity::Rare, 100.0f, 0.0f, 0.0f));
+	const FItemInstance* Equipped = Inventory->GetEquippedItem(EItemSlot::Weapon);
+	TestNotNull(TEXT("Weapon remains equipped"), Equipped);
+	TestEqual(TEXT("Locked item blocks auto-equip replacement"), Equipped ? Equipped->ItemId : NAME_None, FName(TEXT("locked_sword")));
 
 	return true;
 }
