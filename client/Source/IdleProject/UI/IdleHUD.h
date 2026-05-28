@@ -4,6 +4,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CombatSystem/CombatComponent.h"
 #include "GameFramework/HUD.h"
+#include "GameCore/DungeonTypes.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
@@ -15,6 +16,7 @@
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
+class UDungeonService;
 class AIdleCharacter;
 class AIdleMonster;
 class UBattleAIComponent;
@@ -486,6 +488,31 @@ struct IDLEPROJECT_API FIdleHUDTowerViewModel
 	bool bCanClimb = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDDungeonRowViewModel
+{
+	EDungeonType Type = EDungeonType::None;
+	FText NameLabel;
+	FText EntriesLabel;
+	FText RequiredPowerLabel;
+	FText RewardLabel;
+	FText StatusLabel;
+	FText ActionLabel;
+	FName EnterHitBoxName;
+	int32 RemainingEntries = 0;
+	int32 EntryLimit = 0;
+	int64 RequiredPower = 0;
+	int64 CombatPower = 0;
+	bool bCanEnter = false;
+	bool bSoldOut = false;
+	bool bNeedsPower = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDDungeonPanelViewModel
+{
+	FText Title;
+	TArray<FIdleHUDDungeonRowViewModel> Rows;
+};
+
 struct IDLEPROJECT_API FIdleHUDAchievementRowViewModel
 {
 	EAchievementCategory Category = EAchievementCategory::Misc;
@@ -541,6 +568,7 @@ IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimar
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
+IDLEPROJECT_API FIdleHUDDungeonPanelViewModel BuildDungeonPanelViewModel(const UDungeonService& DungeonService, int64 CombatPower, const FString& TodayUtc);
 IDLEPROJECT_API FIdleHUDAchievementViewModel BuildAchievementViewModel(const UAchievementService& AchievementService);
 IDLEPROJECT_API FText BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
@@ -679,6 +707,9 @@ private:
 	void TryTranscend();
 	void DrawTowerPanel();
 	void TryClimbTower();
+	void DrawDungeonPanel();
+	void DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, float Y, float Width, float Height);
+	void TryRunDungeonFromHitBox(FName BoxName);
 	void DrawAchievementPanel();
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
@@ -724,6 +755,7 @@ private:
 	TWeakObjectPtr<UAchievementService> BoundAchievementService;
 	FText StageFeedbackLabel;
 	FText TowerFeedbackLabel;
+	FText DungeonFeedbackLabel;
 	FText AchievementFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
@@ -731,6 +763,7 @@ private:
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;
+	float DungeonFeedbackStartTime = -1000.0f;
 	float AchievementFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
 	float CloudSyncFeedbackStartTime = -1000.0f;

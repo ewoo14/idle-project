@@ -11,6 +11,7 @@
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "EngineUtils.h"
+#include "GameCore/DungeonFormula.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/TowerMilestoneFormula.h"
@@ -48,6 +49,7 @@ const FString RuneUnequipHitBoxPrefix(TEXT("RuneUnequip_"));
 const FString RuneEnhanceHitBoxPrefix(TEXT("RuneEnhance_"));
 const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
+const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName ShopRuneRollHitBoxName(TEXT("ShopRuneRoll"));
 const FName CraftClassRuneHitBoxName(TEXT("CraftClassRune"));
@@ -63,6 +65,7 @@ constexpr float StageFeedbackDurationSeconds = 2.2f;
 constexpr float PetFeedbackDurationSeconds = 2.2f;
 constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 constexpr float TowerFeedbackDurationSeconds = 2.4f;
+constexpr float DungeonFeedbackDurationSeconds = 2.4f;
 constexpr float AchievementFeedbackDurationSeconds = 2.4f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
@@ -736,6 +739,63 @@ FName MakeRuneDisenchantHitBoxName(int32 OwnedIndex)
 FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
 {
 	return FName(*(StatAllocationHitBoxPrefix + FString::FromInt(static_cast<int32>(Stat))));
+}
+
+FName MakeDungeonEnterHitBoxName(EDungeonType Type)
+{
+	return FName(*(DungeonEnterHitBoxPrefix + FString::FromInt(static_cast<int32>(Type))));
+}
+
+EDungeonType DungeonTypeFromHitBoxName(FName BoxName)
+{
+	FString RawType = BoxName.ToString();
+	RawType.RightChopInline(DungeonEnterHitBoxPrefix.Len());
+	return static_cast<EDungeonType>(FCString::Atoi(*RawType));
+}
+
+const TCHAR* DungeonTypeToLocalizationKey(EDungeonType Type)
+{
+	switch (Type)
+	{
+	case EDungeonType::Gold:
+		return TEXT("DUNGEON_GOLD");
+	case EDungeonType::Exp:
+		return TEXT("DUNGEON_EXP");
+	case EDungeonType::Essence:
+		return TEXT("DUNGEON_ESSENCE");
+	case EDungeonType::None:
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+FText BuildDungeonRewardLabel(const FDungeonRunResult& Reward)
+{
+	if (Reward.GoldReward > 0)
+	{
+		return FormatLocalizedUI(TEXT("DUNGEON_REWARD_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Reward"), FormatLocalizedUIWithInt64(TEXT("REWARD_GOLD_PLUS_FORMAT"), TEXT("Amount"), Reward.GoldReward));
+		});
+	}
+	if (Reward.ExpReward > 0)
+	{
+		return FormatLocalizedUI(TEXT("DUNGEON_REWARD_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Reward"), FormatLocalizedUIWithInt64(TEXT("REWARD_EXP_PLUS_FORMAT"), TEXT("Amount"), Reward.ExpReward));
+		});
+	}
+	if (Reward.EssenceReward > 0)
+	{
+		return FormatLocalizedUI(TEXT("DUNGEON_REWARD_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Reward"), FormatLocalizedRune(TEXT("RUNE_ESSENCE_FORMAT"), [&Reward](FFormatNamedArguments& RuneArgs)
+			{
+				RuneArgs.Add(TEXT("Amount"), FText::FromString(FormatIntegerWithCommas(Reward.EssenceReward)));
+			}));
+		});
+	}
+	return IdleProject::Localization::UI(TEXT("NONE_DASH"));
 }
 
 const TCHAR* AchievementCategoryToLocalizationKey(EAchievementCategory Category)
@@ -1862,6 +1922,48 @@ FText IdleProject::UI::BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64
 	});
 }
 
+FIdleHUDDungeonPanelViewModel IdleProject::UI::BuildDungeonPanelViewModel(const UDungeonService& DungeonService, int64 CombatPower, const FString& TodayUtc)
+{
+	FIdleHUDDungeonPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("DUNGEON_PANEL_TITLE"));
+
+	const EDungeonType Types[] = { EDungeonType::Gold, EDungeonType::Exp, EDungeonType::Essence };
+	for (const EDungeonType Type : Types)
+	{
+		FIdleHUDDungeonRowViewModel Row;
+		Row.Type = Type;
+		Row.NameLabel = IdleProject::Localization::UI(DungeonTypeToLocalizationKey(Type));
+		Row.EntryLimit = FDungeonFormula::GetDailyEntryLimit(Type);
+		Row.RemainingEntries = DungeonService.GetRemainingEntries(Type, TodayUtc);
+		Row.RequiredPower = FDungeonFormula::GetMinimumCp(Type);
+		Row.CombatPower = FMath::Max<int64>(0, CombatPower);
+		Row.EnterHitBoxName = MakeDungeonEnterHitBoxName(Type);
+		Row.ActionLabel = IdleProject::Localization::UI(TEXT("DUNGEON_ENTER"));
+		Row.bSoldOut = Row.EntryLimit > 0 && Row.RemainingEntries <= 0;
+		Row.bNeedsPower = Row.CombatPower < Row.RequiredPower;
+		Row.bCanEnter = Row.EntryLimit > 0 && Row.RemainingEntries > 0 && !Row.bNeedsPower;
+
+		Row.EntriesLabel = FormatLocalizedUI(TEXT("DUNGEON_ENTRIES_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Remaining"), FText::AsNumber(Row.RemainingEntries));
+			Args.Add(TEXT("Limit"), FText::AsNumber(Row.EntryLimit));
+		});
+		Row.RequiredPowerLabel = FormatLocalizedUI(TEXT("DUNGEON_CP_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Current"), FText::FromString(FormatIntegerWithCommas(Row.CombatPower)));
+			Args.Add(TEXT("Required"), FText::FromString(FormatIntegerWithCommas(Row.RequiredPower)));
+		});
+		Row.RewardLabel = BuildDungeonRewardLabel(FDungeonFormula::GetRewardForCp(Type, Row.CombatPower));
+		Row.StatusLabel = Row.bSoldOut
+			? IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_SOLD_OUT"))
+			: (Row.bNeedsPower ? IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_NEED_CP")) : IdleProject::Localization::UI(TEXT("DUNGEON_ENTER")));
+
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UAchievementService& AchievementService)
 {
 	FIdleHUDAchievementViewModel ViewModel;
@@ -2469,6 +2571,7 @@ void AIdleHUD::DrawHUD()
 	DrawRebirthPanel();
 	DrawTranscendPanel();
 	DrawTowerPanel();
+	DrawDungeonPanel();
 	DrawAchievementPanel();
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
@@ -2581,6 +2684,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == TowerClimbHitBoxName)
 	{
 		TryClimbTower();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(DungeonEnterHitBoxPrefix))
+	{
+		TryRunDungeonFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -4850,6 +4958,113 @@ void AIdleHUD::TryClimbTower()
 	RefreshMouseInteraction();
 }
 
+void AIdleHUD::DrawDungeonPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UDungeonService* DungeonService = IdleGameInstance ? IdleGameInstance->GetDungeonService() : nullptr;
+	const AIdleCharacter* IdleCharacter = ResolvePlayerCharacter();
+	if (!DungeonService || !IdleCharacter)
+	{
+		return;
+	}
+
+	const FIdleHUDDungeonPanelViewModel ViewModel = BuildDungeonPanelViewModel(*DungeonService, IdleCharacter->GetCombatPower(), UQuestService::GetCurrentUtcDateString());
+
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - DungeonFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !DungeonFeedbackLabel.IsEmpty() && FeedbackElapsed <= DungeonFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	const float RowHeight = 68.0f * Scale;
+	const float RowGap = 8.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
+	const float PanelHeight = 54.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
+	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
+	const float Y = 428.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+
+	float RowY = Y + 48.0f * Scale;
+	for (const FIdleHUDDungeonRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawDungeonRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(DungeonFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, RowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 68.0f;
+	const FLinearColor StateColor = Row.bCanEnter
+		? Theme::AccentGold
+		: (Row.bNeedsPower ? Theme::AccentRed : Theme::TextMuted.CopyWithNewOpacity(0.62f));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Row.NameLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+	DrawText(Row.EntriesLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.RequiredPowerLabel.ToString(), Row.bNeedsPower ? Theme::AccentRed : Theme::AccentBlue, X + 12.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 116.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.StatusLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : StateColor, X + 12.0f * Scale, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+
+	const float ButtonWidth = 72.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 7.0f * Scale;
+	DrawRect(Row.bCanEnter ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanEnter ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 16.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	if (Row.bCanEnter)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.EnterHitBoxName, true, 85);
+	}
+}
+
+void AIdleHUD::TryRunDungeonFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FDungeonRunResult Result = IdleGameInstance->TryRunDungeon(DungeonTypeFromHitBoxName(BoxName));
+	DungeonFeedbackLabel = Result.bSuccess ? BuildDungeonRewardLabel(Result) : IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_NEED_CP"));
+	if (const UWorld* World = GetWorld())
+	{
+		DungeonFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
 void AIdleHUD::DrawAchievementPanel()
 {
 	using namespace IdleProject::UI;
@@ -5338,7 +5553,8 @@ void AIdleHUD::RefreshMouseInteraction()
 	const bool bRebirthReady = IdleGameInstance && IdleGameInstance->CanRebirth();
 	const bool bTranscendReady = IdleGameInstance && IdleGameInstance->CanTranscend();
 	const bool bHasRunePanel = IdleGameInstance && IdleGameInstance->GetRuneService();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
+	const bool bHasDungeonPanel = IdleGameInstance && IdleGameInstance->GetDungeonService();
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

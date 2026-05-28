@@ -125,6 +125,16 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("UNIQUE_TRAIT_GUARD_MASTERY"),
 				TEXT("UNIQUE_TRAIT_PERCENT_FORMAT"),
 				TEXT("UNIQUE_TRAIT_FLAT_FORMAT"),
+				TEXT("DUNGEON_PANEL_TITLE"),
+				TEXT("DUNGEON_GOLD"),
+				TEXT("DUNGEON_EXP"),
+				TEXT("DUNGEON_ESSENCE"),
+				TEXT("DUNGEON_ENTRIES_FORMAT"),
+				TEXT("DUNGEON_CP_FORMAT"),
+				TEXT("DUNGEON_REWARD_FORMAT"),
+				TEXT("DUNGEON_ENTER"),
+				TEXT("DUNGEON_STATUS_SOLD_OUT"),
+				TEXT("DUNGEON_STATUS_NEED_CP"),
 			};
 
 			for (const FString& RequiredKey : RequiredCloudSyncKeys)

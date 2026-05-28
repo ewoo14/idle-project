@@ -4,7 +4,7 @@ namespace
 {
 constexpr float CpRewardScale = 100.0f;
 
-int64 RoundAndClampToInt64(double Value)
+int64 RoundDungeonRewardAndClampToInt64(double Value)
 {
 	if (!FMath::IsFinite(Value) || Value >= static_cast<double>(MAX_int64))
 	{
@@ -63,13 +63,13 @@ FDungeonRunResult FDungeonFormula::GetRewardForCp(EDungeonType Type, int64 Comba
 	switch (Type)
 	{
 	case EDungeonType::Gold:
-		Result.GoldReward = RoundAndClampToInt64(1000.0 * static_cast<double>(Multiplier));
+		Result.GoldReward = RoundDungeonRewardAndClampToInt64(1000.0 * static_cast<double>(Multiplier));
 		break;
 	case EDungeonType::Exp:
-		Result.ExpReward = RoundAndClampToInt64(500.0 * static_cast<double>(Multiplier));
+		Result.ExpReward = RoundDungeonRewardAndClampToInt64(500.0 * static_cast<double>(Multiplier));
 		break;
 	case EDungeonType::Essence:
-		Result.EssenceReward = RoundAndClampToInt64(10.0 * static_cast<double>(Multiplier));
+		Result.EssenceReward = RoundDungeonRewardAndClampToInt64(10.0 * static_cast<double>(Multiplier));
 		break;
 	default:
 		Result.bSuccess = false;

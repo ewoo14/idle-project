@@ -192,3 +192,18 @@ new hard-coded colors. The Canvas-height scale clamp remains 1.0-2.0 so 1080p,
 1440p, and 4K layouts stay aligned with the skill HUD and right-side panels. No
 binary art assets were added; existing `.gitattributes` LFS patterns continue to
 cover future exported `*.uasset` and `*.png` UI assets.
+
+## PR #68 Dungeon HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Dungeon HUD V1 adds a
+right-side panel using the existing `--bg-panel`, `--bg-primary`,
+`--accent-gold`, `--accent-blue`, `--accent-red`, `--text-primary`, and
+`--text-muted` tokens. The panel lists Gold, EXP, and Essence dungeons as fixed
+rows with remaining entries, CP gate, reward preview, status, and an Enter
+hitbox. No new hard-coded colors or binary art assets are introduced.
+
+The panel keeps the Canvas-height scale clamp at 1.0-2.0 for 1080p, 1440p, and
+4K layouts. It is anchored in the center lane below the tower panel and above
+the bottom skill HUD so the right-side shop, enhancement, achievement, and quest
+stack keeps its current visual hierarchy. Existing `.gitattributes` LFS patterns
+continue to cover future exported `.uasset` and `.png` UI assets.
