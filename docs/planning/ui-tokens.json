@@ -16,6 +16,10 @@
       "blue":      "#6BB7F0",
       "red":       "#E5556B"
     },
+    "element": {
+      "dark":      "#7233BF",
+      "darkSoft":  "#B878FF"
+    },
     "errors": {
       "critical":  "#FF4D5E",
       "warn":      "#F0A43A",

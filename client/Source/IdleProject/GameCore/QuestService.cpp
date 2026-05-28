@@ -332,6 +332,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch2_003"), EQuestType::Main, TEXT("Reach the Watch Spire"), EQuestObjective::ReachLevel, 10, 3900, 2800, TEXT("main_ch2_002"), TEXT("2-3"));
 	AddDefinition(TEXT("main_ch2_004"), EQuestType::Main, TEXT("Reforge Through Rebirth"), EQuestObjective::Rebirth, 1, 4800, 3400, TEXT("main_ch2_003"), TEXT("2-4"));
 	AddDefinition(TEXT("main_ch2_005"), EQuestType::Main, TEXT("Defeat the Ember Warden"), EQuestObjective::DefeatBoss, 1, 6200, 4500, TEXT("main_ch2_004"), TEXT("2-5"));
+	AddDefinition(TEXT("main_ch3_001"), EQuestType::Main, TEXT("Enter the Rift Frontier"), EQuestObjective::KillMonster, 35, 7600, 5400, TEXT("main_ch2_005"), TEXT("3-1"));
+	AddDefinition(TEXT("main_ch3_002"), EQuestType::Main, TEXT("Chart the Shadow Fault"), EQuestObjective::ClearMap, 1, 8800, 6200, TEXT("main_ch3_001"), TEXT("3-2"));
+	AddDefinition(TEXT("main_ch3_003"), EQuestType::Main, TEXT("Strength for the Abyss Gate"), EQuestObjective::ReachLevel, 25, 10200, 7300, TEXT("main_ch3_002"), TEXT("3-4"));
+	AddDefinition(TEXT("main_ch3_004"), EQuestType::Main, TEXT("Light the Rift Beacon"), EQuestObjective::ClimbTower, 15, 11800, 8400, TEXT("main_ch3_003"), TEXT("3-5"));
+	AddDefinition(TEXT("main_ch3_005"), EQuestType::Main, TEXT("Silence the Umbral Legion"), EQuestObjective::KillMonster, 50, 13600, 9800, TEXT("main_ch3_004"), TEXT("3-8"));
+	AddDefinition(TEXT("main_ch3_006"), EQuestType::Main, TEXT("Defeat the Dimension Lord"), EQuestObjective::DefeatBoss, 1, 16000, 12000, TEXT("main_ch3_005"), TEXT("3-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);

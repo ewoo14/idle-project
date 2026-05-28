@@ -18,6 +18,8 @@ inline constexpr FLinearColor ErrorCritical = FLinearColor(0xFF / 255.f, 0x4D / 
 inline constexpr FLinearColor Warn = FLinearColor(0xF0 / 255.f, 0xA4 / 255.f, 0x3A / 255.f, 1.f);
 inline constexpr FLinearColor Info = FLinearColor(0x5B / 255.f, 0xA7 / 255.f, 0xF0 / 255.f, 1.f);
 inline constexpr FLinearColor Auth = FLinearColor(0xC0 / 255.f, 0x71 / 255.f, 0xF2 / 255.f, 1.f);
+inline constexpr FLinearColor ElementDark = FLinearColor(0x72 / 255.f, 0x33 / 255.f, 0xBF / 255.f, 1.f);
+inline constexpr FLinearColor ElementDarkSoft = FLinearColor(0xB8 / 255.f, 0x78 / 255.f, 0xFF / 255.f, 1.f);
 
 inline constexpr FLinearColor RarityCommon = FLinearColor(0xB0 / 255.f, 0xB5 / 255.f, 0xC0 / 255.f, 1.f);
 inline constexpr FLinearColor RarityRare = FLinearColor(0x5B / 255.f, 0x8B / 255.f, 0xC0 / 255.f, 1.f);

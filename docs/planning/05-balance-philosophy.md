@@ -1531,3 +1531,62 @@ Guardrails:
 - SaveVersion 6 must default missing or legacy rune-set data to `None`.
 - Do not tune first-rebirth pacing from full six-piece set pressure until rune
   set acquisition is modeled in `tools/balance-sim`.
+
+---
+
+## PR #66 Chapter 3 Stage/Element Balance Addendum
+
+PR #66 expands the stage model to 3 chapters with 10 stages per chapter. The
+global stage index is one-based and must be computed as:
+
+```text
+GlobalStageIndex = (Chapter - 1) * 10 + Stage
+```
+
+This yields chapter 1 as 1-10, chapter 2 as 11-20, and chapter 3 as 21-30.
+Stage 5 is the elite encounter in every chapter, and stage 10 is the chapter
+boss. Elite rewards use a 3x bonus; boss rewards keep the 8x bonus and take
+priority if a stage is ever classified as both.
+
+Monster and reward scaling use the shared stage multiplier:
+
+```text
+Multiplier = 1 + max(0, GlobalStageIndex - 1) * 0.15
+```
+
+The `- 1` progression step keeps stage 1-1 at the exact baseline multiplier
+while preserving the prior early-game balance curve for the simulator's first
+rebirth review band.
+
+Chapter 3 introduces Dark as the fifth combat element. Holy attacks deal 1.5x
+damage to Dark targets, and Dark attacks deal 1.5x damage to Holy targets.
+Unrelated Holy/Dark pairings remain 1.0x. Weakness coverage is:
+
+| Global stages | Weak element notes |
+| --- | --- |
+| 1-10 | Fire/Ice/Lightning/Holy/Dark cycle, boss weak to Dark |
+| 11-20 | Mixed second-chapter cycle, elite and boss weak to Dark |
+| 21-30 | Dark-heavy chapter, alternating non-Dark counters for variety |
+
+Save migration moves to SaveVersion 8. Legacy SaveVersion < 8 data preserves
+the saved current chapter/stage where possible, carries chapter 1 boss defeat
+into the highest-cleared chapter floor, and prevents legacy two-chapter saves
+from accidentally marking chapter 3 complete.
+
+Balance simulator evidence for PR #66:
+
+- `tools/balance-sim` imports `stage.ts`, `reward.ts`, and `combat.ts` for the
+  30-stage review table instead of duplicating stage, reward, or element
+  constants.
+- The generated report covers all chapter 1-3 stages, global indexes 1-30,
+  encounter type, weak element, normal rewards, elite 3x rewards, and boss 8x
+  rewards.
+- Chapter 3 is Dark-heavy without changing the sampled first-rebirth timing
+  model: Dark weakness appears on 9 of 30 stages overall and 5 of 10 chapter 3
+  stages.
+- Dark matchup pressure stays bounded to the existing element formula:
+  Holy->Dark, Dark->Holy, and Dark->Dark are x1.5 weakness hits; unrelated
+  Dark matchups such as Dark->Fire remain neutral x1.0.
+- The 1000-run first-rebirth distribution remains at p10 4.919h, median
+  5.328h, p90 5.751h, min 4.564h, and max 6.144h. Median remains inside the
+  5-10h target and every sampled run remains inside the 3-20h review band.

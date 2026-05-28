@@ -149,6 +149,7 @@ AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocat
 		const bool bEffectiveBoss = ShouldSpawnMonsterAsBoss(bSpawnBoss, StageService != nullptr, StageInfo);
 
 		Monster->SetBoss(bEffectiveBoss);
+		Monster->SetElite(StageInfo.bEliteStage);
 		Monster->SetStageStatMultiplier(FStageFormula::ComputeMonsterStatMultiplier(StageInfo.GlobalStageIndex));
 		Monster->SetStageGlobalIndex(StageInfo.GlobalStageIndex);
 		Monster->SetWeakElement(StageInfo.WeakElement);

@@ -126,7 +126,7 @@ void USkillComponent::LoadDefaultThiefSkills()
 {
 	ResetSkillState();
 
-	Skills.Add(MakeSkill(TEXT("shadow_stab"), EClassId::Thief, TEXT("Shadow Stab"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::None));
+	Skills.Add(MakeSkill(TEXT("shadow_stab"), EClassId::Thief, TEXT("Shadow Stab"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::Dark));
 	Skills.Add(MakeSkill(TEXT("smoke_bomb"), EClassId::Thief, TEXT("Smoke Bomb"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("evasion_stance"), EClassId::Thief, TEXT("Evasion Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("backstab"), EClassId::Thief, TEXT("Backstab"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f));
@@ -181,7 +181,7 @@ void USkillComponent::LoadDefaultSummonerSkills()
 	Skills.Add(MakeSkill(TEXT("spirit_bolt"), EClassId::Summoner, TEXT("Spirit Bolt"), ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 1.9f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("familiar_swarm"), EClassId::Summoner, TEXT("Familiar Swarm"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("arcane_binding"), EClassId::Summoner, TEXT("Arcane Binding"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f));
-	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice));
+	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Dark));
 	Skills.Add(MakeSkill(TEXT("pact_mastery"), EClassId::Summoner, TEXT("Pact Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("spirit_reservoir"), EClassId::Summoner, TEXT("Spirit Reservoir"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("grand_familiar"), EClassId::Summoner, TEXT("Grand Familiar"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning));

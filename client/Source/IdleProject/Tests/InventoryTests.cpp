@@ -128,8 +128,8 @@ bool FShopFormulaGearRollCostTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("Negative stage uses stage zero cost"), FShopFormula::GetGearRollCost(-10), static_cast<int64>(300));
 	TestEqual(TEXT("Stage zero cost"), FShopFormula::GetGearRollCost(0), static_cast<int64>(300));
-	TestEqual(TEXT("Stage one cost rounds 300 * 1.15"), FShopFormula::GetGearRollCost(1), static_cast<int64>(345));
-	TestEqual(TEXT("Stage five cost rounds 300 * 1.75"), FShopFormula::GetGearRollCost(5), static_cast<int64>(525));
+	TestEqual(TEXT("Stage one cost keeps the 1-1 baseline"), FShopFormula::GetGearRollCost(1), static_cast<int64>(300));
+	TestEqual(TEXT("Stage five cost rounds 300 * 1.6"), FShopFormula::GetGearRollCost(5), static_cast<int64>(480));
 	TestTrue(TEXT("Gear roll cost increases with stage"), FShopFormula::GetGearRollCost(10) > FShopFormula::GetGearRollCost(1));
 
 	return true;

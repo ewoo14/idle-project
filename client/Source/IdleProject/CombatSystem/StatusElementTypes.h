@@ -19,5 +19,6 @@ enum class ESkillElement : uint8
 	Fire = 1 UMETA(DisplayName = "Fire"),
 	Ice = 2 UMETA(DisplayName = "Ice"),
 	Lightning = 3 UMETA(DisplayName = "Lightning"),
-	Holy = 4 UMETA(DisplayName = "Holy")
+	Holy = 4 UMETA(DisplayName = "Holy"),
+	Dark = 5 UMETA(DisplayName = "Dark")
 };

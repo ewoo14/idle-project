@@ -3,6 +3,7 @@ import {
   DEFAULT_STAGES_PER_CHAPTER,
   getStageWeakElement,
   isBossStage,
+  isEliteStage,
   type StageElement,
 } from "../formulas/stage.js";
 
@@ -13,6 +14,7 @@ export type StageDefinition = {
   stage: number;
   killsToAdvance: number;
   boss: boolean;
+  elite: boolean;
   weakElement: StageElement;
 };
 
@@ -22,6 +24,11 @@ const killsToAdvanceByStage = new Map([
   [3, 12],
   [4, 16],
   [5, 1],
+  [6, 20],
+  [7, 24],
+  [8, 28],
+  [9, 32],
+  [10, 1],
 ]);
 
 function defineChapterStage(chapter: number, stage: number): StageDefinition {
@@ -36,6 +43,7 @@ function defineChapterStage(chapter: number, stage: number): StageDefinition {
     stage,
     killsToAdvance: killsToAdvanceByStage.get(stage) ?? 0,
     boss: isBossStage(chapter, stage, STAGES_PER_CHAPTER),
+    elite: isEliteStage(stage),
     weakElement: getStageWeakElement(globalStageIndex),
   };
 }
@@ -48,20 +56,26 @@ function defineChapter2Stage(stage: number): StageDefinition {
   return defineChapterStage(2, stage);
 }
 
+function defineChapter3Stage(stage: number): StageDefinition {
+  return defineChapterStage(3, stage);
+}
+
 export const CHAPTER_1_STAGE_DEFINITIONS: StageDefinition[] = [
-  defineChapter1Stage(1),
-  defineChapter1Stage(2),
-  defineChapter1Stage(3),
-  defineChapter1Stage(4),
-  defineChapter1Stage(5),
+  ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
+    defineChapter1Stage(index + 1),
+  ),
 ];
 
 export const CHAPTER_2_STAGE_DEFINITIONS: StageDefinition[] = [
-  defineChapter2Stage(1),
-  defineChapter2Stage(2),
-  defineChapter2Stage(3),
-  defineChapter2Stage(4),
-  defineChapter2Stage(5),
+  ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
+    defineChapter2Stage(index + 1),
+  ),
+];
+
+export const CHAPTER_3_STAGE_DEFINITIONS: StageDefinition[] = [
+  ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
+    defineChapter3Stage(index + 1),
+  ),
 ];
 
 export function getChapter1StageDefinition(
@@ -76,6 +90,14 @@ export function getChapter2StageDefinition(
   stage: number,
 ): StageDefinition | undefined {
   return CHAPTER_2_STAGE_DEFINITIONS.find(
+    (definition) => definition.stage === stage,
+  );
+}
+
+export function getChapter3StageDefinition(
+  stage: number,
+): StageDefinition | undefined {
+  return CHAPTER_3_STAGE_DEFINITIONS.find(
     (definition) => definition.stage === stage,
   );
 }

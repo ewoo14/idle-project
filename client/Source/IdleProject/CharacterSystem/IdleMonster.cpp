@@ -62,7 +62,8 @@ void AIdleMonster::BeginPlay()
 
 	if (UMaterialInstanceDynamic* DynamicMaterial = PlaceholderMesh->CreateAndSetMaterialInstanceDynamic(0))
 	{
-		DynamicMaterial->SetVectorParameterValue(TEXT("Color"), bIsBoss ? FLinearColor(0.9f, 0.15f, 0.05f) : FLinearColor(0.05f, 0.8f, 0.2f));
+		DynamicMaterial->SetVectorParameterValue(TEXT("Color"),
+			bIsBoss ? FLinearColor(0.9f, 0.15f, 0.05f) : (bIsElite ? FLinearColor(0.35f, 0.05f, 0.65f) : FLinearColor(0.05f, 0.8f, 0.2f)));
 	}
 
 	if (Combat)
@@ -82,10 +83,23 @@ void AIdleMonster::BeginPlay()
 void AIdleMonster::SetBoss(bool bInBoss)
 {
 	bIsBoss = bInBoss;
+	if (bIsBoss)
+	{
+		bIsElite = false;
+	}
 	WeakElement = bIsBoss ? ESkillElement::Holy : ESkillElement::Fire;
 	if (PlaceholderMesh)
 	{
 		PlaceholderMesh->SetRelativeScale3D(bIsBoss ? FVector(1.35f, 1.35f, 1.35f) : FVector(0.75f, 0.75f, 0.75f));
+	}
+}
+
+void AIdleMonster::SetElite(bool bInElite)
+{
+	bIsElite = bInElite && !bIsBoss;
+	if (PlaceholderMesh)
+	{
+		PlaceholderMesh->SetRelativeScale3D(bIsElite ? FVector(1.05f, 1.05f, 1.05f) : (bIsBoss ? FVector(1.35f, 1.35f, 1.35f) : FVector(0.75f, 0.75f, 0.75f)));
 	}
 }
 
@@ -96,17 +110,17 @@ void AIdleMonster::SetStageStatMultiplier(float InStageStatMultiplier)
 
 void AIdleMonster::SetStageGlobalIndex(int32 InStageGlobalIndex)
 {
-	StageGlobalIndex = FMath::Max(0, InStageGlobalIndex);
+	StageGlobalIndex = FMath::Max(1, InStageGlobalIndex);
 }
 
 float AIdleMonster::GetConfiguredMaxHp() const
 {
-	return (bIsBoss ? BossMaxHp : NormalMaxHp) * StageStatMultiplier;
+	return (bIsBoss ? BossMaxHp : NormalMaxHp) * StageStatMultiplier * (bIsElite ? EliteStatMultiplier : 1.0f);
 }
 
 float AIdleMonster::GetConfiguredAttack() const
 {
-	return (bIsBoss ? BossAttack : NormalAttack) * StageStatMultiplier;
+	return (bIsBoss ? BossAttack : NormalAttack) * StageStatMultiplier * (bIsElite ? EliteStatMultiplier : 1.0f);
 }
 
 void AIdleMonster::HandleDeath(AActor* DyingActor)
@@ -123,7 +137,7 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	UIdleGameInstance* GameInstance = Cast<UIdleGameInstance>(UGameplayStatics::GetGameInstance(World));
 	if (GameInstance)
 	{
-		const int64 ExpReward = FRewardFormula::ComputeKillExp(12, StageGlobalIndex, bIsBoss);
+		const int64 ExpReward = FRewardFormula::ComputeKillExp(12, StageGlobalIndex, bIsBoss, bIsElite);
 		GameInstance->AddExp(FMath::RoundToInt64(static_cast<double>(ExpReward) * (1.0 + static_cast<double>(GameInstance->GetRuneExpBoostBonus()))));
 	}
 
@@ -132,7 +146,7 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	AGoldDrop* GoldDrop = World->SpawnActor<AGoldDrop>(AGoldDrop::StaticClass(), GetActorLocation(), FRotator::ZeroRotator, SpawnParameters);
 	if (GoldDrop)
 	{
-		const int64 BaseGoldAmount = FRewardFormula::ComputeKillGold(static_cast<int64>(10 + FMath::RandRange(0, 5)), StageGlobalIndex, bIsBoss);
+		const int64 BaseGoldAmount = FRewardFormula::ComputeKillGold(static_cast<int64>(10 + FMath::RandRange(0, 5)), StageGlobalIndex, bIsBoss, bIsElite);
 		const int64 RuneGoldAmount = GameInstance ? FMath::RoundToInt64(static_cast<double>(BaseGoldAmount) * (1.0 + static_cast<double>(GameInstance->GetRuneGoldFindBonus()))) : BaseGoldAmount;
 		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(RuneGoldAmount) : RuneGoldAmount;
 	}

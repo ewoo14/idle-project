@@ -125,6 +125,16 @@ Stage HUD 바로 아래 220px 기준 폭의 얇은 토스트로 표시하며
 피드백 토스트는 상단 HUD 영역 안에서만 페이드되어 하단 스킬 HUD, 우측
 환생/퀘스트, 좌측 클래스/펫/시즌 패널과 겹치지 않게 한다.
 
+Chapter 3 Stage HUD V1 extends the same top-center panel for 10 stages per
+chapter. The progress line remains `Stage {Chapter}-{Stage} {Current}/{Target}`
+so 3-5 and 3-10 are readable at 1080p, 1440p, and 4K without shifting the
+existing HP/EXP/Gold or skill HUD. X-5 stages use an `Elite` badge with the Dark
+element token, while X-10 stages keep the gold `Boss` badge. Dark weakness uses
+`--element-dark` (`#7233BF`) plus a compact `D` glyph chip; the softer
+`--element-dark-soft` (`#B878FF`) is reserved for future hover, pulse, or UMG
+material accents. Binary UI icon exports remain covered by the existing
+`.gitattributes` LFS patterns for `*.uasset` and `*.png`.
+
 Floating Damage Text V1은 Canvas로 머리 위 월드 위치(+120uu Z)를 스크린 투영한 뒤 1.0초 동안 32px 상승하며 페이드아웃한다. 물리 피해는 `--text-primary`, 마법 피해는 `--accent-blue`, 치명타는 `--accent-gold`와 1.25x 크기 및 `!` suffix를 사용하며, 1080p/1440p/4K 가독성을 위해 Canvas 높이 기준 1.0~2.0 스케일을 유지한다.
 
 ### 3.3 타이포

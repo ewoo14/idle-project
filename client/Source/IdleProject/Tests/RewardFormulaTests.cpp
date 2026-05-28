@@ -12,15 +12,16 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FRewardFormulaKillRewardScalingTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Stage 1-1 normal EXP keeps legacy baseline"), FRewardFormula::ComputeKillExp(12, 0, false), int64(12));
-	TestEqual(TEXT("Stage 1-5 normal EXP uses reward multiplier"), FRewardFormula::ComputeKillExp(12, 4, false), int64(19));
+	TestEqual(TEXT("Stage 1-1 normal EXP keeps baseline"), FRewardFormula::ComputeKillExp(12, 1, false), int64(12));
+	TestEqual(TEXT("Stage 1-5 normal EXP uses reward multiplier"), FRewardFormula::ComputeKillExp(12, 5, false), int64(19));
 	TestEqual(TEXT("Negative stage EXP clamps to stage 1-1"), FRewardFormula::ComputeKillExp(12, -3, false), int64(12));
-	TestEqual(TEXT("Stage 1-1 boss EXP uses boss bonus"), FRewardFormula::ComputeKillExp(12, 0, true), int64(96));
-	TestEqual(TEXT("Stage 1-5 boss EXP combines stage multiplier and boss bonus"), FRewardFormula::ComputeKillExp(12, 4, true), int64(154));
+	TestEqual(TEXT("Stage 1-10 boss EXP combines stage multiplier and boss bonus"), FRewardFormula::ComputeKillExp(12, 10, true), int64(226));
+	TestEqual(TEXT("Stage 1-5 elite EXP combines stage multiplier and elite bonus"), FRewardFormula::ComputeKillExp(12, 5, false, true), int64(58));
+	TestEqual(TEXT("Boss bonus takes priority over elite bonus"), FRewardFormula::ComputeKillExp(12, 5, true, true), int64(154));
 
-	TestEqual(TEXT("Stage 1-1 normal gold keeps legacy baseline"), FRewardFormula::ComputeKillGold(10, 0, false), int64(10));
-	TestEqual(TEXT("Stage 1-5 normal gold uses reward multiplier"), FRewardFormula::ComputeKillGold(10, 4, false), int64(16));
-	TestEqual(TEXT("Stage 1-1 boss gold uses boss bonus"), FRewardFormula::ComputeKillGold(10, 0, true), int64(80));
+	TestEqual(TEXT("Stage 1-1 normal gold keeps baseline"), FRewardFormula::ComputeKillGold(10, 1, false), int64(10));
+	TestEqual(TEXT("Stage 1-5 normal gold uses reward multiplier"), FRewardFormula::ComputeKillGold(10, 5, false), int64(16));
+	TestEqual(TEXT("Stage 1-10 boss gold uses boss bonus"), FRewardFormula::ComputeKillGold(10, 10, true), int64(188));
 
 	return true;
 }
@@ -32,9 +33,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FRewardFormulaMonsterLevelTest::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("Stage 1-1 maps to monster level one"), FRewardFormula::GetMonsterLevelForStage(0), 1);
+	TestEqual(TEXT("Stage 1-1 maps to monster level one"), FRewardFormula::GetMonsterLevelForStage(1), 1);
 	TestEqual(TEXT("Negative stage maps to monster level one"), FRewardFormula::GetMonsterLevelForStage(-2), 1);
-	TestEqual(TEXT("Stage 1-5 maps to monster level five"), FRewardFormula::GetMonsterLevelForStage(4), 5);
+	TestEqual(TEXT("Stage 1-10 maps to monster level ten"), FRewardFormula::GetMonsterLevelForStage(10), 10);
 
 	return true;
 }
@@ -53,13 +54,13 @@ bool FIdleMonsterRewardStageContextTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("Monster defaults to stage 1-1 reward context"), Monster->GetStageGlobalIndex(), 0);
+	TestEqual(TEXT("Monster defaults to stage 1-1 reward context"), Monster->GetStageGlobalIndex(), 1);
 
-	Monster->SetStageGlobalIndex(4);
-	TestEqual(TEXT("Monster stores spawn-time stage index"), Monster->GetStageGlobalIndex(), 4);
+	Monster->SetStageGlobalIndex(10);
+	TestEqual(TEXT("Monster stores spawn-time stage index"), Monster->GetStageGlobalIndex(), 10);
 
 	Monster->SetStageGlobalIndex(-3);
-	TestEqual(TEXT("Monster reward stage index clamps negative values"), Monster->GetStageGlobalIndex(), 0);
+	TestEqual(TEXT("Monster reward stage index clamps negative values"), Monster->GetStageGlobalIndex(), 1);
 
 	return true;
 }

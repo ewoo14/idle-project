@@ -29,6 +29,12 @@ public:
 	bool IsBoss() const { return bIsBoss; }
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetElite(bool bInElite);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
+	bool IsElite() const { return bIsElite; }
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
 	void SetWeakElement(ESkillElement InWeakElement) { WeakElement = InWeakElement; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
@@ -60,6 +66,9 @@ protected:
 	bool bIsBoss = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	bool bIsElite = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	float NormalMaxHp = 50.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
@@ -72,13 +81,16 @@ protected:
 	float BossAttack = 24.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	float EliteStatMultiplier = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	ESkillElement WeakElement = ESkillElement::Fire;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	float StageStatMultiplier = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
-	int32 StageGlobalIndex = 0;
+	int32 StageGlobalIndex = 1;
 
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);

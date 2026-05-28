@@ -146,6 +146,66 @@ describe("QuestService", () => {
         chapterMapId: "2-5",
       },
       {
+        questId: "main_ch3_001",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 35,
+        rewardGold: 7600,
+        rewardExp: 5400,
+        prerequisiteQuestId: "main_ch2_005",
+        chapterMapId: "3-1",
+      },
+      {
+        questId: "main_ch3_002",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 8800,
+        rewardExp: 6200,
+        prerequisiteQuestId: "main_ch3_001",
+        chapterMapId: "3-2",
+      },
+      {
+        questId: "main_ch3_003",
+        type: "main",
+        objective: "reach_level",
+        targetCount: 25,
+        rewardGold: 10200,
+        rewardExp: 7300,
+        prerequisiteQuestId: "main_ch3_002",
+        chapterMapId: "3-4",
+      },
+      {
+        questId: "main_ch3_004",
+        type: "main",
+        objective: "climb_tower",
+        targetCount: 15,
+        rewardGold: 11800,
+        rewardExp: 8400,
+        prerequisiteQuestId: "main_ch3_003",
+        chapterMapId: "3-5",
+      },
+      {
+        questId: "main_ch3_005",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 50,
+        rewardGold: 13600,
+        rewardExp: 9800,
+        prerequisiteQuestId: "main_ch3_004",
+        chapterMapId: "3-8",
+      },
+      {
+        questId: "main_ch3_006",
+        type: "main",
+        objective: "defeat_boss",
+        targetCount: 1,
+        rewardGold: 16000,
+        rewardExp: 12000,
+        prerequisiteQuestId: "main_ch3_005",
+        chapterMapId: "3-10",
+      },
+      {
         questId: "daily_kill_monsters",
         type: "daily",
         objective: "kill_monster",
@@ -540,6 +600,53 @@ describe("QuestService", () => {
       completed: true,
       dailyResetDate: null,
       weeklyResetId: "2026-W22",
+    });
+  });
+
+  it("unlocks and progresses chapter three main quests through existing objective hooks", async () => {
+    const repo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch2_005",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const service = new QuestService(repo);
+
+    const killResults = await service.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "kill_monster", amount: 40 },
+    );
+
+    expect(killResults).toEqual([
+      expect.objectContaining({
+        questId: "main_ch1_001",
+        progress: 5,
+        completed: true,
+      }),
+      expect.objectContaining({
+        questId: "main_ch3_001",
+        progress: 35,
+        completed: true,
+        chapterMapId: "3-1",
+      }),
+      expect.objectContaining({
+        questId: "daily_kill_monsters",
+        progress: 30,
+        completed: true,
+      }),
+    ]);
+    expect(repo.upsertProgress).toHaveBeenCalledWith({
+      userId,
+      questId: "main_ch3_001",
+      progress: 35,
+      completed: true,
+      dailyResetDate: null,
+      weeklyResetId: null,
     });
   });
 

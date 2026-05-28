@@ -90,6 +90,16 @@ int32 UStageService::GetKillsToAdvance() const
 		return 16;
 	case 5:
 		return 1;
+	case 6:
+		return 20;
+	case 7:
+		return 24;
+	case 8:
+		return 28;
+	case 9:
+		return 32;
+	case 10:
+		return 1;
 	default:
 		return 5;
 	}
@@ -97,7 +107,7 @@ int32 UStageService::GetKillsToAdvance() const
 
 int32 UStageService::GetGlobalStageIndex() const
 {
-	return (FMath::Max(1, CurrentChapter) - 1) * StagesPerChapter + (FMath::Max(1, CurrentStage) - 1);
+	return (FMath::Max(1, CurrentChapter) - 1) * StagesPerChapter + FMath::Max(1, CurrentStage);
 }
 
 FStageInfo UStageService::GetCurrentStageInfo() const
@@ -109,6 +119,7 @@ FStageInfo UStageService::GetCurrentStageInfo() const
 	Info.KillsThisStage = KillsThisStage;
 	Info.KillsToAdvance = GetKillsToAdvance();
 	Info.bBossStage = FStageFormula::IsBossStage(CurrentChapter, CurrentStage, StagesPerChapter);
+	Info.bEliteStage = FStageFormula::IsEliteStage(CurrentStage);
 	Info.WeakElement = FStageFormula::GetStageWeakElement(Info.GlobalStageIndex);
 	return Info;
 }
@@ -129,7 +140,6 @@ void UStageService::RestoreState(int32 Chapter, int32 Stage, int32 Kills, bool b
 	CurrentChapter = FMath::Clamp(Chapter, 1, TotalChapters);
 	CurrentStage = FMath::Clamp(Stage, 1, StagesPerChapter);
 	HighestClearedChapter = FMath::Clamp(HighestCleared, 0, TotalChapters);
-	HighestClearedChapter = FMath::Min(HighestClearedChapter, CurrentChapter - 1);
 	KillsThisStage = FMath::Clamp(Kills, 0, GetKillsToAdvance());
 	OnStageChanged.Broadcast(GetCurrentStageInfo());
 }

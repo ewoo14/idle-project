@@ -359,6 +359,7 @@ const expectedSkillDefinitionsByClass = new Map<
         statusEffect: "poison",
         statusDuration: 3,
         statusMagnitude: 3,
+        element: "dark",
       },
       {
         skillId: "smoke_bomb",
@@ -801,7 +802,7 @@ const expectedSkillDefinitionsByClass = new Map<
         statusEffect: "freeze",
         statusDuration: 2,
         statusMagnitude: 0.2,
-        element: "ice",
+        element: "dark",
       },
       {
         skillId: "pact_mastery",

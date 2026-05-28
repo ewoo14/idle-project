@@ -340,3 +340,46 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   cells, and the full-codex +71.2% core stat pressure.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target.
+
+## PR #66 Character Checklist Addendum (Section 4)
+
+- [ ] `StageService` and server `stage.ts` use 10 stages per chapter and 3
+  total chapters.
+- [ ] Global stage index is one-based and follows
+  `(Chapter - 1) * 10 + Stage` for all chapter 1-3 data.
+- [ ] `IsEliteStage` identifies stage 5, `IsBossStage` identifies stage 10,
+  and rewards keep normal < elite 3x < boss 8x.
+- [ ] Dark is appended as the fifth combat element, with Holy vs Dark and Dark
+  vs Holy weakness multipliers at 1.5x.
+- [ ] Client and server SkillDB/StageDB parity includes chapter 3, 30 stage
+  definitions, Dark skills, and Dark-heavy stage weaknesses.
+- [ ] SaveVersion 8 migration preserves legacy SaveVersion < 8 stage progress
+  without marking chapter 3 complete from old two-chapter saves.
+- [ ] UE Automation and server Vitest cover stage 1-30 indexing, elite/boss
+  classification, Dark combat parity, reward scaling, and v7-to-v8 save
+  migration.
+
+## PR #66 Designer Checklist Addendum (Section 1)
+
+- [ ] Stage HUD keeps `Stage {Chapter}-{Stage} {Current}/{Target}` readable for
+  3-5 and 3-10 at 1080p, 1440p, and 4K.
+- [ ] X-5 stages show the localized `STAGE_ELITE_BADGE`; X-10 stages keep the
+  localized `STAGE_BOSS_BADGE`.
+- [ ] Dark weakness uses `ELEMENT_DARK`, the `ElementDark` theme token, and a
+  compact `D` glyph chip rather than hard-coded copy or color.
+- [ ] `docs/planning/ui-tokens.json` and `UIThemeTokens.h` stay in sync for
+  Dark element colors, and `.gitattributes` continues to LFS-track exported UI
+  binary assets.
+
+## PR #66 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 30-row
+  chapter 1-3 reward table with global stage indexes 1-30.
+- [ ] The stage table reports encounter type, weak element, HP multiplier,
+  reward multiplier, normal reward, 3x elite reward, and 8x boss reward.
+- [ ] Elite rows remain `X-5`, boss rows remain `X-10`, and normal < elite <
+  boss reward ordering is visible in the table.
+- [ ] Dark element pressure includes Holy->Dark, Dark->Holy, Dark->Dark, and
+  neutral Dark->Fire matchup rows.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target after the report expansion.
