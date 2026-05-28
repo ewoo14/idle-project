@@ -75,8 +75,8 @@
 | `--accent-blue` | `#6BB7F0` | MP, 정보 |
 | `--accent-red` | `#E5556B` | HP, 위험 |
 | `--rarity-common` | `#B0B5C0` | 일반 / Common |
-| `--rarity-rare` | `#5B8BC0` | 희귀 / Rare |
-| `--rarity-epic` | `#A05BC0` | 영웅 / Epic |
+| `--rarity-rare` | `#5B8BC0` | 레어 / Rare |
+| `--rarity-epic` | `#A05BC0` | 에픽 / Epic |
 | `--rarity-unique` | `#5BC07A` | 유니크 / Unique |
 | `--rarity-legendary` | `#F0A040` | 전설 / Legendary |
 | `--rarity-transcendent` | `#40D0E8` | 초월 / Transcendent |

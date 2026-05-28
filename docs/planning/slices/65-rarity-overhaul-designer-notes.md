@@ -11,8 +11,8 @@ server parity remain owned by character/backend/balance.
 | Enum | ko | en |
 | --- | --- | --- |
 | Common | 일반 | Common |
-| Rare | 희귀 | Rare |
-| Epic | 영웅 | Epic |
+| Rare | 레어 | Rare |
+| Epic | 에픽 | Epic |
 | Unique | 유니크 | Unique |
 | Legendary | 전설 | Legendary |
 | Transcendent | 초월 | Transcendent |
