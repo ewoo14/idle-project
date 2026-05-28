@@ -295,17 +295,16 @@ describe("equipment formulas", () => {
     expect(typedItem.rarity).toBe(6);
   });
 
-  it.each([0, 1, 2, 3, 4, 5, 6, 7] as const)(
-    "round-trips numeric rarity grade %i through the server item contract",
-    (rarity) => {
-      const typedItem = {
-        ...rareWeapon,
-        rarity,
-      } satisfies ItemInstance;
+  it.each([
+    0, 1, 2, 3, 4, 5, 6, 7,
+  ] as const)("round-trips numeric rarity grade %i through the server item contract", (rarity) => {
+    const typedItem = {
+      ...rareWeapon,
+      rarity,
+    } satisfies ItemInstance;
 
-      expect(typedItem.rarity).toBe(rarity);
-    },
-  );
+    expect(typedItem.rarity).toBe(rarity);
+  });
 
   it.each(
     clientServerEquipmentAnchors,

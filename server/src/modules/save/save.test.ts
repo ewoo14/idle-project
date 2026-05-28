@@ -62,20 +62,19 @@ describe("SaveService", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it.each([0, 1, 2, 3, 4, 5, 6, 7])(
-    "accepts maxEquipmentGrade %i across the v7 rarity range",
-    async (maxEquipmentGrade) => {
-      const service = new SaveService(createRepo(), createLeaderboard());
+  it.each([
+    0, 1, 2, 3, 4, 5, 6, 7,
+  ])("accepts maxEquipmentGrade %i across the v7 rarity range", async (maxEquipmentGrade) => {
+    const service = new SaveService(createRepo(), createLeaderboard());
 
-      const result = await service.upload(userId(), {
-        characterId: character.id,
-        version: 1,
-        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade },
-      });
+    const result = await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade },
+    });
 
-      expect(result.id).toBe("save-1");
-    },
-  );
+    expect(result.id).toBe("save-1");
+  });
 
   it("accepts Mythic maxEquipmentGrade 7", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
