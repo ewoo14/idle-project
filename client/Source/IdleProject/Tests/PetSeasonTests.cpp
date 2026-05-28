@@ -4,6 +4,7 @@
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/SeasonService.h"
+#include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -349,6 +350,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 {
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
 	UPetService* Pets = NewObject<UPetService>();
 	Pets->InitializeDefaultPets();
 	TestTrue(TEXT("Dog is equipped for the pet HUD seed"), Pets->EquipPet(TEXT("dog")));
@@ -374,6 +377,8 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 		});
 
 	TestEqual(TEXT("Pet HUD shows expanded pet catalog"), PetPanel.Rows.Num(), 10);
+	TestEqual(TEXT("Pet HUD localizes dog name"), PetPanel.Rows[0].Name.ToString(), FString(TEXT("Dog")));
+	TestEqual(TEXT("Pet HUD localizes dragon name"), PetPanel.Rows[9].Name.ToString(), FString(TEXT("Dragon")));
 	TestTrue(TEXT("Dog row is marked equipped"), PetPanel.Rows[0].bEquipped);
 	TestFalse(TEXT("Bird row is not equipped"), PetPanel.Rows[1].bEquipped);
 	TestTrue(TEXT("Dog row shows level one"), PetPanel.Rows[0].LevelLabel.ToString().Contains(TEXT("1")));
@@ -381,8 +386,16 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Dog row can be fed when gold covers the next cost"), PetPanel.Rows[0].bCanFeed);
 	TestTrue(TEXT("Dog row exposes feed action label"), PetPanel.Rows[0].FeedActionLabel.ToString().Len() > 0);
 	TestTrue(TEXT("Bird row cannot be fed at max level"), PetPanel.Rows[1].bFeedDisabled);
+	TestTrue(TEXT("Cat row uses localized exp bonus copy"), PetPanel.Rows[2].BonusLabel.ToString().Contains(TEXT("EXP +15%")));
+	TestTrue(TEXT("Wolf row uses localized physical attack bonus copy"), PetPanel.Rows[3].BonusLabel.ToString().Contains(TEXT("PATK +10%")));
+	TestTrue(TEXT("Owl row uses localized magic attack bonus copy"), PetPanel.Rows[4].BonusLabel.ToString().Contains(TEXT("MATK +10%")));
+	TestTrue(TEXT("Bear row uses localized HP bonus copy"), PetPanel.Rows[5].BonusLabel.ToString().Contains(TEXT("HP +12%")));
+	TestTrue(TEXT("Turtle row uses localized defense bonus copy"), PetPanel.Rows[6].BonusLabel.ToString().Contains(TEXT("DEF +12%")));
+	TestTrue(TEXT("Dragon row uses localized all-stat bonus copy"), PetPanel.Rows[9].BonusLabel.ToString().Contains(TEXT("All Stat +8%")));
 	TestFalse(TEXT("Locked cat row cannot be equipped"), PetPanel.Rows[2].bCanEquip);
 	TestTrue(TEXT("Locked cat row disables feed"), PetPanel.Rows[2].bFeedDisabled);
+	TestEqual(TEXT("Locked cat row uses localized locked action"), PetPanel.Rows[2].ActionLabel.ToString(), FString(TEXT("Locked")));
+	TestEqual(TEXT("Locked cat row uses localized locked status"), PetPanel.Rows[2].StatusLabel.ToString(), FString(TEXT("Locked")));
 	TestTrue(TEXT("Equipped pet summary includes scaled gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("22%")));
 	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
 
@@ -403,7 +416,7 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Season HUD token summary"), SeasonPanel.TokenLabel.ToString(), FString(TEXT("10 / 325")));
 	TestTrue(TEXT("Tier one can be claimed"), SeasonPanel.Rows[0].bCanClaim);
 	TestFalse(TEXT("Tier two is still locked"), SeasonPanel.Rows[1].bReached);
-	TestTrue(TEXT("Tier one action is claim"), SeasonPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("받기")));
+	TestTrue(TEXT("Tier one action is claim"), SeasonPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("Receive")));
 
 	FSeasonClaimResult Claim = Season->ClaimSeasonReward(1);
 	TestTrue(TEXT("Season service claim succeeds"), Claim.bSuccess);
@@ -419,8 +432,9 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Claimed tier is marked claimed"), ClaimedPanel.Rows[0].bClaimed);
 	TestFalse(TEXT("Claimed tier cannot be claimed again"), ClaimedPanel.Rows[0].bCanClaim);
-	TestTrue(TEXT("Claimed action label is final"), ClaimedPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("수령 완료")));
+	TestTrue(TEXT("Claimed action label is final"), ClaimedPanel.Rows[0].ActionLabel.ToString().Contains(TEXT("Claimed")));
 
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 

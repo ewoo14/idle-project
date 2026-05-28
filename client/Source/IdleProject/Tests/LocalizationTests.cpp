@@ -135,6 +135,23 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("DUNGEON_ENTER"),
 				TEXT("DUNGEON_STATUS_SOLD_OUT"),
 				TEXT("DUNGEON_STATUS_NEED_CP"),
+				TEXT("PET_NAME_DOG"),
+				TEXT("PET_NAME_BIRD"),
+				TEXT("PET_NAME_CAT"),
+				TEXT("PET_NAME_WOLF"),
+				TEXT("PET_NAME_OWL"),
+				TEXT("PET_NAME_BEAR"),
+				TEXT("PET_NAME_TURTLE"),
+				TEXT("PET_NAME_FOX"),
+				TEXT("PET_NAME_RABBIT"),
+				TEXT("PET_NAME_DRAGON"),
+				TEXT("PET_BONUS_EXP_FORMAT"),
+				TEXT("PET_BONUS_PHYS_ATK_FORMAT"),
+				TEXT("PET_BONUS_MAGIC_ATK_FORMAT"),
+				TEXT("PET_BONUS_HP_FORMAT"),
+				TEXT("PET_BONUS_DEF_FORMAT"),
+				TEXT("PET_BONUS_ALL_STAT_FORMAT"),
+				TEXT("PET_STATUS_LOCKED"),
 			};
 
 			for (const FString& RequiredKey : RequiredCloudSyncKeys)
