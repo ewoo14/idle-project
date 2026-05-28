@@ -87,6 +87,16 @@ describe("stage formulas", () => {
     { globalStageIndex: 21, expectedWeakElement: "Dark" },
     { globalStageIndex: 25, expectedWeakElement: "Dark" },
     { globalStageIndex: 30, expectedWeakElement: "Holy" },
+    { globalStageIndex: 31, expectedWeakElement: "Lightning" },
+    { globalStageIndex: 32, expectedWeakElement: "Holy" },
+    { globalStageIndex: 33, expectedWeakElement: "Ice" },
+    { globalStageIndex: 34, expectedWeakElement: "Fire" },
+    { globalStageIndex: 35, expectedWeakElement: "Dark" },
+    { globalStageIndex: 36, expectedWeakElement: "Lightning" },
+    { globalStageIndex: 37, expectedWeakElement: "Holy" },
+    { globalStageIndex: 38, expectedWeakElement: "Ice" },
+    { globalStageIndex: 39, expectedWeakElement: "Fire" },
+    { globalStageIndex: 40, expectedWeakElement: "Dark" },
   ] satisfies Array<{
     globalStageIndex: number;
     expectedWeakElement: SkillElement;
@@ -105,6 +115,8 @@ describe("stage formulas", () => {
     { chapter: 1, stage: 10, expectedGlobalStageIndex: 10 },
     { chapter: 2, stage: 1, expectedGlobalStageIndex: 11 },
     { chapter: 3, stage: 10, expectedGlobalStageIndex: 30 },
+    { chapter: 4, stage: 1, expectedGlobalStageIndex: 31 },
+    { chapter: 4, stage: 10, expectedGlobalStageIndex: 40 },
   ])("computes global stage index from chapter and stage", ({
     chapter,
     stage,

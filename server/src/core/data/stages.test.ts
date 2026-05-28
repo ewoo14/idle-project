@@ -8,9 +8,11 @@ import {
   CHAPTER_1_STAGE_DEFINITIONS,
   CHAPTER_2_STAGE_DEFINITIONS,
   CHAPTER_3_STAGE_DEFINITIONS,
+  CHAPTER_4_STAGE_DEFINITIONS,
   getChapter1StageDefinition,
   getChapter2StageDefinition,
   getChapter3StageDefinition,
+  getChapter4StageDefinition,
   STAGES_PER_CHAPTER,
 } from "./stages.js";
 
@@ -160,5 +162,52 @@ describe("chapter 3 stage definitions", () => {
     expect(getChapter3StageDefinition(10)).toBe(CHAPTER_3_STAGE_DEFINITIONS[9]);
     expect(getChapter3StageDefinition(0)).toBeUndefined();
     expect(getChapter3StageDefinition(11)).toBeUndefined();
+  });
+});
+
+describe("chapter 4 stage definitions", () => {
+  it("defines the ten chapter 4 stages in order", () => {
+    expect(CHAPTER_4_STAGE_DEFINITIONS).toHaveLength(10);
+    expect(
+      CHAPTER_4_STAGE_DEFINITIONS.map(({ chapter, stage }) => ({
+        chapter,
+        stage,
+      })),
+    ).toEqual(
+      Array.from({ length: 10 }, (_, index) => ({
+        chapter: 4,
+        stage: index + 1,
+      })),
+    );
+  });
+
+  it("mirrors client kills-to-advance, boss, elite, and weak-element parity", () => {
+    for (const definition of CHAPTER_4_STAGE_DEFINITIONS) {
+      const globalStageIndex = computeGlobalStageIndex(
+        definition.chapter,
+        definition.stage,
+        STAGES_PER_CHAPTER,
+      );
+
+      expect(definition.killsToAdvance).toBe(
+        expectedKillsToAdvanceByStage.get(definition.stage),
+      );
+      expect(definition.boss).toBe(
+        isBossStage(definition.chapter, definition.stage, STAGES_PER_CHAPTER),
+      );
+      expect(definition.elite).toBe(definition.stage === 5);
+      expect(definition.weakElement).toBe(
+        getStageWeakElement(globalStageIndex),
+      );
+      expect(definition.weakElement).not.toBe("None");
+    }
+  });
+
+  it("looks up chapter 4 stage definitions by stage number", () => {
+    expect(getChapter4StageDefinition(1)).toBe(CHAPTER_4_STAGE_DEFINITIONS[0]);
+    expect(getChapter4StageDefinition(5)).toBe(CHAPTER_4_STAGE_DEFINITIONS[4]);
+    expect(getChapter4StageDefinition(10)).toBe(CHAPTER_4_STAGE_DEFINITIONS[9]);
+    expect(getChapter4StageDefinition(0)).toBeUndefined();
+    expect(getChapter4StageDefinition(11)).toBeUndefined();
   });
 });
