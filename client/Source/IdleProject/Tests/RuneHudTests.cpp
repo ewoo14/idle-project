@@ -26,6 +26,13 @@ FRuneInstance MakeHudClassRune(FName RuneId, EClassId ClassId, EItemRarity Rarit
 	Rune.ClassRestriction = ClassId;
 	return Rune;
 }
+
+FRuneInstance MakeHudSetRune(FName RuneId, ERuneType Type, EItemRarity Rarity, ERuneSet RuneSet)
+{
+	FRuneInstance Rune = MakeHudRune(RuneId, Type, Rarity);
+	Rune.RuneSet = RuneSet;
+	return Rune;
+}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -121,6 +128,57 @@ bool FRuneClassSlotHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Empty class slot uses class empty copy"), EmptyClassSlot.TypeLabel.ToString(), FString(TEXT("No class rune")));
 	TestEqual(TEXT("Selected class rune can equip into class slot"), EmptyClassSlot.ActionHitBoxName, FName(TEXT("RuneEquip_6")));
 	TestFalse(TEXT("Class craft disabled without essence"), EmptyViewModel.bCanCraftClassRune);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneSetHudViewModelTest,
+	"IdleProject.Rune.Set.HUD.ViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneSetHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::ResetCacheForTests();
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	URuneService* RuneService = NewObject<URuneService>();
+	RuneService->SetOwnerClassId(EClassId::Warrior);
+	RuneService->AddRune(MakeHudSetRune(TEXT("offense_phys"), ERuneType::PhysAtk, EItemRarity::Rare, ERuneSet::Offense));
+	RuneService->AddRune(MakeHudSetRune(TEXT("offense_magic"), ERuneType::MagicAtk, EItemRarity::Rare, ERuneSet::Offense));
+	RuneService->AddRune(MakeHudSetRune(TEXT("vitality_hp"), ERuneType::Hp, EItemRarity::Epic, ERuneSet::Vitality));
+	RuneService->AddRune(MakeHudClassRune(TEXT("warrior_class"), EClassId::Warrior, EItemRarity::Rare, 0));
+	TestTrue(TEXT("Offense rune 0 equips"), RuneService->TryEquipRune(0, 0));
+	TestTrue(TEXT("Offense rune 1 equips"), RuneService->TryEquipRune(1, 1));
+	TestTrue(TEXT("Vitality rune equips"), RuneService->TryEquipRune(2, 2));
+	TestTrue(TEXT("Class rune equips outside set count"), RuneService->TryEquipRune(FClassRuneFormula::ClassRuneSlotIndex, 3));
+
+	const FIdleHUDRuneViewModel ViewModel = IdleProject::UI::BuildRuneViewModel(
+		*RuneService,
+		150,
+		20000,
+		12,
+		INDEX_NONE);
+
+	TestEqual(TEXT("Rune set panel title is localized"), ViewModel.SetTitle.ToString(), FString(TEXT("Rune Sets")));
+	TestEqual(TEXT("Rune set panel exposes four rows"), ViewModel.SetRows.Num(), 4);
+
+	const FIdleHUDRuneSetRowViewModel& OffenseRow = ViewModel.SetRows[0];
+	TestEqual(TEXT("Offense set row is first"), static_cast<int32>(OffenseRow.RuneSet), static_cast<int32>(ERuneSet::Offense));
+	TestEqual(TEXT("Offense count excludes class slot"), OffenseRow.Count, 2);
+	TestEqual(TEXT("Offense count label is localized"), OffenseRow.CountLabel.ToString(), FString(TEXT("Offense 2/6")));
+	TestEqual(TEXT("Offense tier label shows active threshold"), OffenseRow.TierLabel.ToString(), FString(TEXT("2-Set Active")));
+	TestEqual(TEXT("Offense bonus summarizes active stats"), OffenseRow.BonusLabel.ToString(), FString(TEXT("Physical Attack +5% / Magic Attack +5%")));
+	TestEqual(TEXT("Offense next tier label points to four set"), OffenseRow.NextTierLabel.ToString(), FString(TEXT("Next 4-Set: 2 more")));
+	TestTrue(TEXT("Offense row is active"), OffenseRow.bActive);
+	TestTrue(TEXT("Offense row marks two set active"), OffenseRow.bTwoSetActive);
+	TestFalse(TEXT("Offense row does not mark four set active"), OffenseRow.bFourSetActive);
+	TestFalse(TEXT("Offense row does not mark six set active"), OffenseRow.bSixSetActive);
+
+	const FIdleHUDRuneSetRowViewModel& BastionRow = ViewModel.SetRows[1];
+	TestEqual(TEXT("Bastion empty row keeps no-set copy"), BastionRow.TierLabel.ToString(), FString(TEXT("No set")));
+	TestEqual(TEXT("Bastion inactive bonus is localized"), BastionRow.BonusLabel.ToString(), FString(TEXT("No active bonus")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
