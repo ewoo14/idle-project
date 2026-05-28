@@ -21,6 +21,16 @@ enum class ERuneType : uint8
 	ClassMastery = 10 UMETA(DisplayName = "ClassMastery")
 };
 
+UENUM(BlueprintType)
+enum class ERuneSet : uint8
+{
+	None = 0 UMETA(Hidden),
+	Offense = 1 UMETA(DisplayName = "Offense"),
+	Bastion = 2 UMETA(DisplayName = "Bastion"),
+	Vitality = 3 UMETA(DisplayName = "Vitality"),
+	Fortune = 4 UMETA(DisplayName = "Fortune")
+};
+
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FRuneCoreMultipliers
 {
@@ -79,6 +89,9 @@ struct IDLEPROJECT_API FRuneInstance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Rune")
 	EClassId ClassRestriction = EClassId::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Rune")
+	ERuneSet RuneSet = ERuneSet::None;
 };
 
 USTRUCT(BlueprintType)
@@ -100,4 +113,7 @@ struct IDLEPROJECT_API FRuneSaveEntry
 
 	UPROPERTY()
 	EClassId ClassRestriction = EClassId::None;
+
+	UPROPERTY()
+	ERuneSet RuneSet = ERuneSet::None;
 };

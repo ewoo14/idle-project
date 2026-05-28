@@ -1450,3 +1450,42 @@ Guardrails:
 - Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
   after changing class mastery stat mapping, rarity scaling, or enhancement
   scaling.
+
+## PR #64 Rune Set Bonus Balance Review
+
+PR #64 adds rune set identity to the six regular rune slots only. The dedicated
+ClassMastery slot remains outside set counting even if legacy or malformed save
+data carries a `RuneSet` value there. Set bonuses are pure additive stat
+bonuses and use the highest reached tier, not cumulative tiers:
+
+| Same set count | Bonus |
+| ---: | ---: |
+| 0-1 | 0% |
+| 2-3 | 5% |
+| 4-5 | 12% |
+| 6+ | 25% |
+
+Set mapping:
+
+| Rune set | Bonus lanes |
+| --- | --- |
+| Offense | PhysAtk, MagicAtk |
+| Bastion | PhysDef, MagicDef |
+| Vitality | Hp, OfflineEff |
+| Fortune | GoldFind, ExpBoost, CritDamage |
+
+Core set bonuses join the same additive multiplier path as regular core runes:
+`Result.Stat += SetBonus.Stat`. Utility set bonuses are added after the existing
+utility cap, so Fortune and Vitality remain visible even when rune utility values
+are already capped. This is intentional; tune set tier values before changing
+the shared utility caps.
+
+Guardrails:
+
+- `FRuneSetFormula`, `runeSet.ts`, and tests must keep `Math.fround`/float
+  parity at the 0.05, 0.12, and 0.25 tier boundaries.
+- Common and `None` rarity shop/drop rolls produce `RuneSet=None`; higher
+  rarities may still roll `None` to preserve non-set outcomes.
+- SaveVersion 6 must default missing or legacy rune-set data to `None`.
+- Do not tune first-rebirth pacing from full six-piece set pressure until rune
+  set acquisition is modeled in `tools/balance-sim`.

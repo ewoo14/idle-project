@@ -1,5 +1,7 @@
 #include "RuneSystem/RuneFormula.h"
 
+#include "RuneSystem/RuneSetFormula.h"
+
 namespace
 {
 struct FRuneRarityTuning
@@ -194,5 +196,6 @@ FRuneInstance FRuneFormula::RollShopRune(int32 ProgressIndex, FRandomStream& Rng
 	Rune.Rarity = RollRuneRarity(FMath::Max(0, ProgressIndex), Rng);
 	Rune.EnhanceLevel = 0;
 	Rune.RuneId = MakeRuneId(Rune.RuneType, Rune.Rarity, ProgressIndex);
+	Rune.RuneSet = FRuneSetFormula::RollRuneSet(Rune.Rarity, Rng);
 	return Rune;
 }

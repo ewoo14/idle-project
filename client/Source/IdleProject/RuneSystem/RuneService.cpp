@@ -3,6 +3,33 @@
 #include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
+#include "RuneSystem/RuneSetFormula.h"
+
+namespace
+{
+TMap<ERuneSet, int32> CountEquippedRegularRuneSets(const TArray<FRuneInstance>& OwnedRunes, const TArray<int32>& EquippedSlots)
+{
+	TMap<ERuneSet, int32> Counts;
+	const int32 RegularSlotCount = FMath::Min(FClassRuneFormula::ClassRuneSlotIndex, EquippedSlots.Num());
+	for (int32 SlotIndex = 0; SlotIndex < RegularSlotCount; ++SlotIndex)
+	{
+		const int32 OwnedIndex = EquippedSlots[SlotIndex];
+		if (!OwnedRunes.IsValidIndex(OwnedIndex))
+		{
+			continue;
+		}
+
+		const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
+		if (Rune.RuneType == ERuneType::ClassMastery || Rune.RuneSet == ERuneSet::None)
+		{
+			continue;
+		}
+
+		Counts.FindOrAdd(Rune.RuneSet) += 1;
+	}
+	return Counts;
+}
+}
 
 URuneService::URuneService()
 {
@@ -175,6 +202,15 @@ FRuneCoreMultipliers URuneService::GetEquippedCoreMultipliers() const
 			break;
 		}
 	}
+
+	FRuneCoreMultipliers SetCoreBonus;
+	FRuneUtilValues SetUtilBonus;
+	FRuneSetFormula::ComputeSetBonus(CountEquippedRegularRuneSets(OwnedRunes, EquippedSlots), SetCoreBonus, SetUtilBonus);
+	Result.PhysAtk += SetCoreBonus.PhysAtk;
+	Result.MagicAtk += SetCoreBonus.MagicAtk;
+	Result.PhysDef += SetCoreBonus.PhysDef;
+	Result.MagicDef += SetCoreBonus.MagicDef;
+	Result.Hp += SetCoreBonus.Hp;
 	return Result;
 }
 
@@ -214,6 +250,14 @@ FRuneUtilValues URuneService::GetEquippedUtilValues() const
 	Result.GoldFind = FMath::Min(Result.GoldFind, FRuneFormula::GetUtilCap(ERuneType::GoldFind) + CapExtension);
 	Result.ExpBoost = FMath::Min(Result.ExpBoost, FRuneFormula::GetUtilCap(ERuneType::ExpBoost) + CapExtension);
 	Result.OfflineEff = FMath::Min(Result.OfflineEff, FRuneFormula::GetUtilCap(ERuneType::OfflineEff) + CapExtension);
+
+	FRuneCoreMultipliers SetCoreBonus;
+	FRuneUtilValues SetUtilBonus;
+	FRuneSetFormula::ComputeSetBonus(CountEquippedRegularRuneSets(OwnedRunes, EquippedSlots), SetCoreBonus, SetUtilBonus);
+	Result.CritDamage += SetUtilBonus.CritDamage;
+	Result.GoldFind += SetUtilBonus.GoldFind;
+	Result.ExpBoost += SetUtilBonus.ExpBoost;
+	Result.OfflineEff += SetUtilBonus.OfflineEff;
 	return Result;
 }
 
@@ -311,6 +355,7 @@ void URuneService::CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>&
 		Entry.Rarity = Rune.Rarity;
 		Entry.EnhanceLevel = FMath::Max(0, Rune.EnhanceLevel);
 		Entry.ClassRestriction = Rune.ClassRestriction;
+		Entry.RuneSet = Rune.RuneSet;
 		OutRunes.Add(Entry);
 	}
 
@@ -352,6 +397,7 @@ void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TAr
 		Rune.Rarity = Entry.Rarity;
 		Rune.EnhanceLevel = FMath::Max(0, Entry.EnhanceLevel);
 		Rune.ClassRestriction = Entry.ClassRestriction;
+		Rune.RuneSet = Entry.RuneSet;
 		if (!IsValidRune(Rune))
 		{
 			continue;
