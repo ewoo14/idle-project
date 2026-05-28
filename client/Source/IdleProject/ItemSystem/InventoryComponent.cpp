@@ -2,6 +2,7 @@
 
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/SetBonusFormula.h"
+#include "ItemSystem/UniqueTraitFormula.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -101,6 +102,7 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		Bonus.MagicAtk += Item.BonusMagicAtk * EnhanceMultiplier;
 		Bonus.MagicDef += Item.BonusMagicDef * EnhanceMultiplier;
 		Bonus.CritDmg += Item.BonusCritDmg * EnhanceMultiplier;
+		FUniqueTraitFormula::AccumulateTraitBonus(Item, Bonus);
 	}
 
 	const FDerivedStats SetBonus = FSetBonusFormula::ComputeSetBonus(EquippedItems);
@@ -114,6 +116,21 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 	Bonus.CritDmg += SetBonus.CritDmg;
 
 	return Bonus;
+}
+
+FUniqueTraitCoreMultipliers UInventoryComponent::ComputeUniqueTraitMultipliers() const
+{
+	FUniqueTraitCoreMultipliers Multipliers;
+	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
+	{
+		if (!Items.IsValidIndex(Pair.Value))
+		{
+			continue;
+		}
+
+		FUniqueTraitFormula::AccumulateTraitMultipliers(Items[Pair.Value], Multipliers);
+	}
+	return Multipliers;
 }
 
 const FItemInstance* UInventoryComponent::GetEquippedItem(EItemSlot Slot) const

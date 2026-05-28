@@ -609,6 +609,68 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports unique trait value and combat pressure without injecting it into the sampled rebirth run", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/uniqueTrait.ts",
+    );
+    expect(report.json.model.uniqueTraitPressure.valueRows).toHaveLength(16);
+    expect(report.json.model.uniqueTraitPressure.valueRows).toContainEqual({
+      trait: "AllStatSurge",
+      rarity: "Unique",
+      valuePercent: 8,
+    });
+    expect(report.json.model.uniqueTraitPressure.valueRows).toContainEqual({
+      trait: "AllStatSurge",
+      rarity: "Transcendent",
+      valuePercent: 12,
+    });
+    expect(report.json.model.uniqueTraitPressure.valueRows).toContainEqual({
+      trait: "PhysMastery",
+      rarity: "Transcendent",
+      valuePercent: 18,
+    });
+    expect(report.json.model.uniqueTraitPressure.combatRows).toEqual([
+      expect.objectContaining({
+        rarity: "Unique",
+        traitCount: 1,
+        traits: ["PhysMastery"],
+        className: "Warrior",
+        level: 100,
+        firstRebirthInjected: false,
+      }),
+      expect.objectContaining({
+        rarity: "Transcendent",
+        traitCount: 2,
+        traits: ["AllStatSurge", "PhysMastery"],
+        className: "Warrior",
+        level: 100,
+        firstRebirthInjected: false,
+      }),
+    ]);
+    const uniqueRow = report.json.model.uniqueTraitPressure.combatRows[0];
+    const transcendentRow = report.json.model.uniqueTraitPressure.combatRows[1];
+    expect(uniqueRow.cpMultiplier).toBeGreaterThan(1);
+    expect(uniqueRow.dpsMultiplier).toBeGreaterThan(1);
+    expect(transcendentRow.cpMultiplier).toBeGreaterThan(
+      uniqueRow.cpMultiplier,
+    );
+    expect(transcendentRow.dpsMultiplier).toBeGreaterThan(
+      uniqueRow.dpsMultiplier,
+    );
+    expect(report.json.distribution.summary.medianHours).toBe(5.328);
+    expect(report.markdown).toContain("## Unique Trait Pressure");
+    expect(report.markdown).toContain("| AllStatSurge | Unique | 8% |");
+    expect(report.markdown).toContain(
+      "| Transcendent | 2 | AllStatSurge, PhysMastery |",
+    );
+    expect(report.markdown).toContain(
+      "not injected into the sampled first-rebirth run",
+    );
+  });
+
   it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

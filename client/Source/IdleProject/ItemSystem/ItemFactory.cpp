@@ -158,6 +158,7 @@ FItemInstance BuildDropForLevel(int32 Level, bool bGuaranteeItem, FRandomStream&
 	Item.BonusHp *= BaseItem.HpScale;
 	Item.ItemSet = FDropFormula::RollItemSet(Rarity, Rng);
 	FDropFormula::RollAffixes(Rarity, SafeLevel, Rng, Item);
+	FDropFormula::RollUniqueTraits(Rarity, Rng, Item);
 	Item.DisplayName = BuildLocalizedItemDisplayName(Rarity, BaseItem);
 	Item.ItemId = FName(*FString::Printf(TEXT("%s_%s_L%d"), *BaseItem.BaseItemId.ToString(), *UEnum::GetValueAsString(Rarity), SafeLevel));
 

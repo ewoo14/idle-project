@@ -90,6 +90,12 @@ import {
 } from "../../server/src/core/formulas/stats.js";
 import { getTowerMilestoneMultiplier } from "../../server/src/core/formulas/towerMilestone.js";
 import { getTranscendStatMultiplier } from "../../server/src/core/formulas/transcend.js";
+import {
+  accumulateTraitEffects,
+  applyUniqueTraitMultipliers,
+  getTraitValue,
+  type UniqueTrait,
+} from "../../server/src/core/formulas/uniqueTrait.js";
 
 export type SimulationOptions = {
   runs?: number;
@@ -162,6 +168,7 @@ export type BalanceReport = {
       achievementPressure: AchievementPressure;
       runePressure: RunePressure;
       runeCodexPressure: RuneCodexPressure;
+      uniqueTraitPressure: UniqueTraitPressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -409,6 +416,44 @@ export type RuneCodexPressure = {
   injectedIntoSampledRun: boolean;
 };
 
+export type UniqueTraitRarityName = "Unique" | "Transcendent";
+
+export type UniqueTraitName =
+  | "AllStatSurge"
+  | "CritDamageSurge"
+  | "CritRateSurge"
+  | "LifeSurge"
+  | "SwiftSurge"
+  | "PhysMastery"
+  | "MagicMastery"
+  | "GuardMastery";
+
+export type UniqueTraitValueRow = {
+  trait: UniqueTraitName;
+  rarity: UniqueTraitRarityName;
+  valuePercent: number;
+};
+
+export type UniqueTraitCombatRow = {
+  rarity: UniqueTraitRarityName;
+  traitCount: number;
+  traits: UniqueTraitName[];
+  className: string;
+  level: number;
+  baseCombatPower: number;
+  traitCombatPower: number;
+  cpMultiplier: number;
+  baseDps: number;
+  traitDps: number;
+  dpsMultiplier: number;
+  firstRebirthInjected: boolean;
+};
+
+export type UniqueTraitPressure = {
+  valueRows: UniqueTraitValueRow[];
+  combatRows: UniqueTraitCombatRow[];
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -464,6 +509,28 @@ const RUNE_SET_REVIEW_SETS = [
   RUNE_SET_VITALITY,
   RUNE_SET_FORTUNE,
 ] as const;
+const UNIQUE_TRAIT_REVIEW_CLASS: ClassId = 1;
+const UNIQUE_TRAIT_REVIEW_LEVEL = 100;
+const UNIQUE_TRAIT_DEFINITIONS: Array<{
+  trait: Exclude<UniqueTrait, 0>;
+  name: UniqueTraitName;
+}> = [
+  { trait: 1, name: "AllStatSurge" },
+  { trait: 2, name: "CritDamageSurge" },
+  { trait: 3, name: "CritRateSurge" },
+  { trait: 4, name: "LifeSurge" },
+  { trait: 5, name: "SwiftSurge" },
+  { trait: 6, name: "PhysMastery" },
+  { trait: 7, name: "MagicMastery" },
+  { trait: 8, name: "GuardMastery" },
+];
+const UNIQUE_TRAIT_REVIEW_RARITIES: Array<{
+  rarity: 4 | 6;
+  name: UniqueTraitRarityName;
+}> = [
+  { rarity: 4, name: "Unique" },
+  { rarity: 6, name: "Transcendent" },
+];
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -535,6 +602,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/classRune.ts",
         "server/src/core/formulas/runeSet.ts",
         "server/src/core/formulas/runeCodex.ts",
+        "server/src/core/formulas/uniqueTrait.ts",
       ],
       rewardScaling: buildStageRewardComparison(),
       darkElementPressure: buildDarkElementPressure(),
@@ -546,6 +614,7 @@ export function buildBalanceReport(
       runeCodexPressure: buildRuneCodexPressure(
         distribution.summary.medianHours,
       ),
+      uniqueTraitPressure: buildUniqueTraitPressure(),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -1357,6 +1426,74 @@ function buildRuneCodexPressure(
   };
 }
 
+function buildUniqueTraitPressure(): UniqueTraitPressure {
+  return {
+    valueRows: UNIQUE_TRAIT_REVIEW_RARITIES.flatMap((rarity) =>
+      UNIQUE_TRAIT_DEFINITIONS.map((definition) => ({
+        trait: definition.name,
+        rarity: rarity.name,
+        valuePercent: round(
+          getTraitValue(definition.trait, rarity.rarity) * 100,
+          3,
+        ),
+      })),
+    ),
+    combatRows: [
+      buildUniqueTraitCombatRow(4, [6]),
+      buildUniqueTraitCombatRow(6, [1, 6]),
+    ],
+  };
+}
+
+function buildUniqueTraitCombatRow(
+  rarity: 4 | 6,
+  traits: Array<Exclude<UniqueTrait, 0>>,
+): UniqueTraitCombatRow {
+  const classId = UNIQUE_TRAIT_REVIEW_CLASS;
+  const level = UNIQUE_TRAIT_REVIEW_LEVEL;
+  const baseStats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const traitStats = applyUniqueTraits(baseStats, rarity, traits);
+  const baseCombatPower = computeCombatPower(baseStats);
+  const traitCombatPower = computeCombatPower(traitStats);
+  const baseDps = effectiveReviewDps(baseStats, classId, level);
+  const traitDps = effectiveReviewDps(traitStats, classId, level);
+
+  return {
+    rarity: uniqueTraitRarityName(rarity),
+    traitCount: traits.length,
+    traits: traits.map(uniqueTraitName),
+    className: CLASS_NAMES[classId],
+    level,
+    baseCombatPower,
+    traitCombatPower,
+    cpMultiplier: round(traitCombatPower / Math.max(1, baseCombatPower), 3),
+    baseDps,
+    traitDps,
+    dpsMultiplier: round(traitDps / Math.max(1, baseDps), 3),
+    firstRebirthInjected: false,
+  };
+}
+
+function applyUniqueTraits(
+  baseStats: DerivedStats,
+  rarity: 4 | 6,
+  traits: Array<Exclude<UniqueTrait, 0>>,
+): DerivedStats {
+  const effects = accumulateTraitEffects(traits, rarity);
+  return applyUniqueTraitMultipliers(
+    {
+      ...baseStats,
+      critDmg: Math.fround(baseStats.critDmg + effects.flat.critDmg),
+      critRate: Math.fround(baseStats.critRate + effects.flat.critRate),
+      atkSpeed: Math.fround(baseStats.atkSpeed + effects.flat.atkSpeed),
+    },
+    effects.multipliers,
+  );
+}
+
 function buildRuneCorePressureRow(
   rarity: number,
   enhanceLevel: number,
@@ -1932,6 +2069,32 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "<!-- markdownlint-enable MD013 -->",
     "",
+    "## Unique Trait Pressure",
+    "",
+    "- Unique equipment can roll one unique trait; Transcendent equipment can",
+    "  roll two distinct unique traits. Mythic remains excluded from this trait",
+    "  budget.",
+    "- Rows compare trait pressure on the shared Lv100 Warrior review loadout.",
+    "- Unique trait acquisition is not injected into the sampled first-rebirth run;",
+    "  the 1000-run median remains the PR #61 baseline guard.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Trait | Rarity | Value |",
+    "| --- | --- | ---: |",
+    ...report.model.uniqueTraitPressure.valueRows.map(
+      (row) => `| ${row.trait} | ${row.rarity} | ${row.valuePercent}% |`,
+    ),
+    "",
+    "| Rarity | Trait count | Traits | Base CP | Trait CP | CP x | Base DPS | Trait DPS | DPS x |",
+    "| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.uniqueTraitPressure.combatRows.map(
+      (row) =>
+        `| ${row.rarity} | ${row.traitCount} | ${row.traits.join(", ")} | ${row.baseCombatPower} | ${row.traitCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.traitDps} | x${row.dpsMultiplier} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
     "## Rune Codex Collection Pressure",
     "",
     `- Total cells: ${report.model.runeCodexPressure.totalCells}`,
@@ -2017,6 +2180,20 @@ function assertPositiveInteger(value: number, name: string) {
   if (!Number.isInteger(value) || value < 1) {
     throw new Error(`${name} must be a positive integer`);
   }
+}
+
+function uniqueTraitName(trait: UniqueTrait): UniqueTraitName {
+  const definition = UNIQUE_TRAIT_DEFINITIONS.find(
+    (candidate) => candidate.trait === trait,
+  );
+  if (!definition) {
+    throw new Error(`Unsupported unique trait ${trait}`);
+  }
+  return definition.name;
+}
+
+function uniqueTraitRarityName(rarity: 4 | 6): UniqueTraitRarityName {
+  return rarity === 4 ? "Unique" : "Transcendent";
 }
 
 function defaultOutputDir(): string {

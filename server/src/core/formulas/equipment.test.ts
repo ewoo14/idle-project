@@ -223,6 +223,23 @@ describe("equipment formulas", () => {
     });
   });
 
+  it("keeps unique core traits out of flat equipment bonuses while applying utility traits", () => {
+    expect(
+      computeInventoryBonus([
+        {
+          ...rareWeapon,
+          rarity: 4,
+          uniqueTrait1: 6,
+          uniqueTrait2: 2,
+        },
+      ]),
+    ).toEqual({
+      ...zeroEquipmentBonus,
+      bonusAtk: 15,
+      critDmg: Math.fround(0.15),
+    });
+  });
+
   it("adds flat set bonuses after per-item equipment bonuses", () => {
     expect(
       computeInventoryBonus([

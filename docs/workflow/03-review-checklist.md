@@ -225,6 +225,30 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   Warrior, Guardian, or Arcane.
 - [ ] `FSetBonusFormula::ComputeSetBonus` applies tiered 2-piece and 4-piece
   flat `FDerivedStats` bonuses, with 4-piece including the 2-piece bonus.
+
+## PR #67 Character Checklist Addendum (Section 4)
+
+- [ ] `EUniqueTrait` preserves `None = 0` and defines eight active trait values
+  from `AllStatSurge = 1` through `GuardMastery = 8`.
+- [ ] `FItemInstance.UniqueTrait1` and `UniqueTrait2` default to `None`, so
+  legacy saves without these fields restore with no trait contribution.
+- [ ] `FUniqueTraitFormula::RarityGrantsUnique` is true only for
+  `Unique = 4` and `Transcendent = 6`; `Mythic = 7` is explicitly excluded.
+- [ ] `RollUniqueTraits` gives Unique one trait and Transcendent two distinct
+  traits using the injected `FRandomStream`.
+- [ ] `GetTraitValue` keeps Unique base values and Transcendent `1.5x` values
+  in parity with `server/src/core/formulas/uniqueTrait.ts` via `Math.fround`.
+- [ ] `UInventoryComponent::ComputeEquipmentBonus` accumulates only flat utility
+  unique traits (`CritDamageSurge`, `CritRateSurge`, `SwiftSurge`) after
+  base/enhanced affix stats.
+- [ ] `UInventoryComponent::ComputeUniqueTraitMultipliers` keeps core-stat
+  unique traits out of flat `FDerivedStats`, and `AIdleCharacter::RefreshDerivedStats`
+  applies them once after `DeriveStats` has composed base plus flat stats.
+- [ ] `SaveVersion` writes version 9, and save/migration automation covers
+  legacy version compatibility.
+- [ ] UE Automation and server Vitest cover rarity gates, Mythic exclusion,
+  deterministic rolls, distinct Transcendent traits, flat-vs-percent
+  accumulation, and server/client formula parity.
 - [ ] `UInventoryComponent::ComputeEquipmentBonus` adds set bonuses after
   per-item enhanced bonuses, with under-threshold and None-set equipment
   preserving legacy totals.

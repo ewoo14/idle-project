@@ -171,6 +171,8 @@ void AIdleCharacter::RefreshDerivedStats()
 	}
 
 	FDerivedStats Derived = FStatFormulas::DeriveStats(Primary, EffectiveLevel, EquipBonus, RebirthBonusPoints);
+	const FUniqueTraitCoreMultipliers UniqueTraitMultipliers = Inventory ? Inventory->ComputeUniqueTraitMultipliers() : FUniqueTraitCoreMultipliers();
+	FUniqueTraitFormula::ApplyCoreMultipliers(Derived, UniqueTraitMultipliers);
 	if (Skills)
 	{
 		Skills->ApplyPassivesToStats(Derived);

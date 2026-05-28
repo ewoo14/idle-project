@@ -744,6 +744,37 @@ bool FEquipmentAffixHudSummaryTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEquipmentUniqueTraitHudSummaryTest,
+	"IdleProject.UI.HUD.EquipmentUniqueTraitSummary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEquipmentUniqueTraitHudSummaryTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	const FItemInstance PlainItem = MakeTestItem(TEXT("plain_sword"), EItemSlot::Weapon, EItemRarity::Common, 10.0f, 0.0f, 0.0f);
+	TestTrue(TEXT("No unique traits produce an empty summary"), IdleProject::UI::BuildUniqueTraitSummary(PlainItem).IsEmpty());
+
+	FItemInstance UniqueItem = MakeTestItem(TEXT("unique_sword"), EItemSlot::Weapon, EItemRarity::Unique, 10.0f, 0.0f, 0.0f);
+	UniqueItem.UniqueTrait1 = EUniqueTrait::AllStatSurge;
+	TestEqual(
+		TEXT("Unique item shows one trait with its rarity-scaled value"),
+		IdleProject::UI::BuildUniqueTraitSummary(UniqueItem).ToString(),
+		FString(TEXT("All-Stat Surge +8%")));
+
+	FItemInstance TranscendentItem = MakeTestItem(TEXT("transcendent_sword"), EItemSlot::Weapon, EItemRarity::Transcendent, 10.0f, 0.0f, 0.0f);
+	TranscendentItem.UniqueTrait1 = EUniqueTrait::CritDamageSurge;
+	TranscendentItem.UniqueTrait2 = EUniqueTrait::SwiftSurge;
+	TestEqual(
+		TEXT("Transcendent item shows two traits in slot order"),
+		IdleProject::UI::BuildUniqueTraitSummary(TranscendentItem).ToString(),
+		FString(TEXT("Crit Damage Surge +23% / Swift Surge +0.12")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEquipmentSetHudSummaryTest,
 	"IdleProject.UI.HUD.EquipmentSetSummary",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

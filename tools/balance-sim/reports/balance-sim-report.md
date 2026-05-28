@@ -351,6 +351,43 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Unique Trait Pressure
+
+- Unique equipment can roll one unique trait; Transcendent equipment can
+  roll two distinct unique traits. Mythic remains excluded from this trait
+  budget.
+- Rows compare trait pressure on the shared Lv100 Warrior review loadout.
+- Unique trait acquisition is not injected into the sampled first-rebirth run;
+  the 1000-run median remains the PR #61 baseline guard.
+
+<!-- markdownlint-disable MD013 -->
+
+| Trait | Rarity | Value |
+| --- | --- | ---: |
+| AllStatSurge | Unique | 8% |
+| CritDamageSurge | Unique | 15% |
+| CritRateSurge | Unique | 5% |
+| LifeSurge | Unique | 10% |
+| SwiftSurge | Unique | 8% |
+| PhysMastery | Unique | 12% |
+| MagicMastery | Unique | 12% |
+| GuardMastery | Unique | 10% |
+| AllStatSurge | Transcendent | 12% |
+| CritDamageSurge | Transcendent | 22.5% |
+| CritRateSurge | Transcendent | 7.5% |
+| LifeSurge | Transcendent | 15% |
+| SwiftSurge | Transcendent | 12% |
+| PhysMastery | Transcendent | 18% |
+| MagicMastery | Transcendent | 18% |
+| GuardMastery | Transcendent | 15% |
+
+| Rarity | Trait count | Traits | Base CP | Trait CP | CP x | Base DPS | Trait DPS | DPS x |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Unique | 1 | PhysMastery | 5444 | 5684 | x1.044 | 4295 | 4876 | x1.135 |
+| Transcendent | 2 | AllStatSurge, PhysMastery | 5444 | 6394 | x1.175 | 4295 | 5851 | x1.362 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Rune Codex Collection Pressure
 
 - Total cells: 63
@@ -425,3 +462,4 @@
 - server/src/core/formulas/classRune.ts
 - server/src/core/formulas/runeSet.ts
 - server/src/core/formulas/runeCodex.ts
+- server/src/core/formulas/uniqueTrait.ts

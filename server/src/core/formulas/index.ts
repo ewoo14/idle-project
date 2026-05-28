@@ -36,3 +36,4 @@ export * from "./stats.js";
 export * from "./tower.js";
 export * from "./towerMilestone.js";
 export * from "./transcend.js";
+export * from "./uniqueTrait.js";

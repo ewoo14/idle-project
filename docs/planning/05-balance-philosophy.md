@@ -1532,6 +1532,57 @@ Guardrails:
 - Do not tune first-rebirth pacing from full six-piece set pressure until rune
   set acquisition is modeled in `tools/balance-sim`.
 
+## PR #67 Unique Trait Balance Review
+
+PR #67 adds equipment unique traits as a rarity-gated pressure layer on top of
+the existing item stat, affix, and rune set systems. Traits are available only
+on Unique and Transcendent equipment: Unique rolls one trait, Transcendent rolls
+two distinct traits, and Mythic is explicitly excluded from this trait budget.
+
+The server/client formula values are:
+
+| Trait | Unique | Transcendent |
+| --- | ---: | ---: |
+| AllStatSurge | 8% | 12% |
+| CritDamageSurge | 15% | 22.5% |
+| CritRateSurge | 5% | 7.5% |
+| LifeSurge | 10% | 15% |
+| SwiftSurge | 8% | 12% |
+| PhysMastery | 12% | 18% |
+| MagicMastery | 12% | 18% |
+| GuardMastery | 10% | 15% |
+
+`tools/balance-sim` imports `server/src/core/formulas/uniqueTrait.ts` and
+reports trait pressure against the shared Lv100 Warrior review loadout:
+
+| Rarity | Trait count | Traits | CP x | DPS x |
+| --- | ---: | --- | ---: | ---: |
+| Unique | 1 | PhysMastery | 1.044 | 1.135 |
+| Transcendent | 2 | AllStatSurge, PhysMastery | 1.175 | 1.362 |
+
+This pressure stacks after existing affix and rune-set reporting, but it is not
+injected into the sampled first-rebirth run. The 1000-run first-rebirth
+distribution remains at p10 4.919h, median 5.328h, p90 5.751h, min 4.564h,
+and max 6.144h. Median remains inside the 5-10h target and every sampled run
+remains inside the 3-20h review band.
+
+Guardrails:
+
+- Keep `FUniqueTraitFormula`, `uniqueTrait.ts`, and `tools/balance-sim` aligned
+  at the `Math.fround` parity boundary.
+- Core-stat traits (`AllStatSurge`, `LifeSurge`, `PhysMastery`,
+  `MagicMastery`, `GuardMastery`) are percent multipliers applied after
+  `DeriveStats` has combined base stats, equipment flats, set flats, rebirth
+  flats, and utility trait flats. They do not enter `EquipmentBonus` as flat
+  `FDerivedStats` values.
+- Utility traits (`CritDamageSurge`, `CritRateSurge`, `SwiftSurge`) remain flat
+  additions through the equipment bonus path and are clamped by the existing
+  derived-stat formulas.
+- Do not tune first-rebirth pacing from trait pressure until Unique/
+  Transcendent acquisition timing is modeled in `tools/balance-sim`.
+- If future acquisition modeling pushes the sampled median below 5h, tune drop
+  availability or trait roll timing before reducing the trait value table.
+
 ---
 
 ## PR #66 Chapter 3 Stage/Element Balance Addendum

@@ -4,6 +4,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "Components/ActorComponent.h"
 #include "ItemSystem/ItemTypes.h"
+#include "ItemSystem/UniqueTraitFormula.h"
 #include "InventoryComponent.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEquippedChanged, EItemSlot, Slot);
@@ -25,6 +26,7 @@ public:
 	void EquipItem(int32 ItemIndex);
 	void UnequipSlot(EItemSlot Slot);
 	FDerivedStats ComputeEquipmentBonus() const;
+	FUniqueTraitCoreMultipliers ComputeUniqueTraitMultipliers() const;
 	const FItemInstance* GetEquippedItem(EItemSlot Slot) const;
 	bool EnhanceEquippedItem(EItemSlot Slot);
 	int32 GetEquippedEnhanceLevel(EItemSlot Slot) const;
