@@ -19,7 +19,7 @@ bool FPetServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Pets->InitializeDefaultPets();
 
 	const TArray<FPetDefinition> Definitions = Pets->GetPetDefinitions();
-	TestEqual(TEXT("Pet definition count matches server pets.ts"), Definitions.Num(), 2);
+	TestEqual(TEXT("Pet definition count matches server petBonus.ts"), Definitions.Num(), 10);
 
 	TestEqual(TEXT("Dog pet id mirrors server"), Definitions[0].PetId, FString(TEXT("dog")));
 	TestEqual(TEXT("Dog grants gold bonus"), Definitions[0].BonusType, EPetBonusType::Gold);
@@ -28,6 +28,16 @@ bool FPetServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Bird pet id mirrors server"), Definitions[1].PetId, FString(TEXT("bird")));
 	TestEqual(TEXT("Bird grants drop bonus"), Definitions[1].BonusType, EPetBonusType::Drop);
 	TestEqual(TEXT("Bird drop bonus percent mirrors server"), Definitions[1].BonusPercent, 15.0f);
+
+	TestEqual(TEXT("Cat grants exp bonus"), Definitions[2].BonusType, EPetBonusType::Exp);
+	TestEqual(TEXT("Wolf grants physical attack percent"), Definitions[3].BonusType, EPetBonusType::PhysAtk);
+	TestEqual(TEXT("Owl grants magic attack percent"), Definitions[4].BonusType, EPetBonusType::MagicAtk);
+	TestEqual(TEXT("Bear grants HP percent"), Definitions[5].BonusType, EPetBonusType::Hp);
+	TestEqual(TEXT("Turtle grants defense percent"), Definitions[6].BonusType, EPetBonusType::Def);
+	TestEqual(TEXT("Fox grants upgraded gold percent"), Definitions[7].BonusPercent, 30.0f);
+	TestEqual(TEXT("Rabbit grants upgraded drop percent"), Definitions[8].BonusPercent, 25.0f);
+	TestEqual(TEXT("Dragon grants all-stat percent"), Definitions[9].BonusType, EPetBonusType::AllStat);
+	TestEqual(TEXT("Dragon all-stat percent mirrors server"), Definitions[9].BonusPercent, 8.0f);
 
 	return true;
 }
@@ -53,6 +63,46 @@ bool FPetServiceEquipBonusTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Drop chance applies percent as multiplier"), Pets->ApplyDropBonusChance(0.05f), 0.0575f);
 
 	TestFalse(TEXT("Unknown pet cannot be equipped"), Pets->EquipPet(TEXT("slime")));
+	TestFalse(TEXT("Locked expansion pet cannot be equipped before unlock"), Pets->EquipPet(TEXT("cat")));
+	TestTrue(TEXT("Expansion pet unlock succeeds"), Pets->TryUnlockPet(TEXT("cat")));
+	TestTrue(TEXT("Unlocked cat can be equipped"), Pets->EquipPet(TEXT("cat")));
+	TestEqual(TEXT("Equipped cat grants exp bonus"), Pets->GetEquippedPetExpBonusPercent(), 15.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetServiceExpansionBonusTest,
+	"IdleProject.GameCore.PetService.ExpansionBonus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetServiceExpansionBonusTest::RunTest(const FString& Parameters)
+{
+	UPetService* Pets = NewObject<UPetService>();
+	Pets->InitializeDefaultPets();
+
+	TestTrue(TEXT("Wolf unlock succeeds"), Pets->TryUnlockPet(TEXT("wolf")));
+	TestTrue(TEXT("Wolf equip succeeds"), Pets->EquipPet(TEXT("wolf")));
+	FPetStatBonus WolfBonus = Pets->GetEquippedPetStatBonus();
+	TestEqual(TEXT("Wolf grants physical attack percent as ratio"), WolfBonus.PhysAtkPct, 0.10f);
+	TestEqual(TEXT("Wolf does not grant flat HP"), WolfBonus.HpPct, 0.0f);
+	TestEqual(TEXT("Wolf does not grant magic attack"), WolfBonus.MagicAtkPct, 0.0f);
+
+	TestTrue(TEXT("Turtle unlock succeeds"), Pets->TryUnlockPet(TEXT("turtle")));
+	TestTrue(TEXT("Turtle equip succeeds"), Pets->EquipPet(TEXT("turtle")));
+	FPetStatBonus TurtleBonus = Pets->GetEquippedPetStatBonus();
+	TestEqual(TEXT("Turtle grants physical defense percent as ratio"), TurtleBonus.PhysDefPct, 0.12f);
+	TestEqual(TEXT("Turtle grants magic defense percent as ratio"), TurtleBonus.MagicDefPct, 0.12f);
+
+	TestTrue(TEXT("Dragon unlock succeeds"), Pets->TryUnlockPet(TEXT("dragon")));
+	TestTrue(TEXT("Dragon equip succeeds"), Pets->EquipPet(TEXT("dragon")));
+	TestTrue(TEXT("Dragon feed scales all-stat percent"), Pets->FeedPet(TEXT("dragon")));
+	FPetStatBonus DragonBonus = Pets->GetEquippedPetStatBonus();
+	TestEqual(TEXT("Dragon level one scales physical attack percent"), DragonBonus.PhysAtkPct, 0.088f);
+	TestEqual(TEXT("Dragon level one scales magic attack percent"), DragonBonus.MagicAtkPct, 0.088f);
+	TestEqual(TEXT("Dragon level one scales physical defense percent"), DragonBonus.PhysDefPct, 0.088f);
+	TestEqual(TEXT("Dragon level one scales magic defense percent"), DragonBonus.MagicDefPct, 0.088f);
+	TestEqual(TEXT("Dragon all-stat does not grant HP"), DragonBonus.HpPct, 0.0f);
 
 	return true;
 }
@@ -166,6 +216,16 @@ bool FIdleGameInstancePetFeedTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Bird feed succeeds through GameInstance"), BirdFedResult.bFed);
 	TestEqual(TEXT("GameInstance exposes scaled pet drop bonus after feed"), GameInstance->GetEquippedPetDropBonusPercent(), 16.5f);
 	TestEqual(TEXT("GameInstance applies scaled pet drop bonus"), GameInstance->ApplyEquippedPetDropBonusChance(0.1f), 0.1165f);
+
+	TestFalse(TEXT("GameInstance blocks locked cat before unlock"), GameInstance->EquipPet(TEXT("cat")));
+	GameInstance->AddGold(FPetLevelFormula::GetFeedCost(0));
+	const int64 GoldBeforeLockedFeed = GameInstance->GetGold();
+	FPetFeedResult LockedCatFeedResult = GameInstance->TryFeedPet(TEXT("cat"));
+	TestFalse(TEXT("GameInstance blocks locked cat feed"), LockedCatFeedResult.bFed);
+	TestEqual(TEXT("Locked cat feed spends no gold"), GameInstance->GetGold(), GoldBeforeLockedFeed);
+	TestTrue(TEXT("GameInstance pet service unlocks cat"), GameInstance->GetPetService()->TryUnlockPet(TEXT("cat")));
+	TestTrue(TEXT("GameInstance equips unlocked cat"), GameInstance->EquipPet(TEXT("cat")));
+	TestEqual(TEXT("GameInstance exposes pet exp bonus"), GameInstance->GetEquippedPetExpBonusPercent(), 15.0f);
 
 	return true;
 }
@@ -307,9 +367,13 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 		[Pets](const FString& PetId)
 		{
 			return Pets->GetPetLevel(PetId);
+		},
+		[Pets](const FString& PetId)
+		{
+			return Pets->IsPetOwned(PetId);
 		});
 
-	TestEqual(TEXT("Pet HUD shows both V1 pets"), PetPanel.Rows.Num(), 2);
+	TestEqual(TEXT("Pet HUD shows expanded pet catalog"), PetPanel.Rows.Num(), 10);
 	TestTrue(TEXT("Dog row is marked equipped"), PetPanel.Rows[0].bEquipped);
 	TestFalse(TEXT("Bird row is not equipped"), PetPanel.Rows[1].bEquipped);
 	TestTrue(TEXT("Dog row shows level one"), PetPanel.Rows[0].LevelLabel.ToString().Contains(TEXT("1")));
@@ -317,6 +381,8 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Dog row can be fed when gold covers the next cost"), PetPanel.Rows[0].bCanFeed);
 	TestTrue(TEXT("Dog row exposes feed action label"), PetPanel.Rows[0].FeedActionLabel.ToString().Len() > 0);
 	TestTrue(TEXT("Bird row cannot be fed at max level"), PetPanel.Rows[1].bFeedDisabled);
+	TestFalse(TEXT("Locked cat row cannot be equipped"), PetPanel.Rows[2].bCanEquip);
+	TestTrue(TEXT("Locked cat row disables feed"), PetPanel.Rows[2].bFeedDisabled);
 	TestTrue(TEXT("Equipped pet summary includes scaled gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("22%")));
 	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
 

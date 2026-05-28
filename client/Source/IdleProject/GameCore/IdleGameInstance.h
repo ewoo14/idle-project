@@ -366,6 +366,9 @@ public:
 	bool EquipPet(const FString& PetId);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool TryUnlockPet(const FString& PetId);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	FPetFeedResult TryFeedPet(const FString& PetId);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
@@ -373,6 +376,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	float GetEquippedPetDropBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	float GetEquippedPetExpBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	FPetStatBonus GetEquippedPetStatBonus() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	int64 ApplyEquippedPetGoldBonus(int64 BaseAmount) const;

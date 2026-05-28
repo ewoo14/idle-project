@@ -1747,6 +1747,67 @@ bool FIdleCharacterTowerMilestoneDerivedStatsTest::RunTest(const FString& Parame
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleCharacterPetStatMultiplierTest,
+	"IdleProject.Character.Stats.PetStatMultiplier",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleCharacterPetStatMultiplierTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->SetGameInstance(GameInstance);
+	GameInstance->InitializePetSeasonServicesForTests();
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	Character->SetClassId(EClassId::Warrior);
+	FDerivedStats BaseDerived = Character->GetCurrentDerivedStats();
+
+	UPetService* PetService = GameInstance->GetPetService();
+	TestNotNull(TEXT("Pet service exists"), PetService);
+	TestTrue(TEXT("Wolf unlock succeeds"), PetService ? PetService->TryUnlockPet(TEXT("wolf")) : false);
+	TestTrue(TEXT("Wolf equip succeeds"), GameInstance->EquipPet(TEXT("wolf")));
+	Character->RefreshDerivedStats();
+	FDerivedStats WolfDerived = Character->GetCurrentDerivedStats();
+	TestEqual(TEXT("Wolf multiplies physical attack by percent"), WolfDerived.PhysAtk, BaseDerived.PhysAtk * 1.10f);
+	TestEqual(TEXT("Wolf does not add flat magic attack"), WolfDerived.MagicAtk, BaseDerived.MagicAtk);
+	TestEqual(TEXT("Wolf does not add flat HP"), WolfDerived.Hp, BaseDerived.Hp);
+
+	TestTrue(TEXT("Dragon unlock succeeds"), PetService ? PetService->TryUnlockPet(TEXT("dragon")) : false);
+	TestTrue(TEXT("Dragon equip succeeds"), GameInstance->EquipPet(TEXT("dragon")));
+	Character->RefreshDerivedStats();
+	FDerivedStats DragonDerived = Character->GetCurrentDerivedStats();
+	TestEqual(TEXT("Dragon multiplies physical attack by percent"), DragonDerived.PhysAtk, BaseDerived.PhysAtk * 1.08f);
+	TestEqual(TEXT("Dragon multiplies magic attack by percent"), DragonDerived.MagicAtk, BaseDerived.MagicAtk * 1.08f);
+	TestEqual(TEXT("Dragon multiplies physical defense by percent"), DragonDerived.PhysDef, BaseDerived.PhysDef * 1.08f);
+	TestEqual(TEXT("Dragon multiplies magic defense by percent"), DragonDerived.MagicDef, BaseDerived.MagicDef * 1.08f);
+	TestEqual(TEXT("Dragon does not multiply HP"), DragonDerived.Hp, BaseDerived.Hp);
+
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleCharacterTranscendAndTowerMilestoneDerivedStatsTest,
 	"IdleProject.Character.Stats.TranscendAndTowerMilestoneMultiplier",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

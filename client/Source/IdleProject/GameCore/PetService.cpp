@@ -6,11 +6,11 @@ void UPetService::InitializeDefaultPets()
 {
 	BuildDefaultDefinitions();
 	OwnedPetIds.Empty();
-	for (const FPetDefinition& Definition : Definitions)
-	{
-		OwnedPetIds.Add(Definition.PetId);
-		PetLevels.FindOrAdd(Definition.PetId, 0);
-	}
+	PetLevels.Empty();
+	OwnedPetIds.Add(TEXT("dog"));
+	OwnedPetIds.Add(TEXT("bird"));
+	PetLevels.FindOrAdd(TEXT("dog"), 0);
+	PetLevels.FindOrAdd(TEXT("bird"), 0);
 
 	if (EquippedPetId.IsEmpty() && Definitions.Num() > 0)
 	{
@@ -29,6 +29,23 @@ bool UPetService::EquipPet(const FString& PetId)
 	return true;
 }
 
+bool UPetService::TryUnlockPet(const FString& PetId)
+{
+	if (!DefinitionById.Contains(PetId))
+	{
+		return false;
+	}
+
+	OwnedPetIds.Add(PetId);
+	PetLevels.FindOrAdd(PetId, 0);
+	return true;
+}
+
+bool UPetService::IsPetOwned(const FString& PetId) const
+{
+	return OwnedPetIds.Contains(PetId);
+}
+
 int32 UPetService::GetPetLevel(const FString& PetId) const
 {
 	const int32* Level = PetLevels.Find(PetId);
@@ -37,7 +54,29 @@ int32 UPetService::GetPetLevel(const FString& PetId) const
 
 void UPetService::RestoreState(const FString& PetId, const TMap<FString, int32>& Levels)
 {
+	RestoreState(PetId, TSet<FString>(), Levels);
+}
+
+void UPetService::RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels)
+{
 	InitializeDefaultPets();
+	if (!InOwnedPetIds.IsEmpty())
+	{
+		OwnedPetIds.Empty();
+		for (const FString& OwnedPetId : InOwnedPetIds)
+		{
+			if (DefinitionById.Contains(OwnedPetId))
+			{
+				OwnedPetIds.Add(OwnedPetId);
+				PetLevels.FindOrAdd(OwnedPetId, 0);
+			}
+		}
+		OwnedPetIds.Add(TEXT("dog"));
+		OwnedPetIds.Add(TEXT("bird"));
+		PetLevels.FindOrAdd(TEXT("dog"), 0);
+		PetLevels.FindOrAdd(TEXT("bird"), 0);
+	}
+
 	for (const TPair<FString, int32>& Pair : Levels)
 	{
 		if (OwnedPetIds.Contains(Pair.Key) && DefinitionById.Contains(Pair.Key))
@@ -85,6 +124,51 @@ float UPetService::GetEquippedPetDropBonusPercent() const
 		: 0.0f;
 }
 
+float UPetService::GetEquippedPetExpBonusPercent() const
+{
+	const FPetDefinition* Pet = GetEquippedPetDefinition();
+	return Pet && Pet->BonusType == EPetBonusType::Exp
+		? Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId))
+		: 0.0f;
+}
+
+FPetStatBonus UPetService::GetEquippedPetStatBonus() const
+{
+	FPetStatBonus Bonus;
+	const FPetDefinition* Pet = GetEquippedPetDefinition();
+	if (!Pet)
+	{
+		return Bonus;
+	}
+
+	const float Ratio = Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId)) / 100.0f;
+	switch (Pet->BonusType)
+	{
+	case EPetBonusType::PhysAtk:
+		Bonus.PhysAtkPct = Ratio;
+		break;
+	case EPetBonusType::MagicAtk:
+		Bonus.MagicAtkPct = Ratio;
+		break;
+	case EPetBonusType::Hp:
+		Bonus.HpPct = Ratio;
+		break;
+	case EPetBonusType::Def:
+		Bonus.PhysDefPct = Ratio;
+		Bonus.MagicDefPct = Ratio;
+		break;
+	case EPetBonusType::AllStat:
+		Bonus.PhysAtkPct = Ratio;
+		Bonus.MagicAtkPct = Ratio;
+		Bonus.PhysDefPct = Ratio;
+		Bonus.MagicDefPct = Ratio;
+		break;
+	default:
+		break;
+	}
+	return Bonus;
+}
+
 int64 UPetService::ApplyGoldBonus(int64 BaseAmount) const
 {
 	if (BaseAmount <= 0)
@@ -127,6 +211,14 @@ void UPetService::BuildDefaultDefinitions()
 
 	AddDefinition(TEXT("dog"), TEXT("Dog"), EPetBonusType::Gold, 20.0f);
 	AddDefinition(TEXT("bird"), TEXT("Bird"), EPetBonusType::Drop, 15.0f);
+	AddDefinition(TEXT("cat"), TEXT("Cat"), EPetBonusType::Exp, 15.0f);
+	AddDefinition(TEXT("wolf"), TEXT("Wolf"), EPetBonusType::PhysAtk, 10.0f);
+	AddDefinition(TEXT("owl"), TEXT("Owl"), EPetBonusType::MagicAtk, 10.0f);
+	AddDefinition(TEXT("bear"), TEXT("Bear"), EPetBonusType::Hp, 12.0f);
+	AddDefinition(TEXT("turtle"), TEXT("Turtle"), EPetBonusType::Def, 12.0f);
+	AddDefinition(TEXT("fox"), TEXT("Fox"), EPetBonusType::Gold, 30.0f);
+	AddDefinition(TEXT("rabbit"), TEXT("Rabbit"), EPetBonusType::Drop, 25.0f);
+	AddDefinition(TEXT("dragon"), TEXT("Dragon"), EPetBonusType::AllStat, 8.0f);
 }
 
 const FPetDefinition* UPetService::GetEquippedPetDefinition() const

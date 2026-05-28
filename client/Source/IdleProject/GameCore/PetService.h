@@ -9,7 +9,34 @@ enum class EPetBonusType : uint8
 {
 	None = 0 UMETA(Hidden),
 	Gold = 1,
-	Drop = 2
+	Drop = 2,
+	Exp = 3,
+	PhysAtk = 4,
+	MagicAtk = 5,
+	Hp = 6,
+	Def = 7,
+	AllStat = 8
+};
+
+USTRUCT(BlueprintType)
+struct FPetStatBonus
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Pet")
+	float PhysAtkPct = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Pet")
+	float MagicAtkPct = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Pet")
+	float PhysDefPct = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Pet")
+	float MagicDefPct = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Pet")
+	float HpPct = 0.0f;
 };
 
 USTRUCT(BlueprintType)
@@ -42,6 +69,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool EquipPet(const FString& PetId);
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool TryUnlockPet(const FString& PetId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	bool IsPetOwned(const FString& PetId) const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	const TArray<FPetDefinition>& GetPetDefinitions() const { return Definitions; }
 
@@ -52,8 +85,10 @@ public:
 	int32 GetPetLevel(const FString& PetId) const;
 
 	const TMap<FString, int32>& GetPetLevels() const { return PetLevels; }
+	const TSet<FString>& GetOwnedPetIds() const { return OwnedPetIds; }
 
 	void RestoreState(const FString& PetId, const TMap<FString, int32>& Levels);
+	void RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool FeedPet(const FString& PetId);
@@ -63,6 +98,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	float GetEquippedPetDropBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	float GetEquippedPetExpBonusPercent() const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	FPetStatBonus GetEquippedPetStatBonus() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	int64 ApplyGoldBonus(int64 BaseAmount) const;

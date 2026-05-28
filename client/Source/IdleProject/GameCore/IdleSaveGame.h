@@ -18,7 +18,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 10;
+	int32 SaveVersion = 11;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -82,6 +82,9 @@ public:
 
 	UPROPERTY()
 	FString EquippedPetId;
+
+	UPROPERTY()
+	TSet<FString> OwnedPetIds;
 
 	UPROPERTY()
 	TMap<FString, int32> PetLevels;

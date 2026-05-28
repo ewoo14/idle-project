@@ -138,7 +138,10 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	if (GameInstance)
 	{
 		const int64 ExpReward = FRewardFormula::ComputeKillExp(12, StageGlobalIndex, bIsBoss, bIsElite);
-		GameInstance->AddExp(FMath::RoundToInt64(static_cast<double>(ExpReward) * (1.0 + static_cast<double>(GameInstance->GetRuneExpBoostBonus()))));
+		const double ExpMultiplier = 1.0
+			+ static_cast<double>(GameInstance->GetRuneExpBoostBonus())
+			+ static_cast<double>(GameInstance->GetEquippedPetExpBonusPercent()) / 100.0;
+		GameInstance->AddExp(FMath::RoundToInt64(static_cast<double>(ExpReward) * ExpMultiplier));
 	}
 
 	FActorSpawnParameters SpawnParameters;

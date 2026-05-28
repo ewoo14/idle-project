@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V10"), SaveGame->SaveVersion, static_cast<int32>(10));
+	TestEqual(TEXT("SaveVersion starts at V11"), SaveGame->SaveVersion, static_cast<int32>(11));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -107,6 +107,9 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->StageHighestClearedChapter = 1;
 	SourceSave->TowerHighestFloor = 25;
 	SourceSave->EquippedPetId = TEXT("bird");
+	SourceSave->OwnedPetIds.Add(TEXT("dog"));
+	SourceSave->OwnedPetIds.Add(TEXT("bird"));
+	SourceSave->OwnedPetIds.Add(TEXT("cat"));
 	SourceSave->PetLevels.Add(TEXT("dog"), 2);
 	SourceSave->PetLevels.Add(TEXT("bird"), 4);
 	FQuestSaveEntry QuestEntry;
@@ -134,7 +137,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V10"), CapturedSave->SaveVersion, static_cast<int32>(10));
+	TestEqual(TEXT("Captured save writes V11"), CapturedSave->SaveVersion, static_cast<int32>(11));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -158,6 +161,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Stage highest clear round trips"), CapturedSave->StageHighestClearedChapter, SourceSave->StageHighestClearedChapter);
 	TestEqual(TEXT("Tower highest floor round trips"), CapturedSave->TowerHighestFloor, SourceSave->TowerHighestFloor);
 	TestEqual(TEXT("Equipped pet round trips"), CapturedSave->EquippedPetId, SourceSave->EquippedPetId);
+	TestTrue(TEXT("Owned cat round trips"), CapturedSave->OwnedPetIds.Contains(TEXT("cat")));
 	TestEqual(TEXT("Dog level round trips"), CapturedSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(2));
 	TestEqual(TEXT("Bird level round trips"), CapturedSave->PetLevels.FindRef(TEXT("bird")), static_cast<int32>(4));
 	TestEqual(TEXT("Quest payload round trips"), CapturedSave->Quests.Num(), 12);
@@ -183,6 +187,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	const UPetService* PetService = GameInstance->GetPetService();
 	TestNotNull(TEXT("ApplyFromSave ensures pet service"), PetService);
 	TestEqual(TEXT("Pet restore applies equipped pet"), PetService ? PetService->GetEquippedPetId() : FString(), SourceSave->EquippedPetId);
+	TestTrue(TEXT("Pet restore applies owned cat"), PetService ? PetService->IsPetOwned(TEXT("cat")) : false);
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
 
@@ -217,15 +222,15 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V10"), CapturedSave->SaveVersion, static_cast<int32>(10));
+	TestEqual(TEXT("Capture after legacy migration writes V11"), CapturedSave->SaveVersion, static_cast<int32>(11));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
-	TestTrue(TEXT("Reapplying captured v10 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	TestTrue(TEXT("Reapplying captured v11 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V10 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V10 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V11 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V11 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }
@@ -561,6 +566,9 @@ bool FIdleSaveSystemRestoreSanitizesServiceStateTest::RunTest(const FString& Par
 	SourceSave->StageHighestClearedChapter = -4;
 	SourceSave->TowerHighestFloor = -7;
 	SourceSave->EquippedPetId = TEXT("unknown_pet");
+	SourceSave->OwnedPetIds.Add(TEXT("dog"));
+	SourceSave->OwnedPetIds.Add(TEXT("bird"));
+	SourceSave->OwnedPetIds.Add(TEXT("unknown_pet"));
 	SourceSave->PetLevels.Add(TEXT("dog"), FPetLevelFormula::MaxPetLevel + 50);
 	SourceSave->PetLevels.Add(TEXT("bird"), -5);
 	SourceSave->PetLevels.Add(TEXT("unknown_pet"), 8);
@@ -593,6 +601,8 @@ bool FIdleSaveSystemRestoreSanitizesServiceStateTest::RunTest(const FString& Par
 	const UPetService* PetService = GameInstance->GetPetService();
 	TestNotNull(TEXT("Pet service is restored"), PetService);
 	TestEqual(TEXT("Unknown equipped pet falls back to default dog"), PetService ? PetService->GetEquippedPetId() : FString(), FString(TEXT("dog")));
+	TestTrue(TEXT("Malformed restore keeps default dog owned"), PetService ? PetService->IsPetOwned(TEXT("dog")) : false);
+	TestFalse(TEXT("Malformed restore ignores unknown owned pet"), PetService ? PetService->IsPetOwned(TEXT("unknown_pet")) : true);
 	TestEqual(TEXT("Pet level clamps to max"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, FPetLevelFormula::MaxPetLevel);
 	TestEqual(TEXT("Negative pet level clamps to zero"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(0));
 	TestEqual(TEXT("Unknown pet level is ignored"), PetService ? PetService->GetPetLevel(TEXT("unknown_pet")) : INDEX_NONE, static_cast<int32>(0));
@@ -706,6 +716,8 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->EquippedSlotIndex.Add(EItemSlot::Weapon, 0);
 	SourceSave->SkillRanks.Add(TEXT("heavy_strike"), 4);
 	SourceSave->PetLevels.Add(TEXT("dog"), 3);
+	SourceSave->OwnedPetIds.Add(TEXT("dog"));
+	SourceSave->OwnedPetIds.Add(TEXT("cat"));
 	FQuestSaveEntry QuestEntry;
 	QuestEntry.QuestId = TEXT("main_ch1_001");
 	QuestEntry.Type = EQuestType::Main;
@@ -742,6 +754,7 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Equipped slot map survives cloud payload"), RestoredSave->EquippedSlotIndex.FindRef(EItemSlot::Weapon), static_cast<int32>(0));
 	TestEqual(TEXT("Skill rank map survives cloud payload"), RestoredSave->SkillRanks.FindRef(TEXT("heavy_strike")), static_cast<int32>(4));
 	TestEqual(TEXT("Pet level map survives cloud payload"), RestoredSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(3));
+	TestTrue(TEXT("Owned pet ids survive cloud payload"), RestoredSave->OwnedPetIds.Contains(TEXT("cat")));
 	TestEqual(TEXT("Quest list survives cloud payload"), RestoredSave->Quests.Num(), 1);
 	TestEqual(TEXT("Quest id survives cloud payload"), RestoredSave->Quests[0].QuestId, FString(TEXT("main_ch1_001")));
 	TestEqual(TEXT("Quest reset date survives cloud payload"), RestoredSave->QuestDailyResetDate, FString(TEXT("2026-05-27")));
