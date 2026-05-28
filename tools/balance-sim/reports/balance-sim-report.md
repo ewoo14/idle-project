@@ -23,8 +23,8 @@
 - Normal kill rewards use `computeKillExp` / `computeKillGold`.
 - Source: `server/src/core/formulas/reward.ts`.
 - Monster HP and reward multipliers both reuse the stage index ramp.
-- Result: 30-stage Chapter 1-3 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.
-- Dark stage share: 9/30.
+- Result: 40-stage Chapter 1-4 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.
+- Dark stage share: 11/40.
 
 <!-- markdownlint-disable MD013 -->
 
@@ -60,13 +60,23 @@
 | 3-8 | 28 | normal | Ice | 5.05 | 5.05 | 61 | 51-76 | 182 | 152-227 | 485 | 404-606 |
 | 3-9 | 29 | normal | Dark | 5.2 | 5.2 | 62 | 52-78 | 187 | 156-234 | 499 | 416-624 |
 | 3-10 | 30 | boss | Holy | 5.35 | 5.35 | 64 | 54-80 | 193 | 161-241 | 514 | 428-642 |
+| 4-1 | 31 | normal | Lightning | 5.5 | 5.5 | 66 | 55-83 | 198 | 165-248 | 528 | 440-660 |
+| 4-2 | 32 | normal | Holy | 5.65 | 5.65 | 68 | 57-85 | 203 | 170-254 | 542 | 452-678 |
+| 4-3 | 33 | normal | Ice | 5.8 | 5.8 | 70 | 58-87 | 209 | 174-261 | 557 | 464-696 |
+| 4-4 | 34 | normal | Fire | 5.95 | 5.95 | 71 | 60-89 | 214 | 179-268 | 571 | 476-714 |
+| 4-5 | 35 | elite | Dark | 6.1 | 6.1 | 73 | 61-92 | 220 | 183-275 | 586 | 488-732 |
+| 4-6 | 36 | normal | Lightning | 6.25 | 6.25 | 75 | 63-94 | 225 | 188-281 | 600 | 500-750 |
+| 4-7 | 37 | normal | Holy | 6.4 | 6.4 | 77 | 64-96 | 230 | 192-288 | 614 | 512-768 |
+| 4-8 | 38 | normal | Ice | 6.55 | 6.55 | 79 | 66-98 | 236 | 197-295 | 629 | 524-786 |
+| 4-9 | 39 | normal | Fire | 6.7 | 6.7 | 80 | 67-101 | 241 | 201-302 | 643 | 536-804 |
+| 4-10 | 40 | boss | Dark | 6.85 | 6.85 | 82 | 69-103 | 247 | 206-308 | 658 | 548-822 |
 
 <!-- markdownlint-enable MD013 -->
 
 ## Dark Element Pressure
 
 - Holy and Dark counter each other at the same 1.5x weakness boundary.
-- Dark-heavy chapter 3 increases matchup coverage without changing the
+- Dark-heavy chapters 3-4 increase matchup coverage without changing the
   sampled first-rebirth timing model.
 
 <!-- markdownlint-disable MD013 -->
