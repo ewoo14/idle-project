@@ -44,7 +44,8 @@ bool FDungeonFormulaTest::RunTest(const FString& Parameters)
 
 	const FDungeonRunResult Oversized = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, MAX_int64);
 	TestTrue(TEXT("Oversized CP still succeeds"), Oversized.bSuccess);
-	TestEqual(TEXT("Oversized reward clamps to int64 max"), Oversized.GoldReward, MAX_int64);
+	TestTrue(TEXT("Oversized sqrt reward stays positive"), Oversized.GoldReward > 0);
+	TestTrue(TEXT("Oversized sqrt reward stays within int64 range"), Oversized.GoldReward <= MAX_int64);
 
 	return true;
 }

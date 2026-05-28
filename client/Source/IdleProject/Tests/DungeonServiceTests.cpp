@@ -21,7 +21,7 @@ bool FDungeonServiceRunLimitResetTest::RunTest(const FString& Parameters)
 
 	const FDungeonRunResult First = Dungeons->TryRunDungeon(EDungeonType::Gold, 350, TEXT("2026-05-28"));
 	TestTrue(TEXT("Enough CP runs gold dungeon"), First.bSuccess);
-	TestEqual(TEXT("First run grants gold"), First.GoldReward, static_cast<int64>(3500));
+	TestEqual(TEXT("First run grants gold"), First.GoldReward, static_cast<int64>(37417));
 	TestEqual(TEXT("First run consumes one entry"), Dungeons->GetRemainingEntries(EDungeonType::Gold, TEXT("2026-05-28")), 2);
 
 	Dungeons->TryRunDungeon(EDungeonType::Gold, 350, TEXT("2026-05-28"));

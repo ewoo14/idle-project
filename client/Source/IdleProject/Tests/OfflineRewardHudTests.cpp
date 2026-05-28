@@ -54,7 +54,7 @@ bool FDungeonHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Gold dungeon name is localized"), GoldRow.NameLabel.ToString(), FString(TEXT("Gold Dungeon")));
 	TestEqual(TEXT("Gold remaining entries are formatted"), GoldRow.EntriesLabel.ToString(), FString(TEXT("Entries 2/3")));
 	TestEqual(TEXT("Gold CP requirement is shown"), GoldRow.RequiredPowerLabel.ToString(), FString(TEXT("CP 350 / 100")));
-	TestEqual(TEXT("Gold reward preview uses combat power formula"), GoldRow.RewardLabel.ToString(), FString(TEXT("Reward Gold +3,500")));
+	TestEqual(TEXT("Gold reward preview uses combat power formula"), GoldRow.RewardLabel.ToString(), FString(TEXT("Reward Gold +37,417")));
 	TestEqual(TEXT("Gold ready row uses enter action copy"), GoldRow.ActionLabel.ToString(), FString(TEXT("Enter")));
 	TestTrue(TEXT("Gold ready row enables hitbox"), GoldRow.bCanEnter);
 
