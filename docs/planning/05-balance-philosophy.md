@@ -1558,7 +1558,7 @@ reports trait pressure against the shared Lv100 Warrior review loadout:
 | Rarity | Trait count | Traits | CP x | DPS x |
 | --- | ---: | --- | ---: | ---: |
 | Unique | 1 | PhysMastery | 1.044 | 1.135 |
-| Transcendent | 2 | AllStatSurge, PhysMastery | 1.174 | 1.362 |
+| Transcendent | 2 | AllStatSurge, PhysMastery | 1.175 | 1.362 |
 
 This pressure stacks after existing affix and rune-set reporting, but it is not
 injected into the sampled first-rebirth run. The 1000-run first-rebirth
@@ -1570,6 +1570,14 @@ Guardrails:
 
 - Keep `FUniqueTraitFormula`, `uniqueTrait.ts`, and `tools/balance-sim` aligned
   at the `Math.fround` parity boundary.
+- Core-stat traits (`AllStatSurge`, `LifeSurge`, `PhysMastery`,
+  `MagicMastery`, `GuardMastery`) are percent multipliers applied after
+  `DeriveStats` has combined base stats, equipment flats, set flats, rebirth
+  flats, and utility trait flats. They do not enter `EquipmentBonus` as flat
+  `FDerivedStats` values.
+- Utility traits (`CritDamageSurge`, `CritRateSurge`, `SwiftSurge`) remain flat
+  additions through the equipment bonus path and are clamped by the existing
+  derived-stat formulas.
 - Do not tune first-rebirth pacing from trait pressure until Unique/
   Transcendent acquisition timing is modeled in `tools/balance-sim`.
 - If future acquisition modeling pushes the sampled median below 5h, tune drop

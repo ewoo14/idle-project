@@ -118,6 +118,21 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 	return Bonus;
 }
 
+FUniqueTraitCoreMultipliers UInventoryComponent::ComputeUniqueTraitMultipliers() const
+{
+	FUniqueTraitCoreMultipliers Multipliers;
+	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
+	{
+		if (!Items.IsValidIndex(Pair.Value))
+		{
+			continue;
+		}
+
+		FUniqueTraitFormula::AccumulateTraitMultipliers(Items[Pair.Value], Multipliers);
+	}
+	return Multipliers;
+}
+
 const FItemInstance* UInventoryComponent::GetEquippedItem(EItemSlot Slot) const
 {
 	const int32* Index = EquippedIndex.Find(Slot);

@@ -91,6 +91,8 @@ import {
 import { getTowerMilestoneMultiplier } from "../../server/src/core/formulas/towerMilestone.js";
 import { getTranscendStatMultiplier } from "../../server/src/core/formulas/transcend.js";
 import {
+  accumulateTraitEffects,
+  applyUniqueTraitMultipliers,
   getTraitValue,
   type UniqueTrait,
 } from "../../server/src/core/formulas/uniqueTrait.js";
@@ -1480,41 +1482,16 @@ function applyUniqueTraits(
   rarity: 4 | 6,
   traits: Array<Exclude<UniqueTrait, 0>>,
 ): DerivedStats {
-  const stats = { ...baseStats };
-  for (const trait of traits) {
-    const value = getTraitValue(trait, rarity);
-    switch (trait) {
-      case 1:
-        stats.physAtk = Math.round(stats.physAtk * (1 + value));
-        stats.magicAtk = Math.round(stats.magicAtk * (1 + value));
-        stats.physDef = Math.round(stats.physDef * (1 + value));
-        stats.magicDef = Math.round(stats.magicDef * (1 + value));
-        break;
-      case 2:
-        stats.critDmg = Math.fround(stats.critDmg + value);
-        break;
-      case 3:
-        stats.critRate = Math.fround(stats.critRate + value);
-        break;
-      case 4:
-        stats.hp = Math.round(stats.hp * (1 + value));
-        break;
-      case 5:
-        stats.atkSpeed = Math.fround(stats.atkSpeed + value);
-        break;
-      case 6:
-        stats.physAtk = Math.round(stats.physAtk * (1 + value));
-        break;
-      case 7:
-        stats.magicAtk = Math.round(stats.magicAtk * (1 + value));
-        break;
-      case 8:
-        stats.physDef = Math.round(stats.physDef * (1 + value));
-        stats.magicDef = Math.round(stats.magicDef * (1 + value));
-        break;
-    }
-  }
-  return stats;
+  const effects = accumulateTraitEffects(traits, rarity);
+  return applyUniqueTraitMultipliers(
+    {
+      ...baseStats,
+      critDmg: Math.fround(baseStats.critDmg + effects.flat.critDmg),
+      critRate: Math.fround(baseStats.critRate + effects.flat.critRate),
+      atkSpeed: Math.fround(baseStats.atkSpeed + effects.flat.atkSpeed),
+    },
+    effects.multipliers,
+  );
 }
 
 function buildRuneCorePressureRow(

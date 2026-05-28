@@ -34,6 +34,11 @@ EUniqueTrait RollTrait(FRandomStream& Rng)
 		static_cast<int32>(EUniqueTrait::GuardMastery)));
 }
 
+void AddMultiplier(float Value, float& OutMultiplier)
+{
+	OutMultiplier = (1.0f + OutMultiplier) * (1.0f + Value) - 1.0f;
+}
+
 void AccumulateSingleTrait(EUniqueTrait Trait, EItemRarity Rarity, FDerivedStats& OutBonus)
 {
 	const float Value = FUniqueTraitFormula::GetTraitValue(Trait, Rarity);
@@ -44,34 +49,59 @@ void AccumulateSingleTrait(EUniqueTrait Trait, EItemRarity Rarity, FDerivedStats
 
 	switch (Trait)
 	{
-	case EUniqueTrait::AllStatSurge:
-		OutBonus.PhysAtk += Value;
-		OutBonus.MagicAtk += Value;
-		OutBonus.PhysDef += Value;
-		OutBonus.MagicDef += Value;
-		break;
 	case EUniqueTrait::CritDamageSurge:
 		OutBonus.CritDmg += Value;
 		break;
 	case EUniqueTrait::CritRateSurge:
 		OutBonus.CritRate += Value;
 		break;
-	case EUniqueTrait::LifeSurge:
-		OutBonus.Hp += Value;
-		break;
 	case EUniqueTrait::SwiftSurge:
 		OutBonus.AtkSpeed += Value;
 		break;
+	case EUniqueTrait::AllStatSurge:
+	case EUniqueTrait::LifeSurge:
 	case EUniqueTrait::PhysMastery:
-		OutBonus.PhysAtk += Value;
+	case EUniqueTrait::MagicMastery:
+	case EUniqueTrait::GuardMastery:
+		break;
+	case EUniqueTrait::None:
+	default:
+		break;
+	}
+}
+
+void AccumulateSingleTraitMultiplier(EUniqueTrait Trait, EItemRarity Rarity, FUniqueTraitCoreMultipliers& OutMultipliers)
+{
+	const float Value = FUniqueTraitFormula::GetTraitValue(Trait, Rarity);
+	if (Value <= 0.0f)
+	{
+		return;
+	}
+
+	switch (Trait)
+	{
+	case EUniqueTrait::AllStatSurge:
+		AddMultiplier(Value, OutMultipliers.PhysAtk);
+		AddMultiplier(Value, OutMultipliers.MagicAtk);
+		AddMultiplier(Value, OutMultipliers.PhysDef);
+		AddMultiplier(Value, OutMultipliers.MagicDef);
+		break;
+	case EUniqueTrait::LifeSurge:
+		AddMultiplier(Value, OutMultipliers.Hp);
+		break;
+	case EUniqueTrait::PhysMastery:
+		AddMultiplier(Value, OutMultipliers.PhysAtk);
 		break;
 	case EUniqueTrait::MagicMastery:
-		OutBonus.MagicAtk += Value;
+		AddMultiplier(Value, OutMultipliers.MagicAtk);
 		break;
 	case EUniqueTrait::GuardMastery:
-		OutBonus.PhysDef += Value;
-		OutBonus.MagicDef += Value;
+		AddMultiplier(Value, OutMultipliers.PhysDef);
+		AddMultiplier(Value, OutMultipliers.MagicDef);
 		break;
+	case EUniqueTrait::CritDamageSurge:
+	case EUniqueTrait::CritRateSurge:
+	case EUniqueTrait::SwiftSurge:
 	case EUniqueTrait::None:
 	default:
 		break;
@@ -134,4 +164,19 @@ void FUniqueTraitFormula::AccumulateTraitBonus(const FItemInstance& Item, FDeriv
 {
 	AccumulateSingleTrait(Item.UniqueTrait1, Item.Rarity, OutBonus);
 	AccumulateSingleTrait(Item.UniqueTrait2, Item.Rarity, OutBonus);
+}
+
+void FUniqueTraitFormula::AccumulateTraitMultipliers(const FItemInstance& Item, FUniqueTraitCoreMultipliers& OutMultipliers)
+{
+	AccumulateSingleTraitMultiplier(Item.UniqueTrait1, Item.Rarity, OutMultipliers);
+	AccumulateSingleTraitMultiplier(Item.UniqueTrait2, Item.Rarity, OutMultipliers);
+}
+
+void FUniqueTraitFormula::ApplyCoreMultipliers(FDerivedStats& InOutStats, const FUniqueTraitCoreMultipliers& Multipliers)
+{
+	InOutStats.Hp *= 1.0f + Multipliers.Hp;
+	InOutStats.PhysAtk *= 1.0f + Multipliers.PhysAtk;
+	InOutStats.MagicAtk *= 1.0f + Multipliers.MagicAtk;
+	InOutStats.PhysDef *= 1.0f + Multipliers.PhysDef;
+	InOutStats.MagicDef *= 1.0f + Multipliers.MagicDef;
 }

@@ -112,10 +112,16 @@ bool FUniqueTraitFormulaAccumulateTest::RunTest(const FString& Parameters)
 
 	FDerivedStats Bonus;
 	FUniqueTraitFormula::AccumulateTraitBonus(Item, Bonus);
-	TestEqual(TEXT("AllStatSurge grants physical attack"), Bonus.PhysAtk, 0.08f);
-	TestEqual(TEXT("AllStatSurge grants magic attack"), Bonus.MagicAtk, 0.08f);
-	TestEqual(TEXT("AllStatSurge grants physical defense"), Bonus.PhysDef, 0.08f);
-	TestEqual(TEXT("AllStatSurge grants magic defense"), Bonus.MagicDef, 0.08f);
+	FUniqueTraitCoreMultipliers Multipliers;
+	FUniqueTraitFormula::AccumulateTraitMultipliers(Item, Multipliers);
+	TestEqual(TEXT("AllStatSurge does not grant flat physical attack"), Bonus.PhysAtk, 0.0f);
+	TestEqual(TEXT("AllStatSurge does not grant flat magic attack"), Bonus.MagicAtk, 0.0f);
+	TestEqual(TEXT("AllStatSurge does not grant flat physical defense"), Bonus.PhysDef, 0.0f);
+	TestEqual(TEXT("AllStatSurge does not grant flat magic defense"), Bonus.MagicDef, 0.0f);
+	TestEqual(TEXT("AllStatSurge grants physical attack multiplier"), Multipliers.PhysAtk, 0.08f);
+	TestEqual(TEXT("AllStatSurge grants magic attack multiplier"), Multipliers.MagicAtk, 0.08f);
+	TestEqual(TEXT("AllStatSurge grants physical defense multiplier"), Multipliers.PhysDef, 0.08f);
+	TestEqual(TEXT("AllStatSurge grants magic defense multiplier"), Multipliers.MagicDef, 0.08f);
 	TestEqual(TEXT("CritDamageSurge grants crit damage"), Bonus.CritDmg, 0.15f);
 	TestEqual(TEXT("None HP remains zero"), Bonus.Hp, 0.0f);
 
@@ -141,7 +147,7 @@ bool FUniqueTraitInventoryBonusTest::RunTest(const FString& Parameters)
 	Inventory->AddItem(Weapon);
 
 	FDerivedStats Bonus = Inventory->ComputeEquipmentBonus();
-	TestEqual(TEXT("Equipment bonus includes base physical attack"), Bonus.PhysAtk, 10.12f);
+	TestEqual(TEXT("Equipment bonus keeps PhysMastery out of flat physical attack"), Bonus.PhysAtk, 10.0f);
 	TestEqual(TEXT("Equipment bonus does not add unrelated magic attack"), Bonus.MagicAtk, 0.0f);
 
 	FItemInstance Helmet = MakeTraitTestItem(EItemSlot::Helmet, EItemRarity::Transcendent);
@@ -150,9 +156,25 @@ bool FUniqueTraitInventoryBonusTest::RunTest(const FString& Parameters)
 	Inventory->AddItem(Helmet);
 
 	Bonus = Inventory->ComputeEquipmentBonus();
-	TestEqual(TEXT("Equipment bonus includes LifeSurge HP"), Bonus.Hp, 40.15f);
-	TestEqual(TEXT("Equipment bonus includes GuardMastery physical defense"), Bonus.PhysDef, 10.15f);
-	TestEqual(TEXT("Equipment bonus includes GuardMastery magic defense"), Bonus.MagicDef, 0.15f);
+	const FUniqueTraitCoreMultipliers Multipliers = Inventory->ComputeUniqueTraitMultipliers();
+	TestEqual(TEXT("Equipment bonus keeps LifeSurge out of flat HP"), Bonus.Hp, 40.0f);
+	TestEqual(TEXT("Equipment bonus keeps GuardMastery out of flat physical defense"), Bonus.PhysDef, 10.0f);
+	TestEqual(TEXT("Equipment bonus keeps GuardMastery out of flat magic defense"), Bonus.MagicDef, 0.0f);
+	TestEqual(TEXT("PhysMastery contributes physical attack multiplier"), Multipliers.PhysAtk, 0.12f);
+	TestEqual(TEXT("LifeSurge contributes HP multiplier"), Multipliers.Hp, 0.15f);
+	TestEqual(TEXT("GuardMastery contributes physical defense multiplier"), Multipliers.PhysDef, 0.15f);
+	TestEqual(TEXT("GuardMastery contributes magic defense multiplier"), Multipliers.MagicDef, 0.15f);
+
+	FDerivedStats Derived;
+	Derived.Hp = 100.0f;
+	Derived.PhysAtk = 100.0f;
+	Derived.MagicAtk = 100.0f;
+	Derived.PhysDef = 100.0f;
+	Derived.MagicDef = 100.0f;
+	FUniqueTraitFormula::ApplyCoreMultipliers(Derived, Multipliers);
+	TestEqual(TEXT("Unique trait multiplier scales derived HP by percent"), Derived.Hp, 115.0f);
+	TestEqual(TEXT("Unique trait multiplier scales derived physical attack by percent"), Derived.PhysAtk, 112.0f);
+	TestEqual(TEXT("Unique trait multiplier scales derived physical defense by percent"), Derived.PhysDef, 115.0f);
 
 	return true;
 }

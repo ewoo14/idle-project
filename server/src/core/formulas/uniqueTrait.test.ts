@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accumulateTraitEffects,
   getTraitValue,
   rarityGrantsTwoTraits,
   rarityGrantsUnique,
@@ -50,5 +51,37 @@ describe("unique trait formulas", () => {
     expect(getTraitValue(1, 5)).toBe(0);
     expect(getTraitValue(0, 4)).toBe(0);
     expect(getTraitValue(99, 4)).toBe(0);
+  });
+
+  it("splits core stat traits into percent multipliers and utility traits into flat bonuses", () => {
+    expect(accumulateTraitEffects([1, 2], 4)).toEqual({
+      flat: {
+        critDmg: Math.fround(0.15),
+        critRate: 0,
+        atkSpeed: 0,
+      },
+      multipliers: {
+        hp: 0,
+        physAtk: Math.fround(0.08),
+        magicAtk: Math.fround(0.08),
+        physDef: Math.fround(0.08),
+        magicDef: Math.fround(0.08),
+      },
+    });
+
+    expect(accumulateTraitEffects([4, 8], 6)).toEqual({
+      flat: {
+        critDmg: 0,
+        critRate: 0,
+        atkSpeed: 0,
+      },
+      multipliers: {
+        hp: Math.fround(0.15),
+        physAtk: 0,
+        magicAtk: 0,
+        physDef: Math.fround(0.15),
+        magicDef: Math.fround(0.15),
+      },
+    });
   });
 });

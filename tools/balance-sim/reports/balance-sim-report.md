@@ -384,7 +384,7 @@
 | Rarity | Trait count | Traits | Base CP | Trait CP | CP x | Base DPS | Trait DPS | DPS x |
 | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Unique | 1 | PhysMastery | 5444 | 5684 | x1.044 | 4295 | 4876 | x1.135 |
-| Transcendent | 2 | AllStatSurge, PhysMastery | 5444 | 6393 | x1.174 | 4295 | 5851 | x1.362 |
+| Transcendent | 2 | AllStatSurge, PhysMastery | 5444 | 6394 | x1.175 | 4295 | 5851 | x1.362 |
 
 <!-- markdownlint-enable MD013 -->
 

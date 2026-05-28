@@ -1,4 +1,5 @@
 import { computeSetBonus } from "./setBonus.js";
+import { accumulateTraitEffects, type UniqueTrait } from "./uniqueTrait.js";
 
 /**
  * 장비 PowerScore - UE5 client FItemPowerScore::Compute 미러.
@@ -43,6 +44,8 @@ export interface ItemInstance {
   bonusMagicDef?: number;
   bonusAffixHp?: number;
   bonusCritDmg?: number;
+  uniqueTrait1?: UniqueTrait;
+  uniqueTrait2?: UniqueTrait;
   enhanceLevel: number;
 }
 
@@ -79,6 +82,10 @@ export function computeInventoryBonus(
   const itemBonus = equippedItems.reduce(
     (acc, item) => {
       const enhanceMultiplier = 1 + item.enhanceLevel * 0.1;
+      const traitEffects = accumulateTraitEffects(
+        [item.uniqueTrait1 ?? 0, item.uniqueTrait2 ?? 0],
+        Number(item.rarity),
+      );
 
       return {
         bonusAtk: acc.bonusAtk + item.bonusAtk * enhanceMultiplier,
@@ -88,13 +95,21 @@ export function computeInventoryBonus(
         bonusHp:
           acc.bonusHp +
           (item.bonusHp + (item.bonusAffixHp ?? 0)) * enhanceMultiplier,
-        critRate: acc.critRate + (item.bonusCritRate ?? 0) * enhanceMultiplier,
-        atkSpeed: acc.atkSpeed + (item.bonusAtkSpeed ?? 0) * enhanceMultiplier,
+        critRate:
+          acc.critRate +
+          (item.bonusCritRate ?? 0) * enhanceMultiplier +
+          traitEffects.flat.critRate,
+        atkSpeed:
+          acc.atkSpeed +
+          (item.bonusAtkSpeed ?? 0) * enhanceMultiplier +
+          traitEffects.flat.atkSpeed,
         magicAtk: acc.magicAtk + (item.bonusMagicAtk ?? 0) * enhanceMultiplier,
         magicDef:
           (acc.magicDef ?? 0) + (item.bonusMagicDef ?? 0) * enhanceMultiplier,
         critDmg:
-          (acc.critDmg ?? 0) + (item.bonusCritDmg ?? 0) * enhanceMultiplier,
+          (acc.critDmg ?? 0) +
+          (item.bonusCritDmg ?? 0) * enhanceMultiplier +
+          traitEffects.flat.critDmg,
       };
     },
     {
