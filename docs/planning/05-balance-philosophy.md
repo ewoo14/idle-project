@@ -1349,3 +1349,50 @@ them as aspirational late-game builds unless future telemetry shows a need for
 lower account-level caps. If first-rebirth median time drops below 5h after rune
 acquisition is wired into the simulator, the first tuning candidates are rune
 drop rate, shop roll cost, and essence income rather than the level curve.
+
+## PR #62 Rune Codex Collection Balance Review
+
+PR #62 adds rune codex collection pressure reporting to `tools/balance-sim`
+without injecting codex bonuses into the sampled first-rebirth run. The sampled
+1000-run distribution therefore remains the PR #61 baseline guard:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.919 |
+| median | 5.328 |
+| p90 | 5.751 |
+| min | 4.564 |
+| max | 6.144 |
+
+Rune codex core-stat bonuses are additive before being applied to the five core
+stat lanes:
+
+```text
+0.4% per unlocked cell
++1% / +2% / +3% / +5% / +8% / +12% for completed rarity rows
++5% for completing the core category
++10% util cap extension for completing the util category
+```
+
+A full 54-cell codex gives +21.6% from cells, +31% from all completed rarity
+rows, and +5% from core category completion, for +57.6% core stat add. The util
+category adds +10 percentage points to utility rune caps, but it does not change
+the first-rebirth baseline unless rune acquisition and equipped utility runes
+are explicitly modeled.
+
+If the full +57.6% core codex bonus were applied directly as first-rebirth DPS
+pressure, the 5.328h median projects to about 3.381h, a -36.5% shift. That is
+inside the broad 3-20h review band but below the 5-10h median target. Treat this
+as a risk signal rather than a live rebirth result: until rune drop rates,
+codex unlock pacing, and early equipped rune availability are wired into the
+simulator, codex bonuses should stay documented as collection pressure only.
+
+Guardrails:
+
+- Do not tune the level curve against the projected full-codex median unless
+  codex acquisition is actually active during the first-rebirth simulation.
+- If future acquisition modeling pushes the sampled median below 5h, tune rune
+  drop rate, shop roll cost, unlock pacing, or essence income before reducing
+  the codex formula.
+- Keep `FRuneCodexFormula`, `runeCodex.ts`, and `tools/balance-sim` parity
+  tests aligned with `Math.fround` boundaries.

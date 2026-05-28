@@ -348,4 +348,31 @@ describe("balance simulator", () => {
       "Core rune growth is intentionally uncapped",
     );
   });
+
+  it("reports rune codex collection pressure without injecting it into the sampled rebirth run", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/runeCodex.ts",
+    );
+    expect(report.json.model.runeCodexPressure).toEqual({
+      totalCells: 54,
+      perCellCoreBonusPercent: 0.4,
+      allCellsCoreBonusPercent: 21.6,
+      allRowsCoreBonusPercent: 31,
+      coreCategoryBonusPercent: 5,
+      utilCategoryCapExtensionPercent: 10,
+      fullCodexCoreStatAddPercent: 57.6,
+      baseMedianRebirthHours: 5.328,
+      projectedFullCodexMedianHours: 3.381,
+      projectedMedianDeltaPercent: -36.5,
+      injectedIntoSampledRun: false,
+    });
+    expect(report.markdown).toContain("## Rune Codex Collection Pressure");
+    expect(report.markdown).toContain("Full codex core bonus: +57.6%");
+    expect(report.markdown).toContain(
+      "Not injected into the sampled first-rebirth run",
+    );
+  });
 });
