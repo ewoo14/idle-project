@@ -19,6 +19,8 @@
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
+#include "RuneSystem/RuneFormula.h"
+#include "RuneSystem/RuneService.h"
 
 namespace
 {
@@ -62,9 +64,11 @@ void UIdleGameInstance::Init()
 	EnsureSeasonService();
 	EnsureStageService();
 	EnsureTowerService();
+	EnsureRuneService();
 	EnsureAchievementService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
+	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
 	LoadLanguage();
 	LoadLastSeenUnixSec();
 	LoadProgress();
@@ -87,6 +91,7 @@ void UIdleGameInstance::Shutdown()
 	SeasonService = nullptr;
 	StageService = nullptr;
 	TowerService = nullptr;
+	RuneService = nullptr;
 	AchievementService = nullptr;
 	Super::Shutdown();
 }
@@ -314,14 +319,16 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 
 	EnsureStageService();
 	EnsureTowerService();
+	EnsureRuneService();
 	EnsurePetService();
 	EnsureQuestService();
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 2;
+	SaveGame->SaveVersion = 3;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
+	SaveGame->RuneEssence = RuneEssence;
 	SaveGame->CharacterLevel = CharacterLevel;
 	SaveGame->CurrentExp = CurrentExp;
 	SaveGame->NextExp = NextExp;
@@ -345,6 +352,11 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (TowerService)
 	{
 		SaveGame->TowerHighestFloor = TowerService->GetHighestFloor();
+	}
+
+	if (RuneService)
+	{
+		RuneService->CaptureState(SaveGame->Runes, SaveGame->EquippedRuneSlots);
 	}
 
 	if (PetService)
@@ -404,6 +416,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	TGuardValue<bool> AutosaveGuard(bAutosaveSuppressed, true);
 
 	Gold = FMath::Max<int64>(0, SaveGame->Gold);
+	RuneEssence = SaveGame->SaveVersion >= 3 ? FMath::Max<int64>(0, SaveGame->RuneEssence) : 0;
 	CharacterLevel = FMath::Clamp(SaveGame->CharacterLevel, 1, FLevelFormulas::LEVEL_CAP);
 	CurrentExp = FMath::Max<int64>(0, SaveGame->CurrentExp);
 	NextExp = SaveGame->NextExp > 0 ? SaveGame->NextExp : FLevelFormulas::ExpToNext(CharacterLevel);
@@ -430,6 +443,19 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (TowerService)
 	{
 		TowerService->SetHighestFloor(SaveGame->TowerHighestFloor);
+	}
+
+	EnsureRuneService();
+	if (RuneService)
+	{
+		if (SaveGame->SaveVersion >= 3)
+		{
+			RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots);
+		}
+		else
+		{
+			RuneService->RestoreState({}, {});
+		}
 	}
 
 	EnsurePetService();
@@ -666,6 +692,118 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	return Result;
 }
 
+void UIdleGameInstance::AddRune(const FRuneInstance& Rune)
+{
+	EnsureRuneService();
+	if (!RuneService)
+	{
+		return;
+	}
+
+	const int32 PreviousCount = RuneService->GetOwnedRunes().Num();
+	RuneService->AddRune(Rune);
+	if (RuneService->GetOwnedRunes().Num() != PreviousCount)
+	{
+		RequestAutosave();
+	}
+}
+
+bool UIdleGameInstance::TryEnhanceRune(int32 OwnedIndex)
+{
+	EnsureRuneService();
+	if (!RuneService || !RuneService->GetOwnedRunes().IsValidIndex(OwnedIndex))
+	{
+		return false;
+	}
+
+	const int32 CurrentLevel = RuneService->GetOwnedRunes()[OwnedIndex].EnhanceLevel;
+	const int64 EssenceCost = FRuneFormula::GetEnhanceEssenceCost(CurrentLevel);
+	const int64 GoldCost = FRuneFormula::GetEnhanceGoldCost(CurrentLevel);
+	if (RuneEssence < EssenceCost || Gold < GoldCost)
+	{
+		return false;
+	}
+
+	RuneEssence -= EssenceCost;
+	AddGold(-GoldCost);
+	if (!RuneService->EnhanceRune(OwnedIndex))
+	{
+		RuneEssence += EssenceCost;
+		AddGold(GoldCost);
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryDisenchantRune(int32 OwnedIndex)
+{
+	EnsureRuneService();
+	if (!RuneService)
+	{
+		return false;
+	}
+
+	int64 Refund = 0;
+	if (!RuneService->TryDisenchantRune(OwnedIndex, Refund))
+	{
+		return false;
+	}
+
+	RuneEssence = Refund > MAX_int64 - RuneEssence ? MAX_int64 : RuneEssence + Refund;
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryBuyRuneRoll()
+{
+	EnsureRuneService();
+	if (!RuneService)
+	{
+		return false;
+	}
+
+	const int32 ProgressIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const int64 Cost = FRuneFormula::GetShopRuneRollCost(ProgressIndex);
+	if (Cost <= 0 || Gold < Cost)
+	{
+		return false;
+	}
+
+	AddGold(-Cost);
+	RuneService->AddRune(FRuneFormula::RollShopRune(ProgressIndex, RuneRandomStream));
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryEquipRune(int32 SlotIndex, int32 OwnedIndex)
+{
+	EnsureRuneService();
+	if (!RuneService || !RuneService->TryEquipRune(SlotIndex, OwnedIndex))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::UnequipRune(int32 SlotIndex)
+{
+	EnsureRuneService();
+	if (!RuneService || !RuneService->UnequipRune(SlotIndex))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
 void UIdleGameInstance::SetEnhanceRandomSeed(int32 Seed)
 {
 	EnhanceRandomStream.Initialize(Seed);
@@ -884,6 +1022,26 @@ int64 UIdleGameInstance::GetAchievementMetricValue(EAchievementMetric Metric) co
 	return AchievementService ? AchievementService->GetMetricValue(Metric) : 0;
 }
 
+float UIdleGameInstance::GetRuneGoldFindBonus() const
+{
+	return RuneService ? RuneService->GetEquippedUtilValues().GoldFind : 0.0f;
+}
+
+float UIdleGameInstance::GetRuneExpBoostBonus() const
+{
+	return RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
+}
+
+float UIdleGameInstance::GetRuneOfflineEffBonus() const
+{
+	return RuneService ? RuneService->GetEquippedUtilValues().OfflineEff : 0.0f;
+}
+
+float UIdleGameInstance::GetRuneCritDamageBonus() const
+{
+	return RuneService ? RuneService->GetEquippedUtilValues().CritDamage : 0.0f;
+}
+
 float UIdleGameInstance::PreviewTranscendMultiplier() const
 {
 	return FTranscendFormula::GetTranscendStatMultiplier(TranscendCount + 1);
@@ -931,7 +1089,11 @@ FOfflineRewardResult UIdleGameInstance::ClaimOfflineRewardsAt(int64 NowUnixSec, 
 FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, int32 RebirthCountOverride) const
 {
 	const int32 EffectiveRebirthCount = RebirthCountOverride >= 0 ? RebirthCountOverride : RebirthCount;
-	return FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
+	FOfflineRewardResult Reward = FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
+	const double OfflineMultiplier = 1.0 + static_cast<double>(GetRuneOfflineEffBonus());
+	Reward.Gold = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Gold) * OfflineMultiplier));
+	Reward.Exp = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Exp) * OfflineMultiplier));
+	return Reward;
 }
 
 void UIdleGameInstance::SetLastSeenUnixSec(int64 UnixSec)
@@ -1053,6 +1215,25 @@ void UIdleGameInstance::InitializeTowerServiceForTests()
 	TowerService = NewObject<UTowerService>(this);
 	TowerService->InitializeTower();
 }
+
+void UIdleGameInstance::InitializeRuneServiceForTests()
+{
+	RuneService = NewObject<URuneService>(this);
+	RuneEssence = 0;
+	RuneRandomStream.Initialize(12345);
+}
+
+#if WITH_DEV_AUTOMATION_TESTS
+void UIdleGameInstance::AddRuneForTests(const FRuneInstance& Rune)
+{
+	AddRune(Rune);
+}
+
+void UIdleGameInstance::AddRuneEssenceForTests(int64 Amount)
+{
+	RuneEssence = FMath::Max<int64>(0, RuneEssence + Amount);
+}
+#endif
 
 bool UIdleGameInstance::EquipPet(const FString& PetId)
 {
@@ -1310,12 +1491,28 @@ void UIdleGameInstance::EnsureTowerService()
 	}
 }
 
+void UIdleGameInstance::EnsureRuneService()
+{
+	if (!RuneService)
+	{
+		RuneService = NewObject<URuneService>(this);
+	}
+}
+
 void UIdleGameInstance::EnsureAchievementService()
 {
 	if (!AchievementService)
 	{
 		AchievementService = NewObject<UAchievementService>(this);
 		AchievementService->InitializeDefaultAchievements();
+	}
+}
+
+void UIdleGameInstance::RefreshPlayerCharacterStats()
+{
+	if (AIdleCharacter* Character = FindPlayerCharacter())
+	{
+		Character->RefreshDerivedStats();
 	}
 }
 

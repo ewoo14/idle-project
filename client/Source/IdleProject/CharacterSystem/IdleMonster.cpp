@@ -124,7 +124,7 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	if (GameInstance)
 	{
 		const int64 ExpReward = FRewardFormula::ComputeKillExp(12, StageGlobalIndex, bIsBoss);
-		GameInstance->AddExp(ExpReward);
+		GameInstance->AddExp(FMath::RoundToInt64(static_cast<double>(ExpReward) * (1.0 + static_cast<double>(GameInstance->GetRuneExpBoostBonus()))));
 	}
 
 	FActorSpawnParameters SpawnParameters;
@@ -133,7 +133,8 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	if (GoldDrop)
 	{
 		const int64 BaseGoldAmount = FRewardFormula::ComputeKillGold(static_cast<int64>(10 + FMath::RandRange(0, 5)), StageGlobalIndex, bIsBoss);
-		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(BaseGoldAmount) : BaseGoldAmount;
+		const int64 RuneGoldAmount = GameInstance ? FMath::RoundToInt64(static_cast<double>(BaseGoldAmount) * (1.0 + static_cast<double>(GameInstance->GetRuneGoldFindBonus()))) : BaseGoldAmount;
+		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(RuneGoldAmount) : RuneGoldAmount;
 	}
 
 	const float DropChance = GameInstance ? GameInstance->ApplyEquippedPetDropBonusChance(0.05f) : 0.05f;
