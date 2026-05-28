@@ -349,6 +349,69 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports class mastery rune pressure for all eight classes", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/classRune.ts",
+    );
+    expect(report.json.model.runePressure.classMasteryRows).toHaveLength(8);
+    expect(
+      report.json.model.runePressure.classMasteryRows.map((row) => ({
+        className: row.className,
+        masteryStats: row.masteryStats,
+      })),
+    ).toEqual([
+      { className: "Warrior", masteryStats: ["PhysAtk", "PhysDef"] },
+      { className: "Mage", masteryStats: ["MagicAtk"] },
+      { className: "Archer", masteryStats: ["PhysAtk"] },
+      { className: "Thief", masteryStats: ["PhysAtk"] },
+      { className: "Cleric", masteryStats: ["MagicAtk", "Hp"] },
+      { className: "Paladin", masteryStats: ["PhysDef", "Hp"] },
+      { className: "Berserker", masteryStats: ["PhysAtk"] },
+      { className: "Summoner", masteryStats: ["MagicAtk"] },
+    ]);
+    expect(report.markdown).toContain("## Class Mastery Rune Pressure");
+    expect(report.markdown).toContain("| Warrior | dps | PhysAtk, PhysDef |");
+  });
+
+  it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+    const dpsRows = report.json.model.runePressure.classMasteryRows.filter(
+      (row) => row.role === "dps",
+    );
+    const median = dpsRows
+      .map((row) => row.classRuneDps)
+      .sort((left, right) => left - right)[Math.floor(dpsRows.length / 2)];
+
+    for (const row of dpsRows) {
+      expect(row.classRuneDps).toBeGreaterThanOrEqual(median * 0.85);
+      expect(row.classRuneDps).toBeLessThanOrEqual(median * 1.15);
+    }
+  });
+
+  it("shows two-stat class mastery rows as CP compensation rather than extra DPS pressure", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+    const rowsByName = new Map(
+      report.json.model.runePressure.classMasteryRows.map((row) => [
+        row.className,
+        row,
+      ]),
+    );
+
+    expect(rowsByName.get("Warrior")?.cpMultiplier).toBeGreaterThan(
+      rowsByName.get("Berserker")?.cpMultiplier ?? 0,
+    );
+    expect(rowsByName.get("Cleric")?.cpMultiplier).toBeGreaterThan(
+      rowsByName.get("Mage")?.cpMultiplier ?? 0,
+    );
+    expect(rowsByName.get("Paladin")?.dpsMultiplier).toBe(1);
+    expect(rowsByName.get("Paladin")?.cpMultiplier).toBeGreaterThan(1);
+  });
+
   it("reports rune codex collection pressure without injecting it into the sampled rebirth run", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

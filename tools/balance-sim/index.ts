@@ -8,6 +8,7 @@ import {
   ACHIEVEMENT_POINTS_MULTIPLIER,
   getAchievementStatMultiplier,
 } from "../../server/src/core/formulas/achievement.js";
+import { getClassMasteryMultipliers } from "../../server/src/core/formulas/classRune.js";
 import {
   computeClassDamage,
   computeDamage,
@@ -285,6 +286,22 @@ export type RuneCombatPressureRow = {
   dpsMultiplier: number;
 };
 
+export type ClassMasteryPressureRow = {
+  classId: ClassId;
+  className: string;
+  role: ClassRole;
+  level: number;
+  rarity: RuneRarityName;
+  enhanceLevel: number;
+  masteryStats: string[];
+  baseCombatPower: number;
+  classRuneCombatPower: number;
+  cpMultiplier: number;
+  baseDps: number;
+  classRuneDps: number;
+  dpsMultiplier: number;
+};
+
 export type RuneUtilPressureRow = {
   runeType: RuneTypeName;
   rarity: RuneRarityName;
@@ -298,6 +315,7 @@ export type RunePressure = {
   slotCount: number;
   coreRows: RuneCorePressureRow[];
   combatRows: RuneCombatPressureRow[];
+  classMasteryRows: ClassMasteryPressureRow[];
   utilRows: RuneUtilPressureRow[];
 };
 
@@ -341,6 +359,8 @@ const RUNE_CORE_REVIEW_LEVELS = [0, 10, 50, 100];
 const RUNE_CORE_REVIEW_RARITIES = [1, 3, 6] as const;
 const RUNE_UTIL_REVIEW_TYPES = [6, 7, 8, 9] as const;
 const MYTHIC_RUNE_RARITY = 6;
+const CLASS_MASTERY_REVIEW_LEVEL = 100;
+const CLASS_MASTERY_REVIEW_ENHANCE_LEVEL = 50;
 const REGULAR_RUNE_SLOT_COUNT = RUNE_SLOT_COUNT - 1;
 
 export function simulateRebirthDistribution(
@@ -409,6 +429,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/petLevel.ts",
         "server/src/core/formulas/achievement.ts",
         "server/src/core/formulas/rune.ts",
+        "server/src/core/formulas/classRune.ts",
         "server/src/core/formulas/runeCodex.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
@@ -1055,6 +1076,14 @@ function buildRunePressure(): RunePressure {
       buildCoreCombatPressureRow(1, 100, MYTHIC_RUNE_RARITY, 50, "PhysAtk"),
       buildCoreCombatPressureRow(2, 100, MYTHIC_RUNE_RARITY, 50, "MagicAtk"),
     ],
+    classMasteryRows: ALL_CLASSES.map((classId) =>
+      buildClassMasteryPressureRow(
+        classId,
+        CLASS_MASTERY_REVIEW_LEVEL,
+        MYTHIC_RUNE_RARITY,
+        CLASS_MASTERY_REVIEW_ENHANCE_LEVEL,
+      ),
+    ),
     utilRows: RUNE_UTIL_REVIEW_TYPES.map((runeType) =>
       buildRuneUtilPressureRow(runeType, MYTHIC_RUNE_RARITY),
     ),
@@ -1158,6 +1187,47 @@ function buildCoreCombatPressureRow(
   };
 }
 
+function buildClassMasteryPressureRow(
+  classId: ClassId,
+  level: number,
+  rarity: number,
+  enhanceLevel: number,
+): ClassMasteryPressureRow {
+  const baseStats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const mastery = getClassMasteryMultipliers(classId, rarity, enhanceLevel);
+  const classRuneStats = {
+    ...baseStats,
+    hp: Math.round(baseStats.hp * (1 + mastery.hp)),
+    physAtk: Math.round(baseStats.physAtk * (1 + mastery.physAtk)),
+    magicAtk: Math.round(baseStats.magicAtk * (1 + mastery.magicAtk)),
+    physDef: Math.round(baseStats.physDef * (1 + mastery.physDef)),
+    magicDef: Math.round(baseStats.magicDef * (1 + mastery.magicDef)),
+  };
+  const baseCombatPower = computeCombatPower(baseStats);
+  const classRuneCombatPower = computeCombatPower(classRuneStats);
+  const baseDps = effectiveReviewDps(baseStats, classId, level);
+  const classRuneDps = effectiveReviewDps(classRuneStats, classId, level);
+
+  return {
+    classId,
+    className: CLASS_NAMES[classId],
+    role: CLASS_ROLES[classId],
+    level,
+    rarity: runeRarityName(rarity),
+    enhanceLevel,
+    masteryStats: masteryStatNames(mastery),
+    baseCombatPower,
+    classRuneCombatPower,
+    cpMultiplier: round(classRuneCombatPower / Math.max(1, baseCombatPower), 3),
+    baseDps,
+    classRuneDps,
+    dpsMultiplier: round(classRuneDps / Math.max(1, baseDps), 3),
+  };
+}
+
 function buildRuneUtilPressureRow(
   runeType: number,
   rarity: number,
@@ -1212,6 +1282,20 @@ function effectiveReviewDps(
   const effectiveAtkSpeed = 1 + (stats.atkSpeed - 1) * 0.6;
   const critMultiplier = 1 + stats.critRate * (stats.critDmg - 1) * 0.6;
   return Math.round((baseHit * effectiveAtkSpeed + skillDps) * critMultiplier);
+}
+
+function masteryStatNames(
+  mastery: ReturnType<typeof getClassMasteryMultipliers>,
+): string[] {
+  return [
+    ["PhysAtk", mastery.physAtk],
+    ["MagicAtk", mastery.magicAtk],
+    ["PhysDef", mastery.physDef],
+    ["MagicDef", mastery.magicDef],
+    ["Hp", mastery.hp],
+  ]
+    .filter(([, value]) => value > 0)
+    .map(([name]) => String(name));
 }
 
 function runeRarityName(rarity: number): RuneRarityName {
@@ -1458,6 +1542,26 @@ function renderMarkdown(report: BalanceReport["json"]): string {
       (row) =>
         `| ${row.runeSet} | ${row.className} | ${row.level} | ${row.baseCombatPower} | ${row.runeCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.runeDps} | x${row.dpsMultiplier} |`,
     ),
+    "",
+    "## Class Mastery Rune Pressure",
+    "",
+    "- ClassMastery uses the seventh dedicated rune slot. The table applies one",
+    "  Mythic +50 class rune to each Lv100 review loadout and keeps the regular",
+    "  six core slots out of the comparison.",
+    "- Damage-role rows are checked against the PR #60 +/-15% DPS band after the",
+    "  class rune is applied. Two-stat Warrior, Cleric, and Paladin rows are",
+    "  treated as CP/survival compensation, not an extra DPS lane.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Class | Role | Mastery stats | Base CP | Rune CP | CP x | Base DPS | Rune DPS | DPS x |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.runePressure.classMasteryRows.map(
+      (row) =>
+        `| ${row.className} | ${row.role} | ${row.masteryStats.join(", ")} | ${row.baseCombatPower} | ${row.classRuneCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.classRuneDps} | x${row.dpsMultiplier} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
     "",
     "| Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |",
     "| --- | --- | ---: | ---: | ---: | ---: |",
