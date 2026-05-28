@@ -31,6 +31,7 @@ the rule source:
 - `server/src/core/formulas/offline.ts`
 - `server/src/core/formulas/reward.ts`
 - `server/src/core/formulas/stage.ts`
+- `server/src/core/formulas/dungeon.ts`
 - `server/src/core/formulas/drop.ts`
 - `server/src/core/formulas/enhance.ts`
 - `server/src/core/formulas/achievement.ts`
@@ -74,6 +75,11 @@ PR #66 expands reward-scaling evidence from the chapter 1 sample to all 30
 stages across chapters 1-3. The report now includes encounter type, weak
 element, normal reward, 3x elite reward, and 8x boss reward for every stage,
 plus a Dark element pressure table that verifies the Holy/Dark 1.5x matchup.
+
+PR #68 adds dungeon reward pressure. The simulator imports `dungeon.ts`, reports
+the three-run daily reward for Gold, Exp, and Essence dungeons at minimum and
+Lv100-review CP anchors, and compares Gold/EXP rows against sampled Lv50
+income. Dungeon rewards are not injected into the sampled first-rebirth run.
 
 ## V1 Interpretation
 
@@ -149,3 +155,12 @@ Pet growth V1 pressure:
 This makes dog feeding a recoupable gold investment rather than a first-rebirth
 progression wall. Bird feeding should be reviewed through loot-quality
 telemetry because its drop bonus does not directly convert to gold/hour.
+
+Dungeon V1 pressure:
+
+- daily entry limit: 3 per dungeon
+- reward curve: `round(BaseReward * sqrt(max(1, CP / MinimumCP)))`
+- Gold CP 100: 20,000/run, 60,000/day, about 0.092h of sampled Lv50 gold income
+- Gold CP 5,500: 148,324/run, 444,972/day, about 0.68h of sampled Lv50 gold income
+- Exp CP 5,500: 93,808/run, 281,424/day, about 0.385h of sampled Lv50 EXP income
+- Essence CP 5,500: 40/run, 120/day, reported as quantity until essence/hour exists

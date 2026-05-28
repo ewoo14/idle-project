@@ -25,12 +25,12 @@ describe("dungeon formula", () => {
   });
 
   it.each([
-    [1, 100, { gold: 1000, exp: 0, essence: 0 }],
-    [1, 350, { gold: 3500, exp: 0, essence: 0 }],
-    [2, 250, { gold: 0, exp: 1250, essence: 0 }],
-    [2, 750, { gold: 0, exp: 3750, essence: 0 }],
-    [3, 500, { gold: 0, exp: 0, essence: 50 }],
-    [3, 1200, { gold: 0, exp: 0, essence: 120 }],
+    [1, 100, { gold: 20000, exp: 0, essence: 0 }],
+    [1, 350, { gold: 37417, exp: 0, essence: 0 }],
+    [2, 250, { gold: 0, exp: 20000, essence: 0 }],
+    [2, 750, { gold: 0, exp: 34641, essence: 0 }],
+    [3, 500, { gold: 0, exp: 0, essence: 12 }],
+    [3, 1200, { gold: 0, exp: 0, essence: 19 }],
   ])("returns one-resource rewards for type %i at CP %i", (type, combatPower, expected) => {
     expect(getDungeonReward(type, combatPower)).toEqual(expected);
   });
@@ -43,7 +43,7 @@ describe("dungeon formula", () => {
 
   it("uses fround-compatible scaling anchors and clamps oversized rewards", () => {
     expect(getDungeonReward(1, 101)).toEqual({
-      gold: 1010,
+      gold: 20100,
       exp: 0,
       essence: 0,
     });

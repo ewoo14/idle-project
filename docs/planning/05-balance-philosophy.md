@@ -1583,6 +1583,55 @@ Guardrails:
 - If future acquisition modeling pushes the sampled median below 5h, tune drop
   availability or trait roll timing before reducing the trait value table.
 
+## PR #68 Dungeon Reward Balance Review
+
+PR #68 adds three daily dungeons: Gold, Exp, and Essence. Each dungeon has a
+daily entry limit of three runs and a minimum combat-power gate:
+
+| Dungeon | Minimum CP | Base reward at minimum CP |
+| --- | ---: | ---: |
+| Gold | 100 | 20,000 gold |
+| Exp | 250 | 20,000 EXP |
+| Essence | 500 | 12 rune essence |
+
+Dungeon reward scaling is intentionally sublinear:
+
+```text
+Reward = round(BaseReward * sqrt(max(1, CombatPower / MinimumCp)))
+```
+
+The TypeScript mirror keeps the same `Math.fround` boundary as
+`FDungeonFormula`: the CP ratio is rounded to float precision before `sqrt`,
+and the multiplier is rounded to float precision before reward rounding. This
+keeps server/client parity while avoiding linear high-CP reward pressure.
+
+The balance simulator reports dungeon pressure against sampled Lv50 income
+without injecting dungeon rewards into the first-rebirth run:
+
+| Dungeon | CP | Reward/run | 3-run daily reward | Lv50 income equivalent |
+| --- | ---: | ---: | ---: | ---: |
+| Gold | 100 | 20,000 gold | 60,000 gold | 0.092h |
+| Gold | 5,500 | 148,324 gold | 444,972 gold | 0.68h |
+| Exp | 5,500 | 93,808 EXP | 281,424 EXP | 0.385h |
+| Essence | 5,500 | 40 essence | 120 essence | n/a |
+
+Seed `23`, 1000 runs, still reports the same first-rebirth baseline:
+p10 4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h. The median
+remains inside the 5-10h target and every sampled run remains inside the
+3-20h review band.
+
+Guardrails:
+
+- Keep dungeon acquisition out of the sampled first-rebirth timing model until
+  daily unlock timing and expected player usage are modeled explicitly.
+- Gold and EXP daily totals should stay below one sampled Lv50 income hour at
+  the Lv100 review CP around 5,500.
+- Essence pressure must remain quantity-based until rune-essence/hour exists in
+  the simulator; avoid tuning rune enhancement costs from this row alone.
+- Re-run `npm run balance:sim`, `npm test -- tests/balance-sim.test.ts`, and
+  dungeon parity tests after changing base rewards, CP gates, entry limits, or
+  the `sqrt` scaling formula.
+
 ---
 
 ## PR #66 Chapter 3 Stage/Element Balance Addendum

@@ -671,6 +671,51 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports dungeon daily reward pressure without injecting it into the sampled rebirth run", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+    const dungeonPressure = report.json.model.dungeonPressure;
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/dungeon.ts",
+    );
+    expect(dungeonPressure.dailyEntryLimit).toBe(3);
+    expect(dungeonPressure.injectedIntoSampledRun).toBe(false);
+    expect(dungeonPressure.rows).toEqual([
+      expect.objectContaining({
+        dungeon: "Gold",
+        combatPower: 100,
+        reward: "20000 gold",
+        dailyReward: "60000 gold",
+      }),
+      expect.objectContaining({
+        dungeon: "Gold",
+        combatPower: 5500,
+        reward: "148324 gold",
+        dailyReward: "444972 gold",
+        dailyRewardHoursAtMedianLevel50Income: 0.68,
+      }),
+      expect.objectContaining({
+        dungeon: "Exp",
+        combatPower: 5500,
+        reward: "93808 exp",
+        dailyReward: "281424 exp",
+        dailyRewardHoursAtMedianLevel50Income: 0.385,
+      }),
+      expect.objectContaining({
+        dungeon: "Essence",
+        combatPower: 5500,
+        reward: "40 essence",
+        dailyReward: "120 essence",
+        dailyRewardHoursAtMedianLevel50Income: null,
+      }),
+    ]);
+    expect(report.markdown).toContain("## Dungeon Daily Reward Pressure");
+    expect(report.markdown).toContain(
+      "not injected into the sampled first-rebirth run",
+    );
+  });
+
   it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

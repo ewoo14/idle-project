@@ -22,19 +22,19 @@ bool FDungeonFormulaTest::RunTest(const FString& Parameters)
 
 	const FDungeonRunResult Gold = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 350);
 	TestTrue(TEXT("Gold reward succeeds at minimum or higher CP"), Gold.bSuccess);
-	TestEqual(TEXT("Gold dungeon only grants gold"), Gold.GoldReward, static_cast<int64>(3500));
+	TestEqual(TEXT("Gold dungeon only grants gold"), Gold.GoldReward, static_cast<int64>(37417));
 	TestEqual(TEXT("Gold dungeon grants no exp"), Gold.ExpReward, static_cast<int64>(0));
 	TestEqual(TEXT("Gold dungeon grants no essence"), Gold.EssenceReward, static_cast<int64>(0));
 
 	const FDungeonRunResult Exp = FDungeonFormula::GetRewardForCp(EDungeonType::Exp, 750);
 	TestTrue(TEXT("Exp reward succeeds at minimum or higher CP"), Exp.bSuccess);
-	TestEqual(TEXT("Exp dungeon only grants exp"), Exp.ExpReward, static_cast<int64>(3750));
+	TestEqual(TEXT("Exp dungeon only grants exp"), Exp.ExpReward, static_cast<int64>(34641));
 	TestEqual(TEXT("Exp dungeon grants no gold"), Exp.GoldReward, static_cast<int64>(0));
 	TestEqual(TEXT("Exp dungeon grants no essence"), Exp.EssenceReward, static_cast<int64>(0));
 
 	const FDungeonRunResult Essence = FDungeonFormula::GetRewardForCp(EDungeonType::Essence, 1200);
 	TestTrue(TEXT("Essence reward succeeds at minimum or higher CP"), Essence.bSuccess);
-	TestEqual(TEXT("Essence dungeon only grants essence"), Essence.EssenceReward, static_cast<int64>(120));
+	TestEqual(TEXT("Essence dungeon only grants essence"), Essence.EssenceReward, static_cast<int64>(19));
 	TestEqual(TEXT("Essence dungeon grants no gold"), Essence.GoldReward, static_cast<int64>(0));
 	TestEqual(TEXT("Essence dungeon grants no exp"), Essence.ExpReward, static_cast<int64>(0));
 

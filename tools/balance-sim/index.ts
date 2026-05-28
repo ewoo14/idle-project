@@ -23,6 +23,15 @@ import {
   type ItemRarity,
 } from "../../server/src/core/formulas/drop.js";
 import {
+  DUNGEON_DAILY_ENTRY_LIMIT,
+  DUNGEON_TYPE_ESSENCE,
+  DUNGEON_TYPE_EXP,
+  DUNGEON_TYPE_GOLD,
+  type DungeonReward,
+  getDungeonReward,
+  getMinimumCp,
+} from "../../server/src/core/formulas/dungeon.js";
+import {
   type EnhanceItemRarity,
   getEnhanceCost,
   getEnhanceSuccessRate,
@@ -169,6 +178,7 @@ export type BalanceReport = {
       runePressure: RunePressure;
       runeCodexPressure: RuneCodexPressure;
       uniqueTraitPressure: UniqueTraitPressure;
+      dungeonPressure: DungeonPressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -454,6 +464,25 @@ export type UniqueTraitPressure = {
   combatRows: UniqueTraitCombatRow[];
 };
 
+export type DungeonName = "Gold" | "Exp" | "Essence";
+
+export type DungeonPressureRow = {
+  dungeon: DungeonName;
+  combatPower: number;
+  minimumCp: number;
+  reward: string;
+  dailyReward: string;
+  dailyRewardHoursAtMedianLevel50Income: number | null;
+};
+
+export type DungeonPressure = {
+  dailyEntryLimit: number;
+  medianGoldPerHourAtLevel50: number;
+  medianExpPerHourAtLevel50: number;
+  injectedIntoSampledRun: boolean;
+  rows: DungeonPressureRow[];
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -594,6 +623,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/offline.ts",
         "server/src/core/formulas/reward.ts",
         "server/src/core/formulas/stage.ts",
+        "server/src/core/formulas/dungeon.ts",
         "server/src/core/formulas/drop.ts",
         "server/src/core/formulas/enhance.ts",
         "server/src/core/formulas/petLevel.ts",
@@ -615,6 +645,7 @@ export function buildBalanceReport(
         distribution.summary.medianHours,
       ),
       uniqueTraitPressure: buildUniqueTraitPressure(),
+      dungeonPressure: buildDungeonPressure(distribution.samples),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -1445,6 +1476,107 @@ function buildUniqueTraitPressure(): UniqueTraitPressure {
   };
 }
 
+function buildDungeonPressure(samples: SimulationSample[]): DungeonPressure {
+  const medianGoldPerHour = medianBy(
+    samples,
+    (sample) => sample.goldPerHourAtLevel50,
+  );
+  const medianExpPerHour = medianBy(
+    samples,
+    (sample) => sample.expPerHourAtLevel50,
+  );
+  const rows = [
+    buildDungeonPressureRow(
+      "Gold",
+      DUNGEON_TYPE_GOLD,
+      getMinimumCp(DUNGEON_TYPE_GOLD),
+      medianGoldPerHour,
+      medianExpPerHour,
+    ),
+    buildDungeonPressureRow(
+      "Gold",
+      DUNGEON_TYPE_GOLD,
+      5500,
+      medianGoldPerHour,
+      medianExpPerHour,
+    ),
+    buildDungeonPressureRow(
+      "Exp",
+      DUNGEON_TYPE_EXP,
+      5500,
+      medianGoldPerHour,
+      medianExpPerHour,
+    ),
+    buildDungeonPressureRow(
+      "Essence",
+      DUNGEON_TYPE_ESSENCE,
+      5500,
+      medianGoldPerHour,
+      medianExpPerHour,
+    ),
+  ];
+
+  return {
+    dailyEntryLimit: DUNGEON_DAILY_ENTRY_LIMIT,
+    medianGoldPerHourAtLevel50: medianGoldPerHour,
+    medianExpPerHourAtLevel50: medianExpPerHour,
+    injectedIntoSampledRun: false,
+    rows,
+  };
+}
+
+function buildDungeonPressureRow(
+  dungeon: DungeonName,
+  type: number,
+  combatPower: number,
+  medianGoldPerHour: number,
+  medianExpPerHour: number,
+): DungeonPressureRow {
+  const reward = getDungeonReward(type, combatPower);
+  const dailyReward = multiplyDungeonReward(reward, DUNGEON_DAILY_ENTRY_LIMIT);
+  const dailyIncome = dailyReward.gold > 0 ? dailyReward.gold : dailyReward.exp;
+  const medianIncome =
+    dailyReward.gold > 0
+      ? medianGoldPerHour
+      : dailyReward.exp > 0
+        ? medianExpPerHour
+        : 0;
+
+  return {
+    dungeon,
+    combatPower,
+    minimumCp: getMinimumCp(type),
+    reward: formatDungeonReward(reward),
+    dailyReward: formatDungeonReward(dailyReward),
+    dailyRewardHoursAtMedianLevel50Income:
+      medianIncome > 0 ? round(dailyIncome / medianIncome, 3) : null,
+  };
+}
+
+function multiplyDungeonReward(
+  reward: DungeonReward,
+  multiplier: number,
+): DungeonReward {
+  return {
+    gold: reward.gold * multiplier,
+    exp: reward.exp * multiplier,
+    essence: reward.essence * multiplier,
+  };
+}
+
+function formatDungeonReward(reward: DungeonReward): string {
+  if (reward.gold > 0) {
+    return `${reward.gold} gold`;
+  }
+  if (reward.exp > 0) {
+    return `${reward.exp} exp`;
+  }
+  if (reward.essence > 0) {
+    return `${reward.essence} essence`;
+  }
+  return "0";
+}
+
 function buildUniqueTraitCombatRow(
   rarity: 4 | 6,
   traits: Array<Exclude<UniqueTrait, 0>>,
@@ -1787,6 +1919,13 @@ function summarizeSamples(
   };
 }
 
+function medianBy<T>(items: T[], selector: (item: T) => number): number {
+  return percentile(
+    items.map(selector).sort((left, right) => left - right),
+    0.5,
+  );
+}
+
 function percentile(sortedValues: number[], rank: number): number {
   if (sortedValues.length === 0) {
     return 0;
@@ -2091,6 +2230,28 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.uniqueTraitPressure.combatRows.map(
       (row) =>
         `| ${row.rarity} | ${row.traitCount} | ${row.traits.join(", ")} | ${row.baseCombatPower} | ${row.traitCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.traitDps} | x${row.dpsMultiplier} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Dungeon Daily Reward Pressure",
+    "",
+    `- Daily entry limit: ${report.model.dungeonPressure.dailyEntryLimit} per dungeon.`,
+    `- Median sampled Lv50 gold/hour: ${report.model.dungeonPressure.medianGoldPerHourAtLevel50}.`,
+    `- Median sampled Lv50 EXP/hour: ${report.model.dungeonPressure.medianExpPerHourAtLevel50}.`,
+    "- Dungeon rewards use `getDungeonReward` from `server/src/core/formulas/dungeon.ts`.",
+    "- Dungeon acquisition is not injected into the sampled first-rebirth run;",
+    "  the 1000-run median remains the PR #61 baseline guard.",
+    "- Essence rows are reported as resource quantity because the simulator has",
+    "  no baseline rune-essence/hour source yet.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Dungeon | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |",
+    "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.dungeonPressure.rows.map(
+      (row) =>
+        `| ${row.dungeon} | ${row.combatPower} | ${row.minimumCp} | ${row.reward} | ${row.dailyReward} | ${row.dailyRewardHoursAtMedianLevel50Income ?? "n/a"} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

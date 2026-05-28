@@ -2,7 +2,9 @@
 
 namespace
 {
-constexpr float CpRewardScale = 100.0f;
+constexpr double GoldDungeonBaseReward = 20000.0;
+constexpr double ExpDungeonBaseReward = 20000.0;
+constexpr double EssenceDungeonBaseReward = 12.0;
 
 int64 RoundDungeonRewardAndClampToInt64(double Value)
 {
@@ -13,9 +15,26 @@ int64 RoundDungeonRewardAndClampToInt64(double Value)
 	return FMath::Max<int64>(0, FMath::RoundToInt64(Value));
 }
 
-float GetCpMultiplier(int64 CombatPower)
+double GetBaseReward(EDungeonType Type)
 {
-	return FMath::Max(1.0f, static_cast<float>(CombatPower) / CpRewardScale);
+	switch (Type)
+	{
+	case EDungeonType::Gold:
+		return GoldDungeonBaseReward;
+	case EDungeonType::Exp:
+		return ExpDungeonBaseReward;
+	case EDungeonType::Essence:
+		return EssenceDungeonBaseReward;
+	default:
+		return 0.0;
+	}
+}
+
+float GetCpMultiplier(EDungeonType Type, int64 CombatPower)
+{
+	const int64 MinimumCp = FMath::Max<int64>(1, FDungeonFormula::GetMinimumCp(Type));
+	const float CpRatio = static_cast<float>(CombatPower) / static_cast<float>(MinimumCp);
+	return FMath::Sqrt(FMath::Max(1.0f, CpRatio));
 }
 }
 
@@ -58,18 +77,19 @@ FDungeonRunResult FDungeonFormula::GetRewardForCp(EDungeonType Type, int64 Comba
 		return Result;
 	}
 
-	const float Multiplier = GetCpMultiplier(CombatPower);
+	const float Multiplier = GetCpMultiplier(Type, CombatPower);
+	const double BaseReward = GetBaseReward(Type);
 	Result.bSuccess = true;
 	switch (Type)
 	{
 	case EDungeonType::Gold:
-		Result.GoldReward = RoundDungeonRewardAndClampToInt64(1000.0 * static_cast<double>(Multiplier));
+		Result.GoldReward = RoundDungeonRewardAndClampToInt64(BaseReward * static_cast<double>(Multiplier));
 		break;
 	case EDungeonType::Exp:
-		Result.ExpReward = RoundDungeonRewardAndClampToInt64(500.0 * static_cast<double>(Multiplier));
+		Result.ExpReward = RoundDungeonRewardAndClampToInt64(BaseReward * static_cast<double>(Multiplier));
 		break;
 	case EDungeonType::Essence:
-		Result.EssenceReward = RoundDungeonRewardAndClampToInt64(10.0 * static_cast<double>(Multiplier));
+		Result.EssenceReward = RoundDungeonRewardAndClampToInt64(BaseReward * static_cast<double>(Multiplier));
 		break;
 	default:
 		Result.bSuccess = false;

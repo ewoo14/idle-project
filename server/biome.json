@@ -1,7 +1,13 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
   "files": {
-    "includes": ["**", "!dist", "!node_modules", "!coverage"]
+    "includes": [
+      "**",
+      "!dist",
+      "!node_modules",
+      "!coverage",
+      "!**/balance-sim/reports/*.json"
+    ]
   },
   "formatter": {
     "enabled": true,
