@@ -19,6 +19,7 @@
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/PotentialFormula.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
 #include "ItemSystem/UniqueTraitFormula.h"
@@ -43,6 +44,10 @@ const FString PetFeedHitBoxPrefix(TEXT("PetFeed_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
+const FString EnhanceProtectHitBoxPrefix(TEXT("EnhanceProtect_"));
+const FString PotentialResetHitBoxPrefix(TEXT("PotentialReset_"));
+const FString PotentialRankHitBoxPrefix(TEXT("PotentialRank_"));
+const FString PotentialLockHitBoxPrefix(TEXT("PotentialLock_"));
 const FString RuneSelectHitBoxPrefix(TEXT("RuneSelect_"));
 const FString RuneEquipHitBoxPrefix(TEXT("RuneEquip_"));
 const FString RuneUnequipHitBoxPrefix(TEXT("RuneUnequip_"));
@@ -197,6 +202,106 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 	default:
 		return TEXT("RARITY_NONE");
 	}
+}
+
+const TCHAR* PotentialGradeToLocalizationKey(EPotentialGrade Grade)
+{
+	switch (Grade)
+	{
+	case EPotentialGrade::Rare:
+		return TEXT("RARITY_RARE");
+	case EPotentialGrade::Epic:
+		return TEXT("RARITY_EPIC");
+	case EPotentialGrade::Unique:
+		return TEXT("RARITY_UNIQUE");
+	case EPotentialGrade::Legendary:
+		return TEXT("RARITY_LEGENDARY");
+	case EPotentialGrade::None:
+	default:
+		return TEXT("RARITY_NONE");
+	}
+}
+
+FText PotentialGradeToLabel(EPotentialGrade Grade)
+{
+	return IdleProject::Localization::UI(PotentialGradeToLocalizationKey(Grade));
+}
+
+FLinearColor PotentialGradeToColor(EPotentialGrade Grade)
+{
+	using namespace IdleProject::UI::Theme;
+
+	switch (Grade)
+	{
+	case EPotentialGrade::Rare:
+		return RarityRare;
+	case EPotentialGrade::Epic:
+		return RarityEpic;
+	case EPotentialGrade::Unique:
+		return RarityUnique;
+	case EPotentialGrade::Legendary:
+		return RarityLegendary;
+	case EPotentialGrade::None:
+	default:
+		return TextMuted;
+	}
+}
+
+const TCHAR* PotentialStatToLocalizationKey(EPotentialStat Stat)
+{
+	switch (Stat)
+	{
+	case EPotentialStat::PhysAtkPercent:
+		return TEXT("POTENTIAL_STAT_PHYS_ATK");
+	case EPotentialStat::MagicAtkPercent:
+		return TEXT("POTENTIAL_STAT_MAGIC_ATK");
+	case EPotentialStat::HpPercent:
+		return TEXT("POTENTIAL_STAT_HP");
+	case EPotentialStat::PhysDefPercent:
+		return TEXT("POTENTIAL_STAT_PHYS_DEF");
+	case EPotentialStat::MagicDefPercent:
+		return TEXT("POTENTIAL_STAT_MAGIC_DEF");
+	case EPotentialStat::CritRatePercent:
+		return TEXT("POTENTIAL_STAT_CRIT_RATE");
+	case EPotentialStat::AtkSpeedPercent:
+		return TEXT("POTENTIAL_STAT_ATK_SPEED");
+	case EPotentialStat::CritDmgPercent:
+		return TEXT("POTENTIAL_STAT_CRIT_DMG");
+	case EPotentialStat::None:
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+FText FormatPotentialLineLabel(const FPotentialLine& Line)
+{
+	if (Line.Stat == EPotentialStat::None || Line.Value <= 0.0f)
+	{
+		return FText::GetEmpty();
+	}
+
+	return FormatLocalizedUI(TEXT("POTENTIAL_LINE_PERCENT_FORMAT"), [&Line](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Stat"), IdleProject::Localization::UI(PotentialStatToLocalizationKey(Line.Stat)));
+		Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(Line.Value * 100.0f)));
+	});
+}
+
+FText BuildPotentialLineSummary(const FItemInstance& Item)
+{
+	TArray<FString> Parts;
+	for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3 })
+	{
+		const FText Label = FormatPotentialLineLabel(Line);
+		if (!Label.IsEmpty())
+		{
+			Parts.Add(Label.ToString());
+		}
+	}
+
+	return Parts.Num() > 0
+		? FText::FromString(FString::Join(Parts, TEXT(" / ")))
+		: IdleProject::Localization::UI(TEXT("NONE_DASH"));
 }
 
 const TCHAR* UniqueTraitToLocalizationKey(EUniqueTrait Trait)
@@ -773,6 +878,26 @@ FName MakeSkillRankHitBoxName(FName SkillId)
 FName MakeEnhanceSlotHitBoxName(EItemSlot Slot)
 {
 	return FName(*(EnhanceSlotHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakeEnhanceProtectHitBoxName(EItemSlot Slot)
+{
+	return FName(*(EnhanceProtectHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakePotentialResetHitBoxName(EItemSlot Slot)
+{
+	return FName(*(PotentialResetHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakePotentialRankHitBoxName(EItemSlot Slot)
+{
+	return FName(*(PotentialRankHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
+}
+
+FName MakePotentialLockHitBoxName(EItemSlot Slot)
+{
+	return FName(*(PotentialLockHitBoxPrefix + FString::FromInt(static_cast<int32>(Slot))));
 }
 
 FName MakeRuneSelectHitBoxName(int32 OwnedIndex)
@@ -1459,9 +1584,15 @@ FIdleHUDBossViewModel IdleProject::UI::BuildBossViewModel(float CurrentHp, float
 
 FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess)
 {
+	return BuildEnhancePanelViewModel(Inventory, Gold, 0, MoveTemp(FeedbackLabel), bFeedbackSuccess);
+}
+
+FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, int64 ProtectionScrolls, FText FeedbackLabel, bool bFeedbackSuccess)
+{
 	FIdleHUDEnhancePanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("ENHANCE_PANEL_TITLE"));
 	ViewModel.GoldLabel = FormatLocalizedUIWithInt64(TEXT("HUD_GOLD_FORMAT"), TEXT("Amount"), Gold);
+	ViewModel.ProtectionLabel = FormatLocalizedUIWithInt64(TEXT("ENHANCE_PROTECTION_COUNT_FORMAT"), TEXT("Count"), FMath::Max<int64>(0, ProtectionScrolls));
 	ViewModel.FeedbackLabel = MoveTemp(FeedbackLabel);
 	ViewModel.bFeedbackSuccess = bFeedbackSuccess;
 
@@ -1485,6 +1616,9 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 			Row.LevelLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
 			Row.CostLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
 			Row.SuccessRateLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.RiskLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.FailStreakLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.ProtectionButtonLabel = IdleProject::Localization::UI(TEXT("ACTION_PROTECT"));
 			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_EMPTY"));
 			ViewModel.Rows.Add(Row);
 			continue;
@@ -1496,11 +1630,23 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 		Row.SuccessRate = FEnhanceFormula::GetEnhanceSuccessRate(Row.EnhanceLevel);
 		Row.bGoldEnough = Gold >= Row.Cost;
 		Row.bCanEnhance = !Row.bMaxLevel && Row.Cost > 0 && Row.bGoldEnough;
+		Row.FailStreak = FMath::Max(0, Item->EnhanceFailStreak);
+		Row.bRiskLevel = FEnhanceFormula::IsRiskLevel(Row.EnhanceLevel);
+		Row.bCanUseProtection = Row.bCanEnhance && Row.bRiskLevel && ProtectionScrolls > 0;
 		Row.LevelLabel = FormatLocalizedUI(TEXT("ENHANCE_LEVEL_FORMAT"), [&Row](FFormatNamedArguments& Args)
 		{
 			Args.Add(TEXT("Level"), FText::AsNumber(Row.EnhanceLevel));
 			Args.Add(TEXT("MaxLevel"), FText::AsNumber(FEnhanceFormula::MaxEnhanceLevel));
 		});
+		Row.RiskLabel = Row.bRiskLevel
+			? IdleProject::Localization::UI(TEXT("ENHANCE_RISK_DOWNGRADE"))
+			: IdleProject::Localization::UI(TEXT("ENHANCE_RISK_SAFE"));
+		Row.FailStreakLabel = FormatLocalizedUI(TEXT("ENHANCE_FAIL_STREAK_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Count"), FText::AsNumber(Row.FailStreak));
+			Args.Add(TEXT("Threshold"), FText::AsNumber(FEnhanceFormula::PityThreshold));
+		});
+		Row.ProtectionButtonLabel = IdleProject::Localization::UI(TEXT("ACTION_PROTECT"));
 		Row.CostLabel = Row.bMaxLevel
 			? IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_MAX"))
 			: FormatLocalizedUIWithInt64(TEXT("ENHANCE_COST_FORMAT"), TEXT("Cost"), Row.Cost);
@@ -1521,6 +1667,67 @@ FIdleHUDEnhancePanelViewModel IdleProject::UI::BuildEnhancePanelViewModel(const 
 			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_READY"));
 		}
 
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
+FIdleHUDPotentialPanelViewModel IdleProject::UI::BuildPotentialPanelViewModel(const UInventoryComponent& Inventory, int64 ResetCubes, int64 RankCubes)
+{
+	FIdleHUDPotentialPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("POTENTIAL_PANEL_TITLE"));
+	ViewModel.ResetCubeLabel = FormatLocalizedUIWithInt64(TEXT("POTENTIAL_RESET_CUBE_COUNT_FORMAT"), TEXT("Count"), FMath::Max<int64>(0, ResetCubes));
+	ViewModel.RankCubeLabel = FormatLocalizedUIWithInt64(TEXT("POTENTIAL_RANK_CUBE_COUNT_FORMAT"), TEXT("Count"), FMath::Max<int64>(0, RankCubes));
+
+	const EItemSlot* Slots = GetEnhanceSlotOrder();
+	for (int32 Index = 0; Index < GetEnhanceSlotCount(); ++Index)
+	{
+		const EItemSlot Slot = Slots[Index];
+		const FItemInstance* Item = Inventory.GetEquippedItem(Slot);
+
+		FIdleHUDPotentialSlotViewModel Row;
+		Row.Slot = Slot;
+		Row.SlotLabel = IdleProject::Localization::UI(SlotToLocalizationKey(Slot));
+		Row.ItemName = Item ? Item->DisplayName : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+		Row.ResetActionLabel = IdleProject::Localization::UI(TEXT("ACTION_POTENTIAL_RESET"));
+		Row.RankActionLabel = IdleProject::Localization::UI(TEXT("ACTION_POTENTIAL_RANK"));
+		Row.LockActionLabel = IdleProject::Localization::UI(TEXT("ACTION_LOCK"));
+		Row.ResetHitBoxName = MakePotentialResetHitBoxName(Slot);
+		Row.RankHitBoxName = MakePotentialRankHitBoxName(Slot);
+		Row.LockHitBoxName = MakePotentialLockHitBoxName(Slot);
+
+		if (!Item)
+		{
+			Row.GradeLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.LineSummaryLabel = IdleProject::Localization::UI(TEXT("NONE_DASH"));
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ENHANCE_STATUS_EMPTY"));
+			Row.GradeColor = Theme::TextMuted;
+			ViewModel.Rows.Add(Row);
+			continue;
+		}
+
+		Row.bEquipped = true;
+		Row.bLocked = Item->bLocked;
+		Row.Grade = Item->PotentialGrade;
+		Row.MaxGrade = FPotentialFormula::GetMaxPotentialGrade(Item->Rarity);
+		Row.bHasPotential = Row.Grade != EPotentialGrade::None;
+		Row.bCanResetPotential = Row.bHasPotential && ResetCubes > 0;
+		Row.bCanRankPotential = Row.bHasPotential
+			&& RankCubes > 0
+			&& Row.MaxGrade != EPotentialGrade::None
+			&& static_cast<uint8>(Row.Grade) < static_cast<uint8>(Row.MaxGrade);
+		Row.LockActionLabel = IdleProject::Localization::UI(Row.bLocked ? TEXT("ACTION_UNLOCK") : TEXT("ACTION_LOCK"));
+		Row.GradeColor = PotentialGradeToColor(Row.Grade);
+		Row.GradeLabel = FormatLocalizedUI(TEXT("POTENTIAL_GRADE_CAP_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Grade"), PotentialGradeToLabel(Row.Grade));
+			Args.Add(TEXT("MaxGrade"), PotentialGradeToLabel(Row.MaxGrade));
+		});
+		Row.LineSummaryLabel = BuildPotentialLineSummary(*Item);
+		Row.StatusLabel = Row.bHasPotential
+			? IdleProject::Localization::UI(TEXT("POTENTIAL_STATUS_READY"))
+			: IdleProject::Localization::UI(TEXT("POTENTIAL_STATUS_NONE"));
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -2649,6 +2856,7 @@ void AIdleHUD::DrawHUD()
 	DrawRunePanel();
 	DrawRuneCodexPanel();
 	DrawEnhancePanel();
+	DrawPotentialPanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
 	DrawSeasonPassPanel();
@@ -2699,6 +2907,26 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(EnhanceSlotHitBoxPrefix))
 	{
 		TryEnhanceFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(EnhanceProtectHitBoxPrefix))
+	{
+		TryEnhanceFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PotentialResetHitBoxPrefix))
+	{
+		TryRerollPotentialFromHitBox(BoxName, EPotentialCubeType::Reset);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PotentialRankHitBoxPrefix))
+	{
+		TryRerollPotentialFromHitBox(BoxName, EPotentialCubeType::Rank);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PotentialLockHitBoxPrefix))
+	{
+		ToggleItemLockFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(RuneSelectHitBoxPrefix))
@@ -4103,6 +4331,7 @@ void AIdleHUD::DrawEnhancePanel()
 	const FIdleHUDEnhancePanelViewModel ViewModel = BuildEnhancePanelViewModel(
 		*PlayerInventory,
 		IdleGameInstance->GetGold(),
+		IdleGameInstance->GetProtectionScrolls(),
 		EnhanceFeedbackLabel,
 		bEnhanceFeedbackSuccess);
 
@@ -4126,6 +4355,7 @@ void AIdleHUD::DrawEnhancePanel()
 
 	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 	DrawText(ViewModel.GoldLabel.ToString(), Theme::AccentGold, X + PanelWidth - 114.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	DrawText(ViewModel.ProtectionLabel.ToString(), Theme::AccentBlue, X + Padding, Y + 34.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 
 	float RowY = Y + HeaderHeight;
 	for (const FIdleHUDEnhanceSlotViewModel& Row : ViewModel.Rows)
@@ -4159,12 +4389,25 @@ void AIdleHUD::DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float
 	DrawText(Row.LevelLabel.ToString(), Row.bMaxLevel ? Theme::AccentGold : Theme::TextMuted, X + 10.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 	DrawText(Row.RarityLabel.ToString(), Row.bEquipped ? Row.RarityColor : Theme::TextMuted, X + 78.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 	DrawText(Row.CostLabel.ToString(), Row.bGoldEnough || Row.bMaxLevel ? Theme::TextMuted : Theme::AccentRed, X + 132.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
-	DrawText(Row.SuccessRateLabel.ToString(), Row.bCanEnhance ? Theme::AccentBlue : Theme::TextMuted, X + 206.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.SuccessRateLabel.ToString(), Row.bCanEnhance ? Theme::AccentBlue : Theme::TextMuted, X + 206.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.RiskLabel.ToString(), Row.bRiskLevel ? Theme::AccentRed : Theme::TextMuted, X + 276.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.FailStreakLabel.ToString(), Row.bRiskLevel ? Theme::AccentGold : Theme::TextMuted, X + 206.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
 
-	const float ButtonWidth = 72.0f * Scale;
+	const float ButtonWidth = 64.0f * Scale;
 	const float ButtonHeight = 26.0f * Scale;
+	const float ProtectButtonWidth = 50.0f * Scale;
 	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ProtectButtonX = ButtonX - ProtectButtonWidth - 5.0f * Scale;
 	const float ButtonY = Y + 7.0f * Scale;
+	if (Row.bRiskLevel)
+	{
+		DrawRect(Row.bCanUseProtection ? Theme::AccentBlue : Theme::BgPanel, ProtectButtonX, ButtonY, ProtectButtonWidth, ButtonHeight);
+		DrawText(Row.ProtectionButtonLabel.ToString(), Row.bCanUseProtection ? Theme::BgPrimary : Theme::TextMuted, ProtectButtonX + 7.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		if (Row.bCanUseProtection)
+		{
+			AddHitBox(FVector2D(ProtectButtonX, ButtonY), FVector2D(ProtectButtonWidth, ButtonHeight), MakeEnhanceProtectHitBoxName(Row.Slot), true, 87);
+		}
+	}
 	DrawRect(Row.bCanEnhance ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
 	DrawText(Row.bCanEnhance ? Row.ButtonLabel.ToString() : Row.StatusLabel.ToString(), Row.bCanEnhance ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 	if (Row.bCanEnhance)
@@ -4185,17 +4428,165 @@ void AIdleHUD::TryEnhanceFromHitBox(FName BoxName)
 		return;
 	}
 
+	const bool bUseProtection = BoxName.ToString().StartsWith(EnhanceProtectHitBoxPrefix);
 	FString RawSlot = BoxName.ToString();
-	RawSlot.RightChopInline(EnhanceSlotHitBoxPrefix.Len());
+	RawSlot.RightChopInline(bUseProtection ? EnhanceProtectHitBoxPrefix.Len() : EnhanceSlotHitBoxPrefix.Len());
 	const int32 SlotValue = FCString::Atoi(*RawSlot);
 	if (SlotValue < static_cast<int32>(EItemSlot::Weapon) || SlotValue > static_cast<int32>(EItemSlot::Accessory))
 	{
 		return;
 	}
 
-	IdleGameInstance->TryEnhanceEquipped(static_cast<EItemSlot>(SlotValue), PlayerInventory);
+	IdleGameInstance->TryEnhanceEquipped(static_cast<EItemSlot>(SlotValue), bUseProtection, PlayerInventory);
 	RefreshEquipmentSummary();
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawPotentialPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	const FIdleHUDPotentialPanelViewModel ViewModel = BuildPotentialPanelViewModel(
+		*PlayerInventory,
+		IdleGameInstance->GetResetCubes(),
+		IdleGameInstance->GetRankCubes());
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.25f, 360.0f * Scale, 460.0f * Scale);
+	const float HeaderHeight = 52.0f * Scale;
+	const float RowHeight = 30.0f * Scale;
+	const float RowGap = 6.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 238.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.86f * Scale);
+	DrawText(ViewModel.ResetCubeLabel.ToString(), Theme::AccentBlue, X + Padding, Y + 34.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(ViewModel.RankCubeLabel.ToString(), Theme::AccentGold, X + PanelWidth - 114.0f * Scale, Y + 34.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDPotentialSlotViewModel& Row : ViewModel.Rows)
+	{
+		DrawPotentialSlotRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+}
+
+void AIdleHUD::DrawPotentialSlotRow(const FIdleHUDPotentialSlotViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 30.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(Row.bHasPotential ? Row.GradeColor : Theme::TextMuted.CopyWithNewOpacity(0.46f), X, Y, 4.0f * Scale, Height);
+	DrawText(Row.SlotLabel.ToString(), Row.bHasPotential ? Row.GradeColor : Theme::TextPrimary, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.ItemName.ToString(), Row.bEquipped ? Theme::TextPrimary : Theme::TextMuted, X + 72.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.GradeLabel.ToString(), Row.bHasPotential ? Row.GradeColor : Theme::TextMuted, X + 10.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.LineSummaryLabel.ToString(), Row.bHasPotential ? Theme::TextMuted : Theme::TextMuted.CopyWithNewOpacity(0.66f), X + 82.0f * Scale, Y + 22.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+
+	const float ButtonHeight = 22.0f * Scale;
+	const float ButtonY = Y + 10.0f * Scale;
+	const float ButtonWidth = 42.0f * Scale;
+	const float LockWidth = 46.0f * Scale;
+	const float LockX = X + Width - LockWidth - 6.0f * Scale;
+	const float RankX = LockX - ButtonWidth - 5.0f * Scale;
+	const float ResetX = RankX - ButtonWidth - 5.0f * Scale;
+	DrawRect(Row.bCanResetPotential ? Theme::AccentBlue : Theme::BgPanel, ResetX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ResetActionLabel.ToString(), Row.bCanResetPotential ? Theme::BgPrimary : Theme::TextMuted, ResetX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	if (Row.bCanResetPotential)
+	{
+		AddHitBox(FVector2D(ResetX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.ResetHitBoxName, true, 91);
+	}
+
+	DrawRect(Row.bCanRankPotential ? Theme::AccentGold : Theme::BgPanel, RankX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.RankActionLabel.ToString(), Row.bCanRankPotential ? Theme::BgPrimary : Theme::TextMuted, RankX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	if (Row.bCanRankPotential)
+	{
+		AddHitBox(FVector2D(RankX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.RankHitBoxName, true, 92);
+	}
+
+	DrawRect(Row.bEquipped ? (Row.bLocked ? Theme::AccentRed : Theme::BgPanel) : Theme::BgPanel, LockX, ButtonY, LockWidth, ButtonHeight);
+	DrawText(Row.LockActionLabel.ToString(), Row.bEquipped ? Theme::TextPrimary : Theme::TextMuted, LockX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	if (Row.bEquipped)
+	{
+		AddHitBox(FVector2D(LockX, ButtonY), FVector2D(LockWidth, ButtonHeight), Row.LockHitBoxName, true, 93);
+	}
+}
+
+void AIdleHUD::TryRerollPotentialFromHitBox(FName BoxName, EPotentialCubeType CubeType)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	FString RawSlot = BoxName.ToString();
+	RawSlot.RightChopInline(CubeType == EPotentialCubeType::Reset ? PotentialResetHitBoxPrefix.Len() : PotentialRankHitBoxPrefix.Len());
+	const int32 SlotValue = FCString::Atoi(*RawSlot);
+	if (SlotValue < static_cast<int32>(EItemSlot::Weapon) || SlotValue > static_cast<int32>(EItemSlot::Accessory))
+	{
+		return;
+	}
+
+	IdleGameInstance->TryRerollPotential(static_cast<EItemSlot>(SlotValue), CubeType, PlayerInventory);
+	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ToggleItemLockFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	BindPlayerInventory();
+	if (!IdleGameInstance || !PlayerInventory)
+	{
+		return;
+	}
+
+	FString RawSlot = BoxName.ToString();
+	RawSlot.RightChopInline(PotentialLockHitBoxPrefix.Len());
+	const int32 SlotValue = FCString::Atoi(*RawSlot);
+	if (SlotValue < static_cast<int32>(EItemSlot::Weapon) || SlotValue > static_cast<int32>(EItemSlot::Accessory))
+	{
+		return;
+	}
+
+	const EItemSlot Slot = static_cast<EItemSlot>(SlotValue);
+	const FItemInstance* Item = PlayerInventory->GetEquippedItem(Slot);
+	if (Item)
+	{
+		IdleGameInstance->SetItemLocked(Slot, !Item->bLocked);
+		RefreshEquipmentSummary();
+		RefreshMouseInteraction();
+	}
 }
 
 void AIdleHUD::DrawStatAllocationPanel()

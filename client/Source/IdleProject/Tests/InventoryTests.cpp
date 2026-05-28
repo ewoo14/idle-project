@@ -746,6 +746,9 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rare weapon row shows rarity-scaled level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(200));
 	TestEqual(TEXT("Weapon row level label shows +N / 50 without a plus on the cap"), NoGold.Rows[0].LevelLabel.ToString(), FString(TEXT("+0 / 50")));
 	TestEqual(TEXT("Weapon row success label shows integer percent"), NoGold.Rows[0].SuccessRateLabel.ToString(), FString(TEXT("Success 95%")));
+	TestEqual(TEXT("Safe enhance row states no downgrade risk"), NoGold.Rows[0].RiskLabel.ToString(), FString(TEXT("Safe")));
+	TestEqual(TEXT("Safe enhance row exposes current fail streak"), NoGold.Rows[0].FailStreakLabel.ToString(), FString(TEXT("Pity 0/12")));
+	TestFalse(TEXT("Safe enhance row does not enable protection"), NoGold.Rows[0].bCanUseProtection);
 	TestEqual(TEXT("Legendary gloves row shows rarity-scaled level zero cost"), NoGold.Rows[5].Cost, static_cast<int64>(1600));
 	TestEqual(TEXT("Common cloak row preserves legacy level zero cost"), NoGold.Rows[6].Cost, static_cast<int64>(100));
 	TestFalse(TEXT("Weapon row is disabled without gold"), NoGold.Rows[0].bCanEnhance);
@@ -759,6 +762,23 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 		FText::GetEmpty(),
 		false);
 	TestTrue(TEXT("Weapon row enables when equipped and gold is enough"), EnoughGold.Rows[0].bCanEnhance);
+
+	UInventoryComponent* RiskInventory = NewObject<UInventoryComponent>();
+	FItemInstance RiskSword = MakeTestItem(TEXT("risk_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, 10);
+	RiskSword.EnhanceFailStreak = 7;
+	RiskInventory->AddItem(RiskSword);
+	const FIdleHUDEnhancePanelViewModel RiskView = IdleProject::UI::BuildEnhancePanelViewModel(
+		*RiskInventory,
+		FEnhanceFormula::GetEnhanceCost(10, EItemRarity::Rare),
+		2,
+		FText::GetEmpty(),
+		false);
+	TestTrue(TEXT("Risk enhance row marks downgrade risk"), RiskView.Rows[0].bRiskLevel);
+	TestEqual(TEXT("Risk enhance row explains downgrade penalty"), RiskView.Rows[0].RiskLabel.ToString(), FString(TEXT("Fail: -1 level")));
+	TestEqual(TEXT("Risk enhance row shows pity progress"), RiskView.Rows[0].FailStreakLabel.ToString(), FString(TEXT("Pity 7/12")));
+	TestEqual(TEXT("Enhance panel exposes protection scroll count"), RiskView.ProtectionLabel.ToString(), FString(TEXT("Protection 2")));
+	TestTrue(TEXT("Risk enhance row enables protection when scrolls are available"), RiskView.Rows[0].bCanUseProtection);
+	TestTrue(TEXT("Risk enhance row keeps normal enhance available"), RiskView.Rows[0].bCanEnhance);
 
 	UInventoryComponent* MaxInventory = NewObject<UInventoryComponent>();
 	MaxInventory->AddItem(MakeTestItem(TEXT("max_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f, FEnhanceFormula::MaxEnhanceLevel));
@@ -774,6 +794,48 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Max level row shows localized max status"), MaxLevel.Rows[0].StatusLabel.ToString(), FString(TEXT("MAX")));
 	TestEqual(TEXT("Max level row shows max instead of next cost"), MaxLevel.Rows[0].CostLabel.ToString(), FString(TEXT("MAX")));
 	TestEqual(TEXT("Max level row shows max instead of success percent"), MaxLevel.Rows[0].SuccessRateLabel.ToString(), FString(TEXT("MAX")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialPanelViewModelStateTest,
+	"IdleProject.UI.HUD.PotentialPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialPanelViewModelStateTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	FItemInstance RareSword = MakeTestItem(TEXT("potential_sword"), EItemSlot::Weapon, EItemRarity::Rare, 10.0f, 0.0f, 0.0f);
+	RareSword.PotentialGrade = EPotentialGrade::Rare;
+	RareSword.PotentialLine1.Stat = EPotentialStat::PhysAtkPercent;
+	RareSword.PotentialLine1.Value = 0.05f;
+	RareSword.PotentialLine2.Stat = EPotentialStat::CritRatePercent;
+	RareSword.PotentialLine2.Value = 0.03f;
+	RareSword.bLocked = true;
+	Inventory->AddItem(RareSword);
+
+	const FIdleHUDPotentialPanelViewModel ViewModel = IdleProject::UI::BuildPotentialPanelViewModel(*Inventory, 3, 1);
+	TestEqual(TEXT("Potential panel exposes all equipment slots"), ViewModel.Rows.Num(), 8);
+	TestEqual(TEXT("Potential panel reset cube count label"), ViewModel.ResetCubeLabel.ToString(), FString(TEXT("Reset Cubes 3")));
+	TestEqual(TEXT("Potential panel rank cube count label"), ViewModel.RankCubeLabel.ToString(), FString(TEXT("Rank Cubes 1")));
+
+	const FIdleHUDPotentialSlotViewModel& WeaponRow = ViewModel.Rows[0];
+	TestTrue(TEXT("Potential row knows equipped item"), WeaponRow.bEquipped);
+	TestTrue(TEXT("Potential row exposes lock state"), WeaponRow.bLocked);
+	TestEqual(TEXT("Potential row lock action toggles to unlock"), WeaponRow.LockActionLabel.ToString(), FString(TEXT("Unlock")));
+	TestEqual(TEXT("Potential row shows grade and cap"), WeaponRow.GradeLabel.ToString(), FString(TEXT("Rare / Epic")));
+	TestEqual(TEXT("Potential row summarizes rolled lines"), WeaponRow.LineSummaryLabel.ToString(), FString(TEXT("PATK +5% / Crit +3%")));
+	TestTrue(TEXT("Potential row can use reset cube"), WeaponRow.bCanResetPotential);
+	TestTrue(TEXT("Potential row can use rank cube below cap"), WeaponRow.bCanRankPotential);
+
+	const FIdleHUDPotentialSlotViewModel& EmptyHelmet = ViewModel.Rows[1];
+	TestFalse(TEXT("Empty potential row is not equipped"), EmptyHelmet.bEquipped);
+	TestFalse(TEXT("Empty potential row cannot reset"), EmptyHelmet.bCanResetPotential);
+	TestFalse(TEXT("Empty potential row cannot rank"), EmptyHelmet.bCanRankPotential);
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
