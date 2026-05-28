@@ -52,14 +52,15 @@ void TestAffixCountForRarity(FAutomationTestBase& Test, const TCHAR* Context, co
 	case EItemRarity::Common:
 		Test.TestEqual(FString::Printf(TEXT("%s Common has no affixes"), Context), AffixCount, 0);
 		break;
-	case EItemRarity::Uncommon:
 	case EItemRarity::Rare:
-		Test.TestEqual(FString::Printf(TEXT("%s Uncommon/Rare has one affix"), Context), AffixCount, 1);
+		Test.TestEqual(FString::Printf(TEXT("%s Rare has one affix"), Context), AffixCount, 1);
 		break;
 	case EItemRarity::Epic:
+	case EItemRarity::Unique:
 		Test.TestEqual(FString::Printf(TEXT("%s Epic has two affixes"), Context), AffixCount, 2);
 		break;
 	case EItemRarity::Legendary:
+	case EItemRarity::Transcendent:
 		Test.TestTrue(FString::Printf(TEXT("%s Legendary has two or three affixes"), Context), AffixCount >= 2 && AffixCount <= 3);
 		break;
 	case EItemRarity::Mythic:
@@ -143,10 +144,11 @@ bool FDropFormulaRarityMultiplierTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("None rarity has no stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::None), 0.0f);
 	TestEqual(TEXT("Common stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Common), 1.0f);
-	TestEqual(TEXT("Uncommon stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Uncommon), 1.3f);
 	TestEqual(TEXT("Rare stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Rare), 1.7f);
 	TestEqual(TEXT("Epic stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Epic), 2.3f);
+	TestEqual(TEXT("Unique stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Unique), 2.75f);
 	TestEqual(TEXT("Legendary stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Legendary), 3.2f);
+	TestEqual(TEXT("Transcendent stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Transcendent), 3.85f);
 	TestEqual(TEXT("Mythic stat multiplier"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Mythic), 4.5f);
 	TestTrue(TEXT("Mythic stat multiplier exceeds Legendary"), FDropFormula::GetRarityStatMultiplier(EItemRarity::Mythic) > FDropFormula::GetRarityStatMultiplier(EItemRarity::Legendary));
 
@@ -279,14 +281,14 @@ bool FDropFormulaRollAffixesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Common items roll no HP affix"), Common.BonusAffixHp, 0.0f);
 	TestEqual(TEXT("Common items roll no crit damage affix"), Common.BonusCritDmg, 0.0f);
 
-	FItemInstance Uncommon = MakeTestItem(TEXT("uncommon_sword"), EItemSlot::Weapon, EItemRarity::Uncommon, 1.0f, 0.0f, 0.0f);
-	Uncommon.BonusCritRate = 0.05f;
-	Uncommon.BonusAtkSpeed = 0.15f;
-	Uncommon.BonusMagicAtk = 30.0f;
-	FRandomStream UncommonRng(4001);
-	FDropFormula::RollAffixes(Uncommon.Rarity, 20, UncommonRng, Uncommon);
-	const int32 UncommonAffixCount = CountAffixes(Uncommon);
-	TestEqual(TEXT("Uncommon rolls one affix"), UncommonAffixCount, 1);
+	FItemInstance Rare = MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 1.0f, 0.0f, 0.0f);
+	Rare.BonusCritRate = 0.05f;
+	Rare.BonusAtkSpeed = 0.15f;
+	Rare.BonusMagicAtk = 30.0f;
+	FRandomStream RareRng(4001);
+	FDropFormula::RollAffixes(Rare.Rarity, 20, RareRng, Rare);
+	const int32 RareAffixCount = CountAffixes(Rare);
+	TestEqual(TEXT("Rare rolls one affix"), RareAffixCount, 1);
 
 	FItemInstance Epic = MakeTestItem(TEXT("epic_sword"), EItemSlot::Weapon, EItemRarity::Epic, 1.0f, 0.0f, 0.0f);
 	FRandomStream EpicRng(4002);
@@ -544,19 +546,20 @@ bool FEnhanceFormulaCurveTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Max level has no next enhance cost"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel), static_cast<int64>(0));
 	TestEqual(TEXT("None rarity has no enhance cost multiplier"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::None), static_cast<int64>(0));
 	TestEqual(TEXT("Common rarity keeps legacy cost multiplier"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Common), static_cast<int64>(1));
-	TestEqual(TEXT("Uncommon rarity doubles enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Uncommon), static_cast<int64>(2));
-	TestEqual(TEXT("Rare rarity quadruples enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Rare), static_cast<int64>(4));
-	TestEqual(TEXT("Epic rarity multiplies enhance cost by eight"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Epic), static_cast<int64>(8));
+	TestEqual(TEXT("Rare rarity doubles enhance cost"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Rare), static_cast<int64>(2));
+	TestEqual(TEXT("Epic rarity multiplies enhance cost by four"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Epic), static_cast<int64>(4));
+	TestEqual(TEXT("Unique rarity multiplies enhance cost by eight"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Unique), static_cast<int64>(8));
 	TestEqual(TEXT("Legendary rarity multiplies enhance cost by sixteen"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Legendary), static_cast<int64>(16));
-	TestEqual(TEXT("Mythic rarity multiplies enhance cost by thirty-two"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Mythic), static_cast<int64>(32));
+	TestEqual(TEXT("Transcendent rarity multiplies enhance cost by thirty-two"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Transcendent), static_cast<int64>(32));
+	TestEqual(TEXT("Mythic rarity multiplies enhance cost by sixty-four"), FEnhanceFormula::GetRarityCostMultiplier(EItemRarity::Mythic), static_cast<int64>(64));
 	TestEqual(TEXT("Common overload matches legacy single-argument cost"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Common), static_cast<int64>(400));
-	TestEqual(TEXT("Rare level 1 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Rare), static_cast<int64>(1600));
+	TestEqual(TEXT("Rare level 1 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(1, EItemRarity::Rare), static_cast<int64>(800));
 	TestEqual(TEXT("Legendary level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Legendary), static_cast<int64>(1600));
-	TestEqual(TEXT("Mythic level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Mythic), static_cast<int64>(3200));
+	TestEqual(TEXT("Mythic level 0 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Mythic), static_cast<int64>(6400));
 	TestEqual(TEXT("Max level rarity cost remains zero"), FEnhanceFormula::GetEnhanceCost(FEnhanceFormula::MaxEnhanceLevel, EItemRarity::Legendary), static_cast<int64>(0));
-	TestEqual(TEXT("Uncommon level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Uncommon), static_cast<int64>(5000));
-	TestEqual(TEXT("Rare level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Rare), static_cast<int64>(10000));
-	TestEqual(TEXT("Epic level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Epic), static_cast<int64>(20000));
+	TestEqual(TEXT("Rare level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Rare), static_cast<int64>(5000));
+	TestEqual(TEXT("Epic level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Epic), static_cast<int64>(10000));
+	TestEqual(TEXT("Unique level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Unique), static_cast<int64>(20000));
 	TestEqual(TEXT("Legendary level 4 cost matches server parity table"), FEnhanceFormula::GetEnhanceCost(4, EItemRarity::Legendary), static_cast<int64>(40000));
 	TestEqual(TEXT("Common level 49 cost reaches 50-level sink"), FEnhanceFormula::GetEnhanceCost(49), static_cast<int64>(250000));
 	TestEqual(TEXT("Legendary level 49 cost applies rarity multiplier"), FEnhanceFormula::GetEnhanceCost(49, EItemRarity::Legendary), static_cast<int64>(4000000));
@@ -612,13 +615,13 @@ bool FInventoryAutoEquipBetterWeaponTest::RunTest(const FString& Parameters)
 {
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
 	Inventory->AddItem(MakeTestItem(TEXT("common_sword"), EItemSlot::Weapon, EItemRarity::Common, 5.0f, 0.0f, 0.0f));
-	Inventory->AddItem(MakeTestItem(TEXT("uncommon_sword"), EItemSlot::Weapon, EItemRarity::Uncommon, 8.0f, 0.0f, 0.0f));
+	Inventory->AddItem(MakeTestItem(TEXT("rare_sword"), EItemSlot::Weapon, EItemRarity::Rare, 8.0f, 0.0f, 0.0f));
 
 	const FItemInstance* Equipped = Inventory->GetEquippedItem(EItemSlot::Weapon);
 	TestNotNull(TEXT("무기 자동 장착"), Equipped);
 	if (Equipped)
 	{
-		TestEqual(TEXT("더 강한 무기로 교체"), Equipped->ItemId, FName(TEXT("uncommon_sword")));
+		TestEqual(TEXT("더 강한 무기로 교체"), Equipped->ItemId, FName(TEXT("rare_sword")));
 	}
 
 	return true;
@@ -676,7 +679,7 @@ bool FEnhancePanelViewModelStateTest::RunTest(const FString& Parameters)
 		false);
 	TestEqual(TEXT("Enhance panel exposes all equipment slots"), NoGold.Rows.Num(), 8);
 	TestEqual(TEXT("Weapon row uses current enhance level"), NoGold.Rows[0].EnhanceLevel, 0);
-	TestEqual(TEXT("Rare weapon row shows rarity-scaled level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(400));
+	TestEqual(TEXT("Rare weapon row shows rarity-scaled level zero cost"), NoGold.Rows[0].Cost, static_cast<int64>(200));
 	TestEqual(TEXT("Weapon row level label shows +N / 50 without a plus on the cap"), NoGold.Rows[0].LevelLabel.ToString(), FString(TEXT("+0 / 50")));
 	TestEqual(TEXT("Weapon row success label shows integer percent"), NoGold.Rows[0].SuccessRateLabel.ToString(), FString(TEXT("Success 95%")));
 	TestEqual(TEXT("Legendary gloves row shows rarity-scaled level zero cost"), NoGold.Rows[5].Cost, static_cast<int64>(1600));

@@ -39,14 +39,14 @@ struct IDLEPROJECT_API FRuneCodexCompletion
 
 	FRuneCodexCompletion()
 	{
-		RowComplete.Init(false, 6);
+		RowComplete.Init(false, 7);
 	}
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Rune")
 	int32 UnlockedCells = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Rune")
-	int32 TotalCells = 54;
+	int32 TotalCells = 63;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Rune")
 	TArray<bool> RowComplete;

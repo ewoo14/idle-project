@@ -3,10 +3,11 @@ export const MAX_ENHANCE_LEVEL = 50;
 export type EnhanceItemRarity =
   | "None"
   | "Common"
-  | "Uncommon"
   | "Rare"
   | "Epic"
+  | "Unique"
   | "Legendary"
+  | "Transcendent"
   | "Mythic";
 
 const BASE_ENHANCE_COST = 100;
@@ -18,16 +19,18 @@ export function getRarityCostMultiplier(rarity: EnhanceItemRarity): number {
   switch (rarity) {
     case "Common":
       return 1;
-    case "Uncommon":
-      return 2;
     case "Rare":
-      return 4;
+      return 2;
     case "Epic":
+      return 4;
+    case "Unique":
       return 8;
     case "Legendary":
       return 16;
-    case "Mythic":
+    case "Transcendent":
       return 32;
+    case "Mythic":
+      return 64;
     case "None":
       return 0;
   }

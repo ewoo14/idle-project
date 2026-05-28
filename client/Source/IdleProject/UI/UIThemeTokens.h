@@ -20,10 +20,11 @@ inline constexpr FLinearColor Info = FLinearColor(0x5B / 255.f, 0xA7 / 255.f, 0x
 inline constexpr FLinearColor Auth = FLinearColor(0xC0 / 255.f, 0x71 / 255.f, 0xF2 / 255.f, 1.f);
 
 inline constexpr FLinearColor RarityCommon = FLinearColor(0xB0 / 255.f, 0xB5 / 255.f, 0xC0 / 255.f, 1.f);
-inline constexpr FLinearColor RarityUncommon = FLinearColor(0x5B / 255.f, 0xC0 / 255.f, 0x7A / 255.f, 1.f);
 inline constexpr FLinearColor RarityRare = FLinearColor(0x5B / 255.f, 0x8B / 255.f, 0xC0 / 255.f, 1.f);
 inline constexpr FLinearColor RarityEpic = FLinearColor(0xA0 / 255.f, 0x5B / 255.f, 0xC0 / 255.f, 1.f);
+inline constexpr FLinearColor RarityUnique = FLinearColor(0x5B / 255.f, 0xC0 / 255.f, 0x7A / 255.f, 1.f);
 inline constexpr FLinearColor RarityLegendary = FLinearColor(0xF0 / 255.f, 0xA0 / 255.f, 0x40 / 255.f, 1.f);
+inline constexpr FLinearColor RarityTranscendent = FLinearColor(0x40 / 255.f, 0xD0 / 255.f, 0xE8 / 255.f, 1.f);
 inline constexpr FLinearColor RarityMythicStart = FLinearColor(0xFF / 255.f, 0x7B / 255.f, 0x00 / 255.f, 1.f);
 inline constexpr FLinearColor RarityMythicEnd = FLinearColor(0x00 / 255.f, 0xB4 / 255.f, 0xFF / 255.f, 1.f);
 }

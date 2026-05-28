@@ -31,16 +31,18 @@ int64 FEnhanceFormula::GetRarityCostMultiplier(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return 1;
-	case EItemRarity::Uncommon:
-		return 2;
 	case EItemRarity::Rare:
-		return 4;
+		return 2;
 	case EItemRarity::Epic:
+		return 4;
+	case EItemRarity::Unique:
 		return 8;
 	case EItemRarity::Legendary:
 		return 16;
-	case EItemRarity::Mythic:
+	case EItemRarity::Transcendent:
 		return 32;
+	case EItemRarity::Mythic:
+		return 64;
 	case EItemRarity::None:
 	default:
 		return 0;

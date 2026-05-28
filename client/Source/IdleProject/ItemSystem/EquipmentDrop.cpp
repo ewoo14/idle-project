@@ -123,14 +123,16 @@ FLinearColor AEquipmentDrop::GetRarityColor() const
 
 	switch (Payload.Rarity)
 	{
-	case EItemRarity::Uncommon:
-		return RarityUncommon;
 	case EItemRarity::Rare:
 		return RarityRare;
 	case EItemRarity::Epic:
 		return RarityEpic;
+	case EItemRarity::Unique:
+		return RarityUnique;
 	case EItemRarity::Legendary:
 		return RarityLegendary;
+	case EItemRarity::Transcendent:
+		return RarityTranscendent;
 	case EItemRarity::Mythic:
 		return RarityMythicStart;
 	case EItemRarity::None:

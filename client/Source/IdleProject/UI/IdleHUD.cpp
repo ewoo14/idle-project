@@ -177,14 +177,16 @@ const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return TEXT("RARITY_COMMON");
-	case EItemRarity::Uncommon:
-		return TEXT("RARITY_UNCOMMON");
 	case EItemRarity::Rare:
 		return TEXT("RARITY_RARE");
 	case EItemRarity::Epic:
 		return TEXT("RARITY_EPIC");
+	case EItemRarity::Unique:
+		return TEXT("RARITY_UNIQUE");
 	case EItemRarity::Legendary:
 		return TEXT("RARITY_LEGENDARY");
+	case EItemRarity::Transcendent:
+		return TEXT("RARITY_TRANSCENDENT");
 	case EItemRarity::Mythic:
 		return TEXT("RARITY_MYTHIC");
 	case EItemRarity::None:
@@ -392,7 +394,7 @@ int32 GetCodexColumnIndex(ERuneType Type)
 
 int32 GetCodexCellKey(ERuneType Type, EItemRarity Rarity)
 {
-	return GetCodexColumnIndex(Type) * 6 + (static_cast<int32>(Rarity) - static_cast<int32>(EItemRarity::Common));
+	return GetCodexColumnIndex(Type) * 7 + (static_cast<int32>(Rarity) - static_cast<int32>(EItemRarity::Common));
 }
 
 FText FormatRuneCodexPercentLabel(const TCHAR* Key, float Value)
@@ -955,7 +957,7 @@ bool TryBuildStatusIndicator(ESkillStatusEffect Type, const TArray<FActiveSkillS
 	{
 	case ESkillStatusEffect::Poison:
 		OutIndicator.Label = TEXT("P");
-		OutIndicator.Color = IdleProject::UI::Theme::RarityUncommon;
+		OutIndicator.Color = IdleProject::UI::Theme::RarityUnique;
 		return true;
 	case ESkillStatusEffect::Burn:
 		OutIndicator.Label = TEXT("B");
@@ -985,14 +987,16 @@ FLinearColor IdleProject::UI::RarityToColor(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return RarityCommon;
-	case EItemRarity::Uncommon:
-		return RarityUncommon;
 	case EItemRarity::Rare:
 		return RarityRare;
 	case EItemRarity::Epic:
 		return RarityEpic;
+	case EItemRarity::Unique:
+		return RarityUnique;
 	case EItemRarity::Legendary:
 		return RarityLegendary;
+	case EItemRarity::Transcendent:
+		return RarityTranscendent;
 	case EItemRarity::Mythic:
 		return RarityMythicStart;
 	case EItemRarity::None:
@@ -1534,8 +1538,8 @@ FIdleHUDRuneCodexViewModel IdleProject::UI::BuildRuneCodexViewModel(const URuneS
 	}
 
 	TArray<int32> RowUnlocked;
-	RowUnlocked.Init(0, 6);
-	for (int32 RowIndex = 0; RowIndex < 6; ++RowIndex)
+	RowUnlocked.Init(0, 7);
+	for (int32 RowIndex = 0; RowIndex < 7; ++RowIndex)
 	{
 		const EItemRarity Rarity = RarityFromCodexRow(RowIndex);
 		for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
@@ -1570,7 +1574,7 @@ FIdleHUDRuneCodexViewModel IdleProject::UI::BuildRuneCodexViewModel(const URuneS
 		}
 	}
 
-	for (int32 RowIndex = 0; RowIndex < 6; ++RowIndex)
+	for (int32 RowIndex = 0; RowIndex < 7; ++RowIndex)
 	{
 		const EItemRarity Rarity = RarityFromCodexRow(RowIndex);
 		FIdleHUDRuneCodexRowViewModel Row;

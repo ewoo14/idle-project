@@ -107,14 +107,16 @@ const TCHAR* GetRarityDisplayKey(EItemRarity Rarity)
 {
 	switch (Rarity)
 	{
-	case EItemRarity::Uncommon:
-		return TEXT("RARITY_UNCOMMON");
 	case EItemRarity::Rare:
 		return TEXT("RARITY_RARE");
 	case EItemRarity::Epic:
 		return TEXT("RARITY_EPIC");
+	case EItemRarity::Unique:
+		return TEXT("RARITY_UNIQUE");
 	case EItemRarity::Legendary:
 		return TEXT("RARITY_LEGENDARY");
+	case EItemRarity::Transcendent:
+		return TEXT("RARITY_TRANSCENDENT");
 	case EItemRarity::Mythic:
 		return TEXT("RARITY_MYTHIC");
 	case EItemRarity::None:

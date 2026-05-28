@@ -18,14 +18,16 @@ FRuneRarityTuning GetRarityTuning(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return {0.02f, 0.004f, 0.02f, 1};
-	case EItemRarity::Uncommon:
-		return {0.035f, 0.006f, 0.03f, 2};
 	case EItemRarity::Rare:
 		return {0.05f, 0.009f, 0.04f, 5};
 	case EItemRarity::Epic:
 		return {0.08f, 0.014f, 0.06f, 12};
+	case EItemRarity::Unique:
+		return {0.10f, 0.017f, 0.075f, 20};
 	case EItemRarity::Legendary:
 		return {0.12f, 0.02f, 0.09f, 30};
+	case EItemRarity::Transcendent:
+		return {0.15f, 0.025f, 0.105f, 50};
 	case EItemRarity::Mythic:
 		return {0.18f, 0.03f, 0.12f, 80};
 	default:
@@ -56,21 +58,26 @@ EItemRarity RollRuneRarity(int32 ProgressIndex, FRandomStream& Rng)
 	{
 		return EItemRarity::Mythic;
 	}
-	if (Roll < MythicChance + 0.002f)
+	const float TranscendentChance = ProgressIndex >= 100 ? 0.003f : 0.0f;
+	if (Roll < MythicChance + TranscendentChance)
+	{
+		return EItemRarity::Transcendent;
+	}
+	if (Roll < MythicChance + TranscendentChance + 0.002f)
 	{
 		return EItemRarity::Legendary;
 	}
-	if (Roll < MythicChance + 0.020f)
+	if (Roll < MythicChance + TranscendentChance + 0.012f)
+	{
+		return EItemRarity::Unique;
+	}
+	if (Roll < MythicChance + TranscendentChance + 0.030f)
 	{
 		return EItemRarity::Epic;
 	}
-	if (Roll < MythicChance + 0.100f)
+	if (Roll < MythicChance + TranscendentChance + 0.180f)
 	{
 		return EItemRarity::Rare;
-	}
-	if (Roll < MythicChance + 0.300f)
-	{
-		return EItemRarity::Uncommon;
 	}
 	return EItemRarity::Common;
 }

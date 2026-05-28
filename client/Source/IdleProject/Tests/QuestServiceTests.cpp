@@ -137,7 +137,7 @@ bool FIdleGameInstanceEnhanceAttemptTest::RunTest(const FString& Parameters)
 	const FEnhanceAttemptResult Success = GameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
 	TestTrue(TEXT("Enough gold attempts enhance"), Success.bAttempted);
 	TestTrue(TEXT("Seeded first enhance succeeds"), Success.bSuccess);
-	TestEqual(TEXT("Attempt spends rare level 0 cost once"), Success.GoldSpent, static_cast<int64>(400));
+	TestEqual(TEXT("Attempt spends rare level 0 cost once"), Success.GoldSpent, static_cast<int64>(200));
 	TestEqual(TEXT("Successful enhance returns new level"), Success.NewLevel, 1);
 	TestEqual(TEXT("Successful enhance mutates equipped item"), Inventory->GetEquippedEnhanceLevel(EItemSlot::Weapon), 1);
 	TestEqual(TEXT("Gold is deducted"), GameInstance->GetGold(), static_cast<int64>(0));

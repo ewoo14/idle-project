@@ -17,12 +17,13 @@ int32 GetAffixCount(EItemRarity Rarity, FRandomStream& Rng)
 {
 	switch (Rarity)
 	{
-	case EItemRarity::Uncommon:
 	case EItemRarity::Rare:
 		return 1;
 	case EItemRarity::Epic:
+	case EItemRarity::Unique:
 		return 2;
 	case EItemRarity::Legendary:
+	case EItemRarity::Transcendent:
 		return Rng.GetFraction() < 0.5f ? 2 : 3;
 	case EItemRarity::Mythic:
 		return 3;
@@ -49,14 +50,16 @@ float FDropFormula::GetRarityStatMultiplier(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return 1.0f;
-	case EItemRarity::Uncommon:
-		return 1.3f;
 	case EItemRarity::Rare:
 		return 1.7f;
 	case EItemRarity::Epic:
 		return 2.3f;
+	case EItemRarity::Unique:
+		return 2.75f;
 	case EItemRarity::Legendary:
 		return 3.2f;
+	case EItemRarity::Transcendent:
+		return 3.85f;
 	case EItemRarity::Mythic:
 		return 4.5f;
 	case EItemRarity::None:
@@ -71,12 +74,13 @@ EItemRarity FDropFormula::RollRarityForLevel(int32 Level, FRandomStream& Rng)
 	const float LevelScale = FMath::Clamp((static_cast<float>(SafeLevel) - 1.0f) / 99.0f, 0.0f, 1.0f);
 
 	const float NoneChance = 0.02f;
-	const float UncommonChance = 0.20f;
-	const float RareChance = 0.08f + 0.12f * LevelScale;
+	const float RareChance = 0.28f + 0.02f * LevelScale;
 	const float EpicChance = 0.06f * LevelScale;
+	const float UniqueChance = 0.025f * LevelScale;
 	const float LegendaryChance = 0.015f * LevelScale;
+	const float TranscendentChance = 0.007f * LevelScale;
 	const float MythicChance = 0.005f * LevelScale;
-	const float CommonChance = FMath::Max(0.0f, 1.0f - NoneChance - UncommonChance - RareChance - EpicChance - LegendaryChance - MythicChance);
+	const float CommonChance = FMath::Max(0.0f, 1.0f - NoneChance - RareChance - EpicChance - UniqueChance - LegendaryChance - TranscendentChance - MythicChance);
 
 	const float Roll = Rng.GetFraction();
 	if (Roll < NoneChance)
@@ -87,21 +91,25 @@ EItemRarity FDropFormula::RollRarityForLevel(int32 Level, FRandomStream& Rng)
 	{
 		return EItemRarity::Common;
 	}
-	if (Roll < NoneChance + CommonChance + UncommonChance)
-	{
-		return EItemRarity::Uncommon;
-	}
-	if (Roll < NoneChance + CommonChance + UncommonChance + RareChance)
+	if (Roll < NoneChance + CommonChance + RareChance)
 	{
 		return EItemRarity::Rare;
 	}
-	if (Roll < NoneChance + CommonChance + UncommonChance + RareChance + EpicChance)
+	if (Roll < NoneChance + CommonChance + RareChance + EpicChance)
 	{
 		return EItemRarity::Epic;
 	}
-	if (Roll < NoneChance + CommonChance + UncommonChance + RareChance + EpicChance + LegendaryChance)
+	if (Roll < NoneChance + CommonChance + RareChance + EpicChance + UniqueChance)
+	{
+		return EItemRarity::Unique;
+	}
+	if (Roll < NoneChance + CommonChance + RareChance + EpicChance + UniqueChance + LegendaryChance)
 	{
 		return EItemRarity::Legendary;
+	}
+	if (Roll < NoneChance + CommonChance + RareChance + EpicChance + UniqueChance + LegendaryChance + TranscendentChance)
+	{
+		return EItemRarity::Transcendent;
 	}
 	return EItemRarity::Mythic;
 }

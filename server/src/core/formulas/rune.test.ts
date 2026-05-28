@@ -37,16 +37,18 @@ describe("rune formulas", () => {
 
   it("computes UE float parity core multipliers", () => {
     expect(getCoreRuneMultiplier(1, 0)).toBe(Math.fround(0.02));
-    expect(getCoreRuneMultiplier(6, 50)).toBe(Math.fround(1.68));
+    expect(getCoreRuneMultiplier(4, 0)).toBe(Math.fround(0.1));
+    expect(getCoreRuneMultiplier(6, 0)).toBe(Math.fround(0.15));
+    expect(getCoreRuneMultiplier(7, 50)).toBe(Math.fround(1.68));
     expect(getCoreRuneMultiplier(0, 10)).toBe(0);
     expect(getCoreRuneMultiplier(1, -3)).toBe(Math.fround(0.02));
   });
 
   it("computes capped util values", () => {
-    expect(getUtilRuneValue(7, 6, 0)).toBe(Math.fround(0.12));
-    expect(getUtilRuneValue(7, 6, 10000)).toBe(2);
-    expect(getUtilRuneValue(9, 6, 10000)).toBe(0.5);
-    expect(getUtilRuneValue(1, 6, 10)).toBe(0);
+    expect(getUtilRuneValue(7, 7, 0)).toBe(Math.fround(0.12));
+    expect(getUtilRuneValue(7, 7, 10000)).toBe(2);
+    expect(getUtilRuneValue(9, 7, 10000)).toBe(0.5);
+    expect(getUtilRuneValue(1, 7, 10)).toBe(0);
     expect(getUtilRuneValue(7, 0, 10)).toBe(0);
   });
 
@@ -67,7 +69,9 @@ describe("rune formulas", () => {
     expect(getEnhanceGoldCost(0)).toBe(1000);
     expect(getEnhanceGoldCost(4)).toBe(25000);
     expect(getDisenchantEssence(1, 0)).toBe(1);
-    expect(getDisenchantEssence(6, 3)).toBe(86);
+    expect(getDisenchantEssence(4, 0)).toBe(20);
+    expect(getDisenchantEssence(6, 0)).toBe(50);
+    expect(getDisenchantEssence(7, 3)).toBe(86);
     expect(getDisenchantEssence(0, 3)).toBe(0);
     expect(getShopRuneRollCost(0)).toBe(5000);
     expect(getShopRuneRollCost(10)).toBe(10000);

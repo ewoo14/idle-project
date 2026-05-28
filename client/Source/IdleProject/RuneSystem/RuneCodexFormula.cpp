@@ -6,14 +6,16 @@ float FRuneCodexFormula::GetRowCompletionBonus(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return 0.01f;
-	case EItemRarity::Uncommon:
-		return 0.02f;
 	case EItemRarity::Rare:
-		return 0.03f;
+		return 0.02f;
 	case EItemRarity::Epic:
+		return 0.03f;
+	case EItemRarity::Unique:
 		return 0.05f;
 	case EItemRarity::Legendary:
 		return 0.08f;
+	case EItemRarity::Transcendent:
+		return 0.10f;
 	case EItemRarity::Mythic:
 		return 0.12f;
 	default:
@@ -26,7 +28,7 @@ FRuneCodexBonus FRuneCodexFormula::ComputeBonus(const FRuneCodexCompletion& Comp
 	FRuneCodexBonus Bonus;
 	double CoreStatAdd = static_cast<double>(FMath::Clamp(Completion.UnlockedCells, 0, TotalCells)) * PerCellCoreBonus;
 
-	for (int32 RowIndex = 0; RowIndex < Completion.RowComplete.Num() && RowIndex < 6; ++RowIndex)
+	for (int32 RowIndex = 0; RowIndex < Completion.RowComplete.Num() && RowIndex < 7; ++RowIndex)
 	{
 		if (Completion.RowComplete[RowIndex])
 		{

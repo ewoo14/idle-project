@@ -285,13 +285,13 @@ FRuneCodexCompletion URuneService::GetCodexCompletion() const
 {
 	FRuneCodexCompletion Completion;
 	Completion.TotalCells = FRuneCodexFormula::TotalCells;
-	Completion.RowComplete.Init(false, 6);
+	Completion.RowComplete.Init(false, 7);
 
 	TSet<int32> UnlockedKeys;
 	int32 CoreUnlocked = 0;
 	int32 UtilUnlocked = 0;
 	TArray<int32> RowUnlocked;
-	RowUnlocked.Init(0, 6);
+	RowUnlocked.Init(0, 7);
 
 	for (const FRuneCodexEntry& Entry : OwnedCodex)
 	{
@@ -441,7 +441,7 @@ bool URuneService::IsValidCodexCell(ERuneType Type, EItemRarity Rarity)
 
 int32 URuneService::GetCodexIndex(ERuneType Type, EItemRarity Rarity)
 {
-	return (static_cast<int32>(Type) - static_cast<int32>(ERuneType::PhysAtk)) * 6
+	return (static_cast<int32>(Type) - static_cast<int32>(ERuneType::PhysAtk)) * 7
 		+ (static_cast<int32>(Rarity) - static_cast<int32>(EItemRarity::Common));
 }
 

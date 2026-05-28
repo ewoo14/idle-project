@@ -296,3 +296,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 
 - [ ] QA scenario covers 2-piece active, 4-piece complete, under-threshold,
   None-set regression, and ko/en CSV integrity in Given / When / Then format.
+
+## PR #65 Character Checklist Addendum (Section 4)
+
+- [ ] `EItemRarity` is exactly None=0, Common=1, Rare=2, Epic=3, Unique=4,
+  Legendary=5, Transcendent=6, Mythic=7, with no `Uncommon` references in
+  `client/Source` or `server/src`.
+- [ ] `FRarityMigration::MigrateLegacy` maps legacy values 1/2/3/4/5/6 to
+  Common/Rare/Rare/Epic/Legendary/Mythic and `ApplyFromSave` runs this only
+  for `SaveVersion < 7`.
+- [ ] Save capture writes `SaveVersion = 7`, cloud `maxEquipmentGrade` accepts
+  0-7, and v7 saves are not migrated a second time.
+- [ ] Drop, enhance, rune, class rune, item set, rune set, and rune codex
+  formulas all cover the seven rarity rows with client/server parity.
+- [ ] Rune codex dimensions are 63 total cells, 35 core cells, and 28 util
+  cells; migrated legacy value 2 and 3 codex entries merge into the new Rare
+  row while Unique and Transcendent start locked.

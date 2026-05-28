@@ -266,10 +266,11 @@ export type EnhancementRarityScenario = {
 
 export type RuneRarityName =
   | "Common"
-  | "Uncommon"
   | "Rare"
   | "Epic"
+  | "Unique"
   | "Legendary"
+  | "Transcendent"
   | "Mythic";
 
 export type RuneTypeName =
@@ -377,16 +378,18 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Common",
   "Rare",
   "Epic",
+  "Unique",
   "Legendary",
+  "Transcendent",
   "Mythic",
 ];
 const EQUIPMENT_SLOT_COUNT = 8;
 const DOG_GOLD_BONUS_PERCENT = 20;
 const BIRD_DROP_BONUS_PERCENT = 15;
 const RUNE_CORE_REVIEW_LEVELS = [0, 10, 50, 100];
-const RUNE_CORE_REVIEW_RARITIES = [1, 3, 6] as const;
+const RUNE_CORE_REVIEW_RARITIES = [1, 3, 5, 7] as const;
 const RUNE_UTIL_REVIEW_TYPES = [6, 7, 8, 9] as const;
-const MYTHIC_RUNE_RARITY = 6;
+const MYTHIC_RUNE_RARITY = 7;
 const CLASS_MASTERY_REVIEW_LEVEL = 100;
 const CLASS_MASTERY_REVIEW_ENHANCE_LEVEL = 50;
 const REGULAR_RUNE_SLOT_COUNT = RUNE_SLOT_COUNT - 1;
@@ -1140,13 +1143,13 @@ function buildRunePressure(): RunePressure {
 function buildRuneCodexPressure(
   baseMedianRebirthHours: number,
 ): RuneCodexPressure {
-  const rowBonus = [1, 2, 3, 4, 5, 6].reduce(
+  const rowBonus = [1, 2, 3, 4, 5, 6, 7].reduce(
     (sum, rarity) => sum + getRowCompletionBonus(rarity),
     0,
   );
   const fullCodexBonus = computeRuneCodexBonus({
     unlockedCells: RUNE_CODEX_TOTAL_CELLS,
-    rowComplete: [true, true, true, true, true, true],
+    rowComplete: [true, true, true, true, true, true, true],
     coreCategoryComplete: true,
     utilCategoryComplete: true,
   });
@@ -1422,14 +1425,16 @@ function runeRarityName(rarity: number): RuneRarityName {
     case 1:
       return "Common";
     case 2:
-      return "Uncommon";
-    case 3:
       return "Rare";
-    case 4:
+    case 3:
       return "Epic";
+    case 4:
+      return "Unique";
     case 5:
       return "Legendary";
     case 6:
+      return "Transcendent";
+    case 7:
       return "Mythic";
     default:
       throw new Error(`Unsupported rune rarity ${rarity}`);
