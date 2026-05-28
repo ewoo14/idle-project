@@ -70,4 +70,55 @@ bool FRuneHudViewModelTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneCodexHudViewModelTest,
+	"IdleProject.Rune.Codex.HUD.ViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneCodexHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::ResetCacheForTests();
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	URuneService* RuneService = NewObject<URuneService>();
+	RuneService->UnlockCodexCell(ERuneType::PhysAtk, EItemRarity::Common);
+	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+	{
+		RuneService->UnlockCodexCell(static_cast<ERuneType>(TypeValue), EItemRarity::Mythic);
+	}
+
+	const FIdleHUDRuneCodexViewModel ViewModel = IdleProject::UI::BuildRuneCodexViewModel(*RuneService);
+
+	TestEqual(TEXT("Codex panel title is localized"), ViewModel.Title.ToString(), FString(TEXT("Rune Codex")));
+	TestEqual(TEXT("Codex progress counts unique unlocked cells"), ViewModel.UnlockedCells, 10);
+	TestEqual(TEXT("Codex total is fifty four"), ViewModel.TotalCells, 54);
+	TestEqual(TEXT("Codex progress label is localized"), ViewModel.ProgressLabel.ToString(), FString(TEXT("Codex 10/54")));
+	TestEqual(TEXT("Codex grid exposes fifty four cells"), ViewModel.Cells.Num(), 54);
+	TestEqual(TEXT("Codex grid exposes six row summaries"), ViewModel.Rows.Num(), 6);
+	TestEqual(TEXT("Codex grid exposes nine column labels"), ViewModel.ColumnLabels.Num(), 9);
+
+	const FIdleHUDRuneCodexCellViewModel& FirstCell = ViewModel.Cells[0];
+	TestEqual(TEXT("First cell row is common"), FirstCell.RowIndex, 0);
+	TestEqual(TEXT("First cell column is physical attack"), FirstCell.ColumnIndex, 0);
+	TestTrue(TEXT("Unlocked cell is marked unlocked"), FirstCell.bUnlocked);
+	TestEqual(TEXT("Unlocked cell status is localized"), FirstCell.StatusLabel.ToString(), FString(TEXT("Unlocked")));
+
+	const FIdleHUDRuneCodexCellViewModel& MythicLastCell = ViewModel.Cells.Last();
+	TestEqual(TEXT("Last cell row is mythic"), MythicLastCell.RowIndex, 5);
+	TestEqual(TEXT("Last cell column is offline efficiency"), MythicLastCell.ColumnIndex, 8);
+	TestTrue(TEXT("Completed mythic row marks last cell unlocked"), MythicLastCell.bUnlocked);
+
+	TestTrue(TEXT("Mythic row completion is surfaced"), ViewModel.Rows[5].bComplete);
+	TestEqual(TEXT("Mythic row bonus label is localized"), ViewModel.Rows[5].BonusLabel.ToString(), FString(TEXT("Mythic Row Bonus +12%")));
+	TestFalse(TEXT("Core category is incomplete"), ViewModel.bCoreCategoryComplete);
+	TestFalse(TEXT("Util category is incomplete"), ViewModel.bUtilCategoryComplete);
+	TestEqual(TEXT("Core category incomplete copy is localized"), ViewModel.CoreCategoryLabel.ToString(), FString(TEXT("Core 6/30")));
+	TestEqual(TEXT("Util category incomplete copy is localized"), ViewModel.UtilCategoryLabel.ToString(), FString(TEXT("Util 4/24")));
+	TestEqual(TEXT("Core bonus label includes cells and row completion"), ViewModel.CoreBonusLabel.ToString(), FString(TEXT("Core +16%")));
+	TestEqual(TEXT("Util cap label remains zero before util completion"), ViewModel.UtilCapLabel.ToString(), FString(TEXT("Util Cap +0%")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
 #endif

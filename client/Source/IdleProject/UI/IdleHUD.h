@@ -11,6 +11,7 @@
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "ItemSystem/ItemTypes.h"
+#include "RuneSystem/RuneCodexTypes.h"
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
@@ -338,6 +339,51 @@ struct IDLEPROJECT_API FIdleHUDRuneViewModel
 	TArray<FIdleHUDRuneOwnedRowViewModel> OwnedRows;
 };
 
+struct IDLEPROJECT_API FIdleHUDRuneCodexCellViewModel
+{
+	ERuneType RuneType = ERuneType::None;
+	EItemRarity Rarity = EItemRarity::None;
+	FText TypeLabel;
+	FText RarityLabel;
+	FText StatusLabel;
+	FLinearColor AccentColor = FLinearColor::White;
+	int32 RowIndex = INDEX_NONE;
+	int32 ColumnIndex = INDEX_NONE;
+	bool bUnlocked = false;
+	bool bCoreType = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDRuneCodexRowViewModel
+{
+	EItemRarity Rarity = EItemRarity::None;
+	FText RarityLabel;
+	FText BonusLabel;
+	FLinearColor AccentColor = FLinearColor::White;
+	int32 RowIndex = INDEX_NONE;
+	int32 UnlockedCount = 0;
+	bool bComplete = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDRuneCodexViewModel
+{
+	FText Title;
+	FText ProgressLabel;
+	FText CoreCategoryLabel;
+	FText UtilCategoryLabel;
+	FText CoreBonusLabel;
+	FText UtilCapLabel;
+	int32 UnlockedCells = 0;
+	int32 TotalCells = 54;
+	int32 CoreUnlockedCells = 0;
+	int32 UtilUnlockedCells = 0;
+	float ProgressRatio = 0.0f;
+	bool bCoreCategoryComplete = false;
+	bool bUtilCategoryComplete = false;
+	TArray<FText> ColumnLabels;
+	TArray<FIdleHUDRuneCodexRowViewModel> Rows;
+	TArray<FIdleHUDRuneCodexCellViewModel> Cells;
+};
+
 struct IDLEPROJECT_API FIdleHUDStatRowViewModel
 {
 	EPrimaryStat Stat = EPrimaryStat::Str;
@@ -464,6 +510,7 @@ IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorVie
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
+IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
@@ -571,6 +618,8 @@ private:
 	void DrawShopPanel();
 	void TryBuyGearRoll();
 	void DrawRunePanel();
+	void DrawRuneCodexPanel();
+	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
 	void DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height);
 	void DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float X, float Y, float Width, float Height);
 	void SelectRuneFromHitBox(FName BoxName);
