@@ -20,7 +20,7 @@ piercing_arrow,3,Piercing Arrow,Active,DashDamage,9.0,2.0,0.0,0.0,0.0,0.0,None,0
 critical_eye,3,Critical Eye,Passive,SelfBuff,0.0,0.0,0.05,0.0,0.0,0.0,None,0.0,0.0,None
 quick_draw,3,Quick Draw,Passive,SelfBuff,0.0,0.0,0.1,0.0,0.0,0.0,None,0.0,0.0,None
 eagle_eye,3,Eagle Eye,Ultimate,DamageSingle,0.0,5.0,0.25,4.0,10.0,2.0,None,0.0,0.0,None
-shadow_stab,4,Shadow Stab,Active,DamageSingle,3.0,2.3,0.0,0.0,0.0,0.0,Poison,3.0,3.0,None
+shadow_stab,4,Shadow Stab,Active,DamageSingle,3.0,2.3,0.0,0.0,0.0,0.0,Poison,3.0,3.0,Dark
 smoke_bomb,4,Smoke Bomb,Active,DamageAoe,7.0,1.5,0.0,0.0,0.0,0.0,Poison,3.0,2.0,None
 evasion_stance,4,Evasion Stance,Active,SelfBuff,10.0,0.0,0.2,4.0,0.0,0.0,None,0.0,0.0,None
 backstab,4,Backstab,Active,DashDamage,9.0,2.1,0.0,0.0,0.0,0.0,None,0.0,0.0,None
@@ -51,7 +51,7 @@ berserk_apex,7,Berserk Apex,Ultimate,DamageSingle,0.0,6.5,0.35,4.0,12.0,2.0,None
 spirit_bolt,8,Spirit Bolt,Active,DamageSingle,3.2,1.9,0.0,0.0,1.0,0.0,Poison,3.0,2.5,None
 familiar_swarm,8,Familiar Swarm,Active,DamageAoe,7.0,1.45,0.0,0.0,1.0,0.0,Poison,4.0,2.0,None
 arcane_binding,8,Arcane Binding,Active,SelfBuff,10.0,0.0,0.22,4.0,0.0,0.0,None,0.0,0.0,None
-void_call,8,Void Call,Active,DamageAoe,12.0,2.0,0.0,0.0,1.5,0.0,Freeze,2.0,0.2,Ice
+void_call,8,Void Call,Active,DamageAoe,12.0,2.0,0.0,0.0,1.5,0.0,Freeze,2.0,0.2,Dark
 pact_mastery,8,Pact Mastery,Passive,SelfBuff,0.0,0.0,0.15,0.0,0.0,0.0,None,0.0,0.0,None
 spirit_reservoir,8,Spirit Reservoir,Passive,SelfBuff,0.0,0.0,0.2,0.0,0.0,0.0,None,0.0,0.0,None
 grand_familiar,8,Grand Familiar,Ultimate,DamageAoe,0.0,5.7,0.25,4.0,10.0,3.0,Poison,5.0,4.0,Lightning

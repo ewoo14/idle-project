@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V7"), SaveGame->SaveVersion, static_cast<int32>(7));
+	TestEqual(TEXT("SaveVersion starts at V8"), SaveGame->SaveVersion, static_cast<int32>(8));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -134,6 +134,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
+	TestEqual(TEXT("Captured save writes V8"), CapturedSave->SaveVersion, static_cast<int32>(8));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -184,6 +185,47 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Pet restore applies equipped pet"), PetService ? PetService->GetEquippedPetId() : FString(), SourceSave->EquippedPetId);
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemLegacyV7StageMigrationTest,
+	"IdleProject.GameCore.SaveSystem.LegacyV7StageMigration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->SaveVersion = 7;
+	LegacySave->bHasSave = true;
+	LegacySave->bChapter1BossDefeated = true;
+	LegacySave->StageChapter = 1;
+	LegacySave->StageStage = 5;
+	LegacySave->StageKillsThisStage = 1;
+	LegacySave->StageHighestClearedChapter = 1;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave accepts legacy v7 stage save"), GameInstance->ApplyFromSave(LegacySave));
+
+	const UStageService* StageService = GameInstance->GetStageService();
+	TestNotNull(TEXT("Legacy apply restores stage service"), StageService);
+	TestTrue(TEXT("Legacy chapter one boss flag survives migration"), GameInstance->HasDefeatedChapter1Boss());
+	TestEqual(TEXT("Legacy stage position remains stage five in ten-stage structure"), StageService ? StageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("Legacy highest cleared chapter is preserved for rebirth gate"), StageService ? StageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestFalse(TEXT("Legacy stage five is no longer final chapter clear"), StageService ? StageService->HasFinalChapterCleared() : true);
+
+	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
+	TestEqual(TEXT("Capture after legacy migration writes V8"), CapturedSave->SaveVersion, static_cast<int32>(8));
+	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
+	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
+
+	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("Reapplying captured v8 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
+	TestEqual(TEXT("V8 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V8 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }

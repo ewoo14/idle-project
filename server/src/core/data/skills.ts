@@ -18,7 +18,7 @@ export type SkillDefinition = {
   statusEffect: "none" | "poison" | "burn" | "freeze";
   statusDuration: number;
   statusMagnitude: number;
-  element: "none" | "fire" | "ice" | "lightning" | "holy";
+  element: "none" | "fire" | "ice" | "lightning" | "holy" | "dark";
 };
 
 type SkillDefinitionSeed = Omit<
@@ -349,6 +349,7 @@ export const thiefSkillDefinitions: SkillDefinition[] = defineSkills([
     statusEffect: "poison",
     statusDuration: 3,
     statusMagnitude: 3,
+    element: "dark",
   },
   {
     skillId: "smoke_bomb",
@@ -783,7 +784,7 @@ export const summonerSkillDefinitions: SkillDefinition[] = defineSkills([
     statusEffect: "freeze",
     statusDuration: 2,
     statusMagnitude: 0.2,
-    element: "ice",
+    element: "dark",
   },
   {
     skillId: "pact_mastery",

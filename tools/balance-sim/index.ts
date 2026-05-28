@@ -394,6 +394,7 @@ const ACCEPTABLE_MAX_HOURS = 20;
 const ACTIVE_EXP_TUNING = 5.5;
 const ACTIVE_GOLD_TUNING = 7.4;
 const SKILL_DPS_MULTIPLIER = 1.35;
+const FIRST_REBIRTH_REVIEW_STAGE_COUNT = 5;
 const CLASS_BALANCE_REVIEW_DEF_PER_LEVEL = 5;
 const BOSS_HP_MULTIPLIER = 0.012;
 const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
@@ -873,9 +874,14 @@ function rebirthRamp(level: number): number {
 
 function representativeStageIndex(level: number, targetLevel: number): number {
   const normalizedProgress = Math.max(0, Math.min(level - 1, targetLevel - 1));
-  return Math.min(
-    DEFAULT_STAGES_PER_CHAPTER - 1,
-    Math.floor((normalizedProgress / targetLevel) * DEFAULT_STAGES_PER_CHAPTER),
+  return (
+    1 +
+    Math.min(
+      FIRST_REBIRTH_REVIEW_STAGE_COUNT - 1,
+      Math.floor(
+        (normalizedProgress / targetLevel) * FIRST_REBIRTH_REVIEW_STAGE_COUNT,
+      ),
+    )
   );
 }
 
@@ -894,7 +900,7 @@ function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
     { length: DEFAULT_STAGES_PER_CHAPTER },
     (_, stageOffset) => {
       const globalStageIndex =
-        (chapter - 1) * DEFAULT_STAGES_PER_CHAPTER + stageOffset;
+        (chapter - 1) * DEFAULT_STAGES_PER_CHAPTER + stageOffset + 1;
       const baseExp = baseKillExp(1);
       const normalGoldMin = computeKillGold(
         baseGoldMin,

@@ -158,6 +158,10 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Matching monster weakness amplifies damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Fire, ESkillElement::Fire), 1.5f);
 	TestEqual(TEXT("Opposed monster weakness resists damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Ice, ESkillElement::Fire), 0.5f);
 	TestEqual(TEXT("Unrelated element keeps neutral damage"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Lightning, ESkillElement::Fire), 1.0f);
+	TestEqual(TEXT("Holy attack exploits dark weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Holy, ESkillElement::Dark), 1.5f);
+	TestEqual(TEXT("Dark attack exploits holy weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Dark, ESkillElement::Holy), 1.5f);
+	TestEqual(TEXT("Dark attack stays neutral against no weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Dark, ESkillElement::None), 1.0f);
+	TestEqual(TEXT("Dark attack stays neutral against fire weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Dark, ESkillElement::Fire), 1.0f);
 
 	FRandomStream NeverCritStream(12345);
 	FRandomStream AlwaysCritStream(12345);
@@ -952,7 +956,7 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultThiefSkills();
 	const TArray<FExpectedSkillDefinition> ThiefSkills = {
-		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::None},
+		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::Dark},
 		{TEXT("smoke_bomb"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None},
 		{TEXT("evasion_stance"), EClassId::Thief, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
 		{TEXT("backstab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f, 0.0f, 0.0f},
@@ -1027,7 +1031,7 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("spirit_bolt"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 1.9f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None},
 		{TEXT("familiar_swarm"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None},
 		{TEXT("arcane_binding"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f, 0.0f, 0.0f},
-		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Ice},
+		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Dark},
 		{TEXT("pact_mastery"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
 		{TEXT("spirit_reservoir"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("grand_familiar"), EClassId::Summoner, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning},

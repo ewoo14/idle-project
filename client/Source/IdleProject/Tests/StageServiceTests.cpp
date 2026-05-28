@@ -79,25 +79,29 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FStageFormulaScalingTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("Stage 1-1 has no stat scaling"), FStageFormula::ComputeMonsterStatMultiplier(0), 1.0f);
-	TestEqual(TEXT("Stage 1-2 scales stats by one step"), FStageFormula::ComputeMonsterStatMultiplier(1), 1.15f);
-	TestEqual(TEXT("Stage 1-5 scales stats by four steps"), FStageFormula::ComputeMonsterStatMultiplier(4), 1.6f);
+	TestEqual(TEXT("Stage 1-2 scales stats by one step"), FStageFormula::ComputeMonsterStatMultiplier(2), 1.15f);
+	TestEqual(TEXT("Stage 1-5 scales stats by four steps"), FStageFormula::ComputeMonsterStatMultiplier(5), 1.6f);
 
 	TestEqual(TEXT("Stage 1-1 reward multiplier starts at one"), FStageFormula::ComputeRewardMultiplier(0), 1.0f);
-	TestEqual(TEXT("Stage 1-5 reward multiplier mirrors stat scaling"), FStageFormula::ComputeRewardMultiplier(4), 1.6f);
+	TestEqual(TEXT("Stage 1-5 reward multiplier mirrors stat scaling"), FStageFormula::ComputeRewardMultiplier(5), 1.6f);
 
-	TestFalse(TEXT("Stage 1-4 is not a boss stage"), FStageFormula::IsBossStage(1, 4, 5));
-	TestTrue(TEXT("Stage 1-5 is a boss stage"), FStageFormula::IsBossStage(1, 5, 5));
+	TestFalse(TEXT("Stage 1-5 is elite, not boss"), FStageFormula::IsBossStage(1, 5, 10));
+	TestTrue(TEXT("Stage 1-10 is a boss stage"), FStageFormula::IsBossStage(1, 10, 10));
+	TestTrue(TEXT("Stage five is an elite stage"), FStageFormula::IsEliteStage(5));
+	TestFalse(TEXT("Stage ten is not an elite stage"), FStageFormula::IsEliteStage(10));
 
-	TestEqual(TEXT("Stage 1-1 has no weakness"), FStageFormula::GetStageWeakElement(0), ESkillElement::None);
-	TestEqual(TEXT("Stage 1-2 has no weakness"), FStageFormula::GetStageWeakElement(1), ESkillElement::None);
-	TestEqual(TEXT("Stage 1-3 is weak to ice"), FStageFormula::GetStageWeakElement(2), ESkillElement::Ice);
-	TestEqual(TEXT("Stage 1-4 is weak to holy"), FStageFormula::GetStageWeakElement(3), ESkillElement::Holy);
-	TestEqual(TEXT("Stage 1-5 is weak to fire"), FStageFormula::GetStageWeakElement(4), ESkillElement::Fire);
-	TestEqual(TEXT("Stage 2-1 has no weakness"), FStageFormula::GetStageWeakElement(5), ESkillElement::None);
-	TestEqual(TEXT("Stage 2-2 is weak to lightning"), FStageFormula::GetStageWeakElement(6), ESkillElement::Lightning);
-	TestEqual(TEXT("Stage 2-3 is weak to ice"), FStageFormula::GetStageWeakElement(7), ESkillElement::Ice);
-	TestEqual(TEXT("Stage 2-4 is weak to fire"), FStageFormula::GetStageWeakElement(8), ESkillElement::Fire);
-	TestEqual(TEXT("Stage 2-5 is weak to holy"), FStageFormula::GetStageWeakElement(9), ESkillElement::Holy);
+	TestEqual(TEXT("Stage 1-1 is weak to fire"), FStageFormula::GetStageWeakElement(1), ESkillElement::Fire);
+	TestEqual(TEXT("Stage 1-2 is weak to ice"), FStageFormula::GetStageWeakElement(2), ESkillElement::Ice);
+	TestEqual(TEXT("Stage 1-3 is weak to lightning"), FStageFormula::GetStageWeakElement(3), ESkillElement::Lightning);
+	TestEqual(TEXT("Stage 1-4 is weak to holy"), FStageFormula::GetStageWeakElement(4), ESkillElement::Holy);
+	TestEqual(TEXT("Stage 1-5 is weak to dark"), FStageFormula::GetStageWeakElement(5), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 1-10 is weak to dark"), FStageFormula::GetStageWeakElement(10), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 2-1 is weak to ice"), FStageFormula::GetStageWeakElement(11), ESkillElement::Ice);
+	TestEqual(TEXT("Stage 2-5 is weak to dark"), FStageFormula::GetStageWeakElement(15), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 2-10 is weak to dark"), FStageFormula::GetStageWeakElement(20), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 3-1 is weak to dark"), FStageFormula::GetStageWeakElement(21), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 3-5 is weak to dark"), FStageFormula::GetStageWeakElement(25), ESkillElement::Dark);
+	TestEqual(TEXT("Stage 3-10 is weak to holy"), FStageFormula::GetStageWeakElement(30), ESkillElement::Holy);
 
 	return true;
 }
@@ -114,7 +118,7 @@ bool FStageServiceProgressionTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Initial chapter is one"), Stages->GetCurrentChapter(), 1);
 	TestEqual(TEXT("Initial stage is one"), Stages->GetCurrentStage(), 1);
-	TestEqual(TEXT("Initial global stage index is zero"), Stages->GetGlobalStageIndex(), 0);
+	TestEqual(TEXT("Initial global stage index is one"), Stages->GetGlobalStageIndex(), 1);
 	TestEqual(TEXT("Initial kills to advance mirrors stage one"), Stages->GetKillsToAdvance(), 5);
 	TestEqual(TEXT("Initial kill progress is zero"), Stages->GetKillsThisStage(), 0);
 
@@ -129,13 +133,13 @@ bool FStageServiceProgressionTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Fifth stage-one kill advances to stage two"), Stages->GetCurrentStage(), 2);
 	TestEqual(TEXT("Kill progress resets after stage advance"), Stages->GetKillsThisStage(), 0);
-	TestEqual(TEXT("Global stage index advances"), Stages->GetGlobalStageIndex(), 1);
+	TestEqual(TEXT("Global stage index advances"), Stages->GetGlobalStageIndex(), 2);
 
 	FStageInfo StageTwoInfo = Stages->GetCurrentStageInfo();
 	TestEqual(TEXT("Stage info reports chapter"), StageTwoInfo.Chapter, 1);
 	TestEqual(TEXT("Stage info reports stage"), StageTwoInfo.Stage, 2);
 	TestFalse(TEXT("Stage two is not boss"), StageTwoInfo.bBossStage);
-	TestEqual(TEXT("Stage two has no weakness"), StageTwoInfo.WeakElement, ESkillElement::None);
+	TestEqual(TEXT("Stage two has ice weakness"), StageTwoInfo.WeakElement, ESkillElement::Ice);
 	TestEqual(TEXT("Stage two reports progress target"), StageTwoInfo.KillsToAdvance, 8);
 
 	return true;
@@ -153,50 +157,63 @@ bool FStageServiceBossCompletionTest::RunTest(const FString& Parameters)
 	UStageEventTestReceiver* Receiver = NewObject<UStageEventTestReceiver>();
 	Stages->OnChapterBossDefeated.AddDynamic(Receiver, &UStageEventTestReceiver::CaptureChapterBossDefeated);
 
-	while (Stages->GetCurrentStage() < 5)
+	while (Stages->GetCurrentStage() < 10)
 	{
 		Stages->RecordKill(false);
 	}
 
-	TestEqual(TEXT("Stage service reaches boss stage"), Stages->GetCurrentStage(), 5);
+	TestEqual(TEXT("Stage service reaches boss stage"), Stages->GetCurrentStage(), 10);
 	TestTrue(TEXT("Current stage info flags boss stage"), Stages->GetCurrentStageInfo().bBossStage);
 	TestEqual(TEXT("Boss stage uses one required boss kill"), Stages->GetKillsToAdvance(), 1);
 
 	Stages->RecordKill(false);
-	TestEqual(TEXT("Normal kill does not clear boss stage"), Stages->GetCurrentStage(), 5);
+	TestEqual(TEXT("Normal kill does not clear boss stage"), Stages->GetCurrentStage(), 10);
 	TestEqual(TEXT("Normal kill does not increment boss progress"), Stages->GetKillsThisStage(), 0);
 
 	Stages->RecordKill(true);
 	TestEqual(TEXT("Chapter one boss kill advances to chapter two"), Stages->GetCurrentChapter(), 2);
 	TestEqual(TEXT("Chapter one boss kill resets to stage one"), Stages->GetCurrentStage(), 1);
 	TestEqual(TEXT("Chapter two starts with zero kill progress"), Stages->GetKillsThisStage(), 0);
-	TestEqual(TEXT("Chapter two starts at global stage index five"), Stages->GetGlobalStageIndex(), 5);
+	TestEqual(TEXT("Chapter two starts at global stage index eleven"), Stages->GetGlobalStageIndex(), 11);
 	TestFalse(TEXT("Chapter two current boss is not yet cleared"), Stages->HasClearedCurrentChapterBoss());
 	TestTrue(TEXT("Chapter one boss clear is queryable"), Stages->HasClearedChapterBoss(1));
 	TestEqual(TEXT("Highest cleared chapter records chapter one"), Stages->GetHighestClearedChapter(), 1);
 	TestEqual(TEXT("Chapter boss delegate broadcasts once"), Receiver->Count, 1);
 	TestEqual(TEXT("Chapter boss delegate reports chapter one"), Receiver->LastClearedChapter, 1);
 
-	while (Stages->GetCurrentChapter() < 2 || Stages->GetCurrentStage() < 5)
+	while (Stages->GetCurrentChapter() < 2 || Stages->GetCurrentStage() < 10)
 	{
 		Stages->RecordKill(false);
 	}
 
-	TestEqual(TEXT("Stage service reaches chapter two boss stage"), Stages->GetGlobalStageIndex(), 9);
-	TestEqual(TEXT("Chapter two boss has holy weakness"), Stages->GetCurrentStageInfo().WeakElement, ESkillElement::Holy);
+	TestEqual(TEXT("Stage service reaches chapter two boss stage"), Stages->GetGlobalStageIndex(), 20);
+	TestEqual(TEXT("Chapter two boss has dark weakness"), Stages->GetCurrentStageInfo().WeakElement, ESkillElement::Dark);
 
 	Stages->RecordKill(true);
-	TestEqual(TEXT("Final chapter clear stays on chapter two"), Stages->GetCurrentChapter(), 2);
-	TestEqual(TEXT("Final chapter clear stays on stage five"), Stages->GetCurrentStage(), 5);
-	TestEqual(TEXT("Final chapter boss progress is retained at clear target"), Stages->GetKillsThisStage(), 1);
+	TestEqual(TEXT("Chapter two boss kill advances to chapter three"), Stages->GetCurrentChapter(), 3);
+	TestEqual(TEXT("Chapter two boss kill starts chapter three stage one"), Stages->GetCurrentStage(), 1);
+	TestEqual(TEXT("Chapter three starts with zero kill progress"), Stages->GetKillsThisStage(), 0);
 	TestTrue(TEXT("Chapter two boss clear is queryable"), Stages->HasClearedChapterBoss(2));
-	TestEqual(TEXT("Highest cleared chapter records final chapter"), Stages->GetHighestClearedChapter(), 2);
-	TestEqual(TEXT("Chapter boss delegate broadcasts final clear"), Receiver->Count, 2);
+	TestEqual(TEXT("Highest cleared chapter records chapter two"), Stages->GetHighestClearedChapter(), 2);
+	TestEqual(TEXT("Chapter boss delegate broadcasts chapter two clear"), Receiver->Count, 2);
 	TestEqual(TEXT("Chapter boss delegate reports chapter two"), Receiver->LastClearedChapter, 2);
+
+	while (Stages->GetCurrentChapter() < 3 || Stages->GetCurrentStage() < 10)
+	{
+		Stages->RecordKill(false);
+	}
+	Stages->RecordKill(true);
+	TestEqual(TEXT("Final chapter clear stays on chapter three"), Stages->GetCurrentChapter(), 3);
+	TestEqual(TEXT("Final chapter clear stays on stage ten"), Stages->GetCurrentStage(), 10);
+	TestEqual(TEXT("Final chapter boss progress is retained at clear target"), Stages->GetKillsThisStage(), 1);
+	TestTrue(TEXT("Chapter three boss clear is queryable"), Stages->HasClearedChapterBoss(3));
+	TestEqual(TEXT("Highest cleared chapter records final chapter"), Stages->GetHighestClearedChapter(), 3);
+	TestEqual(TEXT("Chapter boss delegate broadcasts final clear"), Receiver->Count, 3);
+	TestEqual(TEXT("Chapter boss delegate reports chapter three"), Receiver->LastClearedChapter, 3);
 
 	Stages->RecordKill(true);
 	TestEqual(TEXT("Final chapter ignores further kills"), Stages->GetKillsThisStage(), 1);
-	TestEqual(TEXT("Final chapter clear remains idempotent"), Receiver->Count, 2);
+	TestEqual(TEXT("Final chapter clear remains idempotent"), Receiver->Count, 3);
 
 	return true;
 }
@@ -213,7 +230,7 @@ bool FStageServiceManualBossCompletionTest::RunTest(const FString& Parameters)
 	UStageEventTestReceiver* Receiver = NewObject<UStageEventTestReceiver>();
 	Stages->OnChapterBossDefeated.AddDynamic(Receiver, &UStageEventTestReceiver::CaptureChapterBossDefeated);
 
-	while (Stages->GetCurrentStage() < 5)
+	while (Stages->GetCurrentStage() < 10)
 	{
 		Stages->RecordKill(false);
 	}
@@ -231,22 +248,35 @@ bool FStageServiceManualBossCompletionTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Manual completion is idempotent on non-boss chapter two start"), Receiver->Count, 1);
 	TestEqual(TEXT("Idempotent manual completion remains on chapter two stage one"), Stages->GetCurrentStage(), 1);
 
-	while (Stages->GetCurrentStage() < 5)
+	while (Stages->GetCurrentStage() < 10)
 	{
 		Stages->RecordKill(false);
 	}
 
 	Stages->MarkCurrentChapterBossDefeated();
 
-	TestEqual(TEXT("Manual final boss completion stays on final chapter"), Stages->GetCurrentChapter(), 2);
-	TestEqual(TEXT("Manual final boss completion stays on final stage"), Stages->GetCurrentStage(), 5);
-	TestEqual(TEXT("Manual final boss completion retains target progress"), Stages->GetKillsThisStage(), 1);
-	TestEqual(TEXT("Manual final boss completion records final chapter"), Stages->GetHighestClearedChapter(), 2);
-	TestEqual(TEXT("Manual final boss completion broadcasts second clear"), Receiver->Count, 2);
+	TestEqual(TEXT("Manual chapter two boss completion advances to final chapter"), Stages->GetCurrentChapter(), 3);
+	TestEqual(TEXT("Manual chapter two boss completion starts final chapter stage one"), Stages->GetCurrentStage(), 1);
+	TestEqual(TEXT("Manual chapter two boss completion resets progress"), Stages->GetKillsThisStage(), 0);
+	TestEqual(TEXT("Manual chapter two boss completion records chapter two"), Stages->GetHighestClearedChapter(), 2);
+	TestEqual(TEXT("Manual chapter two boss completion broadcasts second clear"), Receiver->Count, 2);
 	TestEqual(TEXT("Manual final boss completion reports chapter two"), Receiver->LastClearedChapter, 2);
 
+	while (Stages->GetCurrentStage() < 10)
+	{
+		Stages->RecordKill(false);
+	}
+
 	Stages->MarkCurrentChapterBossDefeated();
-	TestEqual(TEXT("Manual final completion is idempotent"), Receiver->Count, 2);
+	TestEqual(TEXT("Manual final boss completion stays on final chapter"), Stages->GetCurrentChapter(), 3);
+	TestEqual(TEXT("Manual final boss completion stays on final stage"), Stages->GetCurrentStage(), 10);
+	TestEqual(TEXT("Manual final boss completion retains target progress"), Stages->GetKillsThisStage(), 1);
+	TestEqual(TEXT("Manual final boss completion records final chapter"), Stages->GetHighestClearedChapter(), 3);
+	TestEqual(TEXT("Manual final boss completion broadcasts third clear"), Receiver->Count, 3);
+	TestEqual(TEXT("Manual final boss completion reports chapter three"), Receiver->LastClearedChapter, 3);
+
+	Stages->MarkCurrentChapterBossDefeated();
+	TestEqual(TEXT("Manual final completion is idempotent"), Receiver->Count, 3);
 
 	return true;
 }
@@ -263,14 +293,14 @@ bool FIdleGameInstanceStageServiceHooksTest::RunTest(const FString& Parameters)
 
 	UStageService* Stages = GameInstance->GetStageService();
 	TestNotNull(TEXT("Game instance creates stage service for tests"), Stages);
-	TestEqual(TEXT("Stage service starts at global index zero"), Stages->GetGlobalStageIndex(), 0);
+	TestEqual(TEXT("Stage service starts at global index one"), Stages->GetGlobalStageIndex(), 1);
 
 	GameInstance->MarkChapter1BossDefeated();
 
 	TestTrue(TEXT("Game instance stores chapter one boss defeat"), GameInstance->HasDefeatedChapter1Boss());
 	TestFalse(TEXT("Legacy chapter one flag does not force current stage boss clear"), Stages->HasClearedCurrentChapterBoss());
 
-	while (Stages->GetCurrentStage() < 5)
+	while (Stages->GetCurrentStage() < 10)
 	{
 		Stages->RecordKill(false);
 	}

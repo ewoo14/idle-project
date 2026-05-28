@@ -2,6 +2,7 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/StageService.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemTypes.h"
@@ -33,9 +34,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FIdleGameInstanceGearRollPurchaseTest::RunTest(const FString& Parameters)
 {
 	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeStageServiceForTests();
 	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
 
-	const int64 Cost = FShopFormula::GetGearRollCost(0);
+	const UStageService* StageService = GameInstance->GetStageService();
+	const int64 Cost = FShopFormula::GetGearRollCost(StageService ? StageService->GetGlobalStageIndex() : 1);
 
 	const FShopPurchaseResult MissingInventory = GameInstance->TryBuyGearRoll(nullptr);
 	TestFalse(TEXT("Missing inventory does not purchase"), MissingInventory.bPurchased);
@@ -68,6 +71,7 @@ bool FIdleGameInstanceGearRollPurchaseTest::RunTest(const FString& Parameters)
 	}
 
 	UIdleGameInstance* FullInventoryGameInstance = NewObject<UIdleGameInstance>();
+	FullInventoryGameInstance->InitializeStageServiceForTests();
 	UInventoryComponent* FullInventory = NewObject<UInventoryComponent>();
 	for (int32 Index = 0; Index < 100; ++Index)
 	{

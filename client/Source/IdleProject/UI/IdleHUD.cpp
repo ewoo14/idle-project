@@ -549,6 +549,8 @@ FText StageWeakElementToLabel(ESkillElement Element)
 		return IdleProject::Localization::UI(TEXT("ELEMENT_LIGHTNING"));
 	case ESkillElement::Holy:
 		return IdleProject::Localization::UI(TEXT("ELEMENT_HOLY"));
+	case ESkillElement::Dark:
+		return IdleProject::Localization::UI(TEXT("ELEMENT_DARK"));
 	case ESkillElement::None:
 	default:
 		return IdleProject::Localization::UI(TEXT("ELEMENT_NONE"));
@@ -569,6 +571,8 @@ FLinearColor StageWeakElementToColor(ESkillElement Element)
 		return Warn;
 	case ESkillElement::Holy:
 		return AccentGold;
+	case ESkillElement::Dark:
+		return FLinearColor(0.45f, 0.20f, 0.75f);
 	case ESkillElement::None:
 	default:
 		return TextMuted;

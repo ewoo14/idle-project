@@ -29,6 +29,9 @@ struct FStageInfo
 	bool bBossStage = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Stage")
+	bool bEliteStage = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Stage")
 	ESkillElement WeakElement = ESkillElement::None;
 };
 
@@ -41,8 +44,8 @@ class IDLEPROJECT_API UStageService : public UObject
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 StagesPerChapter = 5;
-	static constexpr int32 TotalChapters = 2;
+	static constexpr int32 StagesPerChapter = 10;
+	static constexpr int32 TotalChapters = 3;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void InitializeDefaultStages();

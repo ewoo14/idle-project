@@ -367,7 +367,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 7;
+	SaveGame->SaveVersion = 8;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -473,12 +473,25 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsureStageService();
 	if (StageService)
 	{
+		int32 RestoredHighestClearedChapter = SaveGame->StageHighestClearedChapter;
+		bool bRestoredFinalChapterCleared = SaveGame->bStageFinalChapterCleared;
+		if (SaveGame->SaveVersion < 8)
+		{
+			if (SaveGame->bChapter1BossDefeated)
+			{
+				RestoredHighestClearedChapter = FMath::Max(RestoredHighestClearedChapter, 1);
+			}
+			if (SaveGame->StageChapter < UStageService::TotalChapters)
+			{
+				bRestoredFinalChapterCleared = false;
+			}
+		}
 		StageService->RestoreState(
 			SaveGame->StageChapter,
 			SaveGame->StageStage,
 			SaveGame->StageKillsThisStage,
-			SaveGame->bStageFinalChapterCleared,
-			SaveGame->StageHighestClearedChapter);
+			bRestoredFinalChapterCleared,
+			RestoredHighestClearedChapter);
 	}
 
 	EnsureTowerService();

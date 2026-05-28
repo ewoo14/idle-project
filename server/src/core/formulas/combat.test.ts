@@ -65,6 +65,10 @@ describe("combat formulas", () => {
     expect(computeElementMultiplier("Fire", "Fire")).toBe(1.5);
     expect(computeElementMultiplier("Ice", "Fire")).toBe(0.5);
     expect(computeElementMultiplier("Lightning", "Fire")).toBe(1);
+    expect(computeElementMultiplier("Holy", "Dark")).toBe(1.5);
+    expect(computeElementMultiplier("Dark", "Holy")).toBe(1.5);
+    expect(computeElementMultiplier("Dark", "None")).toBe(1);
+    expect(computeElementMultiplier("Dark", "Fire")).toBe(1);
   });
 
   it.each([

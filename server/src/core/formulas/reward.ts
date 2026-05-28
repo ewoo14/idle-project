@@ -1,35 +1,45 @@
 import { computeRewardMultiplier } from "./stage.js";
 
 export const BOSS_REWARD_BONUS = 8;
+export const ELITE_REWARD_BONUS = 3;
 
 export function computeKillExp(
   baseExp: number,
   globalStageIndex: number,
   isBoss: boolean,
+  isElite = false,
 ): number {
-  return scaleKillReward(baseExp, globalStageIndex, isBoss);
+  return scaleKillReward(baseExp, globalStageIndex, isBoss, isElite);
 }
 
 export function computeKillGold(
   baseGold: number,
   globalStageIndex: number,
   isBoss: boolean,
+  isElite = false,
 ): number {
-  return scaleKillReward(baseGold, globalStageIndex, isBoss);
+  return scaleKillReward(baseGold, globalStageIndex, isBoss, isElite);
 }
 
 export function getMonsterLevelForStage(globalStageIndex: number): number {
-  return 1 + Math.max(0, globalStageIndex);
+  return 1 + Math.max(0, globalStageIndex - 1);
 }
 
 function scaleKillReward(
   baseReward: number,
   globalStageIndex: number,
   isBoss: boolean,
+  isElite: boolean,
 ): number {
-  const bossMultiplier = isBoss ? BOSS_REWARD_BONUS : 1;
+  const stageTypeMultiplier = isBoss
+    ? BOSS_REWARD_BONUS
+    : isElite
+      ? ELITE_REWARD_BONUS
+      : 1;
   const scaledReward = Math.round(
-    baseReward * computeRewardMultiplier(globalStageIndex) * bossMultiplier,
+    baseReward *
+      computeRewardMultiplier(globalStageIndex) *
+      stageTypeMultiplier,
   );
 
   return Math.max(0, scaledReward);

@@ -162,15 +162,15 @@ describe("balance simulator", () => {
       bossKillGoldAtLevel50?: number;
     };
 
-    expect(sample.level50StageIndex).toBe(2);
+    expect(sample.level50StageIndex).toBe(3);
     expect(sample.normalKillExpAtLevel50).toBe(
-      computeKillExp(50 * 12, 2, false),
+      computeKillExp(50 * 12, 3, false),
     );
     expect(sample.normalKillGoldAtLevel50).toBe(
-      computeKillGold(50 * 8, 2, false),
+      computeKillGold(50 * 8, 3, false),
     );
-    expect(sample.bossKillExpAtLevel50).toBe(computeKillExp(50 * 12, 2, true));
-    expect(sample.bossKillGoldAtLevel50).toBe(computeKillGold(50 * 8, 2, true));
+    expect(sample.bossKillExpAtLevel50).toBe(computeKillExp(50 * 12, 3, true));
+    expect(sample.bossKillGoldAtLevel50).toBe(computeKillGold(50 * 8, 3, true));
   });
 
   it("documents reward scaling against monster HP scaling in the report", () => {
@@ -184,7 +184,7 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("1-5");
     expect(report.markdown).toContain("Boss bonus: 8x");
     expect(report.markdown).toContain(
-      "| 1-1 | 0 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
+      "| 1-1 | 1 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
     );
   });
 

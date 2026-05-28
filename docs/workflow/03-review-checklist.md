@@ -340,3 +340,21 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   cells, and the full-codex +71.2% core stat pressure.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target.
+
+## PR #66 Character Checklist Addendum (Section 4)
+
+- [ ] `StageService` and server `stage.ts` use 10 stages per chapter and 3
+  total chapters.
+- [ ] Global stage index is one-based and follows
+  `(Chapter - 1) * 10 + Stage` for all chapter 1-3 data.
+- [ ] `IsEliteStage` identifies stage 5, `IsBossStage` identifies stage 10,
+  and rewards keep normal < elite 3x < boss 8x.
+- [ ] Dark is appended as the fifth combat element, with Holy vs Dark and Dark
+  vs Holy weakness multipliers at 1.5x.
+- [ ] Client and server SkillDB/StageDB parity includes chapter 3, 30 stage
+  definitions, Dark skills, and Dark-heavy stage weaknesses.
+- [ ] SaveVersion 8 migration preserves legacy SaveVersion < 8 stage progress
+  without marking chapter 3 complete from old two-chapter saves.
+- [ ] UE Automation and server Vitest cover stage 1-30 indexing, elite/boss
+  classification, Dark combat parity, reward scaling, and v7-to-v8 save
+  migration.

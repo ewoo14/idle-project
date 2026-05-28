@@ -32,6 +32,12 @@ float FCombatFormulas::ComputeElementMultiplier(ESkillElement SkillElement, ESki
 		return 1.5f;
 	}
 
+	if ((SkillElement == ESkillElement::Holy && TargetWeakElement == ESkillElement::Dark)
+		|| (SkillElement == ESkillElement::Dark && TargetWeakElement == ESkillElement::Holy))
+	{
+		return 1.5f;
+	}
+
 	const bool bResisted =
 		(SkillElement == ESkillElement::Fire && TargetWeakElement == ESkillElement::Ice) ||
 		(SkillElement == ESkillElement::Ice && TargetWeakElement == ESkillElement::Fire) ||

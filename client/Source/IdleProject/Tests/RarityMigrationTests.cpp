@@ -117,7 +117,7 @@ bool FRarityMigrationApplyFromSaveTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* Captured = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes migrated save"), GameInstance->CaptureToSave(Captured));
-	TestEqual(TEXT("Captured save is v7"), Captured->SaveVersion, 7);
+	TestEqual(TEXT("Captured save is v8"), Captured->SaveVersion, 8);
 	for (int32 Index = 0; Index < UE_ARRAY_COUNT(ExpectedMigratedRarities); ++Index)
 	{
 		TestEqual(

@@ -38,7 +38,13 @@ export function applyCrit(
   return isCrit ? baseDamage * Math.max(1, critDmg) : baseDamage;
 }
 
-export type SkillElement = "None" | "Fire" | "Ice" | "Lightning" | "Holy";
+export type SkillElement =
+  | "None"
+  | "Fire"
+  | "Ice"
+  | "Lightning"
+  | "Holy"
+  | "Dark";
 
 export function computeElementMultiplier(
   skillElement: SkillElement,
@@ -49,6 +55,13 @@ export function computeElementMultiplier(
   }
 
   if (skillElement === targetWeakElement) {
+    return 1.5;
+  }
+
+  if (
+    (skillElement === "Holy" && targetWeakElement === "Dark") ||
+    (skillElement === "Dark" && targetWeakElement === "Holy")
+  ) {
     return 1.5;
   }
 
