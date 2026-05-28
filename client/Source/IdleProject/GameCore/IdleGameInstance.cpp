@@ -106,6 +106,7 @@ void UIdleGameInstance::Init()
 	EnsureSeasonService();
 	EnsureStageService();
 	EnsureTowerService();
+	EnsureDungeonService();
 	EnsureRuneService();
 	EnsureAchievementService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
@@ -133,6 +134,7 @@ void UIdleGameInstance::Shutdown()
 	SeasonService = nullptr;
 	StageService = nullptr;
 	TowerService = nullptr;
+	DungeonService = nullptr;
 	RuneService = nullptr;
 	AchievementService = nullptr;
 	Super::Shutdown();
@@ -361,13 +363,14 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 
 	EnsureStageService();
 	EnsureTowerService();
+	EnsureDungeonService();
 	EnsureRuneService();
 	EnsurePetService();
 	EnsureQuestService();
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 9;
+	SaveGame->SaveVersion = 10;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -394,6 +397,17 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (TowerService)
 	{
 		SaveGame->TowerHighestFloor = TowerService->GetHighestFloor();
+	}
+
+	if (DungeonService)
+	{
+		TMap<EDungeonType, int32> DungeonEntries;
+		DungeonService->CaptureState(DungeonEntries, SaveGame->DungeonDailyResetDate);
+		SaveGame->DungeonEntriesUsed.Reset();
+		for (const EDungeonType Type : { EDungeonType::Gold, EDungeonType::Exp, EDungeonType::Essence })
+		{
+			SaveGame->DungeonEntriesUsed.Add(DungeonEntries.FindRef(Type));
+		}
 	}
 
 	if (RuneService)
@@ -498,6 +512,21 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (TowerService)
 	{
 		TowerService->SetHighestFloor(SaveGame->TowerHighestFloor);
+	}
+
+	EnsureDungeonService();
+	if (DungeonService)
+	{
+		TMap<EDungeonType, int32> DungeonEntries;
+		if (SaveGame->SaveVersion >= 10)
+		{
+			const EDungeonType Types[] = { EDungeonType::Gold, EDungeonType::Exp, EDungeonType::Essence };
+			for (int32 Index = 0; Index < UE_ARRAY_COUNT(Types); ++Index)
+			{
+				DungeonEntries.Add(Types[Index], SaveGame->DungeonEntriesUsed.IsValidIndex(Index) ? SaveGame->DungeonEntriesUsed[Index] : 0);
+			}
+		}
+		DungeonService->RestoreState(DungeonEntries, SaveGame->SaveVersion >= 10 ? SaveGame->DungeonDailyResetDate : UQuestService::GetCurrentUtcDateString());
 	}
 
 	EnsureRuneService();
@@ -661,6 +690,42 @@ int64 UIdleGameInstance::ClimbTower()
 		RequestAutosave();
 	}
 	return Reward;
+}
+
+FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
+{
+	EnsureDungeonService();
+	FDungeonRunResult Result;
+	Result.Type = Type;
+
+	const AIdleCharacter* Character = FindPlayerCharacter();
+	if (!DungeonService || !Character)
+	{
+		return Result;
+	}
+
+	Result = DungeonService->TryRunDungeon(Type, Character->GetCombatPower(), UQuestService::GetCurrentUtcDateString());
+	if (!Result.bSuccess)
+	{
+		return Result;
+	}
+
+	AddGold(Result.GoldReward);
+	AddExp(Result.ExpReward);
+	if (Result.EssenceReward > 0)
+	{
+		if (RuneEssence > MAX_int64 - Result.EssenceReward)
+		{
+			RuneEssence = MAX_int64;
+		}
+		else
+		{
+			RuneEssence += Result.EssenceReward;
+		}
+		RequestAutosave();
+	}
+	RequestAutosave();
+	return Result;
 }
 
 FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot)
@@ -1323,6 +1388,12 @@ void UIdleGameInstance::InitializeTowerServiceForTests()
 	TowerService->InitializeTower();
 }
 
+void UIdleGameInstance::InitializeDungeonServiceForTests(const FString& CurrentUtcDate)
+{
+	DungeonService = NewObject<UDungeonService>(this);
+	DungeonService->EnsureDailyReset(CurrentUtcDate);
+}
+
 void UIdleGameInstance::InitializeRuneServiceForTests()
 {
 	RuneService = NewObject<URuneService>(this);
@@ -1605,6 +1676,15 @@ void UIdleGameInstance::EnsureTowerService()
 	{
 		TowerService = NewObject<UTowerService>(this);
 		TowerService->InitializeTower();
+	}
+}
+
+void UIdleGameInstance::EnsureDungeonService()
+{
+	if (!DungeonService)
+	{
+		DungeonService = NewObject<UDungeonService>(this);
+		DungeonService->EnsureDailyReset(UQuestService::GetCurrentUtcDateString());
 	}
 }
 

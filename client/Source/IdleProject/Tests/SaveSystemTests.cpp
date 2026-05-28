@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V9"), SaveGame->SaveVersion, static_cast<int32>(9));
+	TestEqual(TEXT("SaveVersion starts at V10"), SaveGame->SaveVersion, static_cast<int32>(10));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -134,7 +134,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V9"), CapturedSave->SaveVersion, static_cast<int32>(9));
+	TestEqual(TEXT("Captured save writes V10"), CapturedSave->SaveVersion, static_cast<int32>(10));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -217,15 +217,15 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V9"), CapturedSave->SaveVersion, static_cast<int32>(9));
+	TestEqual(TEXT("Capture after legacy migration writes V10"), CapturedSave->SaveVersion, static_cast<int32>(10));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
-	TestTrue(TEXT("Reapplying captured v9 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	TestTrue(TEXT("Reapplying captured v10 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V9 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V9 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V10 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V10 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }

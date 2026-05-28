@@ -11,6 +11,7 @@ export {
   rollBaseItem,
   rollRarityForLevel,
 } from "./drop.js";
+export * from "./dungeon.js";
 export * from "./enhance.js";
 export * from "./equipment.js";
 export * from "./level.js";
