@@ -358,3 +358,15 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] UE Automation and server Vitest cover stage 1-30 indexing, elite/boss
   classification, Dark combat parity, reward scaling, and v7-to-v8 save
   migration.
+
+## PR #66 Designer Checklist Addendum (Section 1)
+
+- [ ] Stage HUD keeps `Stage {Chapter}-{Stage} {Current}/{Target}` readable for
+  3-5 and 3-10 at 1080p, 1440p, and 4K.
+- [ ] X-5 stages show the localized `STAGE_ELITE_BADGE`; X-10 stages keep the
+  localized `STAGE_BOSS_BADGE`.
+- [ ] Dark weakness uses `ELEMENT_DARK`, the `ElementDark` theme token, and a
+  compact `D` glyph chip rather than hard-coded copy or color.
+- [ ] `docs/planning/ui-tokens.json` and `UIThemeTokens.h` stay in sync for
+  Dark element colors, and `.gitattributes` continues to LFS-track exported UI
+  binary assets.

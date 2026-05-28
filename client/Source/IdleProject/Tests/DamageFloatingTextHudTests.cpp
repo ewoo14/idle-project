@@ -106,6 +106,53 @@ bool FStageChapterFeedbackHudViewModelTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FChapterThreeEliteDarkStageHudViewModelTest,
+	"IdleProject.UI.HUD.ChapterThreeEliteDarkStageViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FChapterThreeEliteDarkStageHudViewModelTest::RunTest(const FString& Parameters)
+{
+	using namespace IdleProject::UI;
+	using namespace IdleProject::UI::Theme;
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	FStageInfo ChapterThreeElite;
+	ChapterThreeElite.Chapter = 3;
+	ChapterThreeElite.Stage = 5;
+	ChapterThreeElite.KillsThisStage = 0;
+	ChapterThreeElite.KillsToAdvance = 1;
+	ChapterThreeElite.bEliteStage = true;
+	ChapterThreeElite.WeakElement = ESkillElement::Dark;
+
+	const FIdleHUDStageViewModel EliteView = BuildStageViewModel(ChapterThreeElite);
+	TestEqual(TEXT("Chapter three label is localized"), EliteView.ChapterLabel.ToString(), FString(TEXT("Chapter 3")));
+	TestEqual(TEXT("Chapter three progress preserves 10-stage coordinates"), EliteView.ProgressLabel.ToString(), FString(TEXT("Stage 3-5 0/1")));
+	TestEqual(TEXT("Elite badge is localized"), EliteView.EliteBadgeLabel.ToString(), FString(TEXT("Elite")));
+	TestEqual(TEXT("Dark weakness is localized"), EliteView.WeaknessLabel.ToString(), FString(TEXT("Weak: Dark")));
+	TestEqual(TEXT("Dark icon uses compact elemental glyph"), EliteView.WeaknessIconLabel.ToString(), FString(TEXT("D")));
+	TestTrue(TEXT("Elite stage is exposed separately from boss"), EliteView.bEliteStage);
+	TestFalse(TEXT("Elite stage is not a boss stage"), EliteView.bBossStage);
+	TestEqual(TEXT("Elite stage uses dark border color"), EliteView.BorderColor.R, ElementDark.R);
+	TestEqual(TEXT("Dark weakness uses dark element token"), EliteView.WeaknessColor.B, ElementDark.B);
+
+	FStageInfo ChapterThreeBoss = ChapterThreeElite;
+	ChapterThreeBoss.Stage = 10;
+	ChapterThreeBoss.KillsThisStage = 1;
+	ChapterThreeBoss.bEliteStage = false;
+	ChapterThreeBoss.bBossStage = true;
+	ChapterThreeBoss.WeakElement = ESkillElement::Holy;
+
+	const FIdleHUDStageViewModel BossView = BuildStageViewModel(ChapterThreeBoss);
+	TestEqual(TEXT("Chapter three boss progress keeps X-10 coordinate"), BossView.ProgressLabel.ToString(), FString(TEXT("Stage 3-10 1/1")));
+	TestEqual(TEXT("Boss badge remains localized"), BossView.BossBadgeLabel.ToString(), FString(TEXT("Boss")));
+	TestEqual(TEXT("Boss stage does not show elite badge"), BossView.EliteBadgeLabel.ToString(), FString());
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBossHudViewModelTest,
 	"IdleProject.UI.HUD.BossViewModel",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

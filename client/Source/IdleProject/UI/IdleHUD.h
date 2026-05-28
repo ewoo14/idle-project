@@ -208,11 +208,14 @@ struct IDLEPROJECT_API FIdleHUDStageViewModel
 	FText ChapterLabel;
 	FText ProgressLabel;
 	FText BossBadgeLabel;
+	FText EliteBadgeLabel;
 	FText WeaknessLabel;
+	FText WeaknessIconLabel;
 	FLinearColor BorderColor = FLinearColor::White;
 	FLinearColor WeaknessColor = FLinearColor::White;
 	float ProgressRatio = 0.0f;
 	bool bBossStage = false;
+	bool bEliteStage = false;
 };
 
 struct IDLEPROJECT_API FIdleHUDBossViewModel

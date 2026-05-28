@@ -557,6 +557,26 @@ FText StageWeakElementToLabel(ESkillElement Element)
 	}
 }
 
+FText StageWeakElementToIconLabel(ESkillElement Element)
+{
+	switch (Element)
+	{
+	case ESkillElement::Fire:
+		return FText::FromString(TEXT("F"));
+	case ESkillElement::Ice:
+		return FText::FromString(TEXT("I"));
+	case ESkillElement::Lightning:
+		return FText::FromString(TEXT("L"));
+	case ESkillElement::Holy:
+		return FText::FromString(TEXT("H"));
+	case ESkillElement::Dark:
+		return FText::FromString(TEXT("D"));
+	case ESkillElement::None:
+	default:
+		return FText::FromString(TEXT("-"));
+	}
+}
+
 FLinearColor StageWeakElementToColor(ESkillElement Element)
 {
 	using namespace IdleProject::UI::Theme;
@@ -572,7 +592,7 @@ FLinearColor StageWeakElementToColor(ESkillElement Element)
 	case ESkillElement::Holy:
 		return AccentGold;
 	case ESkillElement::Dark:
-		return FLinearColor(0.45f, 0.20f, 0.75f);
+		return ElementDark;
 	case ESkillElement::None:
 	default:
 		return TextMuted;
@@ -1177,12 +1197,17 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 	{
 		Args.Add(TEXT("Element"), StageWeakElementToLabel(StageInfo.WeakElement));
 	});
+	ViewModel.WeaknessIconLabel = StageWeakElementToIconLabel(StageInfo.WeakElement);
 	ViewModel.ProgressRatio = SafeTarget > 0
 		? FMath::Clamp(static_cast<float>(SafeCurrent) / static_cast<float>(SafeTarget), 0.0f, 1.0f)
 		: 0.0f;
 	ViewModel.bBossStage = StageInfo.bBossStage;
+	ViewModel.bEliteStage = StageInfo.bEliteStage && !StageInfo.bBossStage;
 	ViewModel.BossBadgeLabel = StageInfo.bBossStage ? IdleProject::Localization::UI(TEXT("STAGE_BOSS_BADGE")) : FText::GetEmpty();
-	ViewModel.BorderColor = StageInfo.bBossStage ? Theme::AccentGold : Theme::AccentBlue;
+	ViewModel.EliteBadgeLabel = ViewModel.bEliteStage ? IdleProject::Localization::UI(TEXT("STAGE_ELITE_BADGE")) : FText::GetEmpty();
+	ViewModel.BorderColor = StageInfo.bBossStage
+		? Theme::AccentGold
+		: (ViewModel.bEliteStage ? Theme::ElementDark : Theme::AccentBlue);
 	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
 	return ViewModel;
 }
@@ -3152,15 +3177,23 @@ void AIdleHUD::DrawStageIndicator()
 	DrawText(ViewModel.TitleLabel.ToString(), TextMuted, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 	DrawText(ViewModel.ChapterLabel.ToString(), AccentGold, X + 82.0f * Scale, Y + 10.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 	DrawText(ViewModel.ProgressLabel.ToString(), TextPrimary, X + Padding, Y + 31.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
-	DrawText(ViewModel.WeaknessLabel.ToString(), ViewModel.WeaknessColor, X + PanelWidth - 118.0f * Scale, Y + 15.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
-	if (ViewModel.bBossStage)
+	const float WeaknessIconSize = 22.0f * Scale;
+	const float WeaknessIconX = X + PanelWidth - 156.0f * Scale;
+	const float WeaknessIconY = Y + 12.0f * Scale;
+	DrawRect(ViewModel.WeaknessColor.CopyWithNewOpacity(0.92f), WeaknessIconX, WeaknessIconY, WeaknessIconSize, WeaknessIconSize);
+	DrawText(ViewModel.WeaknessIconLabel.ToString(), BgPrimary, WeaknessIconX + 7.0f * Scale, WeaknessIconY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.WeaknessLabel.ToString(), ViewModel.WeaknessColor, X + PanelWidth - 128.0f * Scale, Y + 15.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	if (ViewModel.bBossStage || ViewModel.bEliteStage)
 	{
-		const float BadgeWidth = 58.0f * Scale;
+		const bool bEliteBadge = ViewModel.bEliteStage && !ViewModel.bBossStage;
+		const float BadgeWidth = bEliteBadge ? 62.0f * Scale : 58.0f * Scale;
 		const float BadgeHeight = 22.0f * Scale;
 		const float BadgeX = X + PanelWidth - Padding - BadgeWidth;
 		const float BadgeY = Y + 42.0f * Scale;
-		DrawRect(AccentGold, BadgeX, BadgeY, BadgeWidth, BadgeHeight);
-		DrawText(ViewModel.BossBadgeLabel.ToString(), BgPrimary, BadgeX + 13.0f * Scale, BadgeY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+		const FLinearColor BadgeColor = bEliteBadge ? ElementDark : AccentGold;
+		const FText BadgeLabel = bEliteBadge ? ViewModel.EliteBadgeLabel : ViewModel.BossBadgeLabel;
+		DrawRect(BadgeColor, BadgeX, BadgeY, BadgeWidth, BadgeHeight);
+		DrawText(BadgeLabel.ToString(), BgPrimary, BadgeX + 11.0f * Scale, BadgeY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	}
 
 	const float BarX = X + Padding;

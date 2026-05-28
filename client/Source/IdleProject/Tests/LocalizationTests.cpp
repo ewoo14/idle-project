@@ -36,6 +36,12 @@ bool FIdleLocalizationLookupTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("English rarity lookup includes Mythic"),
 		IdleProject::Localization::UI(TEXT("RARITY_MYTHIC")).ToString(),
 		FString(TEXT("Mythic")));
+	TestEqual(TEXT("English dark element lookup uses approved copy"),
+		IdleProject::Localization::UI(TEXT("ELEMENT_DARK")).ToString(),
+		FString(TEXT("Dark")));
+	TestEqual(TEXT("English elite stage badge lookup uses approved copy"),
+		IdleProject::Localization::UI(TEXT("STAGE_ELITE_BADGE")).ToString(),
+		FString(TEXT("Elite")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	TestEqual(TEXT("Korean rarity lookup includes Legendary"),
@@ -45,6 +51,13 @@ bool FIdleLocalizationLookupTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Korean rarity lookup includes Mythic"),
 		IdleProject::Localization::UI(TEXT("RARITY_MYTHIC")).ToString(),
 		FString(TEXT("신화")));
+
+	TestEqual(TEXT("Korean dark element lookup uses approved copy"),
+		IdleProject::Localization::UI(TEXT("ELEMENT_DARK")).ToString(),
+		FString(TEXT("암흑")));
+	TestEqual(TEXT("Korean elite stage badge lookup uses approved copy"),
+		IdleProject::Localization::UI(TEXT("STAGE_ELITE_BADGE")).ToString(),
+		FString(TEXT("정예")));
 
 	TestEqual(TEXT("Unsupported language falls back to Korean"),
 		IdleProject::Localization::NormalizeLanguage(TEXT("ja")),
