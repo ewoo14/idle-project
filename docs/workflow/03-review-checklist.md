@@ -395,6 +395,18 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   Dark element colors, and `.gitattributes` continues to LFS-track exported UI
   binary assets.
 
+## PR #69 Designer Checklist Addendum (Section 1)
+
+- [ ] Pet HUD renders all 10 pet catalog rows with localized names, level,
+  active bonus, feed cost/status, equip hitbox, and feed hitbox.
+- [ ] Pet bonus labels cover Gold, Drop, EXP, PATK, MATK, HP, DEF, and All Stat
+  through ko/en `UI.csv` keys, with `IdleProject.Localization.CsvIntegrity`
+  protecting key parity.
+- [ ] The left-side pet and season panels avoid overlap at 1080p, 1440p, and
+  4K using the Canvas-height 1.0-2.0 scale clamp and existing UI theme tokens.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
 ## PR #66 Balance Checklist Addendum (Section 5)
 
 - [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 30-row
@@ -407,3 +419,16 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   neutral Dark->Fire matchup rows.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target after the report expansion.
+
+## PR #69 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes `Pet Bonus
+  Pressure` with the 10-pet catalog and Lv0/Lv10 effective bonuses.
+- [ ] Simulator imports `server/src/core/formulas/petBonus.ts` rather than
+  duplicating pet ids, bonus types, or bonus percentages.
+- [ ] Stat-facing pets report Lv100 CP/DPS pressure as percent multipliers, not
+  flat stat additions.
+- [ ] Pet bonuses remain out of the sampled first-rebirth timing model until
+  acquisition timing and expected ownership are modeled explicitly.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target.

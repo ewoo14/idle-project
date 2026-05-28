@@ -199,6 +199,13 @@ void AIdleCharacter::RefreshDerivedStats()
 			Derived.Hp *= RuneMultipliers.Hp + CodexCore;
 			Derived.CritDmg += RuneService->GetEquippedUtilValues().CritDamage;
 		}
+
+		const FPetStatBonus PetStatBonus = IdleGameInstance->GetEquippedPetStatBonus();
+		Derived.PhysAtk *= 1.0f + PetStatBonus.PhysAtkPct;
+		Derived.MagicAtk *= 1.0f + PetStatBonus.MagicAtkPct;
+		Derived.PhysDef *= 1.0f + PetStatBonus.PhysDefPct;
+		Derived.MagicDef *= 1.0f + PetStatBonus.MagicDefPct;
+		Derived.Hp *= 1.0f + PetStatBonus.HpPct;
 	}
 
 	CachedPrimaryStats = Primary;

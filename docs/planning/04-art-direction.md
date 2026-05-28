@@ -207,3 +207,18 @@ The panel keeps the Canvas-height scale clamp at 1.0-2.0 for 1080p, 1440p, and
 the bottom skill HUD so the right-side shop, enhancement, achievement, and quest
 stack keeps its current visual hierarchy. Existing `.gitattributes` LFS patterns
 continue to cover future exported `.uasset` and `.png` UI assets.
+
+## PR #69 Pet Expansion HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Pet Expansion HUD V1 keeps the
+existing left-side pet and season stack but compresses the pet rows so all 10
+pets are visible at 1080p, 1440p, and 4K without overlapping the bottom skill
+HUD or the season pass panel. Each pet row shows localized name, level, active
+bonus, feed cost/status, equip hitbox, and feed hitbox in one dense row.
+
+The panel continues to use `--bg-panel`, `--bg-primary`, `--accent-gold`,
+`--accent-blue`, `--text-primary`, and `--text-muted`. Gold and equipped states
+use `--accent-gold`, feed-ready states use `--accent-blue`, and locked or
+blocked states use the existing warning color. No binary art assets were added;
+existing `.gitattributes` LFS patterns continue to cover future `.uasset` and
+`.png` UI exports.

@@ -370,7 +370,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 10;
+	SaveGame->SaveVersion = 11;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -418,6 +418,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (PetService)
 	{
 		SaveGame->EquippedPetId = PetService->GetEquippedPetId();
+		SaveGame->OwnedPetIds = PetService->GetOwnedPetIds();
 		SaveGame->PetLevels = PetService->GetPetLevels();
 	}
 
@@ -555,7 +556,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsurePetService();
 	if (PetService)
 	{
-		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->PetLevels);
+		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->OwnedPetIds, SaveGame->PetLevels);
 	}
 
 	if (SaveGame->SaveVersion >= 2)
@@ -1435,6 +1436,19 @@ bool UIdleGameInstance::EquipPet(const FString& PetId)
 	{
 		ApiClient->EquipPet(PetId);
 	}
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryUnlockPet(const FString& PetId)
+{
+	EnsurePetService();
+	if (!PetService || !PetService->TryUnlockPet(PetId))
+	{
+		return false;
+	}
+
 	RequestAutosave();
 	return true;
 }
@@ -1461,7 +1475,7 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 
 	const int32 CurrentLevel = PetService->GetPetLevel(PetId);
 	Result.NewLevel = CurrentLevel;
-	if (!bKnownPet || CurrentLevel >= FPetLevelFormula::MaxPetLevel)
+	if (!bKnownPet || !PetService->IsPetOwned(PetId) || CurrentLevel >= FPetLevelFormula::MaxPetLevel)
 	{
 		OnPetFed.Broadcast(Result);
 		return Result;
@@ -1485,6 +1499,10 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 	Result.bFed = true;
 	Result.GoldSpent = Cost;
 	Result.NewLevel = CurrentLevel + 1;
+	if (PetService->GetEquippedPetId() == PetId)
+	{
+		RefreshPlayerCharacterStats();
+	}
 	RecordQuestProgress(EQuestObjective::FeedPet, 1);
 	RecordAchievementMetric(EAchievementMetric::PetsFed, 1);
 	RecordAchievementMetric(EAchievementMetric::HighestPetLevel, Result.NewLevel);
@@ -1501,6 +1519,16 @@ float UIdleGameInstance::GetEquippedPetGoldBonusPercent() const
 float UIdleGameInstance::GetEquippedPetDropBonusPercent() const
 {
 	return PetService ? PetService->GetEquippedPetDropBonusPercent() : 0.0f;
+}
+
+float UIdleGameInstance::GetEquippedPetExpBonusPercent() const
+{
+	return PetService ? PetService->GetEquippedPetExpBonusPercent() : 0.0f;
+}
+
+FPetStatBonus UIdleGameInstance::GetEquippedPetStatBonus() const
+{
+	return PetService ? PetService->GetEquippedPetStatBonus() : FPetStatBonus();
 }
 
 int64 UIdleGameInstance::ApplyEquippedPetGoldBonus(int64 BaseAmount) const

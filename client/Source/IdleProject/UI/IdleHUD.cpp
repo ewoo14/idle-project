@@ -536,21 +536,85 @@ FLinearColor QuestTypeToAccentColor(EQuestType Type)
 	}
 }
 
+const TCHAR* PetIdToNameLocalizationKey(const FString& PetId)
+{
+	if (PetId == TEXT("dog"))
+	{
+		return TEXT("PET_NAME_DOG");
+	}
+	if (PetId == TEXT("bird"))
+	{
+		return TEXT("PET_NAME_BIRD");
+	}
+	if (PetId == TEXT("cat"))
+	{
+		return TEXT("PET_NAME_CAT");
+	}
+	if (PetId == TEXT("wolf"))
+	{
+		return TEXT("PET_NAME_WOLF");
+	}
+	if (PetId == TEXT("owl"))
+	{
+		return TEXT("PET_NAME_OWL");
+	}
+	if (PetId == TEXT("bear"))
+	{
+		return TEXT("PET_NAME_BEAR");
+	}
+	if (PetId == TEXT("turtle"))
+	{
+		return TEXT("PET_NAME_TURTLE");
+	}
+	if (PetId == TEXT("fox"))
+	{
+		return TEXT("PET_NAME_FOX");
+	}
+	if (PetId == TEXT("rabbit"))
+	{
+		return TEXT("PET_NAME_RABBIT");
+	}
+	if (PetId == TEXT("dragon"))
+	{
+		return TEXT("PET_NAME_DRAGON");
+	}
+	return TEXT("NONE_DASH");
+}
+
+FText PetIdToNameLabel(const FString& PetId)
+{
+	return IdleProject::Localization::UI(PetIdToNameLocalizationKey(PetId));
+}
+
 FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
 {
 	const FString Percent = FString::Printf(TEXT("%.0f%%"), BonusPercent);
+	auto FormatPetBonus = [&Percent](const TCHAR* Key)
+	{
+		return FormatLocalizedUI(Key, [&Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::FromString(Percent));
+		});
+	};
+
 	switch (Type)
 	{
 	case EPetBonusType::Gold:
-		return FormatLocalizedUI(TEXT("PET_BONUS_GOLD_FORMAT"), [&Percent](FFormatNamedArguments& Args)
-		{
-			Args.Add(TEXT("Percent"), FText::FromString(Percent));
-		});
+		return FormatPetBonus(TEXT("PET_BONUS_GOLD_FORMAT"));
 	case EPetBonusType::Drop:
-		return FormatLocalizedUI(TEXT("PET_BONUS_DROP_FORMAT"), [&Percent](FFormatNamedArguments& Args)
-		{
-			Args.Add(TEXT("Percent"), FText::FromString(Percent));
-		});
+		return FormatPetBonus(TEXT("PET_BONUS_DROP_FORMAT"));
+	case EPetBonusType::Exp:
+		return FormatPetBonus(TEXT("PET_BONUS_EXP_FORMAT"));
+	case EPetBonusType::PhysAtk:
+		return FormatPetBonus(TEXT("PET_BONUS_PHYS_ATK_FORMAT"));
+	case EPetBonusType::MagicAtk:
+		return FormatPetBonus(TEXT("PET_BONUS_MAGIC_ATK_FORMAT"));
+	case EPetBonusType::Hp:
+		return FormatPetBonus(TEXT("PET_BONUS_HP_FORMAT"));
+	case EPetBonusType::Def:
+		return FormatPetBonus(TEXT("PET_BONUS_DEF_FORMAT"));
+	case EPetBonusType::AllStat:
+		return FormatPetBonus(TEXT("PET_BONUS_ALL_STAT_FORMAT"));
 	case EPetBonusType::None:
 	default:
 		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
@@ -2300,7 +2364,7 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	return Options;
 }
 
-FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel)
+FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel, TFunctionRef<bool(const FString&)> IsPetOwned)
 {
 	FIdleHUDPetPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("PET_PANEL_TITLE"));
@@ -2308,7 +2372,7 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 		? IdleProject::Localization::UI(TEXT("PET_EQUIPPED_NONE"))
 		: FormatLocalizedUI(TEXT("PET_EQUIPPED_FORMAT"), [&EquippedPetId](FFormatNamedArguments& Args)
 		{
-			Args.Add(TEXT("PetId"), FText::FromString(EquippedPetId));
+			Args.Add(TEXT("PetId"), PetIdToNameLabel(EquippedPetId));
 		});
 	ViewModel.GoldBonusLabel = FormatLocalizedUI(TEXT("PET_BONUS_GOLD_FORMAT"), [GoldBonusPercent](FFormatNamedArguments& Args)
 	{
@@ -2322,27 +2386,33 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 	for (const FPetDefinition& Definition : PetDefinitions)
 	{
 		const int32 Level = FMath::Clamp(GetPetLevel(Definition.PetId), 0, FPetLevelFormula::MaxPetLevel);
+		const bool bOwned = IsPetOwned(Definition.PetId);
 		const int64 FeedCost = FPetLevelFormula::GetFeedCost(Level);
 		const bool bMaxLevel = Level >= FPetLevelFormula::MaxPetLevel;
-		const bool bCanFeed = !bMaxLevel && FeedCost > 0 && Gold >= FeedCost;
+		const bool bCanFeed = bOwned && !bMaxLevel && FeedCost > 0 && Gold >= FeedCost;
 
 		FIdleHUDPetRowViewModel Row;
 		Row.PetId = Definition.PetId;
-		Row.Name = Definition.Name;
+		Row.Name = PetIdToNameLabel(Definition.PetId);
 		Row.BonusLabel = PetBonusTypeToLabel(Definition.BonusType, Definition.BonusPercent * FPetLevelFormula::GetBonusMultiplier(Level));
 		Row.LevelLabel = BuildPetLevelLabel(Level);
 		Row.FeedCostLabel = BuildPetFeedCostLabel(FeedCost);
 		Row.bEquipped = Definition.PetId == EquippedPetId;
-		Row.ActionLabel = IdleProject::Localization::UI(Row.bEquipped ? TEXT("ACTION_EQUIPPED") : TEXT("ACTION_EQUIP"));
+		Row.bCanEquip = bOwned && !Row.bEquipped;
+		Row.ActionLabel = Row.bEquipped
+			? IdleProject::Localization::UI(TEXT("ACTION_EQUIPPED"))
+			: (bOwned ? IdleProject::Localization::UI(TEXT("ACTION_EQUIP")) : IdleProject::Localization::UI(TEXT("PET_STATUS_LOCKED")));
 		Row.FeedActionLabel = IdleProject::Localization::UI(TEXT("ACTION_FEED"));
 		Row.bCanFeed = bCanFeed;
 		Row.bFeedDisabled = !bCanFeed;
 		Row.bMaxLevel = bMaxLevel;
-		Row.StatusLabel = bMaxLevel
+		Row.StatusLabel = !bOwned
+			? IdleProject::Localization::UI(TEXT("PET_STATUS_LOCKED"))
+			: (bMaxLevel
 			? IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_MAX"))
 			: (bCanFeed
 				? IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_READY"))
-				: IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_NEED_GOLD")));
+				: IdleProject::Localization::UI(TEXT("PET_FEED_STATUS_NEED_GOLD"))));
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -5158,6 +5228,10 @@ void AIdleHUD::DrawPetPanel()
 		[PetService](const FString& PetId)
 		{
 			return PetService->GetPetLevel(PetId);
+		},
+		[PetService](const FString& PetId)
+		{
+			return PetService->IsPetOwned(PetId);
 		});
 
 	const UWorld* World = GetWorld();
@@ -5165,15 +5239,15 @@ void AIdleHUD::DrawPetPanel()
 	const bool bShowPetFeedback = !PetFeedbackLabel.IsEmpty() && PetFeedbackElapsed <= PetFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 322.0f * Scale;
+	const float PanelWidth = 460.0f * Scale;
 	const float HeaderHeight = 44.0f * Scale;
-	const float RowHeight = 64.0f * Scale;
-	const float RowGap = 8.0f * Scale;
+	const float RowHeight = 30.0f * Scale;
+	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowPetFeedback ? 26.0f * Scale : 0.0f;
-	const float PanelHeight = HeaderHeight + 48.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
+	const float PanelHeight = HeaderHeight + 38.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
 	const float X = 28.0f * Scale;
-	const float Y = 360.0f * Scale;
+	const float Y = 300.0f * Scale;
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -5187,7 +5261,7 @@ void AIdleHUD::DrawPetPanel()
 	DrawText(ViewModel.GoldBonusLabel.ToString(), Theme::AccentGold, X + Padding, Y + 46.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
 	DrawText(ViewModel.DropBonusLabel.ToString(), Theme::AccentBlue, X + 128.0f * Scale, Y + 46.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
 
-	float RowY = Y + HeaderHeight + 42.0f * Scale;
+	float RowY = Y + HeaderHeight + 32.0f * Scale;
 	for (const FIdleHUDPetRowViewModel& Row : ViewModel.Rows)
 	{
 		DrawPetRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
@@ -5206,34 +5280,35 @@ void AIdleHUD::DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, 
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 64.0f;
+	const float Scale = Height / 30.0f;
 	const FLinearColor StateColor = Row.bEquipped ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
 	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
 	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
 
-	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
-	DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, X + 92.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
-	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 12.0f * Scale, Y + 29.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	DrawText(Row.FeedCostLabel.ToString(), Theme::TextMuted, X + 110.0f * Scale, Y + 29.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	DrawText(Row.StatusLabel.ToString(), Row.bCanFeed ? Theme::AccentBlue : Theme::Warn, X + 12.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, X + 76.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 136.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.FeedCostLabel.ToString(), Theme::TextMuted, X + 214.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.StatusLabel.ToString(), Row.bCanFeed ? Theme::AccentBlue : Theme::Warn, X + 214.0f * Scale, Y + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
 
-	const float ButtonWidth = 78.0f * Scale;
-	const float ButtonHeight = 24.0f * Scale;
-	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
-	const float ButtonY = Y + 7.0f * Scale;
-	DrawRect(Row.bEquipped ? Theme::BgPanel : Theme::AccentGold, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(Row.ActionLabel.ToString(), Row.bEquipped ? Theme::TextMuted : Theme::BgPrimary, ButtonX + 11.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
-	if (!Row.bEquipped)
+	const float ButtonWidth = 56.0f * Scale;
+	const float ButtonHeight = 20.0f * Scale;
+	const float ButtonGap = 4.0f * Scale;
+	const float FeedButtonX = X + Width - ButtonWidth - 6.0f * Scale;
+	const float ButtonX = FeedButtonX - ButtonWidth - ButtonGap;
+	const float ButtonY = Y + 5.0f * Scale;
+	DrawRect(Row.bCanEquip ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanEquip ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+	if (Row.bCanEquip)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetEquipHitBoxName(Row.PetId), true, 82);
 	}
 
-	const float FeedButtonY = Y + 34.0f * Scale;
-	DrawRect(Row.bCanFeed ? Theme::AccentBlue : Theme::BgPanel, ButtonX, FeedButtonY, ButtonWidth, ButtonHeight);
-	DrawText(Row.FeedActionLabel.ToString(), Row.bCanFeed ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 11.0f * Scale, FeedButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawRect(Row.bCanFeed ? Theme::AccentBlue : Theme::BgPanel, FeedButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.FeedActionLabel.ToString(), Row.bCanFeed ? Theme::BgPrimary : Theme::TextMuted, FeedButtonX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
 	if (Row.bCanFeed)
 	{
-		AddHitBox(FVector2D(ButtonX, FeedButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetFeedHitBoxName(Row.PetId), true, 83);
+		AddHitBox(FVector2D(FeedButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetFeedHitBoxName(Row.PetId), true, 83);
 	}
 }
 
@@ -5305,14 +5380,14 @@ void AIdleHUD::DrawSeasonPassPanel()
 		});
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 420.0f * Scale;
+	const float PanelWidth = 460.0f * Scale;
 	const float HeaderHeight = 54.0f * Scale;
-	const float RowHeight = 29.0f * Scale;
-	const float RowGap = 5.0f * Scale;
+	const float RowHeight = 23.0f * Scale;
+	const float RowGap = 3.0f * Scale;
 	const float Padding = 14.0f * Scale;
-	const float PanelHeight = HeaderHeight + 30.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float PanelHeight = HeaderHeight + 24.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
 	const float X = 28.0f * Scale;
-	const float Y = 574.0f * Scale;
+	const float Y = 724.0f * Scale;
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -5326,7 +5401,7 @@ void AIdleHUD::DrawSeasonPassPanel()
 	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), X + Padding, Y + 42.0f * Scale, PanelWidth - Padding * 2.0f, 6.0f * Scale);
 	DrawRect(Theme::AccentBlue, X + Padding, Y + 42.0f * Scale, (PanelWidth - Padding * 2.0f) * ViewModel.ProgressRatio, 6.0f * Scale);
 
-	float RowY = Y + HeaderHeight + 22.0f * Scale;
+	float RowY = Y + HeaderHeight + 18.0f * Scale;
 	for (const FIdleHUDSeasonTierRowViewModel& Row : ViewModel.Rows)
 	{
 		DrawSeasonTierRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);

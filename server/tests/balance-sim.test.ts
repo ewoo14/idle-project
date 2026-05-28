@@ -404,6 +404,137 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports expanded pet bonus economy and combat pressure", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/petBonus.ts",
+    );
+    expect(report.json.model.petBonusPressure.catalogRows).toHaveLength(10);
+    expect(
+      report.json.model.petBonusPressure.catalogRows.map((row) => ({
+        petId: row.petId,
+        bonusType: row.bonusType,
+        baseBonusPercent: row.baseBonusPercent,
+        maxLevelBonusPercent: row.maxLevelBonusPercent,
+      })),
+    ).toEqual([
+      {
+        petId: "dog",
+        bonusType: "Gold",
+        baseBonusPercent: 20,
+        maxLevelBonusPercent: 40,
+      },
+      {
+        petId: "bird",
+        bonusType: "Drop",
+        baseBonusPercent: 15,
+        maxLevelBonusPercent: 30,
+      },
+      {
+        petId: "cat",
+        bonusType: "Exp",
+        baseBonusPercent: 15,
+        maxLevelBonusPercent: 30,
+      },
+      {
+        petId: "wolf",
+        bonusType: "PhysAtk",
+        baseBonusPercent: 10,
+        maxLevelBonusPercent: 20,
+      },
+      {
+        petId: "owl",
+        bonusType: "MagicAtk",
+        baseBonusPercent: 10,
+        maxLevelBonusPercent: 20,
+      },
+      {
+        petId: "bear",
+        bonusType: "Hp",
+        baseBonusPercent: 12,
+        maxLevelBonusPercent: 24,
+      },
+      {
+        petId: "turtle",
+        bonusType: "Def",
+        baseBonusPercent: 12,
+        maxLevelBonusPercent: 24,
+      },
+      {
+        petId: "fox",
+        bonusType: "Gold",
+        baseBonusPercent: 30,
+        maxLevelBonusPercent: 60,
+      },
+      {
+        petId: "rabbit",
+        bonusType: "Drop",
+        baseBonusPercent: 25,
+        maxLevelBonusPercent: 50,
+      },
+      {
+        petId: "dragon",
+        bonusType: "AllStat",
+        baseBonusPercent: 8,
+        maxLevelBonusPercent: 16,
+      },
+    ]);
+    expect(report.json.model.petBonusPressure.combatRows).toEqual([
+      expect.objectContaining({
+        petId: "wolf",
+        bonusType: "PhysAtk",
+        className: "Warrior",
+        level: 100,
+        firstRebirthInjected: false,
+      }),
+      expect.objectContaining({
+        petId: "owl",
+        bonusType: "MagicAtk",
+        className: "Mage",
+        level: 100,
+        firstRebirthInjected: false,
+      }),
+      expect.objectContaining({
+        petId: "bear",
+        bonusType: "Hp",
+        dpsMultiplier: 1,
+        firstRebirthInjected: false,
+      }),
+      expect.objectContaining({
+        petId: "turtle",
+        bonusType: "Def",
+        dpsMultiplier: 1,
+        firstRebirthInjected: false,
+      }),
+      expect.objectContaining({
+        petId: "dragon",
+        bonusType: "AllStat",
+        className: "Warrior",
+        level: 100,
+        firstRebirthInjected: false,
+      }),
+    ]);
+    expect(
+      report.json.model.petBonusPressure.combatRows.find(
+        (row) => row.petId === "wolf",
+      )?.dpsMultiplier,
+    ).toBeGreaterThan(1);
+    expect(
+      report.json.model.petBonusPressure.combatRows.find(
+        (row) => row.petId === "dragon",
+      )?.cpMultiplier,
+    ).toBeGreaterThan(1);
+    expect(report.json.distribution.summary.medianHours).toBe(5.328);
+    expect(report.markdown).toContain("## Pet Bonus Pressure");
+    expect(report.markdown).toContain("| dog | Gold | 20% | 40% | economy |");
+    expect(report.markdown).toContain("| wolf | PhysAtk | Warrior |");
+    expect(report.markdown).toContain(
+      "not injected into the sampled first-rebirth run",
+    );
+  });
+
   it("reports rune growth pressure against CP, DPS, and economy caps", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

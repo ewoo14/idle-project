@@ -16,6 +16,13 @@ export * from "./enhance.js";
 export * from "./equipment.js";
 export * from "./level.js";
 export * from "./offline.js";
+export {
+  getEffectiveBonusPercent as getEffectivePetBonusPercent,
+  getPetCatalog,
+  PET_BONUS_TYPE,
+  type PetBonusType,
+  type PetDefinition,
+} from "./petBonus.js";
 export * from "./petLevel.js";
 export * from "./rebirth.js";
 export * from "./reward.js";
