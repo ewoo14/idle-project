@@ -12,6 +12,8 @@ import { getClassMasteryMultipliers } from "../../server/src/core/formulas/class
 import {
   computeClassDamage,
   computeDamage,
+  computeElementMultiplier,
+  type SkillElement,
 } from "../../server/src/core/formulas/combat.js";
 import { computeCombatPower } from "../../server/src/core/formulas/combatPower.js";
 import {
@@ -44,6 +46,7 @@ import {
   BOSS_REWARD_BONUS,
   computeKillExp,
   computeKillGold,
+  ELITE_REWARD_BONUS,
 } from "../../server/src/core/formulas/reward.js";
 import {
   getCoreRuneMultiplier,
@@ -71,9 +74,13 @@ import {
   RUNE_SET_VITALITY,
 } from "../../server/src/core/formulas/runeSet.js";
 import {
+  computeGlobalStageIndex,
   computeMonsterStatMultiplier,
   computeRewardMultiplier,
   DEFAULT_STAGES_PER_CHAPTER,
+  getStageWeakElement,
+  isBossStage,
+  isEliteStage,
 } from "../../server/src/core/formulas/stage.js";
 import {
   type ClassId,
@@ -148,6 +155,7 @@ export type BalanceReport = {
       bossIncluded: boolean;
       formulas: string[];
       rewardScaling: StageRewardComparison[];
+      darkElementPressure: ElementPressure;
       dropRarityPressure: DropRarityPressure;
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
@@ -190,12 +198,29 @@ export type ClassBalanceSnapshot = {
 export type StageRewardComparison = {
   stage: string;
   globalStageIndex: number;
+  encounterType: "normal" | "elite" | "boss";
+  weakElement: SkillElement;
   monsterHpMultiplier: number;
   rewardMultiplier: number;
   normalExp: number;
   normalGold: string;
+  eliteExp: number;
+  eliteGold: string;
   bossExp: number;
   bossGold: string;
+};
+
+export type ElementPressureRow = {
+  skillElement: SkillElement;
+  targetWeakElement: SkillElement;
+  multiplier: number;
+  note: string;
+};
+
+export type ElementPressure = {
+  darkWeakStageCount: number;
+  totalStageCount: number;
+  rows: ElementPressureRow[];
 };
 
 export type DropRarityPressureRow = {
@@ -387,6 +412,7 @@ export type RuneCodexPressure = {
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
+const TOTAL_CHAPTERS = 3;
 const TARGET_MIN_HOURS = 5;
 const TARGET_MAX_HOURS = 10;
 const ACCEPTABLE_MIN_HOURS = 3;
@@ -510,7 +536,8 @@ export function buildBalanceReport(
         "server/src/core/formulas/runeSet.ts",
         "server/src/core/formulas/runeCodex.ts",
       ],
-      rewardScaling: buildStageRewardComparison(1),
+      rewardScaling: buildStageRewardComparison(),
+      darkElementPressure: buildDarkElementPressure(),
       dropRarityPressure: buildDropRarityPressure(),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
@@ -893,42 +920,121 @@ function baseKillGold(level: number): number {
   return level * 8;
 }
 
-function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
+function buildStageRewardComparison(): StageRewardComparison[] {
   const baseGoldMin = 10;
   const baseGoldMax = 15;
-  return Array.from(
-    { length: DEFAULT_STAGES_PER_CHAPTER },
-    (_, stageOffset) => {
-      const globalStageIndex =
-        (chapter - 1) * DEFAULT_STAGES_PER_CHAPTER + stageOffset + 1;
-      const baseExp = baseKillExp(1);
-      const normalGoldMin = computeKillGold(
-        baseGoldMin,
-        globalStageIndex,
-        false,
-      );
-      const normalGoldMax = computeKillGold(
-        baseGoldMax,
-        globalStageIndex,
-        false,
-      );
-      const bossGoldMin = computeKillGold(baseGoldMin, globalStageIndex, true);
-      const bossGoldMax = computeKillGold(baseGoldMax, globalStageIndex, true);
-      return {
-        stage: `${chapter}-${stageOffset + 1}`,
-        globalStageIndex,
-        monsterHpMultiplier: round(
-          computeMonsterStatMultiplier(globalStageIndex),
-          3,
-        ),
-        rewardMultiplier: round(computeRewardMultiplier(globalStageIndex), 3),
-        normalExp: computeKillExp(baseExp, globalStageIndex, false),
-        normalGold: `${normalGoldMin}-${normalGoldMax}`,
-        bossExp: computeKillExp(baseExp, globalStageIndex, true),
-        bossGold: `${bossGoldMin}-${bossGoldMax}`,
-      };
-    },
-  );
+  return Array.from({ length: TOTAL_CHAPTERS }, (_, chapterOffset) =>
+    Array.from(
+      { length: DEFAULT_STAGES_PER_CHAPTER },
+      (_, stageOffset): StageRewardComparison => {
+        const chapter = chapterOffset + 1;
+        const stage = stageOffset + 1;
+        const globalStageIndex = computeGlobalStageIndex(
+          chapter,
+          stage,
+          DEFAULT_STAGES_PER_CHAPTER,
+        );
+        const encounterType = isBossStage(
+          chapter,
+          stage,
+          DEFAULT_STAGES_PER_CHAPTER,
+        )
+          ? "boss"
+          : isEliteStage(stage)
+            ? "elite"
+            : "normal";
+        const baseExp = baseKillExp(1);
+        const normalGoldMin = computeKillGold(
+          baseGoldMin,
+          globalStageIndex,
+          false,
+        );
+        const normalGoldMax = computeKillGold(
+          baseGoldMax,
+          globalStageIndex,
+          false,
+        );
+        const eliteGoldMin = computeKillGold(
+          baseGoldMin,
+          globalStageIndex,
+          false,
+          true,
+        );
+        const eliteGoldMax = computeKillGold(
+          baseGoldMax,
+          globalStageIndex,
+          false,
+          true,
+        );
+        const bossGoldMin = computeKillGold(
+          baseGoldMin,
+          globalStageIndex,
+          true,
+        );
+        const bossGoldMax = computeKillGold(
+          baseGoldMax,
+          globalStageIndex,
+          true,
+        );
+        return {
+          stage: `${chapter}-${stage}`,
+          globalStageIndex,
+          encounterType,
+          weakElement: getStageWeakElement(globalStageIndex),
+          monsterHpMultiplier: round(
+            computeMonsterStatMultiplier(globalStageIndex),
+            3,
+          ),
+          rewardMultiplier: round(computeRewardMultiplier(globalStageIndex), 3),
+          normalExp: computeKillExp(baseExp, globalStageIndex, false),
+          normalGold: `${normalGoldMin}-${normalGoldMax}`,
+          eliteExp: computeKillExp(baseExp, globalStageIndex, false, true),
+          eliteGold: `${eliteGoldMin}-${eliteGoldMax}`,
+          bossExp: computeKillExp(baseExp, globalStageIndex, true),
+          bossGold: `${bossGoldMin}-${bossGoldMax}`,
+        };
+      },
+    ),
+  ).flat();
+}
+
+function buildDarkElementPressure(): ElementPressure {
+  const totalStageCount = TOTAL_CHAPTERS * DEFAULT_STAGES_PER_CHAPTER;
+  const darkWeakStageCount = Array.from(
+    { length: totalStageCount },
+    (_, index) => getStageWeakElement(index + 1),
+  ).filter((element) => element === "Dark").length;
+
+  return {
+    darkWeakStageCount,
+    totalStageCount,
+    rows: [
+      {
+        skillElement: "Holy",
+        targetWeakElement: "Dark",
+        multiplier: computeElementMultiplier("Holy", "Dark"),
+        note: "Holy counter into Dark-heavy stages",
+      },
+      {
+        skillElement: "Dark",
+        targetWeakElement: "Holy",
+        multiplier: computeElementMultiplier("Dark", "Holy"),
+        note: "Dark counter into Holy weakness stages",
+      },
+      {
+        skillElement: "Dark",
+        targetWeakElement: "Dark",
+        multiplier: computeElementMultiplier("Dark", "Dark"),
+        note: "Direct Dark weakness match",
+      },
+      {
+        skillElement: "Dark",
+        targetWeakElement: "Fire",
+        multiplier: computeElementMultiplier("Dark", "Fire"),
+        note: "Neutral non-Holy/Dark matchup",
+      },
+    ],
+  };
 }
 
 function buildDropRarityPressure(): DropRarityPressure {
@@ -1602,18 +1708,37 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "## Reward Scaling",
     "",
     `- Boss bonus: ${BOSS_REWARD_BONUS}x`,
+    `- Elite bonus: ${ELITE_REWARD_BONUS}x`,
     "- Normal kill rewards use `computeKillExp` / `computeKillGold`.",
     "- Source: `server/src/core/formulas/reward.ts`.",
     "- Monster HP and reward multipliers both reuse the stage index ramp.",
-    "- Result: 1-1 through 1-5 keep reward-per-HP pressure stable before boss bonuses.",
+    "- Result: 30-stage Chapter 1-3 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.",
+    `- Dark stage share: ${report.model.darkElementPressure.darkWeakStageCount}/${report.model.darkElementPressure.totalStageCount}.`,
     "",
     "<!-- markdownlint-disable MD013 -->",
     "",
-    "| Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Stage | idx | Type | Weak | HP x | Reward x | Normal EXP | Normal Gold | Elite EXP | Elite Gold | Boss EXP | Boss Gold |",
+    "| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...report.model.rewardScaling.map(
       (row) =>
-        `| ${row.stage} | ${row.globalStageIndex} | ${row.monsterHpMultiplier} | ${row.rewardMultiplier} | ${row.normalExp} | ${row.normalGold} | ${row.bossExp} | ${row.bossGold} |`,
+        `| ${row.stage} | ${row.globalStageIndex} | ${row.encounterType} | ${row.weakElement} | ${row.monsterHpMultiplier} | ${row.rewardMultiplier} | ${row.normalExp} | ${row.normalGold} | ${row.eliteExp} | ${row.eliteGold} | ${row.bossExp} | ${row.bossGold} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Dark Element Pressure",
+    "",
+    "- Holy and Dark counter each other at the same 1.5x weakness boundary.",
+    "- Dark-heavy chapter 3 increases matchup coverage without changing the",
+    "  sampled first-rebirth timing model.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Skill element | Target weakness | Multiplier | Note |",
+    "| --- | --- | ---: | --- |",
+    ...report.model.darkElementPressure.rows.map(
+      (row) =>
+        `| ${row.skillElement} | ${row.targetWeakElement} | x${row.multiplier} | ${row.note} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

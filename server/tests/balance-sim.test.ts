@@ -184,8 +184,66 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("1-5");
     expect(report.markdown).toContain("Boss bonus: 8x");
     expect(report.markdown).toContain(
-      "| 1-1 | 1 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |",
+      "| 1-1 | 1 | normal | Fire | 1 | 1 | 12 | 10-15 | 36 | 30-45 | 96 | 80-120 |",
     );
+  });
+
+  it("documents the PR #66 30-stage chapter expansion with elite and Dark pressure", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.rewardScaling).toHaveLength(30);
+    expect(report.json.model.rewardScaling[0]).toEqual(
+      expect.objectContaining({
+        stage: "1-1",
+        globalStageIndex: 1,
+        encounterType: "normal",
+        weakElement: "Fire",
+      }),
+    );
+    expect(report.json.model.rewardScaling[4]).toEqual(
+      expect.objectContaining({
+        stage: "1-5",
+        globalStageIndex: 5,
+        encounterType: "elite",
+        weakElement: "Dark",
+        eliteExp: 58,
+      }),
+    );
+    expect(report.json.model.rewardScaling[9]).toEqual(
+      expect.objectContaining({
+        stage: "1-10",
+        globalStageIndex: 10,
+        encounterType: "boss",
+      }),
+    );
+    expect(report.json.model.rewardScaling[20]).toEqual(
+      expect.objectContaining({
+        stage: "3-1",
+        globalStageIndex: 21,
+        weakElement: "Dark",
+      }),
+    );
+    expect(report.json.model.rewardScaling.at(-1)).toEqual(
+      expect.objectContaining({
+        stage: "3-10",
+        globalStageIndex: 30,
+        encounterType: "boss",
+        weakElement: "Holy",
+      }),
+    );
+    expect(report.markdown).toContain("30-stage Chapter 1-3 comparison");
+    expect(report.markdown).toContain("Elite bonus: 3x");
+    expect(report.json.model.darkElementPressure.darkWeakStageCount).toBe(9);
+    expect(report.json.model.darkElementPressure.rows).toHaveLength(4);
+    expect(report.json.model.darkElementPressure.rows).toContainEqual({
+      skillElement: "Holy",
+      targetWeakElement: "Dark",
+      multiplier: 1.5,
+      note: "Holy counter into Dark-heavy stages",
+    });
+    expect(report.markdown).toContain("Dark stage share: 9/30");
+    expect(report.markdown).toContain("| 3-10 | 30 | boss | Holy |");
   });
 
   it("reports enhancement spend pressure against sampled gold income", () => {

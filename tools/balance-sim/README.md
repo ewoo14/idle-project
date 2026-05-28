@@ -70,6 +70,11 @@ PR #55 adds achievement multiplier pressure. The simulator imports
 multiplier, and reports the composite impact against the PR #47 transcend and
 PR #51 tower milestone reference multipliers.
 
+PR #66 expands reward-scaling evidence from the chapter 1 sample to all 30
+stages across chapters 1-3. The report now includes encounter type, weak
+element, normal reward, 3x elite reward, and 8x boss reward for every stage,
+plus a Dark element pressure table that verifies the Holy/Dark 1.5x matchup.
+
 ## V1 Interpretation
 
 The V1 pass is a distribution check, not a curve rewrite. It validates the
@@ -95,9 +100,20 @@ Seed `23`, 1000 runs:
 The median is inside the 5-10h target and the full distribution is inside the
 3-20h acceptable range, so this slice keeps the current EXP curve unchanged.
 BossBonus remains 8x and the stage reward multiplier remains
-`1 + globalStageIndex * 0.15`. The sensitivity recommendation is to monitor
-enhancement gold pressure in the next balance slice before changing combat or
-EXP coefficients.
+`1 + max(0, globalStageIndex - 1) * 0.15`. EliteBonus is 3x and is lower than
+the boss reward spike. The sensitivity recommendation is to monitor enhancement
+gold pressure in the next balance slice before changing combat or EXP
+coefficients.
+
+PR #66 stage evidence:
+
+- stage table coverage: 30 rows, chapter 1-3, global indexes 1-30
+- elite stages: 1-5, 2-5, 3-5 at 3x reward
+- boss stages: 1-10, 2-10, 3-10 at 8x reward
+- Dark weakness coverage: 9 of 30 stages, with chapter 3 carrying 5 Dark-weak
+  stages
+- Dark matchup pressure: Holy->Dark x1.5, Dark->Holy x1.5, Dark->Dark x1.5,
+  Dark->Fire x1.0 neutral
 
 Enhancement V1 pressure, using the current +0 to +50 formula:
 

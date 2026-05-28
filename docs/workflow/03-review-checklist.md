@@ -370,3 +370,16 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `docs/planning/ui-tokens.json` and `UIThemeTokens.h` stay in sync for
   Dark element colors, and `.gitattributes` continues to LFS-track exported UI
   binary assets.
+
+## PR #66 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 30-row
+  chapter 1-3 reward table with global stage indexes 1-30.
+- [ ] The stage table reports encounter type, weak element, HP multiplier,
+  reward multiplier, normal reward, 3x elite reward, and 8x boss reward.
+- [ ] Elite rows remain `X-5`, boss rows remain `X-10`, and normal < elite <
+  boss reward ordering is visible in the table.
+- [ ] Dark element pressure includes Holy->Dark, Dark->Holy, Dark->Dark, and
+  neutral Dark->Fire matchup rows.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target after the report expansion.

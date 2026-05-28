@@ -19,25 +19,64 @@
 ## Reward Scaling
 
 - Boss bonus: 8x
+- Elite bonus: 3x
 - Normal kill rewards use `computeKillExp` / `computeKillGold`.
 - Source: `server/src/core/formulas/reward.ts`.
 - Monster HP and reward multipliers both reuse the stage index ramp.
-- Result: 1-1 through 1-5 keep reward-per-HP pressure stable before boss bonuses.
+- Result: 30-stage Chapter 1-3 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.
+- Dark stage share: 9/30.
 
 <!-- markdownlint-disable MD013 -->
 
-| Stage | idx | HP x | Reward x | Normal EXP | Normal Gold | Boss EXP | Boss Gold |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1-1 | 1 | 1 | 1 | 12 | 10-15 | 96 | 80-120 |
-| 1-2 | 2 | 1.15 | 1.15 | 14 | 11-17 | 110 | 92-138 |
-| 1-3 | 3 | 1.3 | 1.3 | 16 | 13-19 | 125 | 104-156 |
-| 1-4 | 4 | 1.45 | 1.45 | 17 | 15-22 | 139 | 116-174 |
-| 1-5 | 5 | 1.6 | 1.6 | 19 | 16-24 | 154 | 128-192 |
-| 1-6 | 6 | 1.75 | 1.75 | 21 | 18-26 | 168 | 140-210 |
-| 1-7 | 7 | 1.9 | 1.9 | 23 | 19-29 | 182 | 152-228 |
-| 1-8 | 8 | 2.05 | 2.05 | 25 | 21-31 | 197 | 164-246 |
-| 1-9 | 9 | 2.2 | 2.2 | 26 | 22-33 | 211 | 176-264 |
-| 1-10 | 10 | 2.35 | 2.35 | 28 | 23-35 | 226 | 188-282 |
+| Stage | idx | Type | Weak | HP x | Reward x | Normal EXP | Normal Gold | Elite EXP | Elite Gold | Boss EXP | Boss Gold |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1-1 | 1 | normal | Fire | 1 | 1 | 12 | 10-15 | 36 | 30-45 | 96 | 80-120 |
+| 1-2 | 2 | normal | Ice | 1.15 | 1.15 | 14 | 11-17 | 41 | 34-52 | 110 | 92-138 |
+| 1-3 | 3 | normal | Lightning | 1.3 | 1.3 | 16 | 13-19 | 47 | 39-58 | 125 | 104-156 |
+| 1-4 | 4 | normal | Holy | 1.45 | 1.45 | 17 | 15-22 | 52 | 44-65 | 139 | 116-174 |
+| 1-5 | 5 | elite | Dark | 1.6 | 1.6 | 19 | 16-24 | 58 | 48-72 | 154 | 128-192 |
+| 1-6 | 6 | normal | Fire | 1.75 | 1.75 | 21 | 18-26 | 63 | 53-79 | 168 | 140-210 |
+| 1-7 | 7 | normal | Ice | 1.9 | 1.9 | 23 | 19-29 | 68 | 57-86 | 182 | 152-228 |
+| 1-8 | 8 | normal | Lightning | 2.05 | 2.05 | 25 | 21-31 | 74 | 62-92 | 197 | 164-246 |
+| 1-9 | 9 | normal | Holy | 2.2 | 2.2 | 26 | 22-33 | 79 | 66-99 | 211 | 176-264 |
+| 1-10 | 10 | boss | Dark | 2.35 | 2.35 | 28 | 23-35 | 85 | 70-106 | 226 | 188-282 |
+| 2-1 | 11 | normal | Ice | 2.5 | 2.5 | 30 | 25-38 | 90 | 75-113 | 240 | 200-300 |
+| 2-2 | 12 | normal | Fire | 2.65 | 2.65 | 32 | 27-40 | 95 | 80-119 | 254 | 212-318 |
+| 2-3 | 13 | normal | Holy | 2.8 | 2.8 | 34 | 28-42 | 101 | 84-126 | 269 | 224-336 |
+| 2-4 | 14 | normal | Lightning | 2.95 | 2.95 | 35 | 30-44 | 106 | 89-133 | 283 | 236-354 |
+| 2-5 | 15 | elite | Dark | 3.1 | 3.1 | 37 | 31-47 | 112 | 93-140 | 298 | 248-372 |
+| 2-6 | 16 | normal | Ice | 3.25 | 3.25 | 39 | 33-49 | 117 | 98-146 | 312 | 260-390 |
+| 2-7 | 17 | normal | Fire | 3.4 | 3.4 | 41 | 34-51 | 122 | 102-153 | 326 | 272-408 |
+| 2-8 | 18 | normal | Holy | 3.55 | 3.55 | 43 | 36-53 | 128 | 107-160 | 341 | 284-426 |
+| 2-9 | 19 | normal | Lightning | 3.7 | 3.7 | 44 | 37-56 | 133 | 111-167 | 355 | 296-444 |
+| 2-10 | 20 | boss | Dark | 3.85 | 3.85 | 46 | 39-58 | 139 | 116-173 | 370 | 308-462 |
+| 3-1 | 21 | normal | Dark | 4 | 4 | 48 | 40-60 | 144 | 120-180 | 384 | 320-480 |
+| 3-2 | 22 | normal | Holy | 4.15 | 4.15 | 50 | 42-62 | 149 | 125-187 | 398 | 332-498 |
+| 3-3 | 23 | normal | Dark | 4.3 | 4.3 | 52 | 43-65 | 155 | 129-194 | 413 | 344-516 |
+| 3-4 | 24 | normal | Lightning | 4.45 | 4.45 | 53 | 44-67 | 160 | 133-200 | 427 | 356-534 |
+| 3-5 | 25 | elite | Dark | 4.6 | 4.6 | 55 | 46-69 | 166 | 138-207 | 442 | 368-552 |
+| 3-6 | 26 | normal | Fire | 4.75 | 4.75 | 57 | 48-71 | 171 | 143-214 | 456 | 380-570 |
+| 3-7 | 27 | normal | Dark | 4.9 | 4.9 | 59 | 49-74 | 176 | 147-221 | 470 | 392-588 |
+| 3-8 | 28 | normal | Ice | 5.05 | 5.05 | 61 | 51-76 | 182 | 152-227 | 485 | 404-606 |
+| 3-9 | 29 | normal | Dark | 5.2 | 5.2 | 62 | 52-78 | 187 | 156-234 | 499 | 416-624 |
+| 3-10 | 30 | boss | Holy | 5.35 | 5.35 | 64 | 54-80 | 193 | 161-241 | 514 | 428-642 |
+
+<!-- markdownlint-enable MD013 -->
+
+## Dark Element Pressure
+
+- Holy and Dark counter each other at the same 1.5x weakness boundary.
+- Dark-heavy chapter 3 increases matchup coverage without changing the
+  sampled first-rebirth timing model.
+
+<!-- markdownlint-disable MD013 -->
+
+| Skill element | Target weakness | Multiplier | Note |
+| --- | --- | ---: | --- |
+| Holy | Dark | x1.5 | Holy counter into Dark-heavy stages |
+| Dark | Holy | x1.5 | Dark counter into Holy weakness stages |
+| Dark | Dark | x1.5 | Direct Dark weakness match |
+| Dark | Fire | x1 | Neutral non-Holy/Dark matchup |
 
 <!-- markdownlint-enable MD013 -->
 

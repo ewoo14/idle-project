@@ -1572,3 +1572,21 @@ Save migration moves to SaveVersion 8. Legacy SaveVersion < 8 data preserves
 the saved current chapter/stage where possible, carries chapter 1 boss defeat
 into the highest-cleared chapter floor, and prevents legacy two-chapter saves
 from accidentally marking chapter 3 complete.
+
+Balance simulator evidence for PR #66:
+
+- `tools/balance-sim` imports `stage.ts`, `reward.ts`, and `combat.ts` for the
+  30-stage review table instead of duplicating stage, reward, or element
+  constants.
+- The generated report covers all chapter 1-3 stages, global indexes 1-30,
+  encounter type, weak element, normal rewards, elite 3x rewards, and boss 8x
+  rewards.
+- Chapter 3 is Dark-heavy without changing the sampled first-rebirth timing
+  model: Dark weakness appears on 9 of 30 stages overall and 5 of 10 chapter 3
+  stages.
+- Dark matchup pressure stays bounded to the existing element formula:
+  Holy->Dark, Dark->Holy, and Dark->Dark are x1.5 weakness hits; unrelated
+  Dark matchups such as Dark->Fire remain neutral x1.0.
+- The 1000-run first-rebirth distribution remains at p10 4.919h, median
+  5.328h, p90 5.751h, min 4.564h, and max 6.144h. Median remains inside the
+  5-10h target and every sampled run remains inside the 3-20h review band.
