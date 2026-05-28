@@ -59,3 +59,11 @@ Rate limit: 저장 30/min/User, 조회 120/min/User.
 stored as `FRuneCodexEntry[]` (`RuneType`, `Rarity`, `bUnlocked`). Servers keep this
 inside `clientSave` without interpreting it; clients loading saves with version `<4`
 must treat the codex as an empty grid.
+
+## Client save v6 note
+
+`payload.clientSave.SaveVersion` 6 adds `RuneSet` to each `FRuneSaveEntry`.
+Valid values are `0=None`, `1=Offense`, `2=Bastion`, `3=Vitality`, and
+`4=Fortune`. Servers keep the field inside `clientSave` without interpreting it;
+clients loading saves with version `<6` must treat missing rune-set data as
+`None`, which contributes no set bonus.

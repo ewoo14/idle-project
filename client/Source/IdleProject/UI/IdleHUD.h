@@ -320,6 +320,21 @@ struct IDLEPROJECT_API FIdleHUDRuneOwnedRowViewModel
 	bool bCanDisenchant = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDRuneSetRowViewModel
+{
+	ERuneSet RuneSet = ERuneSet::None;
+	FText SetLabel;
+	FText CountLabel;
+	FText TierLabel;
+	FText BonusLabel;
+	FText NextTierLabel;
+	int32 Count = 0;
+	bool bActive = false;
+	bool bTwoSetActive = false;
+	bool bFourSetActive = false;
+	bool bSixSetActive = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneViewModel
 {
 	FText Title;
@@ -342,6 +357,8 @@ struct IDLEPROJECT_API FIdleHUDRuneViewModel
 	bool bCanCraftClassRune = false;
 	TArray<FIdleHUDRuneSlotViewModel> Slots;
 	TArray<FIdleHUDRuneOwnedRowViewModel> OwnedRows;
+	FText SetTitle;
+	TArray<FIdleHUDRuneSetRowViewModel> SetRows;
 };
 
 struct IDLEPROJECT_API FIdleHUDRuneCodexCellViewModel
@@ -625,6 +642,7 @@ private:
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
+	void DrawRuneSetRow(const FIdleHUDRuneSetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height);
 	void DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float X, float Y, float Width, float Height);
 	void SelectRuneFromHitBox(FName BoxName);

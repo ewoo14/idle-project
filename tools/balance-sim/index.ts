@@ -54,6 +54,17 @@ import {
   UTIL_CATEGORY_CAP_EXTENSION,
 } from "../../server/src/core/formulas/runeCodex.js";
 import {
+  computeRuneSetBonus,
+  getSetTierBonus,
+  RUNE_SET_BASTION,
+  RUNE_SET_FORTUNE,
+  RUNE_SET_OFFENSE,
+  RUNE_SET_TIER1_COUNT,
+  RUNE_SET_TIER2_COUNT,
+  RUNE_SET_TIER3_COUNT,
+  RUNE_SET_VITALITY,
+} from "../../server/src/core/formulas/runeSet.js";
+import {
   computeMonsterStatMultiplier,
   computeRewardMultiplier,
   DEFAULT_STAGES_PER_CHAPTER,
@@ -302,6 +313,22 @@ export type ClassMasteryPressureRow = {
   dpsMultiplier: number;
 };
 
+export type RuneSetPressureRow = {
+  runeSet: string;
+  count: number;
+  tierBonusPercent: number;
+  bonusLanes: string[];
+  className: string;
+  level: number;
+  baseCombatPower: number;
+  setCombatPower: number;
+  cpMultiplier: number;
+  baseDps: number;
+  setDps: number;
+  dpsMultiplier: number;
+  firstRebirthInjected: boolean;
+};
+
 export type RuneUtilPressureRow = {
   runeType: RuneTypeName;
   rarity: RuneRarityName;
@@ -316,6 +343,7 @@ export type RunePressure = {
   coreRows: RuneCorePressureRow[];
   combatRows: RuneCombatPressureRow[];
   classMasteryRows: ClassMasteryPressureRow[];
+  setRows: RuneSetPressureRow[];
   utilRows: RuneUtilPressureRow[];
 };
 
@@ -362,6 +390,19 @@ const MYTHIC_RUNE_RARITY = 6;
 const CLASS_MASTERY_REVIEW_LEVEL = 100;
 const CLASS_MASTERY_REVIEW_ENHANCE_LEVEL = 50;
 const REGULAR_RUNE_SLOT_COUNT = RUNE_SLOT_COUNT - 1;
+const RUNE_SET_REVIEW_CLASS: ClassId = 1;
+const RUNE_SET_REVIEW_LEVEL = 100;
+const RUNE_SET_REVIEW_COUNTS = [
+  RUNE_SET_TIER1_COUNT,
+  RUNE_SET_TIER2_COUNT,
+  RUNE_SET_TIER3_COUNT,
+];
+const RUNE_SET_REVIEW_SETS = [
+  RUNE_SET_OFFENSE,
+  RUNE_SET_BASTION,
+  RUNE_SET_VITALITY,
+  RUNE_SET_FORTUNE,
+] as const;
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -430,6 +471,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/achievement.ts",
         "server/src/core/formulas/rune.ts",
         "server/src/core/formulas/classRune.ts",
+        "server/src/core/formulas/runeSet.ts",
         "server/src/core/formulas/runeCodex.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
@@ -1084,6 +1126,11 @@ function buildRunePressure(): RunePressure {
         CLASS_MASTERY_REVIEW_ENHANCE_LEVEL,
       ),
     ),
+    setRows: RUNE_SET_REVIEW_SETS.flatMap((runeSet) =>
+      RUNE_SET_REVIEW_COUNTS.map((count) =>
+        buildRuneSetPressureRow(runeSet, count),
+      ),
+    ),
     utilRows: RUNE_UTIL_REVIEW_TYPES.map((runeType) =>
       buildRuneUtilPressureRow(runeType, MYTHIC_RUNE_RARITY),
     ),
@@ -1228,6 +1275,48 @@ function buildClassMasteryPressureRow(
   };
 }
 
+function buildRuneSetPressureRow(
+  runeSet: number,
+  count: number,
+): RuneSetPressureRow {
+  const classId = RUNE_SET_REVIEW_CLASS;
+  const level = RUNE_SET_REVIEW_LEVEL;
+  const baseStats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const bonus = computeRuneSetBonus({ [runeSet]: count });
+  const setStats = {
+    ...baseStats,
+    hp: Math.round(baseStats.hp * (1 + bonus.core.hp)),
+    physAtk: Math.round(baseStats.physAtk * (1 + bonus.core.physAtk)),
+    magicAtk: Math.round(baseStats.magicAtk * (1 + bonus.core.magicAtk)),
+    physDef: Math.round(baseStats.physDef * (1 + bonus.core.physDef)),
+    magicDef: Math.round(baseStats.magicDef * (1 + bonus.core.magicDef)),
+    critDmg: baseStats.critDmg + bonus.util.critDamage,
+  };
+  const baseCombatPower = computeCombatPower(baseStats);
+  const setCombatPower = computeCombatPower(setStats);
+  const baseDps = effectiveReviewDps(baseStats, classId, level);
+  const setDps = effectiveReviewDps(setStats, classId, level);
+
+  return {
+    runeSet: runeSetName(runeSet),
+    count,
+    tierBonusPercent: round(getSetTierBonus(count) * 100, 3),
+    bonusLanes: runeSetBonusLanes(runeSet),
+    className: CLASS_NAMES[classId],
+    level,
+    baseCombatPower,
+    setCombatPower,
+    cpMultiplier: round(setCombatPower / Math.max(1, baseCombatPower), 3),
+    baseDps,
+    setDps,
+    dpsMultiplier: round(setDps / Math.max(1, baseDps), 3),
+    firstRebirthInjected: false,
+  };
+}
+
 function buildRuneUtilPressureRow(
   runeType: number,
   rarity: number,
@@ -1296,6 +1385,36 @@ function masteryStatNames(
   ]
     .filter(([, value]) => value > 0)
     .map(([name]) => String(name));
+}
+
+function runeSetName(runeSet: number): string {
+  switch (runeSet) {
+    case RUNE_SET_OFFENSE:
+      return "Offense";
+    case RUNE_SET_BASTION:
+      return "Bastion";
+    case RUNE_SET_VITALITY:
+      return "Vitality";
+    case RUNE_SET_FORTUNE:
+      return "Fortune";
+    default:
+      throw new Error(`Unsupported rune set ${runeSet}`);
+  }
+}
+
+function runeSetBonusLanes(runeSet: number): string[] {
+  switch (runeSet) {
+    case RUNE_SET_OFFENSE:
+      return ["PhysAtk", "MagicAtk"];
+    case RUNE_SET_BASTION:
+      return ["PhysDef", "MagicDef"];
+    case RUNE_SET_VITALITY:
+      return ["Hp", "OfflineEff"];
+    case RUNE_SET_FORTUNE:
+      return ["GoldFind", "ExpBoost", "CritDamage"];
+    default:
+      throw new Error(`Unsupported rune set ${runeSet}`);
+  }
 }
 
 function runeRarityName(rarity: number): RuneRarityName {
@@ -1559,6 +1678,27 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.runePressure.classMasteryRows.map(
       (row) =>
         `| ${row.className} | ${row.role} | ${row.masteryStats.join(", ")} | ${row.baseCombatPower} | ${row.classRuneCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.classRuneDps} | x${row.dpsMultiplier} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Rune Set Bonus Pressure",
+    "",
+    "- Set bonuses apply only to the six regular rune slots; the ClassMastery",
+    "  slot remains outside set counting.",
+    "- Rows compare 2/4/6 same-set tiers on the shared Lv100 Warrior review",
+    "  loadout. Utility economy lanes are listed as pressure signals, while",
+    "  only combat-facing lanes change CP or DPS in this table.",
+    "- Rune set acquisition is not injected into the sampled first-rebirth run;",
+    "  the 1000-run median remains the PR #61 baseline guard.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Rune set | Count | Bonus | Bonus lanes | Base CP | Set CP | CP x | Base DPS | Set DPS | DPS x |",
+    "| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.runePressure.setRows.map(
+      (row) =>
+        `| ${row.runeSet} | ${row.count} | ${row.tierBonusPercent}% | ${row.bonusLanes.join(", ")} | ${row.baseCombatPower} | ${row.setCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.setDps} | x${row.dpsMultiplier} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

@@ -296,7 +296,7 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes rune state"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Class rune save bumps version to five"), CapturedSave->SaveVersion, 5);
+	TestEqual(TEXT("Rune save bumps version to six"), CapturedSave->SaveVersion, 6);
 	TestEqual(TEXT("Captured rune count round trips"), CapturedSave->Runes.Num(), 2);
 	TestEqual(TEXT("Captured rune codex has fifty four cells"), CapturedSave->RuneCodex.Num(), FRuneCodexFormula::TotalCells);
 	TestEqual(TEXT("Captured rune essence round trips"), CapturedSave->RuneEssence, GameInstance->GetRuneEssence());

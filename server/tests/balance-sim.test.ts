@@ -376,6 +376,123 @@ describe("balance simulator", () => {
     expect(report.markdown).toContain("| Warrior | dps | PhysAtk, PhysDef |");
   });
 
+  it("reports rune set tier pressure without injecting it into the sampled rebirth run", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/runeSet.ts",
+    );
+    expect(report.json.model.runePressure.setRows).toHaveLength(12);
+    expect(
+      report.json.model.runePressure.setRows.map((row) => ({
+        runeSet: row.runeSet,
+        count: row.count,
+        tierBonusPercent: row.tierBonusPercent,
+        firstRebirthInjected: row.firstRebirthInjected,
+      })),
+    ).toEqual([
+      {
+        runeSet: "Offense",
+        count: 2,
+        tierBonusPercent: 5,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Offense",
+        count: 4,
+        tierBonusPercent: 12,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Offense",
+        count: 6,
+        tierBonusPercent: 25,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Bastion",
+        count: 2,
+        tierBonusPercent: 5,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Bastion",
+        count: 4,
+        tierBonusPercent: 12,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Bastion",
+        count: 6,
+        tierBonusPercent: 25,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Vitality",
+        count: 2,
+        tierBonusPercent: 5,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Vitality",
+        count: 4,
+        tierBonusPercent: 12,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Vitality",
+        count: 6,
+        tierBonusPercent: 25,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Fortune",
+        count: 2,
+        tierBonusPercent: 5,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Fortune",
+        count: 4,
+        tierBonusPercent: 12,
+        firstRebirthInjected: false,
+      },
+      {
+        runeSet: "Fortune",
+        count: 6,
+        tierBonusPercent: 25,
+        firstRebirthInjected: false,
+      },
+    ]);
+    expect(
+      report.json.model.runePressure.setRows.find(
+        (row) => row.runeSet === "Offense" && row.count === 6,
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        bonusLanes: ["PhysAtk", "MagicAtk"],
+        className: "Warrior",
+        level: 100,
+        cpMultiplier: expect.any(Number),
+        dpsMultiplier: expect.any(Number),
+      }),
+    );
+    expect(
+      report.json.model.runePressure.setRows.find(
+        (row) => row.runeSet === "Offense" && row.count === 6,
+      )?.dpsMultiplier,
+    ).toBeGreaterThan(1);
+    expect(report.json.distribution.summary.medianHours).toBe(5.328);
+    expect(report.markdown).toContain("## Rune Set Bonus Pressure");
+    expect(report.markdown).toContain(
+      "| Offense | 6 | 25% | PhysAtk, MagicAtk |",
+    );
+    expect(report.markdown).toContain(
+      "not injected into the sampled first-rebirth run",
+    );
+  });
+
   it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

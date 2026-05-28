@@ -17,7 +17,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 5;
+	int32 SaveVersion = 6;
 
 	UPROPERTY()
 	bool bHasSave = false;

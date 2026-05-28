@@ -327,7 +327,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 5;
+	SaveGame->SaveVersion = 6;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;

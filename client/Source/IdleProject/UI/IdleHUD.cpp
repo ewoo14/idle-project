@@ -24,6 +24,7 @@
 #include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
+#include "RuneSystem/RuneSetFormula.h"
 #include "UI/IdleHUDWidget.h"
 #include "UI/UIThemeTokens.h"
 
@@ -234,9 +235,111 @@ const TCHAR* RuneTypeToLocalizationKey(ERuneType Type)
 	}
 }
 
+const TCHAR* RuneSetToLocalizationKey(ERuneSet RuneSet)
+{
+	switch (RuneSet)
+	{
+	case ERuneSet::Offense:
+		return TEXT("RUNE_SET_OFFENSE");
+	case ERuneSet::Bastion:
+		return TEXT("RUNE_SET_BASTION");
+	case ERuneSet::Vitality:
+		return TEXT("RUNE_SET_VITALITY");
+	case ERuneSet::Fortune:
+		return TEXT("RUNE_SET_FORTUNE");
+	case ERuneSet::None:
+	default:
+		return TEXT("RUNE_SET_NONE");
+	}
+}
+
 FText RuneTypeToLabel(ERuneType Type)
 {
 	return RuneText(RuneTypeToLocalizationKey(Type));
+}
+
+FText RuneSetToLabel(ERuneSet RuneSet)
+{
+	return RuneText(RuneSetToLocalizationKey(RuneSet));
+}
+
+FText FormatRuneSetTierLabel(int32 Count)
+{
+	if (Count < FRuneSetFormula::Tier1Count)
+	{
+		return RuneText(TEXT("RUNE_SET_NONE"));
+	}
+
+	const int32 ActiveTier = Count >= FRuneSetFormula::Tier3Count
+		? FRuneSetFormula::Tier3Count
+		: (Count >= FRuneSetFormula::Tier2Count ? FRuneSetFormula::Tier2Count : FRuneSetFormula::Tier1Count);
+	return FormatLocalizedRune(TEXT("RUNE_SET_TIER_FORMAT"), [ActiveTier](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Tier"), FText::AsNumber(ActiveTier));
+	});
+}
+
+FText FormatRuneSetNextTierLabel(int32 Count)
+{
+	if (Count >= FRuneSetFormula::Tier3Count)
+	{
+		return RuneText(TEXT("RUNE_SET_COMPLETE"));
+	}
+
+	const int32 NextTier = Count >= FRuneSetFormula::Tier2Count
+		? FRuneSetFormula::Tier3Count
+		: (Count >= FRuneSetFormula::Tier1Count ? FRuneSetFormula::Tier2Count : FRuneSetFormula::Tier1Count);
+	const int32 Needed = FMath::Max(0, NextTier - Count);
+	return FormatLocalizedRune(TEXT("RUNE_SET_NEXT_FORMAT"), [NextTier, Needed](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Tier"), FText::AsNumber(NextTier));
+		Args.Add(TEXT("Needed"), FText::AsNumber(Needed));
+	});
+}
+
+FText FormatRuneSetBonusLabel(ERuneSet RuneSet, int32 Count)
+{
+	const int32 Percent = FMath::RoundToInt(FRuneSetFormula::GetSetTierBonus(Count) * 100.0f);
+	if (Percent <= 0)
+	{
+		return RuneText(TEXT("RUNE_SET_BONUS_NONE"));
+	}
+
+	switch (RuneSet)
+	{
+	case ERuneSet::Offense:
+		return FormatLocalizedRune(TEXT("RUNE_SET_BONUS_DUAL_FORMAT"), [Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("StatA"), RuneTypeToLabel(ERuneType::PhysAtk));
+			Args.Add(TEXT("StatB"), RuneTypeToLabel(ERuneType::MagicAtk));
+			Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+		});
+	case ERuneSet::Bastion:
+		return FormatLocalizedRune(TEXT("RUNE_SET_BONUS_DUAL_FORMAT"), [Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("StatA"), RuneTypeToLabel(ERuneType::PhysDef));
+			Args.Add(TEXT("StatB"), RuneTypeToLabel(ERuneType::MagicDef));
+			Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+		});
+	case ERuneSet::Vitality:
+		return FormatLocalizedRune(TEXT("RUNE_SET_BONUS_DUAL_FORMAT"), [Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("StatA"), RuneTypeToLabel(ERuneType::Hp));
+			Args.Add(TEXT("StatB"), RuneTypeToLabel(ERuneType::OfflineEff));
+			Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+		});
+	case ERuneSet::Fortune:
+		return FormatLocalizedRune(TEXT("RUNE_SET_BONUS_TRIPLE_FORMAT"), [Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("StatA"), RuneTypeToLabel(ERuneType::GoldFind));
+			Args.Add(TEXT("StatB"), RuneTypeToLabel(ERuneType::ExpBoost));
+			Args.Add(TEXT("StatC"), RuneTypeToLabel(ERuneType::CritDamage));
+			Args.Add(TEXT("Percent"), FText::AsNumber(Percent));
+		});
+	case ERuneSet::None:
+	default:
+		return RuneText(TEXT("RUNE_SET_BONUS_NONE"));
+	}
 }
 
 const TCHAR* ClassToLocalizationKey(EClassId ClassId);
@@ -1257,6 +1360,47 @@ FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& Ru
 		{
 			EquippedOwnedIndexes.Add(OwnedIndex);
 		}
+	}
+
+	TMap<ERuneSet, int32> RuneSetCounts;
+	const int32 RegularRuneSlotCount = FMath::Min(FClassRuneFormula::ClassRuneSlotIndex, FRuneFormula::RuneSlotCount);
+	for (int32 SlotIndex = 0; SlotIndex < RegularRuneSlotCount; ++SlotIndex)
+	{
+		const int32 OwnedIndex = RuneService.GetEquippedOwnedIndex(SlotIndex);
+		if (!OwnedRunes.IsValidIndex(OwnedIndex))
+		{
+			continue;
+		}
+
+		const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
+		if (Rune.RuneSet == ERuneSet::None || Rune.RuneType == ERuneType::ClassMastery)
+		{
+			continue;
+		}
+		RuneSetCounts.FindOrAdd(Rune.RuneSet) += 1;
+	}
+
+	ViewModel.SetTitle = RuneText(TEXT("RUNE_SET_TITLE"));
+	const ERuneSet RuneSetOrder[] = { ERuneSet::Offense, ERuneSet::Bastion, ERuneSet::Vitality, ERuneSet::Fortune };
+	for (const ERuneSet RuneSet : RuneSetOrder)
+	{
+		FIdleHUDRuneSetRowViewModel Row;
+		Row.RuneSet = RuneSet;
+		Row.SetLabel = RuneSetToLabel(RuneSet);
+		Row.Count = FMath::Clamp(RuneSetCounts.FindRef(RuneSet), 0, RegularRuneSlotCount);
+		Row.CountLabel = FormatLocalizedRune(TEXT("RUNE_SET_COUNT_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Set"), Row.SetLabel);
+			Args.Add(TEXT("Count"), FText::AsNumber(Row.Count));
+		});
+		Row.TierLabel = FormatRuneSetTierLabel(Row.Count);
+		Row.BonusLabel = FormatRuneSetBonusLabel(RuneSet, Row.Count);
+		Row.NextTierLabel = FormatRuneSetNextTierLabel(Row.Count);
+		Row.bTwoSetActive = Row.Count >= FRuneSetFormula::Tier1Count;
+		Row.bFourSetActive = Row.Count >= FRuneSetFormula::Tier2Count;
+		Row.bSixSetActive = Row.Count >= FRuneSetFormula::Tier3Count;
+		Row.bActive = Row.bTwoSetActive;
+		ViewModel.SetRows.Add(Row);
 	}
 
 	for (int32 SlotIndex = 0; SlotIndex < FRuneFormula::RuneSlotCount; ++SlotIndex)
@@ -3237,12 +3381,17 @@ void AIdleHUD::DrawRunePanel()
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.26f, 380.0f * Scale, 500.0f * Scale);
 	const float HeaderHeight = 62.0f * Scale;
 	const float CraftHeight = 32.0f * Scale;
+	const float SetHeaderHeight = 22.0f * Scale;
+	const float SetRowHeight = 34.0f * Scale;
+	const float SetGap = 4.0f * Scale;
 	const float SlotHeight = 24.0f * Scale;
 	const float RowHeight = 48.0f * Scale;
 	const float RowGap = 6.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const int32 VisibleRows = FMath::Min(ViewModel.OwnedRows.Num(), 2);
-	const float PanelHeight = HeaderHeight + CraftHeight + FRuneFormula::RuneSlotCount * SlotHeight + 10.0f * Scale + FMath::Max(1, VisibleRows) * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
+	const float SetSectionHeight = SetHeaderHeight + ViewModel.SetRows.Num() * SetRowHeight + FMath::Max(0, ViewModel.SetRows.Num() - 1) * SetGap + 8.0f * Scale;
+	const float SlotSectionHeight = (FRuneFormula::RuneSlotCount * SlotHeight) + 16.0f * Scale;
+	const float PanelHeight = HeaderHeight + CraftHeight + SetSectionHeight + SlotSectionHeight + FMath::Max(1, VisibleRows) * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
 	const float Y = 282.0f * Scale;
 	const float Border = 2.0f * Scale;
@@ -3283,9 +3432,22 @@ void AIdleHUD::DrawRunePanel()
 	}
 
 	float RowY = Y + HeaderHeight + CraftHeight;
-	for (const FIdleHUDRuneSlotViewModel& Slot : ViewModel.Slots)
+	DrawText(ViewModel.SetTitle.ToString(), Theme::TextPrimary, X + Padding, RowY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	RowY += SetHeaderHeight;
+	for (const FIdleHUDRuneSetRowViewModel& SetRow : ViewModel.SetRows)
 	{
-		DrawRuneSlot(Slot, X + Padding, RowY, PanelWidth - Padding * 2.0f, SlotHeight);
+		DrawRuneSetRow(SetRow, X + Padding, RowY, PanelWidth - Padding * 2.0f, SetRowHeight);
+		RowY += SetRowHeight + SetGap;
+	}
+
+	RowY += 4.0f * Scale;
+	for (int32 SlotIndex = 0; SlotIndex < ViewModel.Slots.Num(); ++SlotIndex)
+	{
+		if (SlotIndex == FClassRuneFormula::ClassRuneSlotIndex)
+		{
+			RowY += 8.0f * Scale;
+		}
+		DrawRuneSlot(ViewModel.Slots[SlotIndex], X + Padding, RowY, PanelWidth - Padding * 2.0f, SlotHeight);
 		RowY += SlotHeight;
 	}
 
@@ -3396,6 +3558,24 @@ void AIdleHUD::DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, flo
 	{
 		DrawRect(Theme::AccentGold.CopyWithNewOpacity(Cell.bUnlocked ? 0.88f : 0.30f), X + 4.0f, Y + Size - 6.0f, Size - 8.0f, 2.0f);
 	}
+}
+
+void AIdleHUD::DrawRuneSetRow(const FIdleHUDRuneSetRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	const FLinearColor StateColor = Row.bSixSetActive
+		? Theme::RarityMythicEnd
+		: (Row.bFourSetActive ? Theme::AccentGold : (Row.bTwoSetActive ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.50f)));
+
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Row.CountLabel.ToString(), Row.bActive ? Theme::TextPrimary : Theme::TextMuted, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.TierLabel.ToString(), StateColor, X + 112.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.NextTierLabel.ToString(), Theme::TextMuted, X + 216.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.BonusLabel.ToString(), Row.bActive ? Theme::RarityMythicEnd : Theme::TextMuted, X + 10.0f * Scale, Y + 19.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
 }
 
 void AIdleHUD::DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height)
