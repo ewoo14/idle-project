@@ -1,5 +1,7 @@
 #include "ItemSystem/DropFormula.h"
 
+#include "ItemSystem/UniqueTraitFormula.h"
+
 namespace
 {
 enum class EAffixKind : uint8
@@ -239,4 +241,9 @@ void FDropFormula::RollAffixes(EItemRarity Rarity, int32 Level, FRandomStream& R
 			break;
 		}
 	}
+}
+
+void FDropFormula::RollUniqueTraits(EItemRarity Rarity, FRandomStream& Rng, FItemInstance& OutItem)
+{
+	FUniqueTraitFormula::RollUniqueTraits(Rarity, Rng, OutItem.UniqueTrait1, OutItem.UniqueTrait2);
 }

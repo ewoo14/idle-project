@@ -43,6 +43,20 @@ enum class EItemSet : uint8
 	Berserker = 7 UMETA(DisplayName = "Berserker")
 };
 
+UENUM(BlueprintType)
+enum class EUniqueTrait : uint8
+{
+	None = 0 UMETA(Hidden),
+	AllStatSurge = 1 UMETA(DisplayName = "AllStatSurge"),
+	CritDamageSurge = 2 UMETA(DisplayName = "CritDamageSurge"),
+	CritRateSurge = 3 UMETA(DisplayName = "CritRateSurge"),
+	LifeSurge = 4 UMETA(DisplayName = "LifeSurge"),
+	SwiftSurge = 5 UMETA(DisplayName = "SwiftSurge"),
+	PhysMastery = 6 UMETA(DisplayName = "PhysMastery"),
+	MagicMastery = 7 UMETA(DisplayName = "MagicMastery"),
+	GuardMastery = 8 UMETA(DisplayName = "GuardMastery")
+};
+
 /** 장비 1개의 런타임 인스턴스입니다. */
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FItemInstance
@@ -63,6 +77,12 @@ struct IDLEPROJECT_API FItemInstance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	EItemSet ItemSet = EItemSet::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	EUniqueTrait UniqueTrait1 = EUniqueTrait::None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	EUniqueTrait UniqueTrait2 = EUniqueTrait::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	FText DisplayName;
