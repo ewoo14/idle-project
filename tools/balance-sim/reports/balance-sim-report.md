@@ -227,6 +227,41 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Pet Bonus Pressure
+
+- Source: `server/src/core/formulas/petBonus.ts`.
+- Catalog size: 10 pets.
+- Lv10 doubles the base bonus through the shared pet-level multiplier.
+- Combat rows apply the equipped pet percent as a stat multiplier to a
+  Lv100 review loadout and report CP/DPS pressure only. Pet bonuses are
+  not injected into the sampled first-rebirth run until acquisition timing
+  is modeled explicitly.
+
+<!-- markdownlint-disable MD013 -->
+
+| Pet | Bonus | Lv0 | Lv10 | Pressure |
+| --- | --- | ---: | ---: | --- |
+| dog | Gold | 20% | 40% | economy |
+| bird | Drop | 15% | 30% | economy |
+| cat | Exp | 15% | 30% | economy |
+| wolf | PhysAtk | 10% | 20% | combat |
+| owl | MagicAtk | 10% | 20% | combat |
+| bear | Hp | 12% | 24% | combat |
+| turtle | Def | 12% | 24% | combat |
+| fox | Gold | 30% | 60% | economy |
+| rabbit | Drop | 25% | 50% | economy |
+| dragon | AllStat | 8% | 16% | combat |
+
+| Pet | Bonus | Class | Lv | Base CP | Pet CP | CP x | Base DPS | Pet DPS | DPS x |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| wolf | PhysAtk | Warrior | 100 | 5444 | 5644 | x1.037 | 4295 | 4779 | x1.113 |
+| owl | MagicAtk | Mage | 100 | 5519 | 5727 | x1.038 | 4787 | 5319 | x1.111 |
+| bear | Hp | Warrior | 100 | 5444 | 5488 | x1.008 | 4295 | 4295 | x1 |
+| turtle | Def | Warrior | 100 | 5444 | 5538 | x1.017 | 4295 | 4295 | x1 |
+| dragon | AllStat | Warrior | 100 | 5444 | 5808 | x1.067 | 4295 | 4682 | x1.09 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Achievement Multiplier Pressure
 
 - Soft cap starts at 100 points.
@@ -480,6 +515,7 @@
 - server/src/core/formulas/drop.ts
 - server/src/core/formulas/enhance.ts
 - server/src/core/formulas/petLevel.ts
+- server/src/core/formulas/petBonus.ts
 - server/src/core/formulas/achievement.ts
 - server/src/core/formulas/rune.ts
 - server/src/core/formulas/classRune.ts

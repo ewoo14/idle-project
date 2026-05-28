@@ -47,7 +47,13 @@ import {
   OFFLINE_EFFICIENCY,
 } from "../../server/src/core/formulas/offline.js";
 import {
-  getEffectiveBonusPercent,
+  getEffectiveBonusPercent as getEffectivePetBonusPercent,
+  getPetCatalog,
+  PET_BONUS_TYPE,
+  type PetBonusType,
+  type PetDefinition,
+} from "../../server/src/core/formulas/petBonus.js";
+import {
   getFeedCost,
   MAX_PET_LEVEL,
 } from "../../server/src/core/formulas/petLevel.js";
@@ -174,6 +180,7 @@ export type BalanceReport = {
       dropRarityPressure: DropRarityPressure;
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
+      petBonusPressure: PetBonusPressure;
       achievementPressure: AchievementPressure;
       runePressure: RunePressure;
       runeCodexPressure: RuneCodexPressure;
@@ -301,6 +308,35 @@ export type PetFeedPressure = {
   incrementalGoldPerHourAtMedian: number;
   paybackHoursAtMedianGoldPerHour: number;
   rows: PetFeedPressureRow[];
+};
+
+export type PetBonusCatalogRow = {
+  petId: string;
+  name: string;
+  bonusType: string;
+  baseBonusPercent: number;
+  maxLevelBonusPercent: number;
+  pressureKind: "economy" | "combat";
+};
+
+export type PetBonusCombatRow = {
+  petId: string;
+  bonusType: string;
+  className: string;
+  level: number;
+  baseCombatPower: number;
+  petCombatPower: number;
+  cpMultiplier: number;
+  baseDps: number;
+  petDps: number;
+  dpsMultiplier: number;
+  firstRebirthInjected: boolean;
+};
+
+export type PetBonusPressure = {
+  maxLevel: number;
+  catalogRows: PetBonusCatalogRow[];
+  combatRows: PetBonusCombatRow[];
 };
 
 export type AchievementPressureRow = {
@@ -627,6 +663,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/drop.ts",
         "server/src/core/formulas/enhance.ts",
         "server/src/core/formulas/petLevel.ts",
+        "server/src/core/formulas/petBonus.ts",
         "server/src/core/formulas/achievement.ts",
         "server/src/core/formulas/rune.ts",
         "server/src/core/formulas/classRune.ts",
@@ -639,6 +676,7 @@ export function buildBalanceReport(
       dropRarityPressure: buildDropRarityPressure(),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
+      petBonusPressure: buildPetBonusPressure(),
       achievementPressure: buildAchievementPressure(),
       runePressure: buildRunePressure(),
       runeCodexPressure: buildRuneCodexPressure(
@@ -1280,11 +1318,11 @@ function buildPetFeedPressure(samples: SimulationSample[]): PetFeedPressure {
       feedCost,
       cumulativeFeedCost,
       dogGoldBonusPercentAfterFeed: round(
-        getEffectiveBonusPercent(DOG_GOLD_BONUS_PERCENT, nextLevel),
+        getEffectivePetBonusPercent(DOG_GOLD_BONUS_PERCENT, nextLevel),
         3,
       ),
       birdDropBonusPercentAfterFeed: round(
-        getEffectiveBonusPercent(BIRD_DROP_BONUS_PERCENT, nextLevel),
+        getEffectivePetBonusPercent(BIRD_DROP_BONUS_PERCENT, nextLevel),
         3,
       ),
     };
@@ -1295,19 +1333,19 @@ function buildPetFeedPressure(samples: SimulationSample[]): PetFeedPressure {
       .sort((left, right) => left - right),
     0.5,
   );
-  const dogBaseGoldBonusPercent = getEffectiveBonusPercent(
+  const dogBaseGoldBonusPercent = getEffectivePetBonusPercent(
     DOG_GOLD_BONUS_PERCENT,
     0,
   );
-  const dogMaxGoldBonusPercent = getEffectiveBonusPercent(
+  const dogMaxGoldBonusPercent = getEffectivePetBonusPercent(
     DOG_GOLD_BONUS_PERCENT,
     MAX_PET_LEVEL,
   );
-  const birdBaseDropBonusPercent = getEffectiveBonusPercent(
+  const birdBaseDropBonusPercent = getEffectivePetBonusPercent(
     BIRD_DROP_BONUS_PERCENT,
     0,
   );
-  const birdMaxDropBonusPercent = getEffectiveBonusPercent(
+  const birdMaxDropBonusPercent = getEffectivePetBonusPercent(
     BIRD_DROP_BONUS_PERCENT,
     MAX_PET_LEVEL,
   );
@@ -1340,6 +1378,125 @@ function buildPetFeedPressure(samples: SimulationSample[]): PetFeedPressure {
     ),
     rows,
   };
+}
+
+function buildPetBonusPressure(): PetBonusPressure {
+  const catalog = getPetCatalog();
+
+  return {
+    maxLevel: MAX_PET_LEVEL,
+    catalogRows: catalog.map((pet) => ({
+      petId: pet.id,
+      name: pet.name,
+      bonusType: petBonusTypeName(pet.bonusType),
+      baseBonusPercent: round(
+        getEffectivePetBonusPercent(pet.bonusPercent, 0),
+        3,
+      ),
+      maxLevelBonusPercent: round(
+        getEffectivePetBonusPercent(pet.bonusPercent, MAX_PET_LEVEL),
+        3,
+      ),
+      pressureKind: isCombatPetBonus(pet.bonusType) ? "combat" : "economy",
+    })),
+    combatRows: catalog
+      .filter((pet) => isCombatPetBonus(pet.bonusType))
+      .map(buildPetBonusCombatRow),
+  };
+}
+
+function buildPetBonusCombatRow(pet: PetDefinition): PetBonusCombatRow {
+  const classId = pet.bonusType === PET_BONUS_TYPE.MagicAtk ? 2 : 1;
+  const level = 100;
+  const baseStats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const bonusRatio = getEffectivePetBonusPercent(pet.bonusPercent, 0) / 100;
+  const petStats = applyPetStatBonus(baseStats, pet.bonusType, bonusRatio);
+  const baseCombatPower = computeCombatPower(baseStats);
+  const petCombatPower = computeCombatPower(petStats);
+  const baseDps = effectiveReviewDps(baseStats, classId, level);
+  const petDps = effectiveReviewDps(petStats, classId, level);
+
+  return {
+    petId: pet.id,
+    bonusType: petBonusTypeName(pet.bonusType),
+    className: CLASS_NAMES[classId],
+    level,
+    baseCombatPower,
+    petCombatPower,
+    cpMultiplier: round(petCombatPower / Math.max(1, baseCombatPower), 3),
+    baseDps,
+    petDps,
+    dpsMultiplier: round(petDps / Math.max(1, baseDps), 3),
+    firstRebirthInjected: false,
+  };
+}
+
+function applyPetStatBonus(
+  stats: DerivedStats,
+  bonusType: PetBonusType,
+  bonusRatio: number,
+): DerivedStats {
+  const multiply = (value: number) => Math.round(value * (1 + bonusRatio));
+  switch (bonusType) {
+    case PET_BONUS_TYPE.PhysAtk:
+      return { ...stats, physAtk: multiply(stats.physAtk) };
+    case PET_BONUS_TYPE.MagicAtk:
+      return { ...stats, magicAtk: multiply(stats.magicAtk) };
+    case PET_BONUS_TYPE.Hp:
+      return { ...stats, hp: multiply(stats.hp) };
+    case PET_BONUS_TYPE.Def:
+      return {
+        ...stats,
+        physDef: multiply(stats.physDef),
+        magicDef: multiply(stats.magicDef),
+      };
+    case PET_BONUS_TYPE.AllStat:
+      return {
+        ...stats,
+        physAtk: multiply(stats.physAtk),
+        magicAtk: multiply(stats.magicAtk),
+        physDef: multiply(stats.physDef),
+        magicDef: multiply(stats.magicDef),
+      };
+    default:
+      return stats;
+  }
+}
+
+function isCombatPetBonus(bonusType: PetBonusType): boolean {
+  return (
+    bonusType === PET_BONUS_TYPE.PhysAtk ||
+    bonusType === PET_BONUS_TYPE.MagicAtk ||
+    bonusType === PET_BONUS_TYPE.Hp ||
+    bonusType === PET_BONUS_TYPE.Def ||
+    bonusType === PET_BONUS_TYPE.AllStat
+  );
+}
+
+function petBonusTypeName(bonusType: PetBonusType): string {
+  switch (bonusType) {
+    case PET_BONUS_TYPE.Gold:
+      return "Gold";
+    case PET_BONUS_TYPE.Drop:
+      return "Drop";
+    case PET_BONUS_TYPE.Exp:
+      return "Exp";
+    case PET_BONUS_TYPE.PhysAtk:
+      return "PhysAtk";
+    case PET_BONUS_TYPE.MagicAtk:
+      return "MagicAtk";
+    case PET_BONUS_TYPE.Hp:
+      return "Hp";
+    case PET_BONUS_TYPE.Def:
+      return "Def";
+    case PET_BONUS_TYPE.AllStat:
+      return "AllStat";
+    default:
+      return "None";
+  }
 }
 
 function buildAchievementPressure(): AchievementPressure {
@@ -2104,6 +2261,34 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.petFeedPressure.rows.map(
       (row) =>
         `| Lv${row.currentLevel} | Lv${row.nextLevel} | ${row.feedCost} | ${row.cumulativeFeedCost} | ${row.dogGoldBonusPercentAfterFeed}% | ${row.birdDropBonusPercentAfterFeed}% |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Pet Bonus Pressure",
+    "",
+    "- Source: `server/src/core/formulas/petBonus.ts`.",
+    `- Catalog size: ${report.model.petBonusPressure.catalogRows.length} pets.`,
+    "- Lv10 doubles the base bonus through the shared pet-level multiplier.",
+    "- Combat rows apply the equipped pet percent as a stat multiplier to a",
+    "  Lv100 review loadout and report CP/DPS pressure only. Pet bonuses are",
+    "  not injected into the sampled first-rebirth run until acquisition timing",
+    "  is modeled explicitly.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Pet | Bonus | Lv0 | Lv10 | Pressure |",
+    "| --- | --- | ---: | ---: | --- |",
+    ...report.model.petBonusPressure.catalogRows.map(
+      (row) =>
+        `| ${row.petId} | ${row.bonusType} | ${row.baseBonusPercent}% | ${row.maxLevelBonusPercent}% | ${row.pressureKind} |`,
+    ),
+    "",
+    "| Pet | Bonus | Class | Lv | Base CP | Pet CP | CP x | Base DPS | Pet DPS | DPS x |",
+    "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.petBonusPressure.combatRows.map(
+      (row) =>
+        `| ${row.petId} | ${row.bonusType} | ${row.className} | ${row.level} | ${row.baseCombatPower} | ${row.petCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.petDps} | x${row.dpsMultiplier} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

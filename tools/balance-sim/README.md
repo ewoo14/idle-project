@@ -81,6 +81,11 @@ the three-run daily reward for Gold, Exp, and Essence dungeons at minimum and
 Lv100-review CP anchors, and compares Gold/EXP rows against sampled Lv50
 income. Dungeon rewards are not injected into the sampled first-rebirth run.
 
+PR #69 adds expanded pet bonus pressure. The simulator imports `petBonus.ts`,
+reports the 10-pet catalog at Lv0 and Lv10, and compares stat-facing pet
+bonuses against Lv100 CP/DPS review loadouts. Pet bonuses are not injected into
+the sampled first-rebirth run until acquisition timing is modeled.
+
 ## V1 Interpretation
 
 The V1 pass is a distribution check, not a curve rewrite. It validates the
@@ -155,6 +160,15 @@ Pet growth V1 pressure:
 This makes dog feeding a recoupable gold investment rather than a first-rebirth
 progression wall. Bird feeding should be reviewed through loot-quality
 telemetry because its drop bonus does not directly convert to gold/hour.
+
+Pet expansion V1 pressure:
+
+- catalog: dog, bird, cat, wolf, owl, bear, turtle, fox, rabbit, dragon
+- Lv10 effective bonuses double Lv0 values through the shared pet-level formula
+- Wolf/Owl stat pets add about x1.11 DPS on their matching Lv100 review class
+- Bear/Turtle are CP/survival pressure and do not change DPS in the review row
+- Dragon AllStat reports x1.067 CP and x1.09 DPS on the Lv100 Warrior row
+- no pet bonus is injected into the sampled first-rebirth timing model
 
 Dungeon V1 pressure:
 

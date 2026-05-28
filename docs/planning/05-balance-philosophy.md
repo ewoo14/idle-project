@@ -1634,6 +1634,66 @@ Guardrails:
 
 ---
 
+## PR #69 Pet Expansion Balance Review
+
+PR #69 expands pets from the original Dog/Bird pair to a 10-pet catalog. The
+new catalog keeps pet leveling at MaxPetLevel 10 and uses the same shared
+effective-bonus formula:
+
+```text
+EffectiveBonusPercent = Math.fround(BaseBonusPercent * (1 + Level * 0.1))
+```
+
+Catalog pressure:
+
+| Pet | Bonus | Lv0 | Lv10 | Pressure |
+| --- | --- | ---: | ---: | --- |
+| dog | Gold | 20% | 40% | economy |
+| bird | Drop | 15% | 30% | economy |
+| cat | Exp | 15% | 30% | economy |
+| wolf | PhysAtk | 10% | 20% | combat |
+| owl | MagicAtk | 10% | 20% | combat |
+| bear | Hp | 12% | 24% | combat |
+| turtle | Def | 12% | 24% | combat |
+| fox | Gold | 30% | 60% | economy |
+| rabbit | Drop | 25% | 50% | economy |
+| dragon | AllStat | 8% | 16% | combat |
+
+The balance simulator imports `server/src/core/formulas/petBonus.ts` for the
+catalog and applies combat-facing pet bonuses to a Lv100 review loadout as
+percent multipliers, not flat stats:
+
+| Pet | Bonus | Class | CP x | DPS x |
+| --- | --- | --- | ---: | ---: |
+| wolf | PhysAtk | Warrior | 1.037 | 1.113 |
+| owl | MagicAtk | Mage | 1.038 | 1.111 |
+| bear | Hp | Warrior | 1.008 | 1.000 |
+| turtle | Def | Warrior | 1.017 | 1.000 |
+| dragon | AllStat | Warrior | 1.067 | 1.090 |
+
+Seed `23`, 1000 runs, still reports the same first-rebirth baseline:
+p10 4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h. The median
+remains inside the 5-10h target and every sampled run remains inside the
+3-20h review band because pet acquisition is not injected into the sampled
+first-rebirth run.
+
+Guardrails:
+
+- Keep stat pet bonuses as percent multipliers after base stats, equipment
+  flats, set flats, rebirth flats, and trait-style flat utilities have been
+  composed. Do not convert them into flat `DerivedStats` additions.
+- Gold, Drop, and Exp pets are economy pressure. Do not tune the first-rebirth
+  EXP curve from Fox/Rabbit/Cat until pet acquisition timing and expected
+  ownership are modeled explicitly.
+- Wolf/Owl/Dragon are bounded DPS pressure in this review model. If future
+  acquisition modeling pushes first-rebirth median below 5h, tune unlock/drop
+  timing before lowering the base pet bonus table.
+- Re-run `npm run balance:sim`, `npm test -- tests/balance-sim.test.ts`, and
+  pet bonus parity tests after changing `petBonus.ts`, `FPetService`
+  definitions, pet-level scaling, or stat-pet application order.
+
+---
+
 ## PR #66 Chapter 3 Stage/Element Balance Addendum
 
 PR #66 expands the stage model to 3 chapters with 10 stages per chapter. The
