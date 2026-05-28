@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLASS_RUNE_SLOT_INDEX,
   getClassMasteryMultipliers,
+  getClassRuneCraftCost,
 } from "./classRune.js";
 import { getCoreRuneMultiplier } from "./rune.js";
 
@@ -43,5 +44,18 @@ describe("class rune formulas", () => {
       magicDef: 0,
       hp: 0,
     });
+  });
+
+  it.each([
+    [1, 25],
+    [2, 60],
+    [3, 150],
+    [4, 400],
+    [5, 1000],
+    [6, 1700],
+    [7, 2500],
+    [0, 25],
+  ])("computes class rune craft cost for rarity %i", (rarity, expected) => {
+    expect(getClassRuneCraftCost(rarity)).toBe(expected);
   });
 });

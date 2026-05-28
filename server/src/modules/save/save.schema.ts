@@ -1,5 +1,5 @@
 export const SAVE_LEVEL_MAX = 1000;
-export const SAVE_MAX_EQUIPMENT_GRADE = 6;
+export const SAVE_MAX_EQUIPMENT_GRADE = 7;
 
 export const getSaveSchema = {
   querystring: {

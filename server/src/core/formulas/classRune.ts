@@ -64,3 +64,24 @@ export function getClassMasteryMultipliers(
     hp: Math.fround(result.hp),
   };
 }
+
+export function getClassRuneCraftCost(rarity: number): number {
+  switch (rarity) {
+    case 1:
+      return 25;
+    case 2:
+      return 60;
+    case 3:
+      return 150;
+    case 4:
+      return 400;
+    case 5:
+      return 1000;
+    case 6:
+      return 1700;
+    case 7:
+      return 2500;
+    default:
+      return 25;
+  }
+}

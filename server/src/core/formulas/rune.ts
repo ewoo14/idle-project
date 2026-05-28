@@ -1,18 +1,22 @@
 export const RUNE_SLOT_COUNT = 7;
 
-const CORE_BASE_BY_RARITY = [0, 0.02, 0.035, 0.05, 0.08, 0.12, 0.18] as const;
-const CORE_STEP_BY_RARITY = [
-  0, 0.004, 0.006, 0.009, 0.014, 0.02, 0.03,
+const CORE_BASE_BY_RARITY = [
+  0, 0.02, 0.05, 0.08, 0.1, 0.12, 0.15, 0.18,
 ] as const;
-const UTIL_BASE_BY_RARITY = [0, 0.02, 0.03, 0.04, 0.06, 0.09, 0.12] as const;
-const DISENCHANT_BASE_BY_RARITY = [0, 1, 2, 5, 12, 30, 80] as const;
+const CORE_STEP_BY_RARITY = [
+  0, 0.004, 0.009, 0.014, 0.017, 0.02, 0.025, 0.03,
+] as const;
+const UTIL_BASE_BY_RARITY = [
+  0, 0.02, 0.04, 0.06, 0.075, 0.09, 0.105, 0.12,
+] as const;
+const DISENCHANT_BASE_BY_RARITY = [0, 1, 5, 12, 20, 30, 50, 80] as const;
 
 function clampedLevel(level: number): number {
   return Math.max(0, Math.trunc(level));
 }
 
 function validRarity(rarity: number): boolean {
-  return Number.isInteger(rarity) && rarity >= 1 && rarity <= 6;
+  return Number.isInteger(rarity) && rarity >= 1 && rarity <= 7;
 }
 
 export function isCoreRuneType(type: number): boolean {

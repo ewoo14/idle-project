@@ -62,26 +62,52 @@ describe("SaveService", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it("accepts Mythic maxEquipmentGrade 6", async () => {
+  it.each([
+    0, 1, 2, 3, 4, 5, 6, 7,
+  ])("accepts maxEquipmentGrade %i across the v7 rarity range", async (maxEquipmentGrade) => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
     const result = await service.upload(userId(), {
       characterId: character.id,
       version: 1,
-      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 6 },
+      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade },
     });
 
     expect(result.id).toBe("save-1");
   });
 
-  it("rejects maxEquipmentGrade 7", async () => {
+  it("accepts Mythic maxEquipmentGrade 7", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    const result = await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 7 },
+    });
+
+    expect(result.id).toBe("save-1");
+  });
+
+  it("rejects maxEquipmentGrade below None", async () => {
     const service = new SaveService(createRepo(), createLeaderboard());
 
     await expect(
       service.upload(userId(), {
         characterId: character.id,
         version: 1,
-        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 7 },
+        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: -1 },
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("rejects maxEquipmentGrade 8", async () => {
+    const service = new SaveService(createRepo(), createLeaderboard());
+
+    await expect(
+      service.upload(userId(), {
+        characterId: character.id,
+        version: 1,
+        payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 8 },
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
@@ -185,7 +211,7 @@ describe("SaveService", () => {
     const payloadSchema = putSaveSchema.body.properties.payload;
 
     expect(payloadSchema.properties.level.maximum).toBe(1000);
-    expect(payloadSchema.properties.maxEquipmentGrade.maximum).toBe(6);
+    expect(payloadSchema.properties.maxEquipmentGrade.maximum).toBe(7);
     expect(payloadSchema.properties.transcendCount).toEqual({
       type: "integer",
       minimum: 0,

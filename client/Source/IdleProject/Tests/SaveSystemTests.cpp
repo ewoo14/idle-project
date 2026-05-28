@@ -67,7 +67,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V6"), SaveGame->SaveVersion, static_cast<int32>(6));
+	TestEqual(TEXT("SaveVersion starts at V7"), SaveGame->SaveVersion, static_cast<int32>(7));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -679,7 +679,7 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	FString PayloadJson;
 	TestTrue(TEXT("Cloud payload serializes populated local save"), FCloudSavePayloadMapper::SaveToPayloadJson(*SourceSave, PayloadJson));
 	TestTrue(TEXT("Payload includes level cap accepted by backend"), PayloadJson.Contains(TEXT("\"level\":1000")));
-	TestTrue(TEXT("Payload includes Mythic max equipment grade"), PayloadJson.Contains(TEXT("\"maxEquipmentGrade\":6")));
+	TestTrue(TEXT("Payload includes Mythic max equipment grade"), PayloadJson.Contains(TEXT("\"maxEquipmentGrade\":7")));
 	TestTrue(TEXT("Payload includes transcend extension field"), PayloadJson.Contains(TEXT("\"transcendCount\":2")));
 	TestTrue(TEXT("Payload includes tower extension field"), PayloadJson.Contains(TEXT("\"towerHighestFloor\":42")));
 	TestTrue(TEXT("Payload includes skill point extension field"), PayloadJson.Contains(TEXT("\"skillPoints\":9")));

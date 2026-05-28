@@ -17,6 +17,7 @@
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/ItemFactory.h"
+#include "ItemSystem/RarityMigration.h"
 #include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
 #include "RuneSystem/ClassRuneFormula.h"
@@ -34,6 +35,45 @@ FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
 		FMath::Max(0.0f, Stats.Wis),
 		FMath::Max(0.0f, Stats.Con),
 		FMath::Max(0.0f, Stats.Luk));
+}
+
+TArray<FItemInstance> GetMigratedInventoryItems(const UIdleSaveGame& SaveGame)
+{
+	TArray<FItemInstance> Items = SaveGame.InventoryItems;
+	if (SaveGame.SaveVersion < 7)
+	{
+		for (FItemInstance& Item : Items)
+		{
+			Item.Rarity = FRarityMigration::MigrateLegacy(static_cast<int32>(Item.Rarity));
+		}
+	}
+	return Items;
+}
+
+TArray<FRuneSaveEntry> GetMigratedRunes(const UIdleSaveGame& SaveGame)
+{
+	TArray<FRuneSaveEntry> Runes = SaveGame.Runes;
+	if (SaveGame.SaveVersion < 7)
+	{
+		for (FRuneSaveEntry& Rune : Runes)
+		{
+			Rune.Rarity = FRarityMigration::MigrateLegacy(static_cast<int32>(Rune.Rarity));
+		}
+	}
+	return Runes;
+}
+
+TArray<FRuneCodexEntry> GetMigratedRuneCodex(const UIdleSaveGame& SaveGame)
+{
+	TArray<FRuneCodexEntry> Codex = SaveGame.RuneCodex;
+	if (SaveGame.SaveVersion < 7)
+	{
+		for (FRuneCodexEntry& Entry : Codex)
+		{
+			Entry.Rarity = FRarityMigration::MigrateLegacy(static_cast<int32>(Entry.Rarity));
+		}
+	}
+	return Codex;
 }
 
 }
@@ -327,7 +367,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 6;
+	SaveGame->SaveVersion = 7;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -451,15 +491,17 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (RuneService)
 	{
 		RuneService->SetOwnerClassId(GetCurrentClassIdForRunes());
+		const TArray<FRuneSaveEntry> MigratedRunes = GetMigratedRunes(*SaveGame);
+		const TArray<FRuneCodexEntry> MigratedCodex = GetMigratedRuneCodex(*SaveGame);
 		if (SaveGame->SaveVersion >= 3)
 		{
 			if (SaveGame->SaveVersion >= 4)
 			{
-				RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots, SaveGame->RuneCodex);
+				RuneService->RestoreState(MigratedRunes, SaveGame->EquippedRuneSlots, MigratedCodex);
 			}
 			else
 			{
-				RuneService->RestoreState(SaveGame->Runes, SaveGame->EquippedRuneSlots, {});
+				RuneService->RestoreState(MigratedRunes, SaveGame->EquippedRuneSlots, {});
 			}
 		}
 		else
@@ -477,7 +519,8 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (SaveGame->SaveVersion >= 2)
 	{
 		AIdleCharacter* Character = FindPlayerCharacter();
-		PendingInventoryItems = SaveGame->InventoryItems;
+		const TArray<FItemInstance> MigratedInventoryItems = GetMigratedInventoryItems(*SaveGame);
+		PendingInventoryItems = MigratedInventoryItems;
 		PendingEquippedSlotIndex = SaveGame->EquippedSlotIndex;
 		PendingSkillRanks = SaveGame->SkillRanks;
 		PendingSkillPoints = SaveGame->SkillPoints;
@@ -485,7 +528,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 
 		if (ApplyCharacterSaveState(
 			Character,
-			SaveGame->InventoryItems,
+			MigratedInventoryItems,
 			SaveGame->EquippedSlotIndex,
 			SaveGame->SkillRanks,
 			SaveGame->SkillPoints))

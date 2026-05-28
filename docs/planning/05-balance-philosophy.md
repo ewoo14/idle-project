@@ -13,8 +13,12 @@
 | 등급 | ATK 평균 | DEF 평균 | HP 평균 | MaxEnhance |
 | --- | ---: | ---: | ---: | ---: |
 | Common | 1.0 | 2.5 | 11.25 | 5 |
-| Uncommon | 2.0 | 5.25 | 26.63 | 8 |
-| Rare | 3.88 | 9.75 | 49.38 | 10 |
+| Rare | 1.7 | 4.25 | 19.13 | 50 |
+| Epic | 2.3 | 5.75 | 25.88 | 50 |
+| Unique | 2.75 | 6.88 | 30.94 | 50 |
+| Legendary | 3.2 | 8.0 | 36.0 | 50 |
+| Transcendent | 3.85 | 9.63 | 43.31 | 50 |
+| Mythic | 4.5 | 11.25 | 50.63 | 50 |
 
 PowerScore 공식은 UE5 `FItemPowerScore::Compute`와 서버 `computeItemPowerScore`가 공유한다.
 
@@ -66,7 +70,9 @@ PowerScore = (ATK + DEF + HP / 10) × (1 + EnhanceLevel × 0.1)
 
 ### 2.2 골드 / 드롭률
 - 시간당 골드: 사냥터 권장 레벨 × 1,000 (기본) × 펫/장비 보너스
-- 드롭률 (장비): 마리당 5% (Common 70 / Uncommon 20 / Rare 8 / Epic 1.8 / Legendary 0.2 / Mythic 0.001%)
+- 드롭률 (장비): shared `drop.ts` table keeps total probability at 1.0:
+  Lv100 = None 2%, Common 56.8%, Rare 30%, Epic 6%, Unique 2.5%,
+  Legendary 1.5%, Transcendent 0.7%, Mythic 0.5%.
 
 ### 2.3 강화 비용 / 성공률
 
@@ -525,7 +531,7 @@ Sensitivity notes:
 - Simulator pressure check: the deterministic 1000-run balance report imports
   `server/src/core/formulas/enhance.ts` and models +0 to +50 enhancement spend.
   The minimum all-success cost is 4,292,500 gold, while expected cost using
-  `cost / successRate` is 22,717,602.91 gold. Against the sampled median Lv50
+  `cost / successRate` is 22,717,602.46 gold. Against the sampled median Lv50
   active/idle blended gold rate, a single Common +0 to +50 path is about 34.7h
   of income. Treat this as the first long-tail gold sink baseline; high-rarity
   and multi-slot enhancement intentionally extend beyond first-rebirth pacing.
@@ -545,18 +551,21 @@ Client drop rarity now affects generated equipment stats through
 | --- | ---: |
 | None | 0.0 |
 | Common | 1.0 |
-| Uncommon | 1.3 |
 | Rare | 1.7 |
 | Epic | 2.3 |
+| Unique | 2.75 |
 | Legendary | 3.2 |
+| Transcendent | 3.85 |
+| Mythic | 4.5 |
 
 `FDropFormula::RollRarityForLevel` keeps early drops Common-heavy while moving
-some Common weight into Rare, Epic, Legendary, and Mythic as monster level approaches
-100. The current level 1 distribution is equivalent to the legacy baseline:
-2% none, 70% common, 20% uncommon, and 8% rare. At level 100 the intended
-distribution is 2% none, 50% common, 20% uncommon, 20% rare, 6% epic, 1.5%
-legendary, and 0.5% Mythic. Mythic is unavailable at level 1 because its chance
-is `0.005 * LevelScale`.
+some Common weight into Rare, Epic, Unique, Legendary, Transcendent, and Mythic
+as monster level approaches 100. The current level 1 distribution is
+2% none, 70% common, and 28% rare. At level 100 the intended distribution is
+2% none, 56.8% common, 30% rare, 6% epic, 2.5% unique, 1.5% legendary,
+0.7% transcendent, and 0.5% Mythic. The seven active rarity rows plus None sum
+to exactly 1.0, Unique remains below Epic drop pressure, and Transcendent
+remains below Legendary drop pressure.
 
 `FDropFormula::ComputeItemBonus` preserves the existing slot split: weapons put
 100% of the scaled bonus into ATK, armor slots put 70% into DEF and 300% into
@@ -570,7 +579,8 @@ Parity anchors:
 - Lv1 Common with variance `1.0` keeps the legacy base bonus: weapon ATK `1.0`,
   armor DEF `0.7` / HP `3.0`, accessory ATK `0.5` / DEF `0.3` / HP `2.0`.
 - Lv100 variance `1.0` produces base bonuses of Rare `170`, Epic `230`,
-  Legendary `320`, and Mythic `450` before slot split.
+  Unique `275`, Legendary `320`, Transcendent `385`, and Mythic `450`
+  before slot split.
 - Enhancement remains a separate #33/#44 multiplier. A Legendary Lv100 weapon
   at +50 has PowerScore `round(320 * 6.0) = 1920`; rarity does not bypass the
   existing `EnhanceLevel` formula.
@@ -780,7 +790,7 @@ Representative costs:
 Pressure check against PR #33:
 
 - Enhancement is now a long-tail single-item sink: expected Common +0 to +50
-  cost is 22,717,602.91 gold, or 34.7h at the sampled median Lv50 blended
+  cost is 22,717,602.46 gold, or 34.7h at the sampled median Lv50 blended
   income of 654,689 gold/hour.
 - At that same sampled income, the V1 shop can absorb about 2,182 rolls/hour
   at idx 0, 1,364 rolls/hour at idx 4, or 929 rolls/hour at idx 9 if the player
@@ -806,17 +816,19 @@ EnhanceCost = 100 * (CurrentLevel + 1)^2 * RarityCostMultiplier
 | --- | ---: |
 | None | 0 |
 | Common | 1 |
-| Uncommon | 2 |
-| Rare | 4 |
-| Epic | 8 |
+| Rare | 2 |
+| Epic | 4 |
+| Unique | 8 |
 | Legendary | 16 |
+| Transcendent | 32 |
+| Mythic | 64 |
 
 The design intent is to keep Common enhancement as the low-friction early-game
 path while making high-rarity gear a deliberate gold sink. The single-argument
 client/server helper remains Common-compatible so existing Common anchors keep
 their PR #33 values. Equipped-item enhancement and the HUD panel must pass the
-actual equipped rarity. A Rare +0 attempt costs 400 gold, a Legendary +0
-attempt costs 1,600 gold, and a Mythic +0 attempt costs 3,200 gold; max-level
+actual equipped rarity. A Rare +0 attempt costs 200 gold, a Legendary +0
+attempt costs 1,600 gold, and a Mythic +0 attempt costs 6,400 gold; max-level
 items still cost 0. PR #44 updates the success-rate curve and max level, while failure behavior and the
 `1 + EnhanceLevel * 0.1` stat payoff remain intact.
 
@@ -831,25 +843,27 @@ Side effects to monitor:
   repeatable PR #38 shop remains the broader surplus-gold outlet.
 
 Pressure check using the PR #44 expected Common +0 to +50 cost of
-22,717,602.91 gold: a single Legendary item costs 363,481,646.52 expected gold,
-and eight Legendary slots cost 2,907,853,172.16 expected gold. Against the
+22,717,602.46 gold: a single Legendary item costs 363,481,639.40 expected gold,
+and eight Legendary slots cost 2,907,853,115.20 expected gold. Against the
 sampled PR #33 median Lv50 blended income of 654,689 gold/hour, that full
-Legendary pass is about 4441.579h of income. A Mythic pass doubles that pressure
-to 726,963,278.80 expected gold per item and 5,815,706,230.40 expected gold for
-eight slots, about 8883.159h at the same income anchor. Common early enhancement
-still starts at the PR #33 cost curve while high-rarity enhancement becomes an
-open-ended midgame/endgame sink alongside the repeatable shop roll outlet from
-PR #38.
+Legendary pass is about 4441.579h of income. The PR #65 seven-rarity x2 curve
+puts Mythic at 64x: 1,453,926,557.61 expected gold per item and
+11,631,412,460.88 expected gold for eight slots, about 17766.317h at the same
+income anchor. Common early enhancement still starts at the PR #33 cost curve
+while high-rarity enhancement becomes an open-ended midgame/endgame sink
+alongside the repeatable shop roll outlet from PR #38.
 
 The balance simulator reports these rarity scenarios:
 
 | Rarity | Multiplier | Minimum +0 to +50 gold | Expected +0 to +50 gold |
 | --- | ---: | ---: | ---: |
-| Common | 1 | 4,292,500 | 22,717,602.91 |
-| Rare | 4 | 17,170,000 | 90,870,411.63 |
-| Epic | 8 | 34,340,000 | 181,740,823.26 |
-| Legendary | 16 | 68,680,000 | 363,481,646.52 |
-| Mythic | 32 | 137,360,000 | 726,963,278.80 |
+| Common | 1 | 4,292,500 | 22,717,602.46 |
+| Rare | 2 | 8,585,000 | 45,435,204.93 |
+| Epic | 4 | 17,170,000 | 90,870,409.85 |
+| Unique | 8 | 34,340,000 | 181,740,819.70 |
+| Legendary | 16 | 68,680,000 | 363,481,639.40 |
+| Transcendent | 32 | 137,360,000 | 726,963,278.80 |
+| Mythic | 64 | 274,720,000 | 1,453,926,557.61 |
 
 ## PR #40 Item Affix V1
 
@@ -864,10 +878,11 @@ Affix count by rarity:
 | --- | ---: |
 | None | 0 |
 | Common | 0 |
-| Uncommon | 1 |
 | Rare | 1 |
 | Epic | 2 |
+| Unique | 2 |
 | Legendary | 2-3 |
+| Transcendent | 2-3 |
 | Mythic | 3 |
 
 V1 affix types:
@@ -931,16 +946,17 @@ behavior:
 | --- | --- |
 | None | None |
 | Common | None |
-| Uncommon | Warrior, Guardian, or Arcane |
 | Rare | Warrior, Guardian, or Arcane |
 | Epic | Warrior, Guardian, or Arcane |
+| Unique | Warrior, Guardian, or Arcane |
 | Legendary | Warrior, Guardian, or Arcane |
+| Transcendent | Warrior, Guardian, or Arcane |
 | Mythic | Warrior, Guardian, or Arcane |
 
 Eligible rarities pick one of the three V1 sets with the injected RNG. This
 creates a clear early rule: Common equipment preserves legacy behavior, while
-Uncommon and above, including Mythic, can contribute to set goals without changing stat rolls,
-affixes, enhancement cost, or PowerScore.
+Rare and above, including Unique, Transcendent, and Mythic, can contribute to
+set goals without changing stat rolls, affixes, enhancement cost, or PowerScore.
 
 Build impact is intentionally moderate. Warrior and Arcane push attack lanes
 with small crit modifiers at 4 pieces, while Guardian converts set completion

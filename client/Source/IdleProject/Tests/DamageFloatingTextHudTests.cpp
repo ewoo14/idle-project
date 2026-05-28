@@ -249,7 +249,7 @@ bool FStatusIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("HUD shows one indicator per active status"), Indicators.Num(), 3);
 	TestEqual(TEXT("Poison is shown first for stable horizontal layout"), static_cast<int32>(Indicators[0].Type), static_cast<int32>(ESkillStatusEffect::Poison));
 	TestEqual(TEXT("Poison uses a compact glyph"), Indicators[0].Label, FString(TEXT("P")));
-	TestEqual(TEXT("Poison uses green rarity token"), Indicators[0].Color.R, RarityUncommon.R);
+	TestEqual(TEXT("Poison uses green rarity token"), Indicators[0].Color.R, RarityUnique.R);
 	TestEqual(TEXT("Poison remaining time is exposed"), Indicators[0].RemainingSeconds, 2.0f);
 
 	TestEqual(TEXT("Burn is shown second for stable horizontal layout"), static_cast<int32>(Indicators[1].Type), static_cast<int32>(ESkillStatusEffect::Burn));

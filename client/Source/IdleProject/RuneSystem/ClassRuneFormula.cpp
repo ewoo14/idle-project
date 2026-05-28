@@ -82,14 +82,16 @@ int64 FClassRuneFormula::GetClassRuneCraftCost(EItemRarity Rarity)
 	{
 	case EItemRarity::Common:
 		return 25;
-	case EItemRarity::Uncommon:
-		return 60;
 	case EItemRarity::Rare:
-		return 150;
+		return 60;
 	case EItemRarity::Epic:
+		return 150;
+	case EItemRarity::Unique:
 		return 400;
 	case EItemRarity::Legendary:
 		return 1000;
+	case EItemRarity::Transcendent:
+		return 1700;
 	case EItemRarity::Mythic:
 		return 2500;
 	default:

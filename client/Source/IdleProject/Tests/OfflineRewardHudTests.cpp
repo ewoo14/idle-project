@@ -260,8 +260,8 @@ bool FEnhanceHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weapon row rarity label is localized"), WeaponRow.RarityLabel.ToString(), FString(TEXT("Rare")));
 	TestEqual(TEXT("Weapon row rarity color uses rare theme"), WeaponRow.RarityColor, IdleProject::UI::Theme::RarityRare);
 	TestEqual(TEXT("Weapon level label shows current level"), WeaponRow.LevelLabel.ToString(), FString(TEXT("+2 / 50")));
-	TestEqual(TEXT("Weapon next cost follows rarity-scaled formula"), WeaponRow.Cost, static_cast<int64>(3600));
-	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 3,600")));
+	TestEqual(TEXT("Weapon next cost follows rarity-scaled formula"), WeaponRow.Cost, static_cast<int64>(1800));
+	TestEqual(TEXT("Weapon cost label is localized"), WeaponRow.CostLabel.ToString(), FString(TEXT("Cost 1,800")));
 	TestEqual(TEXT("Weapon success rate follows formula"), WeaponRow.SuccessRate, FEnhanceFormula::GetEnhanceSuccessRate(2));
 	TestEqual(TEXT("Weapon success label is localized"), WeaponRow.SuccessRateLabel.ToString(), FString(TEXT("Success 91%")));
 	TestTrue(TEXT("Enough gold and below max enables enhance"), WeaponRow.bCanEnhance);
@@ -316,7 +316,7 @@ bool FEnhanceHudRarityViewModelTest::RunTest(const FString& Parameters)
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	const FIdleHUDEnhancePanelViewModel KoreanViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
-	TestEqual(TEXT("Epic row uses Korean rarity label"), KoreanViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("영웅")));
+	TestEqual(TEXT("Epic row uses Korean rarity label"), KoreanViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("에픽")));
 	TestEqual(TEXT("Legendary row uses Korean rarity label"), KoreanViewModel.Rows[1].RarityLabel.ToString(), FString(TEXT("전설")));
 
 	return true;

@@ -29,7 +29,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FRuneServiceCodexUnlockTest::RunTest(const FString& Parameters)
 {
 	URuneService* RuneService = NewObject<URuneService>();
-	TestEqual(TEXT("New codex has all fifty four cells modeled"), RuneService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
+	TestEqual(TEXT("New codex has all sixty three cells modeled"), RuneService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
 	TestEqual(TEXT("New codex has no unlocked cells"), RuneService->GetCodexCompletion().UnlockedCells, 0);
 	TestEqual(TEXT("New codex has no core bonus"), RuneService->GetCodexBonus().CoreStatAdd, 0.0f);
 
@@ -70,7 +70,7 @@ bool FRuneServiceCodexCompletionAndRestoreTest::RunTest(const FString& Parameter
 
 	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::Hp); ++TypeValue)
 	{
-		for (int32 RarityValue = static_cast<int32>(EItemRarity::Uncommon); RarityValue <= static_cast<int32>(EItemRarity::Mythic); ++RarityValue)
+		for (int32 RarityValue = static_cast<int32>(EItemRarity::Rare); RarityValue <= static_cast<int32>(EItemRarity::Mythic); ++RarityValue)
 		{
 			RuneService->AddRune(MakeRune(
 				*FString::Printf(TEXT("core_%d_%d"), TypeValue, RarityValue),
@@ -99,7 +99,7 @@ bool FRuneServiceCodexCompletionAndRestoreTest::RunTest(const FString& Parameter
 	InvalidCodex[0].Rarity = EItemRarity::None;
 	InvalidCodex[0].bUnlocked = true;
 	RestoredService->RestoreState(CapturedRunes, CapturedSlots, InvalidCodex);
-	TestEqual(TEXT("Restore sanitizes invalid codex cells back to a fifty four cell grid"), RestoredService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
+	TestEqual(TEXT("Restore sanitizes invalid codex cells back to a sixty three cell grid"), RestoredService->GetOwnedCodex().Num(), FRuneCodexFormula::TotalCells);
 	TestFalse(TEXT("Invalid codex entry does not unlock None/None"), RestoredService->GetOwnedCodex()[0].RuneType == ERuneType::None);
 
 	return true;
@@ -296,9 +296,9 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes rune state"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Rune save bumps version to six"), CapturedSave->SaveVersion, 6);
+	TestEqual(TEXT("Rune save bumps version to seven"), CapturedSave->SaveVersion, 7);
 	TestEqual(TEXT("Captured rune count round trips"), CapturedSave->Runes.Num(), 2);
-	TestEqual(TEXT("Captured rune codex has fifty four cells"), CapturedSave->RuneCodex.Num(), FRuneCodexFormula::TotalCells);
+	TestEqual(TEXT("Captured rune codex has sixty three cells"), CapturedSave->RuneCodex.Num(), FRuneCodexFormula::TotalCells);
 	TestEqual(TEXT("Captured rune essence round trips"), CapturedSave->RuneEssence, GameInstance->GetRuneEssence());
 	TestEqual(TEXT("Captured equipped rune slots have seven entries"), CapturedSave->EquippedRuneSlots.Num(), FRuneFormula::RuneSlotCount);
 

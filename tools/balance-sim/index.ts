@@ -15,6 +15,12 @@ import {
 } from "../../server/src/core/formulas/combat.js";
 import { computeCombatPower } from "../../server/src/core/formulas/combatPower.js";
 import {
+  getAffixCount,
+  getRarityDropChances,
+  getRarityStatMultiplier,
+  type ItemRarity,
+} from "../../server/src/core/formulas/drop.js";
+import {
   type EnhanceItemRarity,
   getEnhanceCost,
   getEnhanceSuccessRate,
@@ -142,6 +148,7 @@ export type BalanceReport = {
       bossIncluded: boolean;
       formulas: string[];
       rewardScaling: StageRewardComparison[];
+      dropRarityPressure: DropRarityPressure;
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
       achievementPressure: AchievementPressure;
@@ -189,6 +196,21 @@ export type StageRewardComparison = {
   normalGold: string;
   bossExp: number;
   bossGold: string;
+};
+
+export type DropRarityPressureRow = {
+  rarity: Exclude<ItemRarity, "None">;
+  statMultiplier: number;
+  chanceAtLevel1Percent: number;
+  chanceAtLevel100Percent: number;
+  affixCount: string;
+};
+
+export type DropRarityPressure = {
+  levels: number[];
+  totalChanceAtLevel1: number;
+  totalChanceAtLevel100: number;
+  rows: DropRarityPressureRow[];
 };
 
 export type EnhancementPressureRow = {
@@ -266,10 +288,11 @@ export type EnhancementRarityScenario = {
 
 export type RuneRarityName =
   | "Common"
-  | "Uncommon"
   | "Rare"
   | "Epic"
+  | "Unique"
   | "Legendary"
+  | "Transcendent"
   | "Mythic";
 
 export type RuneTypeName =
@@ -377,16 +400,27 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Common",
   "Rare",
   "Epic",
+  "Unique",
   "Legendary",
+  "Transcendent",
+  "Mythic",
+];
+const ITEM_DROP_RARITIES: Exclude<ItemRarity, "None">[] = [
+  "Common",
+  "Rare",
+  "Epic",
+  "Unique",
+  "Legendary",
+  "Transcendent",
   "Mythic",
 ];
 const EQUIPMENT_SLOT_COUNT = 8;
 const DOG_GOLD_BONUS_PERCENT = 20;
 const BIRD_DROP_BONUS_PERCENT = 15;
 const RUNE_CORE_REVIEW_LEVELS = [0, 10, 50, 100];
-const RUNE_CORE_REVIEW_RARITIES = [1, 3, 6] as const;
+const RUNE_CORE_REVIEW_RARITIES = [1, 3, 5, 7] as const;
 const RUNE_UTIL_REVIEW_TYPES = [6, 7, 8, 9] as const;
-const MYTHIC_RUNE_RARITY = 6;
+const MYTHIC_RUNE_RARITY = 7;
 const CLASS_MASTERY_REVIEW_LEVEL = 100;
 const CLASS_MASTERY_REVIEW_ENHANCE_LEVEL = 50;
 const REGULAR_RUNE_SLOT_COUNT = RUNE_SLOT_COUNT - 1;
@@ -466,6 +500,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/offline.ts",
         "server/src/core/formulas/reward.ts",
         "server/src/core/formulas/stage.ts",
+        "server/src/core/formulas/drop.ts",
         "server/src/core/formulas/enhance.ts",
         "server/src/core/formulas/petLevel.ts",
         "server/src/core/formulas/achievement.ts",
@@ -475,6 +510,7 @@ export function buildBalanceReport(
         "server/src/core/formulas/runeCodex.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
+      dropRarityPressure: buildDropRarityPressure(),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
       achievementPressure: buildAchievementPressure(),
@@ -889,6 +925,36 @@ function buildStageRewardComparison(chapter: number): StageRewardComparison[] {
   );
 }
 
+function buildDropRarityPressure(): DropRarityPressure {
+  const level1Chances = getRarityDropChances(1);
+  const level100Chances = getRarityDropChances(100);
+
+  return {
+    levels: [1, 100],
+    totalChanceAtLevel1: round(
+      Object.values(level1Chances).reduce((sum, chance) => sum + chance, 0),
+      6,
+    ),
+    totalChanceAtLevel100: round(
+      Object.values(level100Chances).reduce((sum, chance) => sum + chance, 0),
+      6,
+    ),
+    rows: ITEM_DROP_RARITIES.map((rarity) => ({
+      rarity,
+      statMultiplier: round(getRarityStatMultiplier(rarity), 3),
+      chanceAtLevel1Percent: round(level1Chances[rarity] * 100, 3),
+      chanceAtLevel100Percent: round(level100Chances[rarity] * 100, 3),
+      affixCount: describeAffixCount(rarity),
+    })),
+  };
+}
+
+function describeAffixCount(rarity: ItemRarity): string {
+  const lowRoll = getAffixCount(rarity, () => 0.49);
+  const highRoll = getAffixCount(rarity, () => 0.5);
+  return lowRoll === highRoll ? String(lowRoll) : `${lowRoll}-${highRoll}`;
+}
+
 function buildEnhancementPressure(
   samples: SimulationSample[],
 ): EnhancementPressure {
@@ -1140,13 +1206,13 @@ function buildRunePressure(): RunePressure {
 function buildRuneCodexPressure(
   baseMedianRebirthHours: number,
 ): RuneCodexPressure {
-  const rowBonus = [1, 2, 3, 4, 5, 6].reduce(
+  const rowBonus = [1, 2, 3, 4, 5, 6, 7].reduce(
     (sum, rarity) => sum + getRowCompletionBonus(rarity),
     0,
   );
   const fullCodexBonus = computeRuneCodexBonus({
     unlockedCells: RUNE_CODEX_TOTAL_CELLS,
-    rowComplete: [true, true, true, true, true, true],
+    rowComplete: [true, true, true, true, true, true, true],
     coreCategoryComplete: true,
     utilCategoryComplete: true,
   });
@@ -1422,14 +1488,16 @@ function runeRarityName(rarity: number): RuneRarityName {
     case 1:
       return "Common";
     case 2:
-      return "Uncommon";
-    case 3:
       return "Rare";
-    case 4:
+    case 3:
       return "Epic";
+    case 4:
+      return "Unique";
     case 5:
       return "Legendary";
     case 6:
+      return "Transcendent";
+    case 7:
       return "Mythic";
     default:
       throw new Error(`Unsupported rune rarity ${rarity}`);
@@ -1540,6 +1608,27 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.rewardScaling.map(
       (row) =>
         `| ${row.stage} | ${row.globalStageIndex} | ${row.monsterHpMultiplier} | ${row.rewardMultiplier} | ${row.normalExp} | ${row.normalGold} | ${row.bossExp} | ${row.bossGold} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Item Drop Rarity Pressure",
+    "",
+    "- Source: `server/src/core/formulas/drop.ts`.",
+    `- Level 1 total probability: ${round(report.model.dropRarityPressure.totalChanceAtLevel1 * 100, 3)}%`,
+    `- Level 100 total probability: ${round(report.model.dropRarityPressure.totalChanceAtLevel100 * 100, 3)}%`,
+    "- Unique and Transcendent are interpolation tiers: Unique stays below",
+    "  Epic drop pressure, and Transcendent stays below Legendary drop pressure.",
+    "- This table reports rarity pressure only; the sampled first-rebirth",
+    "  distribution still uses the existing equipmentMultiplier abstraction.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Rarity | Stat x | Lv1 chance | Lv100 chance | Affixes |",
+    "| --- | ---: | ---: | ---: | ---: |",
+    ...report.model.dropRarityPressure.rows.map(
+      (row) =>
+        `| ${row.rarity} | ${row.statMultiplier} | ${row.chanceAtLevel1Percent}% | ${row.chanceAtLevel100Percent}% | ${row.affixCount} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

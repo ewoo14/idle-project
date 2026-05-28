@@ -1,6 +1,6 @@
-export const RUNE_CODEX_TOTAL_CELLS = 54;
-export const RUNE_CODEX_CORE_CELLS = 30;
-export const RUNE_CODEX_UTIL_CELLS = 24;
+export const RUNE_CODEX_TOTAL_CELLS = 63;
+export const RUNE_CODEX_CORE_CELLS = 35;
+export const RUNE_CODEX_UTIL_CELLS = 28;
 export const PER_CELL_CORE_BONUS = 0.004;
 export const CORE_CATEGORY_BONUS = 0.05;
 export const UTIL_CATEGORY_CAP_EXTENSION = 0.1;
@@ -30,6 +30,8 @@ export function getRowCompletionBonus(rarity: number): number {
     case 5:
       return Math.fround(0.08);
     case 6:
+      return Math.fround(0.1);
+    case 7:
       return Math.fround(0.12);
     default:
       return 0;
@@ -47,7 +49,7 @@ export function computeRuneCodexBonus(
 
   for (
     let rowIndex = 0;
-    rowIndex < completion.rowComplete.length && rowIndex < 6;
+    rowIndex < completion.rowComplete.length && rowIndex < 7;
     rowIndex++
   ) {
     if (completion.rowComplete[rowIndex]) {

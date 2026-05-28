@@ -47,12 +47,58 @@ describe("balance simulator", () => {
       "server/src/core/formulas/enhance.ts",
     );
     expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/drop.ts",
+    );
+    expect(report.json.model.formulas).toContain(
       "server/src/core/formulas/achievement.ts",
     );
     expect(report.markdown).toContain("# Balance Simulator V1");
     expect(report.markdown).toContain("median");
     expect(report.markdown).toContain("Sensitivity");
     expect(report.markdown).toContain("EXP curve");
+  });
+
+  it("reports seven-rarity item drop pressure through the shared drop formula", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.dropRarityPressure.rows).toHaveLength(7);
+    expect(report.json.model.dropRarityPressure.totalChanceAtLevel100).toBe(1);
+    expect(
+      report.json.model.dropRarityPressure.rows.map((row) => row.rarity),
+    ).toEqual([
+      "Common",
+      "Rare",
+      "Epic",
+      "Unique",
+      "Legendary",
+      "Transcendent",
+      "Mythic",
+    ]);
+    expect(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Unique",
+      )?.chanceAtLevel100Percent,
+    ).toBeLessThan(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Epic",
+      )?.chanceAtLevel100Percent ?? 0,
+    );
+    expect(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Transcendent",
+      )?.chanceAtLevel100Percent,
+    ).toBeLessThan(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Legendary",
+      )?.chanceAtLevel100Percent ?? 0,
+    );
+    expect(report.markdown).toContain("## Item Drop Rarity Pressure");
+    expect(report.markdown).toContain("Level 100 total probability: 100%");
+    expect(report.markdown).toContain("| Unique | 2.75 | 0% | 2.5% | 2 |");
+    expect(report.markdown).toContain(
+      "| Transcendent | 3.85 | 0% | 0.7% | 2-3 |",
+    );
   });
 
   it("reports achievement soft-cap pressure against transcend and tower multipliers", () => {
@@ -203,12 +249,18 @@ describe("balance simulator", () => {
       },
       {
         rarity: "Rare",
+        multiplier: 2,
+        expectedGoldCostToMax: 45435204.93,
+        expectedHoursAtMedianGoldPerHour: 69.4,
+      },
+      {
+        rarity: "Epic",
         multiplier: 4,
         expectedGoldCostToMax: 90870409.85,
         expectedHoursAtMedianGoldPerHour: 138.799,
       },
       {
-        rarity: "Epic",
+        rarity: "Unique",
         multiplier: 8,
         expectedGoldCostToMax: 181740819.7,
         expectedHoursAtMedianGoldPerHour: 277.599,
@@ -220,10 +272,16 @@ describe("balance simulator", () => {
         expectedHoursAtMedianGoldPerHour: 555.197,
       },
       {
-        rarity: "Mythic",
+        rarity: "Transcendent",
         multiplier: 32,
         expectedGoldCostToMax: 726963278.8,
         expectedHoursAtMedianGoldPerHour: 1110.395,
+      },
+      {
+        rarity: "Mythic",
+        multiplier: 64,
+        expectedGoldCostToMax: 1453926557.61,
+        expectedHoursAtMedianGoldPerHour: 2220.79,
       },
     ]);
     expect(
@@ -235,11 +293,11 @@ describe("balance simulator", () => {
     ).toBe(4441.579);
     expect(
       report.json.model.enhancementPressure.mythicEightSlotExpectedGoldCost,
-    ).toBeCloseTo(5815706230.4, 2);
+    ).toBeCloseTo(11631412460.88, 2);
     expect(
       report.json.model.enhancementPressure
         .mythicEightSlotExpectedHoursAtMedianGoldPerHour,
-    ).toBe(8883.159);
+    ).toBe(17766.317);
     expect(report.markdown).toContain("## Rarity Enhancement Pressure");
     expect(report.markdown).toContain(
       "| Legendary | 16 | 68680000 | 363481639.4 | 555.197h |",
@@ -251,10 +309,10 @@ describe("balance simulator", () => {
       "4441.579h at sampled median Lv50 gold/hour",
     );
     expect(report.markdown).toContain(
-      "| Mythic | 32 | 137360000 | 726963278.8 | 1110.395h |",
+      "| Mythic | 64 | 274720000 | 1453926557.61 | 2220.79h |",
     );
     expect(report.markdown).toContain(
-      "Eight Mythic slots: 5,815,706,230.40 expected gold",
+      "Eight Mythic slots: 11,631,412,460.88 expected gold",
     );
   });
 
@@ -537,20 +595,20 @@ describe("balance simulator", () => {
       "server/src/core/formulas/runeCodex.ts",
     );
     expect(report.json.model.runeCodexPressure).toEqual({
-      totalCells: 54,
+      totalCells: 63,
       perCellCoreBonusPercent: 0.4,
-      allCellsCoreBonusPercent: 21.6,
-      allRowsCoreBonusPercent: 31,
+      allCellsCoreBonusPercent: 25.2,
+      allRowsCoreBonusPercent: 41,
       coreCategoryBonusPercent: 5,
       utilCategoryCapExtensionPercent: 10,
-      fullCodexCoreStatAddPercent: 57.6,
+      fullCodexCoreStatAddPercent: 71.2,
       baseMedianRebirthHours: 5.328,
-      projectedFullCodexMedianHours: 3.381,
-      projectedMedianDeltaPercent: -36.5,
+      projectedFullCodexMedianHours: 3.112,
+      projectedMedianDeltaPercent: -41.6,
       injectedIntoSampledRun: false,
     });
     expect(report.markdown).toContain("## Rune Codex Collection Pressure");
-    expect(report.markdown).toContain("Full codex core bonus: +57.6%");
+    expect(report.markdown).toContain("Full codex core bonus: +71.2%");
     expect(report.markdown).toContain(
       "Not injected into the sampled first-rebirth run",
     );

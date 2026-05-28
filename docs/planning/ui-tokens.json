@@ -24,10 +24,11 @@
     },
     "rarity": {
       "common":    "#B0B5C0",
-      "uncommon":  "#5BC07A",
       "rare":      "#5B8BC0",
       "epic":      "#A05BC0",
+      "unique":    "#5BC07A",
       "legendary": "#F0A040",
+      "transcendent": "#40D0E8",
       "mythic": {
         "$type": "linear-gradient",
         "angle": 45,
@@ -35,9 +36,33 @@
           { "at": 0.0, "color": "#FF7B00" },
           { "at": 1.0, "color": "#00B4FF" }
         ],
-        "$comment": "PR #2 디자이너 슬라이스에서 angle/stops 최종 확정 예정."
+        "$comment": "Use start/end colors in UE Theme::RarityMythicStart/End for UMG fallback."
       }
     }
+  },
+  "rarityDisplay": {
+    "order": ["common", "rare", "epic", "unique", "legendary", "transcendent", "mythic"],
+    "labels": {
+      "ko": {
+        "common": "일반",
+        "rare": "레어",
+        "epic": "에픽",
+        "unique": "유니크",
+        "legendary": "전설",
+        "transcendent": "초월",
+        "mythic": "신화"
+      },
+      "en": {
+        "common": "Common",
+        "rare": "Rare",
+        "epic": "Epic",
+        "unique": "Unique",
+        "legendary": "Legendary",
+        "transcendent": "Transcendent",
+        "mythic": "Mythic"
+      }
+    },
+    "$comment": "PR #65 removes Uncommon. Transcendent appears only in item/rune context; prestige Transcendence keeps TRANSCEND_* UI keys."
   },
   "typography": {
     "korean": {
@@ -94,7 +119,6 @@
   },
   "$todo": [
     "다크/라이트 분리는 1.0 출시 전 결정 (현재 다크 단일).",
-    "Mythic gradient angle/stops 최종 확정 — PR #2.",
     "Pretendard 셀프호스팅 경로/라이선스 표기 — PR #2.",
     "UE5 C++ 미러: client/Source/IdleProject/UI/UIThemeTokens.h"
   ]

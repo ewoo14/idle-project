@@ -395,7 +395,7 @@ struct IDLEPROJECT_API FIdleHUDRuneCodexViewModel
 	FText CoreBonusLabel;
 	FText UtilCapLabel;
 	int32 UnlockedCells = 0;
-	int32 TotalCells = 54;
+	int32 TotalCells = 63;
 	int32 CoreUnlockedCells = 0;
 	int32 UtilUnlockedCells = 0;
 	float ProgressRatio = 0.0f;
