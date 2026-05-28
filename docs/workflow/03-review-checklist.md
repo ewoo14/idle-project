@@ -319,7 +319,7 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   `docs/planning/ui-tokens.json` list exactly seven item rarity tokens:
   Common, Rare, Epic, Unique, Legendary, Transcendent, and Mythic.
 - [ ] `Uncommon` is absent from active rarity tokens and UI localization keys.
-- [ ] ko/en UI labels remain paired as 일반/Common, 희귀/Rare, 영웅/Epic,
+- [ ] ko/en UI labels remain paired as 일반/Common, 레어/Rare, 에픽/Epic,
   유니크/Unique, 전설/Legendary, 초월/Transcendent, and 신화/Mythic.
 - [ ] HUD rarity rendering uses token-driven color only; Unique keeps the
   legacy green, Transcendent uses cyan, and Mythic keeps the orange-to-blue

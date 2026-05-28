@@ -316,7 +316,7 @@ bool FEnhanceHudRarityViewModelTest::RunTest(const FString& Parameters)
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	const FIdleHUDEnhancePanelViewModel KoreanViewModel = IdleProject::UI::BuildEnhancePanelViewModel(*Inventory, 1000, FText::GetEmpty(), false);
-	TestEqual(TEXT("Epic row uses Korean rarity label"), KoreanViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("영웅")));
+	TestEqual(TEXT("Epic row uses Korean rarity label"), KoreanViewModel.Rows[0].RarityLabel.ToString(), FString(TEXT("에픽")));
 	TestEqual(TEXT("Legendary row uses Korean rarity label"), KoreanViewModel.Rows[1].RarityLabel.ToString(), FString(TEXT("전설")));
 
 	return true;
