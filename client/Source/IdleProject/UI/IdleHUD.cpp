@@ -56,6 +56,9 @@ const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
+const FName ShopProtectionScrollHitBoxName(TEXT("ShopProtectionScroll"));
+const FName ShopResetCubeHitBoxName(TEXT("ShopResetCube"));
+const FName ShopRankCubeHitBoxName(TEXT("ShopRankCube"));
 const FName ShopRuneRollHitBoxName(TEXT("ShopRuneRoll"));
 const FName CraftClassRuneHitBoxName(TEXT("CraftClassRune"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
@@ -1734,17 +1737,32 @@ FIdleHUDPotentialPanelViewModel IdleProject::UI::BuildPotentialPanelViewModel(co
 	return ViewModel;
 }
 
-FIdleHUDShopPanelViewModel IdleProject::UI::BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult)
+FIdleHUDShopPanelViewModel IdleProject::UI::BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult)
 {
 	FIdleHUDShopPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("SHOP_PANEL_TITLE"));
 	ViewModel.Gold = FMath::Max<int64>(0, Gold);
 	ViewModel.GearRollCost = FMath::Max<int64>(0, GearRollCost);
+	ViewModel.ProtectionScrollCost = FMath::Max<int64>(0, ProtectionScrollCost);
+	ViewModel.ResetCubeCost = FMath::Max<int64>(0, ResetCubeCost);
+	ViewModel.RankCubeCost = FMath::Max<int64>(0, RankCubeCost);
 	ViewModel.GearRollHitBoxName = ShopGearRollHitBoxName;
+	ViewModel.ProtectionScrollHitBoxName = ShopProtectionScrollHitBoxName;
+	ViewModel.ResetCubeHitBoxName = ShopResetCubeHitBoxName;
+	ViewModel.RankCubeHitBoxName = ShopRankCubeHitBoxName;
 	ViewModel.GoldLabel = FormatLocalizedUIWithInt64(TEXT("HUD_GOLD_FORMAT"), TEXT("Amount"), ViewModel.Gold);
 	ViewModel.CostLabel = FormatLocalizedUIWithInt64(TEXT("SHOP_GEAR_ROLL_COST_FORMAT"), TEXT("Cost"), ViewModel.GearRollCost);
+	ViewModel.ProtectionScrollCostLabel = FormatLocalizedUIWithInt64(TEXT("SHOP_PROTECTION_SCROLL_COST_FORMAT"), TEXT("Cost"), ViewModel.ProtectionScrollCost);
+	ViewModel.ResetCubeCostLabel = FormatLocalizedUIWithInt64(TEXT("SHOP_RESET_CUBE_COST_FORMAT"), TEXT("Cost"), ViewModel.ResetCubeCost);
+	ViewModel.RankCubeCostLabel = FormatLocalizedUIWithInt64(TEXT("SHOP_RANK_CUBE_COST_FORMAT"), TEXT("Cost"), ViewModel.RankCubeCost);
 	ViewModel.ButtonLabel = IdleProject::Localization::UI(TEXT("SHOP_GEAR_ROLL_BUTTON"));
+	ViewModel.ProtectionScrollButtonLabel = IdleProject::Localization::UI(TEXT("SHOP_PROTECTION_SCROLL_BUTTON"));
+	ViewModel.ResetCubeButtonLabel = IdleProject::Localization::UI(TEXT("SHOP_RESET_CUBE_BUTTON"));
+	ViewModel.RankCubeButtonLabel = IdleProject::Localization::UI(TEXT("SHOP_RANK_CUBE_BUTTON"));
 	ViewModel.bCanBuyGearRoll = ViewModel.GearRollCost > 0 && ViewModel.Gold >= ViewModel.GearRollCost;
+	ViewModel.bCanBuyProtectionScroll = ViewModel.ProtectionScrollCost > 0 && ViewModel.Gold >= ViewModel.ProtectionScrollCost;
+	ViewModel.bCanBuyResetCube = ViewModel.ResetCubeCost > 0 && ViewModel.Gold >= ViewModel.ResetCubeCost;
+	ViewModel.bCanBuyRankCube = ViewModel.RankCubeCost > 0 && ViewModel.Gold >= ViewModel.RankCubeCost;
 	ViewModel.StatusLabel = ViewModel.bCanBuyGearRoll
 		? IdleProject::Localization::UI(TEXT("SHOP_STATUS_READY"))
 		: IdleProject::Localization::UI(TEXT("SHOP_STATUS_NEED_GOLD"));
@@ -2994,6 +3012,21 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		TryBuyGearRoll();
 		return;
 	}
+	if (BoxName == ShopProtectionScrollHitBoxName)
+	{
+		TryBuyProtectionScroll();
+		return;
+	}
+	if (BoxName == ShopResetCubeHitBoxName)
+	{
+		TryBuyResetCube();
+		return;
+	}
+	if (BoxName == ShopRankCubeHitBoxName)
+	{
+		TryBuyRankCube();
+		return;
+	}
 	if (BoxName == ShopRuneRollHitBoxName)
 	{
 		TryBuyRuneRoll();
@@ -3827,12 +3860,15 @@ void AIdleHUD::DrawShopPanel()
 	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
 	const FIdleHUDShopPanelViewModel ViewModel = BuildShopPanelViewModel(
 		FShopFormula::GetGearRollCost(GlobalStageIndex),
+		FShopFormula::GetProtectionScrollCost(GlobalStageIndex),
+		FShopFormula::GetResetCubeCost(GlobalStageIndex),
+		FShopFormula::GetRankCubeCost(GlobalStageIndex),
 		IdleGameInstance->GetGold(),
 		LastShopPurchaseResult);
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 300.0f * Scale, 380.0f * Scale);
-	const float PanelHeight = (ViewModel.bHasLastResult ? 178.0f : 144.0f) * Scale;
+	const float PanelHeight = (ViewModel.bHasLastResult ? 292.0f : 258.0f) * Scale;
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
 	const float Y = 92.0f * Scale;
 	const float Padding = 14.0f * Scale;
@@ -3847,26 +3883,33 @@ void AIdleHUD::DrawShopPanel()
 
 	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 	DrawText(ViewModel.GoldLabel.ToString(), Theme::AccentGold, X + PanelWidth - 110.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
-	DrawText(ViewModel.CostLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::TextPrimary : Theme::AccentRed, X + Padding, Y + 54.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 82.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
 
 	const float ButtonWidth = 112.0f * Scale;
-	const float ButtonHeight = 32.0f * Scale;
+	const float ButtonHeight = 28.0f * Scale;
 	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
-	const float ButtonY = Y + 68.0f * Scale;
-	DrawRect(ViewModel.bCanBuyGearRoll ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 16.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	if (ViewModel.bCanBuyGearRoll)
+	auto DrawShopRow = [&](float RowY, const FText& CostLabel, const FText& ButtonLabel, bool bCanBuy, FName HitBoxName, int32 Priority)
 	{
-		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.GearRollHitBoxName, true, 84);
-	}
+		DrawText(CostLabel.ToString(), bCanBuy ? Theme::TextPrimary : Theme::AccentRed, X + Padding, RowY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+		DrawRect(bCanBuy ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, RowY, ButtonWidth, ButtonHeight);
+		DrawText(ButtonLabel.ToString(), bCanBuy ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 10.0f * Scale, RowY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+		if (bCanBuy)
+		{
+			AddHitBox(FVector2D(ButtonX, RowY), FVector2D(ButtonWidth, ButtonHeight), HitBoxName, true, Priority);
+		}
+	};
+
+	DrawShopRow(Y + 50.0f * Scale, ViewModel.CostLabel, ViewModel.ButtonLabel, ViewModel.bCanBuyGearRoll, ViewModel.GearRollHitBoxName, 84);
+	DrawShopRow(Y + 86.0f * Scale, ViewModel.ProtectionScrollCostLabel, ViewModel.ProtectionScrollButtonLabel, ViewModel.bCanBuyProtectionScroll, ViewModel.ProtectionScrollHitBoxName, 85);
+	DrawShopRow(Y + 122.0f * Scale, ViewModel.ResetCubeCostLabel, ViewModel.ResetCubeButtonLabel, ViewModel.bCanBuyResetCube, ViewModel.ResetCubeHitBoxName, 86);
+	DrawShopRow(Y + 158.0f * Scale, ViewModel.RankCubeCostLabel, ViewModel.RankCubeButtonLabel, ViewModel.bCanBuyRankCube, ViewModel.RankCubeHitBoxName, 87);
+	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanBuyGearRoll ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 198.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 
 	if (ViewModel.bHasLastResult)
 	{
 		const FLinearColor ResultColor = ViewModel.bLastResultError ? Theme::AccentRed : RarityToColor(ViewModel.LastResultRarity);
-		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.86f), X + Padding, Y + 118.0f * Scale, PanelWidth - Padding * 2.0f, 34.0f * Scale);
-		DrawRect(ResultColor, X + Padding, Y + 118.0f * Scale, 4.0f * Scale, 34.0f * Scale);
-		DrawText(ViewModel.LastResultLabel.ToString(), ResultColor, X + Padding + 12.0f * Scale, Y + 126.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.86f), X + Padding, Y + 224.0f * Scale, PanelWidth - Padding * 2.0f, 34.0f * Scale);
+		DrawRect(ResultColor, X + Padding, Y + 224.0f * Scale, 4.0f * Scale, 34.0f * Scale);
+		DrawText(ViewModel.LastResultLabel.ToString(), ResultColor, X + Padding + 12.0f * Scale, Y + 232.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
 	}
 
 	RefreshMouseInteraction();
@@ -3886,6 +3929,45 @@ void AIdleHUD::TryBuyGearRoll()
 
 	IdleGameInstance->TryBuyGearRoll(PlayerInventory);
 	RefreshEquipmentSummary();
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryBuyProtectionScroll()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->TryBuyProtectionScroll();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryBuyResetCube()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->TryBuyResetCube();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryBuyRankCube()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->TryBuyRankCube();
+	}
 	RefreshMouseInteraction();
 }
 

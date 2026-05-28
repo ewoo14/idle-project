@@ -90,6 +90,43 @@ bool FIdleGameInstanceGearRollPurchaseTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceMaterialShopPurchaseTest,
+	"IdleProject.GameCore.IdleGameInstance.MaterialShopPurchase",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceMaterialShopPurchaseTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeStageServiceForTests();
+
+	TestFalse(TEXT("Protection scroll purchase fails with no gold"), GameInstance->TryBuyProtectionScroll());
+	TestEqual(TEXT("Failed protection scroll purchase does not grant resource"), GameInstance->GetProtectionScrolls(), static_cast<int64>(0));
+
+	const int64 ProtectionCost = FShopFormula::GetProtectionScrollCost(0);
+	GameInstance->AddGold(ProtectionCost);
+	TestTrue(TEXT("Protection scroll purchase succeeds with enough gold"), GameInstance->TryBuyProtectionScroll());
+	TestEqual(TEXT("Protection scroll purchase deducts gold once"), GameInstance->GetGold(), static_cast<int64>(0));
+	TestEqual(TEXT("Protection scroll purchase grants one scroll"), GameInstance->GetProtectionScrolls(), static_cast<int64>(1));
+
+	const int64 ResetCost = FShopFormula::GetResetCubeCost(0);
+	GameInstance->AddGold(ResetCost - 1);
+	TestFalse(TEXT("Reset cube purchase fails below cost"), GameInstance->TryBuyResetCube());
+	TestEqual(TEXT("Failed reset cube purchase keeps balance"), GameInstance->GetGold(), ResetCost - 1);
+	TestEqual(TEXT("Failed reset cube purchase grants no cube"), GameInstance->GetResetCubes(), static_cast<int64>(0));
+	GameInstance->AddGold(1);
+	TestTrue(TEXT("Reset cube purchase succeeds at exact cost"), GameInstance->TryBuyResetCube());
+	TestEqual(TEXT("Reset cube purchase grants one cube"), GameInstance->GetResetCubes(), static_cast<int64>(1));
+
+	const int64 RankCost = FShopFormula::GetRankCubeCost(0);
+	GameInstance->AddGold(RankCost);
+	TestTrue(TEXT("Rank cube purchase succeeds at exact cost"), GameInstance->TryBuyRankCube());
+	TestEqual(TEXT("Rank cube purchase deducts gold once"), GameInstance->GetGold(), static_cast<int64>(0));
+	TestEqual(TEXT("Rank cube purchase grants one cube"), GameInstance->GetRankCubes(), static_cast<int64>(1));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FIdleGameInstanceEnhanceAttemptTest,
 	"IdleProject.GameCore.IdleGameInstance.EnhanceAttempt",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

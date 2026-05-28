@@ -803,6 +803,32 @@ Pressure check against PR #33:
   raise `BaseCost` in both `FShopFormula` and the server `shop.ts` mirror, then
   update parity tests in the same change.
 
+## PR #71 Material Shop Extension
+
+The equipment-depth resource shop reuses the PR #38 reward-axis curve so
+client HUD prices, GameInstance purchase gates, and the server formula mirror
+stay on one balance dial:
+
+```text
+ProtectionScrollCost = max(1, round(300 * RewardMultiplier(globalStageIndex)))
+ResetCubeCost = max(1, round(800 * RewardMultiplier(globalStageIndex)))
+RankCubeCost = max(1, round(4000 * RewardMultiplier(globalStageIndex)))
+```
+
+Representative parity anchors:
+
+| idx | Protection scroll | Reset cube | Rank cube |
+| ---: | ---: | ---: | ---: |
+| 0 | 300 | 800 | 4,000 |
+| 4 | 435 | 1,160 | 5,800 |
+| 9 | 660 | 1,760 | 8,800 |
+
+Protection scrolls intentionally share the gear-roll base cost so early risk
+mitigation is reachable without making enhancement free. Reset cubes sit at a
+mid-tier price because they reroll value within an existing potential grade.
+Rank cubes use the 4,000 base as the premium sink because they can raise
+long-tail potential quality.
+
 ## PR #39 Rarity-Scaled Enhancement Cost V1
 
 Enhancement cost keeps the PR #33 level curve and multiplies it by equipped item

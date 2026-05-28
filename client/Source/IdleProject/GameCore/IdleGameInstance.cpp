@@ -911,6 +911,37 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	return Result;
 }
 
+bool UIdleGameInstance::TryBuyProtectionScroll()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetProtectionScrollCost(GlobalStageIndex), ProtectionScrolls);
+}
+
+bool UIdleGameInstance::TryBuyResetCube()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetResetCubeCost(GlobalStageIndex), ResetCubes);
+}
+
+bool UIdleGameInstance::TryBuyRankCube()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetRankCubeCost(GlobalStageIndex), RankCubes);
+}
+
+bool UIdleGameInstance::TryBuyShopResource(int64 Cost, int64& ResourceCount)
+{
+	if (Cost <= 0 || Gold < Cost || ResourceCount >= MAX_int64)
+	{
+		return false;
+	}
+
+	AddGold(-Cost);
+	++ResourceCount;
+	RequestAutosave();
+	return true;
+}
+
 void UIdleGameInstance::AddRune(const FRuneInstance& Rune)
 {
 	EnsureRuneService();

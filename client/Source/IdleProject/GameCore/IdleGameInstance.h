@@ -217,6 +217,15 @@ public:
 
 	FShopPurchaseResult TryBuyGearRoll(UInventoryComponent* Inventory);
 
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyProtectionScroll();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyResetCube();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyRankCube();
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	void AddRune(const FRuneInstance& Rune);
 
@@ -587,6 +596,7 @@ private:
 	void EnsureRuneService();
 	void EnsureAchievementService();
 	void RefreshPlayerCharacterStats();
+	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();

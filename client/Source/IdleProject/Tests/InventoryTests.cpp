@@ -200,6 +200,28 @@ bool FShopFormulaGearRollCostTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FShopFormulaMaterialCostTest,
+	"IdleProject.Inventory.ShopFormula.MaterialCosts",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FShopFormulaMaterialCostTest::RunTest(const FString& Parameters)
+{
+	TestEqual(TEXT("Protection scroll uses gear roll base at stage zero"), FShopFormula::GetProtectionScrollCost(0), static_cast<int64>(300));
+	TestEqual(TEXT("Reset cube uses reset base at stage zero"), FShopFormula::GetResetCubeCost(0), static_cast<int64>(800));
+	TestEqual(TEXT("Rank cube uses rank base at stage zero"), FShopFormula::GetRankCubeCost(0), static_cast<int64>(4000));
+
+	TestEqual(TEXT("Protection scroll rounds stage four multiplier"), FShopFormula::GetProtectionScrollCost(4), static_cast<int64>(435));
+	TestEqual(TEXT("Reset cube rounds stage four multiplier"), FShopFormula::GetResetCubeCost(4), static_cast<int64>(1160));
+	TestEqual(TEXT("Rank cube rounds stage four multiplier"), FShopFormula::GetRankCubeCost(4), static_cast<int64>(5800));
+
+	TestEqual(TEXT("Protection scroll rounds stage nine multiplier"), FShopFormula::GetProtectionScrollCost(9), static_cast<int64>(660));
+	TestEqual(TEXT("Reset cube rounds stage nine multiplier"), FShopFormula::GetResetCubeCost(9), static_cast<int64>(1760));
+	TestEqual(TEXT("Rank cube rounds stage nine multiplier"), FShopFormula::GetRankCubeCost(9), static_cast<int64>(8800));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDropFormulaRarityMultiplierTest,
 	"IdleProject.Inventory.DropFormula.RarityMultiplier",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -959,7 +981,7 @@ bool FShopPanelViewModelStateTest::RunTest(const FString& Parameters)
 	PurchaseResult.Slot = EItemSlot::Weapon;
 	PurchaseResult.ItemName = FText::FromString(TEXT("rare_sword"));
 
-	const FIdleHUDShopPanelViewModel Ready = IdleProject::UI::BuildShopPanelViewModel(300, 450, PurchaseResult);
+	const FIdleHUDShopPanelViewModel Ready = IdleProject::UI::BuildShopPanelViewModel(300, 300, 800, 4000, 450, PurchaseResult);
 	TestEqual(TEXT("Shop panel exposes gear roll cost"), Ready.GearRollCost, static_cast<int64>(300));
 	TestTrue(TEXT("Shop panel enables purchase when gold is enough"), Ready.bCanBuyGearRoll);
 	TestEqual(TEXT("Shop gear roll hitbox is stable"), Ready.GearRollHitBoxName, FName(TEXT("ShopGearRoll")));
@@ -967,16 +989,33 @@ bool FShopPanelViewModelStateTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Shop result is visible after purchase"), Ready.bHasLastResult);
 	TestFalse(TEXT("Shop result is not an error after purchase"), Ready.bLastResultError);
 
-	const FIdleHUDShopPanelViewModel NoGold = IdleProject::UI::BuildShopPanelViewModel(300, 250, FShopPurchaseResult());
+	const FIdleHUDShopPanelViewModel NoGold = IdleProject::UI::BuildShopPanelViewModel(300, 300, 800, 4000, 250, FShopPurchaseResult());
 	TestFalse(TEXT("Shop panel disables purchase when gold is short"), NoGold.bCanBuyGearRoll);
 	TestFalse(TEXT("Empty shop result is hidden"), NoGold.bHasLastResult);
 
 	FShopPurchaseResult FailedResult;
 	FailedResult.bPurchased = false;
 	FailedResult.GoldSpent = 300;
-	const FIdleHUDShopPanelViewModel Failed = IdleProject::UI::BuildShopPanelViewModel(300, 250, FailedResult);
+	const FIdleHUDShopPanelViewModel Failed = IdleProject::UI::BuildShopPanelViewModel(300, 300, 800, 4000, 250, FailedResult);
 	TestTrue(TEXT("Failed purchase result is visible when a cost was attempted"), Failed.bHasLastResult);
 	TestTrue(TEXT("Failed purchase result is flagged as an error"), Failed.bLastResultError);
+
+	const FIdleHUDShopPanelViewModel Materials = IdleProject::UI::BuildShopPanelViewModel(
+		300,
+		300,
+		800,
+		4000,
+		1000,
+		FShopPurchaseResult());
+	TestEqual(TEXT("Shop panel exposes protection scroll cost"), Materials.ProtectionScrollCost, static_cast<int64>(300));
+	TestEqual(TEXT("Shop panel exposes reset cube cost"), Materials.ResetCubeCost, static_cast<int64>(800));
+	TestEqual(TEXT("Shop panel exposes rank cube cost"), Materials.RankCubeCost, static_cast<int64>(4000));
+	TestTrue(TEXT("Shop panel enables protection scroll when gold is enough"), Materials.bCanBuyProtectionScroll);
+	TestTrue(TEXT("Shop panel enables reset cube when gold is enough"), Materials.bCanBuyResetCube);
+	TestFalse(TEXT("Shop panel disables rank cube when gold is short"), Materials.bCanBuyRankCube);
+	TestEqual(TEXT("Protection scroll hitbox is stable"), Materials.ProtectionScrollHitBoxName, FName(TEXT("ShopProtectionScroll")));
+	TestEqual(TEXT("Reset cube hitbox is stable"), Materials.ResetCubeHitBoxName, FName(TEXT("ShopResetCube")));
+	TestEqual(TEXT("Rank cube hitbox is stable"), Materials.RankCubeHitBoxName, FName(TEXT("ShopRankCube")));
 
 	return true;
 }
