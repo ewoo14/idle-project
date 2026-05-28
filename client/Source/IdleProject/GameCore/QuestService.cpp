@@ -338,6 +338,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch3_004"), EQuestType::Main, TEXT("Light the Rift Beacon"), EQuestObjective::ClimbTower, 15, 11800, 8400, TEXT("main_ch3_003"), TEXT("3-5"));
 	AddDefinition(TEXT("main_ch3_005"), EQuestType::Main, TEXT("Silence the Umbral Legion"), EQuestObjective::KillMonster, 50, 13600, 9800, TEXT("main_ch3_004"), TEXT("3-8"));
 	AddDefinition(TEXT("main_ch3_006"), EQuestType::Main, TEXT("Defeat the Dimension Lord"), EQuestObjective::DefeatBoss, 1, 16000, 12000, TEXT("main_ch3_005"), TEXT("3-10"));
+	AddDefinition(TEXT("main_ch4_001"), EQuestType::Main, TEXT("Enter the Fractured Sky"), EQuestObjective::KillMonster, 65, 18400, 13800, TEXT("main_ch3_006"), TEXT("4-1"));
+	AddDefinition(TEXT("main_ch4_002"), EQuestType::Main, TEXT("Survey the Mirror Ramparts"), EQuestObjective::ClearMap, 1, 21000, 15800, TEXT("main_ch4_001"), TEXT("4-2"));
+	AddDefinition(TEXT("main_ch4_003"), EQuestType::Main, TEXT("Strength for the Sky Breach"), EQuestObjective::ReachLevel, 40, 24000, 18000, TEXT("main_ch4_002"), TEXT("4-4"));
+	AddDefinition(TEXT("main_ch4_004"), EQuestType::Main, TEXT("Raise the Tower Signal"), EQuestObjective::ClimbTower, 25, 27500, 20500, TEXT("main_ch4_003"), TEXT("4-5"));
+	AddDefinition(TEXT("main_ch4_005"), EQuestType::Main, TEXT("Break the Mirror Legion"), EQuestObjective::KillMonster, 80, 31500, 23600, TEXT("main_ch4_004"), TEXT("4-8"));
+	AddDefinition(TEXT("main_ch4_006"), EQuestType::Main, TEXT("Defeat the Rift Sovereign"), EQuestObjective::DefeatBoss, 1, 38000, 28500, TEXT("main_ch4_005"), TEXT("4-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);

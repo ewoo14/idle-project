@@ -1694,6 +1694,70 @@ Guardrails:
 
 ---
 
+## PR #70 Chapter 4 Quest Reward Review
+
+PR #70 extends the main quest chain with six chapter 4 quests. Rewards continue
+the chapter 3 curve without changing daily or weekly quest pressure:
+
+| Quest | Objective | Target | Gold | EXP | Map |
+| --- | --- | ---: | ---: | ---: | --- |
+| main_ch4_001 | KillMonster | 65 | 18,400 | 13,800 | 4-1 |
+| main_ch4_002 | ClearMap | 1 | 21,000 | 15,800 | 4-2 |
+| main_ch4_003 | ReachLevel | 40 | 24,000 | 18,000 | 4-4 |
+| main_ch4_004 | ClimbTower | 25 | 27,500 | 20,500 | 4-5 |
+| main_ch4_005 | KillMonster | 80 | 31,500 | 23,600 | 4-8 |
+| main_ch4_006 | DefeatBoss | 1 | 38,000 | 28,500 | 4-10 |
+
+Guardrails:
+
+- Keep chapter 4 main quests chained after `main_ch3_006`; no new daily or
+  weekly reset behavior is introduced.
+- `ReachLevel` remains maximum-observed progress, while `KillMonster`,
+  `ClimbTower`, and `DefeatBoss` remain cumulative objective hooks.
+- Re-run quest definition parity on both client and server after changing
+  quest IDs, objective names, target counts, rewards, or chapter-map IDs.
+
+## PR #70 Chapter 4 Stage Balance Review
+
+PR #70 extends `tools/balance-sim` reward scaling from the PR #66 30-stage
+table to a 40-stage chapter 1-4 table. The simulator imports
+`server/src/core/formulas/stage.ts` and `server/src/core/formulas/reward.ts`,
+so chapter 4 uses the same one-based global index and multiplier rule:
+
+```text
+GlobalStageIndex = (Chapter - 1) * 10 + Stage
+Multiplier = 1 + max(0, GlobalStageIndex - 1) * 0.15
+```
+
+Chapter 4 review anchors:
+
+| Stage | Global idx | Encounter | Weak | HP x | Reward x |
+| --- | ---: | --- | --- | ---: | ---: |
+| 4-1 | 31 | normal | Lightning | 5.5 | 5.5 |
+| 4-5 | 35 | elite | Dark | 6.1 | 6.1 |
+| 4-10 | 40 | boss | Dark | 6.85 | 6.85 |
+
+The 1000-run first-rebirth distribution remains unchanged because chapter 4
+reward scaling is report-only pressure and is not injected into the sampled
+first-rebirth timing model: p10 4.919h, median 5.328h, p90 5.751h, min
+4.564h, and max 6.144h. Median remains inside the 5-10h target and every
+sampled run remains inside the 3-20h review band.
+
+Guardrails:
+
+- Keep chapter 4 rewards on the shared stage multiplier; do not add a separate
+  chapter 4 reward bump without simulator evidence.
+- Stage 4-5 remains the elite reward row and stage 4-10 remains the boss reward
+  row, with normal < elite 3x < boss 8x ordering visible in the report.
+- Dark weakness coverage is 11/40 after chapter 4. Treat additional Dark-heavy
+  chapters as matchup pressure and re-check element coverage before expanding
+  beyond chapter 4.
+- Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
+  after changing stage multipliers, weak-element mapping, elite/boss rules, or
+  reward formulas.
+
+---
+
 ## PR #66 Chapter 3 Stage/Element Balance Addendum
 
 PR #66 expands the stage model to 3 chapters with 10 stages per chapter. The

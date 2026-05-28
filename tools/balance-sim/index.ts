@@ -522,7 +522,7 @@ export type DungeonPressure = {
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
-const TOTAL_CHAPTERS = 3;
+const TOTAL_CHAPTERS = 4;
 const TARGET_MIN_HOURS = 5;
 const TARGET_MAX_HOURS = 10;
 const ACCEPTABLE_MIN_HOURS = 3;
@@ -2145,7 +2145,7 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "- Normal kill rewards use `computeKillExp` / `computeKillGold`.",
     "- Source: `server/src/core/formulas/reward.ts`.",
     "- Monster HP and reward multipliers both reuse the stage index ramp.",
-    "- Result: 30-stage Chapter 1-3 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.",
+    "- Result: 40-stage Chapter 1-4 comparison keeps reward-per-HP pressure stable before elite and boss bonuses.",
     `- Dark stage share: ${report.model.darkElementPressure.darkWeakStageCount}/${report.model.darkElementPressure.totalStageCount}.`,
     "",
     "<!-- markdownlint-disable MD013 -->",
@@ -2162,7 +2162,7 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "## Dark Element Pressure",
     "",
     "- Holy and Dark counter each other at the same 1.5x weakness boundary.",
-    "- Dark-heavy chapter 3 increases matchup coverage without changing the",
+    "- Dark-heavy chapters 3-4 increase matchup coverage without changing the",
     "  sampled first-rebirth timing model.",
     "",
     "<!-- markdownlint-disable MD013 -->",

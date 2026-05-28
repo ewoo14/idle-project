@@ -407,6 +407,22 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
   this PR adds no binary art assets.
 
+## PR #70 Designer Checklist Addendum (Section 1)
+
+- [ ] Stage HUD keeps `Stage {Chapter}-{Stage} {Current}/{Target}` readable for
+  Chapter 4 stages 4-1 through 4-10 at 1080p, 1440p, and 4K.
+- [ ] Stage 4-5 shows localized `STAGE_ELITE_BADGE`; stage 4-10 shows localized
+  `STAGE_BOSS_BADGE`.
+- [ ] Chapter 4 entry and clear feedback use localized
+  `STAGE_CHAPTER_ENTRY_FORMAT` and `STAGE_CHAPTER_CLEAR_FORMAT` in both ko/en
+  UI CSV files.
+- [ ] Dark weakness uses `ELEMENT_DARK`, the `ElementDark` theme token, and the
+  compact `D` glyph chip rather than hard-coded copy or color.
+- [ ] `IdleProject.UI.HUD.ChapterFourStageViewModel` and
+  `IdleProject.Localization.CsvIntegrity` cover the HUD/localization contract.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
 ## PR #66 Balance Checklist Addendum (Section 5)
 
 - [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 30-row
@@ -430,5 +446,18 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   flat stat additions.
 - [ ] Pet bonuses remain out of the sampled first-rebirth timing model until
   acquisition timing and expected ownership are modeled explicitly.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target.
+
+## PR #70 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 40-row
+  chapter 1-4 reward table with global stage indexes 1-40.
+- [ ] Chapter 4 rows report weak elements for stages 4-1 through 4-10, with no
+  `None` weakness in global indexes 31-40.
+- [ ] Stage 4-5 remains `elite`, stage 4-10 remains `boss`, and normal < elite
+  < boss reward ordering is visible in the table.
+- [ ] The stage table imports `stage.ts` and `reward.ts`; it does not duplicate
+  stage multipliers, weak-element mappings, or reward bonus constants.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target.

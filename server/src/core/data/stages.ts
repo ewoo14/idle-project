@@ -60,6 +60,10 @@ function defineChapter3Stage(stage: number): StageDefinition {
   return defineChapterStage(3, stage);
 }
 
+function defineChapter4Stage(stage: number): StageDefinition {
+  return defineChapterStage(4, stage);
+}
+
 export const CHAPTER_1_STAGE_DEFINITIONS: StageDefinition[] = [
   ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
     defineChapter1Stage(index + 1),
@@ -75,6 +79,12 @@ export const CHAPTER_2_STAGE_DEFINITIONS: StageDefinition[] = [
 export const CHAPTER_3_STAGE_DEFINITIONS: StageDefinition[] = [
   ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
     defineChapter3Stage(index + 1),
+  ),
+];
+
+export const CHAPTER_4_STAGE_DEFINITIONS: StageDefinition[] = [
+  ...Array.from({ length: STAGES_PER_CHAPTER }, (_, index) =>
+    defineChapter4Stage(index + 1),
   ),
 ];
 
@@ -98,6 +108,14 @@ export function getChapter3StageDefinition(
   stage: number,
 ): StageDefinition | undefined {
   return CHAPTER_3_STAGE_DEFINITIONS.find(
+    (definition) => definition.stage === stage,
+  );
+}
+
+export function getChapter4StageDefinition(
+  stage: number,
+): StageDefinition | undefined {
+  return CHAPTER_4_STAGE_DEFINITIONS.find(
     (definition) => definition.stage === stage,
   );
 }

@@ -240,7 +240,7 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
 	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
-	TestEqual(TEXT("Quest definition count matches chapter three client contract"), Definitions.Num(), 29);
+	TestEqual(TEXT("Quest definition count matches chapter four client contract"), Definitions.Num(), 35);
 
 	struct FExpectedQuestDefinition
 	{
@@ -273,6 +273,12 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("main_ch3_004"), EQuestType::Main, EQuestObjective::ClimbTower, 15, 11800, 8400, TEXT("main_ch3_003"), TEXT("3-5")},
 		{TEXT("main_ch3_005"), EQuestType::Main, EQuestObjective::KillMonster, 50, 13600, 9800, TEXT("main_ch3_004"), TEXT("3-8")},
 		{TEXT("main_ch3_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 16000, 12000, TEXT("main_ch3_005"), TEXT("3-10")},
+		{TEXT("main_ch4_001"), EQuestType::Main, EQuestObjective::KillMonster, 65, 18400, 13800, TEXT("main_ch3_006"), TEXT("4-1")},
+		{TEXT("main_ch4_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 21000, 15800, TEXT("main_ch4_001"), TEXT("4-2")},
+		{TEXT("main_ch4_003"), EQuestType::Main, EQuestObjective::ReachLevel, 40, 24000, 18000, TEXT("main_ch4_002"), TEXT("4-4")},
+		{TEXT("main_ch4_004"), EQuestType::Main, EQuestObjective::ClimbTower, 25, 27500, 20500, TEXT("main_ch4_003"), TEXT("4-5")},
+		{TEXT("main_ch4_005"), EQuestType::Main, EQuestObjective::KillMonster, 80, 31500, 23600, TEXT("main_ch4_004"), TEXT("4-8")},
+		{TEXT("main_ch4_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 38000, 28500, TEXT("main_ch4_005"), TEXT("4-10")},
 		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
 		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
 		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
@@ -301,6 +307,87 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		TestEqual(*(Prefix + TEXT("prerequisite")), Actual.PrerequisiteQuestId, FString(ExpectedQuest.PrerequisiteQuestId));
 		TestEqual(*(Prefix + TEXT("chapter map")), Actual.ChapterMapId, FString(ExpectedQuest.ChapterMapId));
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FQuestServiceChapterFourPrerequisiteChainTest,
+	"IdleProject.GameCore.QuestService.ChapterFourPrerequisiteChain",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FQuestServiceChapterFourPrerequisiteChainTest::RunTest(const FString& Parameters)
+{
+	UQuestService* Quests = NewObject<UQuestService>();
+	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
+
+	const TArray<TPair<EQuestObjective, int32>> MainChainProgress = {
+		{EQuestObjective::KillMonster, 5},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::KillMonster, 12},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::KillMonster, 20},
+		{EQuestObjective::Enhance, 2},
+		{EQuestObjective::DefeatBoss, 1},
+		{EQuestObjective::KillMonster, 25},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::ReachLevel, 10},
+		{EQuestObjective::Rebirth, 1},
+		{EQuestObjective::DefeatBoss, 1},
+		{EQuestObjective::KillMonster, 35},
+		{EQuestObjective::ClearMap, 1},
+		{EQuestObjective::ReachLevel, 25},
+		{EQuestObjective::ClimbTower, 15},
+		{EQuestObjective::KillMonster, 50},
+		{EQuestObjective::DefeatBoss, 1},
+	};
+	const TCHAR* MainChainIds[] = {
+		TEXT("main_ch1_001"),
+		TEXT("main_ch1_002"),
+		TEXT("main_ch1_003"),
+		TEXT("main_ch1_004"),
+		TEXT("main_ch1_005"),
+		TEXT("main_ch1_006"),
+		TEXT("main_ch1_007"),
+		TEXT("main_ch2_001"),
+		TEXT("main_ch2_002"),
+		TEXT("main_ch2_003"),
+		TEXT("main_ch2_004"),
+		TEXT("main_ch2_005"),
+		TEXT("main_ch3_001"),
+		TEXT("main_ch3_002"),
+		TEXT("main_ch3_003"),
+		TEXT("main_ch3_004"),
+		TEXT("main_ch3_005"),
+		TEXT("main_ch3_006"),
+	};
+
+	for (int32 Index = 0; Index < UE_ARRAY_COUNT(MainChainIds); ++Index)
+	{
+		Quests->RecordProgress(MainChainProgress[Index].Key, MainChainProgress[Index].Value);
+		const FQuestClaimResult Claim = Quests->ClaimQuest(MainChainIds[Index]);
+		TestTrue(*FString::Printf(TEXT("%s can be claimed"), MainChainIds[Index]), Claim.bSuccess);
+	}
+
+	FQuestState ChapterFourStart;
+	TestTrue(TEXT("Claiming chapter three finale unlocks chapter four start"), Quests->GetQuestState(TEXT("main_ch4_001"), ChapterFourStart));
+	TestEqual(TEXT("Chapter four quest starts on map 4-1"), ChapterFourStart.ChapterMapId, FString(TEXT("4-1")));
+
+	Quests->RecordProgress(EQuestObjective::KillMonster, 65);
+	FQuestClaimResult ChapterFourFirstClaim = Quests->ClaimQuest(TEXT("main_ch4_001"));
+	TestTrue(TEXT("Chapter four first quest can be claimed"), ChapterFourFirstClaim.bSuccess);
+	TestTrue(TEXT("Chapter four first quest unlocks map survey"), ChapterFourFirstClaim.UnlockedQuestIds.Contains(TEXT("main_ch4_002")));
+
+	Quests->RecordProgress(EQuestObjective::ClearMap, 1);
+	TestTrue(TEXT("Chapter four map survey can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_002")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 40);
+	TestTrue(TEXT("Chapter four level gate can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_003")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ClimbTower, 25);
+	TestTrue(TEXT("Chapter four tower gate can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_004")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::KillMonster, 80);
+	TestTrue(TEXT("Chapter four legion quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_005")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
+	TestTrue(TEXT("Chapter four boss quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_006")).bSuccess);
 
 	return true;
 }
