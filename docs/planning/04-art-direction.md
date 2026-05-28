@@ -222,3 +222,20 @@ use `--accent-gold`, feed-ready states use `--accent-blue`, and locked or
 blocked states use the existing warning color. No binary art assets were added;
 existing `.gitattributes` LFS patterns continue to cover future `.uasset` and
 `.png` UI exports.
+
+## PR #70 Chapter 4 Stage HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Chapter 4 Stage HUD V1 keeps
+the same top-center panel introduced for the 10-stage chapter structure. The
+progress line remains `Stage {Chapter}-{Stage} {Current}/{Target}` so 4-1
+through 4-10 are readable at 1080p, 1440p, and 4K without moving the existing
+HP/EXP/Gold HUD, bottom skill HUD, or right-side utility panels.
+
+Stage 4-5 uses the localized `STAGE_ELITE_BADGE`; stage 4-10 uses the localized
+`STAGE_BOSS_BADGE`. Chapter entry and clear feedback continue to use the
+localized `STAGE_CHAPTER_ENTRY_FORMAT` and `STAGE_CHAPTER_CLEAR_FORMAT` keys so
+ko/en copy stays paired by `IdleProject.Localization.CsvIntegrity`. Dark
+weakness keeps `ELEMENT_DARK`, the `ElementDark` theme token, and the compact
+`D` glyph chip; no hard-coded Chapter 4 copy, color, or binary art asset is
+introduced. Existing `.gitattributes` LFS patterns continue to cover future
+`.uasset` and `.png` UI exports.

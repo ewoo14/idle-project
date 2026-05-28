@@ -407,6 +407,22 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
   this PR adds no binary art assets.
 
+## PR #70 Designer Checklist Addendum (Section 1)
+
+- [ ] Stage HUD keeps `Stage {Chapter}-{Stage} {Current}/{Target}` readable for
+  Chapter 4 stages 4-1 through 4-10 at 1080p, 1440p, and 4K.
+- [ ] Stage 4-5 shows localized `STAGE_ELITE_BADGE`; stage 4-10 shows localized
+  `STAGE_BOSS_BADGE`.
+- [ ] Chapter 4 entry and clear feedback use localized
+  `STAGE_CHAPTER_ENTRY_FORMAT` and `STAGE_CHAPTER_CLEAR_FORMAT` in both ko/en
+  UI CSV files.
+- [ ] Dark weakness uses `ELEMENT_DARK`, the `ElementDark` theme token, and the
+  compact `D` glyph chip rather than hard-coded copy or color.
+- [ ] `IdleProject.UI.HUD.ChapterFourStageViewModel` and
+  `IdleProject.Localization.CsvIntegrity` cover the HUD/localization contract.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
 ## PR #66 Balance Checklist Addendum (Section 5)
 
 - [ ] `tools/balance-sim/reports/balance-sim-report.md` includes a 30-row
