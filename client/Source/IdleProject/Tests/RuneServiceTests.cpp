@@ -175,7 +175,7 @@ bool FRuneServiceEquipAndMultiplierTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Unequip clears slot"), RuneService->UnequipRune(0));
 	TestEqual(TEXT("Unequipped slot returns INDEX_NONE"), RuneService->GetEquippedOwnedIndex(0), INDEX_NONE);
-	TestFalse(TEXT("Invalid slot cannot equip"), RuneService->TryEquipRune(6, 0));
+	TestFalse(TEXT("Invalid slot cannot equip"), RuneService->TryEquipRune(FRuneFormula::RuneSlotCount, 0));
 	TestFalse(TEXT("Invalid owned index cannot equip"), RuneService->TryEquipRune(0, 99));
 
 	return true;
@@ -265,7 +265,7 @@ bool FRuneServiceRestoreSanitizeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Equipped slot remaps old index three to new index one"), CapturedSlots[1], 1);
 	TestEqual(TEXT("Out of range equipped slot is cleared"), CapturedSlots[2], INDEX_NONE);
 	TestEqual(TEXT("Equipped slot pointing at dropped rune is cleared"), CapturedSlots[3], INDEX_NONE);
-	TestEqual(TEXT("Captured slot array always has six entries"), CapturedSlots.Num(), FRuneFormula::RuneSlotCount);
+	TestEqual(TEXT("Captured slot array always has seven entries"), CapturedSlots.Num(), FRuneFormula::RuneSlotCount);
 
 	return true;
 }
@@ -296,11 +296,11 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes rune state"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Rune codex save bumps version to four"), CapturedSave->SaveVersion, 4);
+	TestEqual(TEXT("Class rune save bumps version to five"), CapturedSave->SaveVersion, 5);
 	TestEqual(TEXT("Captured rune count round trips"), CapturedSave->Runes.Num(), 2);
 	TestEqual(TEXT("Captured rune codex has fifty four cells"), CapturedSave->RuneCodex.Num(), FRuneCodexFormula::TotalCells);
 	TestEqual(TEXT("Captured rune essence round trips"), CapturedSave->RuneEssence, GameInstance->GetRuneEssence());
-	TestEqual(TEXT("Captured equipped rune slots have six entries"), CapturedSave->EquippedRuneSlots.Num(), FRuneFormula::RuneSlotCount);
+	TestEqual(TEXT("Captured equipped rune slots have seven entries"), CapturedSave->EquippedRuneSlots.Num(), FRuneFormula::RuneSlotCount);
 
 	UIdleGameInstance* RestoredGameInstance = NewObject<UIdleGameInstance>();
 	TestTrue(TEXT("Apply accepts captured rune save"), RestoredGameInstance->ApplyFromSave(CapturedSave));

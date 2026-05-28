@@ -215,6 +215,30 @@
 | 6x Mythic +50 PhysAtk | Warrior | 100 | 5444 | 25604 | x4.703 | 4295 | 53071 | x12.356 |
 | 6x Mythic +50 MagicAtk | Mage | 100 | 5519 | 26526 | x4.806 | 4787 | 58561 | x12.233 |
 
+## Class Mastery Rune Pressure
+
+- ClassMastery uses the seventh dedicated rune slot. The table applies one
+  Mythic +50 class rune to each Lv100 review loadout and keeps the regular
+  six core slots out of the comparison.
+- Damage-role rows are checked against the PR #60 +/-15% DPS band after the
+  class rune is applied. Two-stat Warrior, Cleric, and Paladin rows are
+  treated as CP/survival compensation, not an extra DPS lane.
+
+<!-- markdownlint-disable MD013 -->
+
+| Class | Role | Mastery stats | Base CP | Rune CP | CP x | Base DPS | Rune DPS | DPS x |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Warrior | dps | PhysAtk, PhysDef | 5444 | 9732 | x1.788 | 4295 | 12425 | x2.893 |
+| Mage | dps | MagicAtk | 5519 | 9020 | x1.634 | 4787 | 13749 | x2.872 |
+| Archer | dps | PhysAtk | 5197 | 8184 | x1.575 | 4451 | 13081 | x2.939 |
+| Thief | dps | PhysAtk | 5145 | 8097 | x1.574 | 4669 | 13686 | x2.931 |
+| Cleric | healer | MagicAtk, Hp | 5566 | 9452 | x1.698 | 3378 | 9852 | x2.917 |
+| Paladin | tank | PhysDef, Hp | 5805 | 7733 | x1.332 | 3644 | 3644 | x1 |
+| Berserker | dps | PhysAtk | 5316 | 8716 | x1.64 | 4629 | 13378 | x2.89 |
+| Summoner | dps | MagicAtk | 5681 | 9221 | x1.623 | 4249 | 12306 | x2.896 |
+
+<!-- markdownlint-enable MD013 -->
+
 | Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |
 | --- | --- | ---: | ---: | ---: | ---: |
 | CritDamage | Mythic | +177 | 100% | 600% | x2 |
@@ -294,4 +318,5 @@
 - server/src/core/formulas/petLevel.ts
 - server/src/core/formulas/achievement.ts
 - server/src/core/formulas/rune.ts
+- server/src/core/formulas/classRune.ts
 - server/src/core/formulas/runeCodex.ts

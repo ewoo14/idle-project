@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CharacterSystem/StatFormulas.h"
 #include "ItemSystem/ItemTypes.h"
 #include "RuneTypes.generated.h"
 
@@ -16,7 +17,8 @@ enum class ERuneType : uint8
 	CritDamage = 6 UMETA(DisplayName = "CritDamage"),
 	GoldFind = 7 UMETA(DisplayName = "GoldFind"),
 	ExpBoost = 8 UMETA(DisplayName = "ExpBoost"),
-	OfflineEff = 9 UMETA(DisplayName = "OfflineEff")
+	OfflineEff = 9 UMETA(DisplayName = "OfflineEff"),
+	ClassMastery = 10 UMETA(DisplayName = "ClassMastery")
 };
 
 USTRUCT(BlueprintType)
@@ -74,6 +76,9 @@ struct IDLEPROJECT_API FRuneInstance
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Rune", meta = (ClampMin = "0"))
 	int32 EnhanceLevel = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Rune")
+	EClassId ClassRestriction = EClassId::None;
 };
 
 USTRUCT(BlueprintType)
@@ -92,4 +97,7 @@ struct IDLEPROJECT_API FRuneSaveEntry
 
 	UPROPERTY()
 	FName RuneId = NAME_None;
+
+	UPROPERTY()
+	EClassId ClassRestriction = EClassId::None;
 };

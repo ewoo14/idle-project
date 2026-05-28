@@ -1396,3 +1396,57 @@ Guardrails:
   the codex formula.
 - Keep `FRuneCodexFormula`, `runeCodex.ts`, and `tools/balance-sim` parity
   tests aligned with `Math.fround` boundaries.
+
+## PR #63 Class Mastery Rune Balance Review
+
+PR #63 adds one dedicated ClassMastery rune slot on top of the six regular rune
+slots. The balance simulator treats this as a separate pressure row: one Mythic
++50 class rune is applied to each Lv100 review loadout, while the six regular
+core slots stay empty. This keeps class mastery pressure visible without
+changing the sampled first-rebirth distribution.
+
+The PR #63 sampled 1000-run first-rebirth distribution is unchanged from the
+PR #61/#62 baseline because class mastery acquisition is not injected into the
+first-rebirth model:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.919 |
+| median | 5.328 |
+| p90 | 5.751 |
+| min | 4.564 |
+| max | 6.144 |
+
+ClassMastery stat mapping:
+
+| Class | Mastery stats |
+| --- | --- |
+| Warrior | PhysAtk, PhysDef |
+| Mage | MagicAtk |
+| Archer | PhysAtk |
+| Thief | PhysAtk |
+| Cleric | MagicAtk, Hp |
+| Paladin | PhysDef, Hp |
+| Berserker | PhysAtk |
+| Summoner | MagicAtk |
+
+At the Lv100 Mythic +50 review point, DPS classes remain inside the PR #60
++/-15% band after applying their class rune. Warrior receives a higher CP
+multiplier than single-lane Berserker because its second lane is PhysDef, not
+additional DPS. Cleric converts its second lane into HP support pressure.
+Paladin receives no DPS multiplier from ClassMastery because its dedicated rune
+is PhysDef + HP only; this preserves the tank budget and prevents the support
+slot from becoming a hidden damage lane.
+
+Guardrails:
+
+- Keep ClassMastery as the seventh dedicated slot; regular slots 0-5 remain
+  core/utility only.
+- ClassMastery multipliers are additive bonus values returned from
+  `FClassRuneFormula` / `classRune.ts`, then applied as `1 + bonus` to the
+  affected stat lanes.
+- Do not tune first-rebirth pacing from class mastery pressure until class rune
+  drop/craft acquisition is modeled in `tools/balance-sim`.
+- Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
+  after changing class mastery stat mapping, rarity scaling, or enhancement
+  scaling.

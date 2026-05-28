@@ -20,6 +20,9 @@ public:
 	bool TryEquipRune(int32 SlotIndex, int32 OwnedIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	void SetOwnerClassId(EClassId ClassId);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	bool UnequipRune(int32 SlotIndex);
 
 	bool EnhanceRune(int32 OwnedIndex);
@@ -29,6 +32,7 @@ public:
 	FRuneUtilValues GetEquippedUtilValues() const;
 	const TArray<FRuneInstance>& GetOwnedRunes() const { return OwnedRunes; }
 	const TArray<FRuneCodexEntry>& GetOwnedCodex() const { return OwnedCodex; }
+	EClassId GetOwnerClassId() const { return OwnerClassId; }
 	int32 GetEquippedOwnedIndex(int32 SlotIndex) const;
 	void UnlockCodexCell(ERuneType Type, EItemRarity Rarity);
 	FRuneCodexCompletion GetCodexCompletion() const;
@@ -48,6 +52,9 @@ private:
 
 	UPROPERTY()
 	TArray<int32> EquippedSlots;
+
+	UPROPERTY()
+	EClassId OwnerClassId = EClassId::None;
 
 	static bool IsValidRune(const FRuneInstance& Rune);
 	static bool IsValidCodexCell(ERuneType Type, EItemRarity Rarity);

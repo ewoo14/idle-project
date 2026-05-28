@@ -1,4 +1,4 @@
-export const RUNE_SLOT_COUNT = 6;
+export const RUNE_SLOT_COUNT = 7;
 
 const CORE_BASE_BY_RARITY = [0, 0.02, 0.035, 0.05, 0.08, 0.12, 0.18] as const;
 const CORE_STEP_BY_RARITY = [

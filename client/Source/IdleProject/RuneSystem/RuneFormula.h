@@ -5,7 +5,7 @@
 
 struct IDLEPROJECT_API FRuneFormula
 {
-	static constexpr int32 RuneSlotCount = 6;
+	static constexpr int32 RuneSlotCount = 7;
 
 	static bool IsCoreType(ERuneType Type);
 	static bool IsUtilType(ERuneType Type);
