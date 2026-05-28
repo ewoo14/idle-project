@@ -1,3 +1,4 @@
+import type { PotentialGrade, PotentialLine } from "./potential.js";
 import { computeSetBonus } from "./setBonus.js";
 import { accumulateTraitEffects, type UniqueTrait } from "./uniqueTrait.js";
 
@@ -46,7 +47,57 @@ export interface ItemInstance {
   bonusCritDmg?: number;
   uniqueTrait1?: UniqueTrait;
   uniqueTrait2?: UniqueTrait;
+  potentialGrade?: PotentialGrade;
+  potentialLine1?: PotentialLine;
+  potentialLine2?: PotentialLine;
+  potentialLine3?: PotentialLine;
   enhanceLevel: number;
+}
+
+function getPotentialLines(item: ItemInstance): PotentialLine[] {
+  return [item.potentialLine1, item.potentialLine2, item.potentialLine3].filter(
+    (line): line is PotentialLine =>
+      !!line && line.stat !== "None" && line.value > 0,
+  );
+}
+
+function getPotentialPowerScoreBonus(item: ItemInstance): number {
+  const enhanceMultiplier = 1 + item.enhanceLevel * 0.1;
+  return getPotentialLines(item).reduce((sum, line) => {
+    switch (line.stat) {
+      case "PhysAtkPercent":
+        return sum + item.bonusAtk * enhanceMultiplier * line.value;
+      case "MagicAtkPercent":
+        return sum + (item.bonusMagicAtk ?? 0) * enhanceMultiplier * line.value;
+      case "HpPercent":
+        return (
+          sum +
+          ((item.bonusHp + (item.bonusAffixHp ?? 0)) *
+            enhanceMultiplier *
+            line.value) /
+            10
+        );
+      case "PhysDefPercent":
+        return (
+          sum +
+          (item.bonusDef + (item.bonusPhysDef ?? 0)) *
+            enhanceMultiplier *
+            line.value
+        );
+      case "MagicDefPercent":
+        return sum + (item.bonusMagicDef ?? 0) * enhanceMultiplier * line.value;
+      case "CritRatePercent":
+        return sum + line.value * 1000;
+      case "AtkSpeedPercent":
+        return sum + line.value * 100;
+      case "CritDmgPercent":
+        return sum + line.value * 100;
+      case "None":
+        return sum;
+      default:
+        return sum;
+    }
+  }, 0);
 }
 
 export function computeItemPowerScore(item: ItemInstance): number {
@@ -62,7 +113,10 @@ export function computeItemPowerScore(item: ItemInstance): number {
     (item.bonusAffixHp ?? 0) / 10 +
     (item.bonusCritDmg ?? 0) * 100;
 
-  return Math.round(baseScore * (1 + item.enhanceLevel * 0.1));
+  return Math.round(
+    baseScore * (1 + item.enhanceLevel * 0.1) +
+      getPotentialPowerScoreBonus(item),
+  );
 }
 
 export interface EquipmentBonus {
@@ -86,30 +140,71 @@ export function computeInventoryBonus(
         [item.uniqueTrait1 ?? 0, item.uniqueTrait2 ?? 0],
         Number(item.rarity),
       );
+      const potential = getPotentialLines(item);
+      const potentialAtkMultiplier = potential
+        .filter((line) => line.stat === "PhysAtkPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialMagicAtkMultiplier = potential
+        .filter((line) => line.stat === "MagicAtkPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialHpMultiplier = potential
+        .filter((line) => line.stat === "HpPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialPhysDefMultiplier = potential
+        .filter((line) => line.stat === "PhysDefPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialMagicDefMultiplier = potential
+        .filter((line) => line.stat === "MagicDefPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialCritRate = potential
+        .filter((line) => line.stat === "CritRatePercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialAtkSpeed = potential
+        .filter((line) => line.stat === "AtkSpeedPercent")
+        .reduce((sum, line) => sum + line.value, 0);
+      const potentialCritDmg = potential
+        .filter((line) => line.stat === "CritDmgPercent")
+        .reduce((sum, line) => sum + line.value, 0);
 
       return {
-        bonusAtk: acc.bonusAtk + item.bonusAtk * enhanceMultiplier,
+        bonusAtk:
+          acc.bonusAtk +
+          item.bonusAtk * enhanceMultiplier * (1 + potentialAtkMultiplier),
         bonusDef:
           acc.bonusDef +
-          (item.bonusDef + (item.bonusPhysDef ?? 0)) * enhanceMultiplier,
+          (item.bonusDef + (item.bonusPhysDef ?? 0)) *
+            enhanceMultiplier *
+            (1 + potentialPhysDefMultiplier),
         bonusHp:
           acc.bonusHp +
-          (item.bonusHp + (item.bonusAffixHp ?? 0)) * enhanceMultiplier,
+          (item.bonusHp + (item.bonusAffixHp ?? 0)) *
+            enhanceMultiplier *
+            (1 + potentialHpMultiplier),
         critRate:
           acc.critRate +
           (item.bonusCritRate ?? 0) * enhanceMultiplier +
-          traitEffects.flat.critRate,
+          traitEffects.flat.critRate +
+          potentialCritRate,
         atkSpeed:
           acc.atkSpeed +
           (item.bonusAtkSpeed ?? 0) * enhanceMultiplier +
-          traitEffects.flat.atkSpeed,
-        magicAtk: acc.magicAtk + (item.bonusMagicAtk ?? 0) * enhanceMultiplier,
+          traitEffects.flat.atkSpeed +
+          potentialAtkSpeed,
+        magicAtk:
+          acc.magicAtk +
+          (item.bonusMagicAtk ?? 0) *
+            enhanceMultiplier *
+            (1 + potentialMagicAtkMultiplier),
         magicDef:
-          (acc.magicDef ?? 0) + (item.bonusMagicDef ?? 0) * enhanceMultiplier,
+          (acc.magicDef ?? 0) +
+          (item.bonusMagicDef ?? 0) *
+            enhanceMultiplier *
+            (1 + potentialMagicDefMultiplier),
         critDmg:
           (acc.critDmg ?? 0) +
           (item.bonusCritDmg ?? 0) * enhanceMultiplier +
-          traitEffects.flat.critDmg,
+          traitEffects.flat.critDmg +
+          potentialCritDmg,
       };
     },
     {

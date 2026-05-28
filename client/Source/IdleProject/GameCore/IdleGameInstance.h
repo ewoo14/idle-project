@@ -54,10 +54,31 @@ struct IDLEPROJECT_API FEnhanceAttemptResult
 	bool bSuccess = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	bool bConsumedProtection = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
 	int64 GoldSpent = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
 	int32 NewLevel = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Enhance")
+	int32 NewFailStreak = 0;
+};
+
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FPotentialRerollResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Potential")
+	bool bRerolled = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Potential")
+	EPotentialCubeType CubeType = EPotentialCubeType::Reset;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Potential")
+	EPotentialGrade NewGrade = EPotentialGrade::None;
 };
 
 USTRUCT(BlueprintType)
@@ -178,14 +199,32 @@ public:
 	FDungeonRunResult TryRunDungeon(EDungeonType Type);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
-	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot);
+	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection = false);
 
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, UInventoryComponent* Inventory);
+	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection, UInventoryComponent* Inventory);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Potential")
+	FPotentialRerollResult TryRerollPotential(EItemSlot Slot, EPotentialCubeType CubeType);
+
+	FPotentialRerollResult TryRerollPotential(EItemSlot Slot, EPotentialCubeType CubeType, UInventoryComponent* Inventory);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Inventory")
+	bool SetItemLocked(EItemSlot Slot, bool bLocked);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
 	FShopPurchaseResult TryBuyGearRoll();
 
 	FShopPurchaseResult TryBuyGearRoll(UInventoryComponent* Inventory);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyProtectionScroll();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyResetCube();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyRankCube();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	void AddRune(const FRuneInstance& Rune);
@@ -264,6 +303,15 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Rune")
 	int64 GetRuneEssence() const { return RuneEssence; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Potential")
+	int64 GetProtectionScrolls() const { return ProtectionScrolls; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Potential")
+	int64 GetResetCubes() const { return ResetCubes; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Potential")
+	int64 GetRankCubes() const { return RankCubes; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int32 GetCharacterLevel() const { return CharacterLevel; }
@@ -470,6 +518,15 @@ private:
 	int64 RuneEssence = 0;
 
 	UPROPERTY()
+	int64 ProtectionScrolls = 0;
+
+	UPROPERTY()
+	int64 ResetCubes = 0;
+
+	UPROPERTY()
+	int64 RankCubes = 0;
+
+	UPROPERTY()
 	int32 CharacterLevel = 1;
 
 	UPROPERTY()
@@ -510,6 +567,7 @@ private:
 	FTimerHandle AutosaveTimerHandle;
 
 	FRandomStream EnhanceRandomStream;
+	FRandomStream PotentialRandomStream;
 	FRandomStream RuneRandomStream;
 	ECloudSyncState CloudSyncState = ECloudSyncState::Idle;
 
@@ -538,6 +596,7 @@ private:
 	void EnsureRuneService();
 	void EnsureAchievementService();
 	void RefreshPlayerCharacterStats();
+	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();

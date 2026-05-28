@@ -243,13 +243,19 @@ struct IDLEPROJECT_API FIdleHUDEnhanceSlotViewModel
 	FText LevelLabel;
 	FText CostLabel;
 	FText SuccessRateLabel;
+	FText RiskLabel;
+	FText FailStreakLabel;
+	FText ProtectionButtonLabel;
 	FText StatusLabel;
 	FText ButtonLabel;
 	int32 EnhanceLevel = INDEX_NONE;
+	int32 FailStreak = 0;
 	int64 Cost = 0;
 	float SuccessRate = 0.0f;
 	bool bEquipped = false;
 	bool bCanEnhance = false;
+	bool bCanUseProtection = false;
+	bool bRiskLevel = false;
 	bool bMaxLevel = false;
 	bool bGoldEnough = false;
 };
@@ -258,9 +264,42 @@ struct IDLEPROJECT_API FIdleHUDEnhancePanelViewModel
 {
 	FText Title;
 	FText GoldLabel;
+	FText ProtectionLabel;
 	FText FeedbackLabel;
 	bool bFeedbackSuccess = false;
 	TArray<FIdleHUDEnhanceSlotViewModel> Rows;
+};
+
+struct IDLEPROJECT_API FIdleHUDPotentialSlotViewModel
+{
+	EItemSlot Slot = EItemSlot::None;
+	FText SlotLabel;
+	FText ItemName;
+	FText GradeLabel;
+	FText LineSummaryLabel;
+	FText ResetActionLabel;
+	FText RankActionLabel;
+	FText LockActionLabel;
+	FText StatusLabel;
+	FName ResetHitBoxName;
+	FName RankHitBoxName;
+	FName LockHitBoxName;
+	FLinearColor GradeColor = FLinearColor::White;
+	EPotentialGrade Grade = EPotentialGrade::None;
+	EPotentialGrade MaxGrade = EPotentialGrade::None;
+	bool bEquipped = false;
+	bool bLocked = false;
+	bool bHasPotential = false;
+	bool bCanResetPotential = false;
+	bool bCanRankPotential = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDPotentialPanelViewModel
+{
+	FText Title;
+	FText ResetCubeLabel;
+	FText RankCubeLabel;
+	TArray<FIdleHUDPotentialSlotViewModel> Rows;
 };
 
 struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
@@ -268,14 +307,29 @@ struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
 	FText Title;
 	FText GoldLabel;
 	FText CostLabel;
+	FText ProtectionScrollCostLabel;
+	FText ResetCubeCostLabel;
+	FText RankCubeCostLabel;
 	FText ButtonLabel;
+	FText ProtectionScrollButtonLabel;
+	FText ResetCubeButtonLabel;
+	FText RankCubeButtonLabel;
 	FText StatusLabel;
 	FText LastResultLabel;
 	FName GearRollHitBoxName;
+	FName ProtectionScrollHitBoxName;
+	FName ResetCubeHitBoxName;
+	FName RankCubeHitBoxName;
 	EItemRarity LastResultRarity = EItemRarity::None;
 	int64 GearRollCost = 0;
+	int64 ProtectionScrollCost = 0;
+	int64 ResetCubeCost = 0;
+	int64 RankCubeCost = 0;
 	int64 Gold = 0;
 	bool bCanBuyGearRoll = false;
+	bool bCanBuyProtectionScroll = false;
+	bool bCanBuyResetCube = false;
+	bool bCanBuyRankCube = false;
 	bool bHasLastResult = false;
 	bool bLastResultError = false;
 };
@@ -562,7 +616,9 @@ IDLEPROJECT_API FIdleHUDBossViewModel BuildBossViewModel(float CurrentHp, float 
 IDLEPROJECT_API FIdleHUDFloatingDamageViewModel BuildFloatingDamageViewModel(const FIdleHUDFloatingDamageEntry& Entry, float Now, FVector2D ProjectedScreenPosition, float HudScale);
 IDLEPROJECT_API TArray<FIdleHUDStatusIndicatorViewModel> BuildStatusIndicatorViewModels(const TArray<FActiveSkillStatus>& Statuses, float Now, float HudScale);
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, FText FeedbackLabel, bool bFeedbackSuccess);
-IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 Gold, const FShopPurchaseResult& LastResult);
+IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, int64 ProtectionScrolls, FText FeedbackLabel, bool bFeedbackSuccess);
+IDLEPROJECT_API FIdleHUDPotentialPanelViewModel BuildPotentialPanelViewModel(const UInventoryComponent& Inventory, int64 ResetCubes, int64 RankCubes);
+IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -672,6 +728,9 @@ private:
 	void DrawBossSpecialWarning(float Now);
 	void DrawShopPanel();
 	void TryBuyGearRoll();
+	void TryBuyProtectionScroll();
+	void TryBuyResetCube();
+	void TryBuyRankCube();
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
@@ -688,6 +747,10 @@ private:
 	void DrawEnhancePanel();
 	void DrawEnhanceSlotRow(const FIdleHUDEnhanceSlotViewModel& Row, float X, float Y, float Width, float Height);
 	void TryEnhanceFromHitBox(FName BoxName);
+	void DrawPotentialPanel();
+	void DrawPotentialSlotRow(const FIdleHUDPotentialSlotViewModel& Row, float X, float Y, float Width, float Height);
+	void TryRerollPotentialFromHitBox(FName BoxName, EPotentialCubeType CubeType);
+	void ToggleItemLockFromHitBox(FName BoxName);
 	void DrawStatAllocationPanel();
 	void DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float X, float Y, float Width, float Height);
 	void AllocateStatFromHitBox(FName BoxName);

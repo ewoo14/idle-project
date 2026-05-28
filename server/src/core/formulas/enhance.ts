@@ -1,4 +1,6 @@
 export const MAX_ENHANCE_LEVEL = 50;
+export const ENHANCE_SAFE_MAX_LEVEL = 9;
+export const ENHANCE_PITY_THRESHOLD = 12;
 
 export type EnhanceItemRarity =
   | "None"
@@ -79,4 +81,75 @@ export function rollEnhanceSuccess(
 ): boolean {
   const clampedRate = Math.max(0, Math.min(rate, 1));
   return rng() < clampedRate;
+}
+
+export interface EnhanceAttemptInput {
+  currentLevel: number;
+  failStreak: number;
+  useProtection: boolean;
+  hasProtection: boolean;
+  roll: number;
+}
+
+export interface EnhanceAttemptOutcome {
+  attempted: boolean;
+  success: boolean;
+  consumedProtection: boolean;
+  newLevel: number;
+  newFailStreak: number;
+  pityTriggered: boolean;
+}
+
+export function isRiskLevel(currentLevel: number): boolean {
+  return (
+    currentLevel > ENHANCE_SAFE_MAX_LEVEL && currentLevel < MAX_ENHANCE_LEVEL
+  );
+}
+
+export function resolveEnhanceAttempt(
+  input: EnhanceAttemptInput,
+): EnhanceAttemptOutcome {
+  const currentLevel = Math.max(
+    0,
+    Math.min(Math.trunc(input.currentLevel), MAX_ENHANCE_LEVEL),
+  );
+  const failStreak = Math.max(0, Math.trunc(input.failStreak));
+  if (currentLevel >= MAX_ENHANCE_LEVEL) {
+    return {
+      attempted: false,
+      success: false,
+      consumedProtection: false,
+      newLevel: currentLevel,
+      newFailStreak: failStreak,
+      pityTriggered: false,
+    };
+  }
+
+  const risk = isRiskLevel(currentLevel);
+  const pityTriggered = risk && failStreak >= ENHANCE_PITY_THRESHOLD;
+  const success =
+    pityTriggered || input.roll < getEnhanceSuccessRate(currentLevel);
+  if (success) {
+    return {
+      attempted: true,
+      success: true,
+      consumedProtection: false,
+      newLevel: Math.min(currentLevel + 1, MAX_ENHANCE_LEVEL),
+      newFailStreak: 0,
+      pityTriggered,
+    };
+  }
+
+  const consumedProtection = risk && input.useProtection && input.hasProtection;
+  return {
+    attempted: true,
+    success: false,
+    consumedProtection,
+    newLevel:
+      risk && !consumedProtection
+        ? Math.max(0, currentLevel - 1)
+        : currentLevel,
+    newFailStreak: failStreak + 1,
+    pityTriggered: false,
+  };
 }

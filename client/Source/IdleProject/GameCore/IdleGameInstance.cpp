@@ -16,6 +16,7 @@
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/PotentialFormula.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/RarityMigration.h"
 #include "ItemSystem/ShopFormula.h"
@@ -112,6 +113,7 @@ void UIdleGameInstance::Init()
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
+	PotentialRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x71e4d);
 	LoadLanguage();
 	LoadLastSeenUnixSec();
 	LoadProgress();
@@ -370,10 +372,13 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 11;
+	SaveGame->SaveVersion = 12;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
+	SaveGame->ProtectionScrolls = ProtectionScrolls;
+	SaveGame->ResetCubes = ResetCubes;
+	SaveGame->RankCubes = RankCubes;
 	SaveGame->CharacterLevel = CharacterLevel;
 	SaveGame->CurrentExp = CurrentExp;
 	SaveGame->NextExp = NextExp;
@@ -474,6 +479,9 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 
 	Gold = FMath::Max<int64>(0, SaveGame->Gold);
 	RuneEssence = SaveGame->SaveVersion >= 3 ? FMath::Max<int64>(0, SaveGame->RuneEssence) : 0;
+	ProtectionScrolls = SaveGame->SaveVersion >= 12 ? FMath::Max<int64>(0, SaveGame->ProtectionScrolls) : 0;
+	ResetCubes = SaveGame->SaveVersion >= 12 ? FMath::Max<int64>(0, SaveGame->ResetCubes) : 0;
+	RankCubes = SaveGame->SaveVersion >= 12 ? FMath::Max<int64>(0, SaveGame->RankCubes) : 0;
 	CharacterLevel = FMath::Clamp(SaveGame->CharacterLevel, 1, FLevelFormulas::LEVEL_CAP);
 	CurrentExp = FMath::Max<int64>(0, SaveGame->CurrentExp);
 	NextExp = SaveGame->NextExp > 0 ? SaveGame->NextExp : FLevelFormulas::ExpToNext(CharacterLevel);
@@ -729,12 +737,17 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
 	return Result;
 }
 
-FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot)
+FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection)
 {
-	return TryEnhanceEquipped(Slot, FindPlayerInventory());
+	return TryEnhanceEquipped(Slot, bUseProtection, FindPlayerInventory());
 }
 
 FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInventoryComponent* Inventory)
+{
+	return TryEnhanceEquipped(Slot, false, Inventory);
+}
+
+FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection, UInventoryComponent* Inventory)
 {
 	FEnhanceAttemptResult Result;
 	if (!Inventory || Slot == EItemSlot::None)
@@ -754,7 +767,8 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 	const FItemInstance* EquippedItem = Inventory->GetEquippedItem(Slot);
 	const EItemRarity Rarity = EquippedItem ? EquippedItem->Rarity : EItemRarity::None;
 	const int64 Cost = FEnhanceFormula::GetEnhanceCost(CurrentLevel, Rarity);
-	if (Cost <= 0 || Gold < Cost)
+	const bool bHasProtection = ProtectionScrolls > 0;
+	if (Cost <= 0 || Gold < Cost || (bUseProtection && FEnhanceFormula::IsRiskLevel(CurrentLevel) && !bHasProtection))
 	{
 		OnEnhanceResult.Broadcast(Result);
 		return Result;
@@ -764,18 +778,91 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, UInv
 	Result.bAttempted = true;
 	Result.GoldSpent = Cost;
 
-	const float SuccessRate = FEnhanceFormula::GetEnhanceSuccessRate(CurrentLevel);
-	if (FEnhanceFormula::RollEnhanceSuccess(SuccessRate, EnhanceRandomStream) && Inventory->EnhanceEquippedItem(Slot))
+	const FEnhanceAttemptOutcome Outcome = FEnhanceFormula::ResolveAttempt(
+		CurrentLevel,
+		EquippedItem ? EquippedItem->EnhanceFailStreak : 0,
+		bUseProtection,
+		bHasProtection,
+		EnhanceRandomStream.GetFraction());
+	Inventory->ApplyEnhanceOutcome(Slot, Outcome);
+	if (Outcome.bConsumedProtection)
 	{
-		Result.bSuccess = true;
-		Result.NewLevel = CurrentLevel + 1;
+		ProtectionScrolls = FMath::Max<int64>(0, ProtectionScrolls - 1);
 	}
+	Result.bSuccess = Outcome.bSuccess;
+	Result.bConsumedProtection = Outcome.bConsumedProtection;
+	Result.NewLevel = Outcome.NewLevel;
+	Result.NewFailStreak = Outcome.NewFailStreak;
 
 	RecordGearEnhanced();
 	RecordAchievementMetric(EAchievementMetric::HighestEnhanceLevel, Result.NewLevel);
 	OnEnhanceResult.Broadcast(Result);
 	RequestAutosave();
 	return Result;
+}
+
+FPotentialRerollResult UIdleGameInstance::TryRerollPotential(EItemSlot Slot, EPotentialCubeType CubeType)
+{
+	return TryRerollPotential(Slot, CubeType, FindPlayerInventory());
+}
+
+FPotentialRerollResult UIdleGameInstance::TryRerollPotential(EItemSlot Slot, EPotentialCubeType CubeType, UInventoryComponent* Inventory)
+{
+	FPotentialRerollResult Result;
+	Result.CubeType = CubeType;
+	if (!Inventory || Slot == EItemSlot::None)
+	{
+		return Result;
+	}
+
+	const FItemInstance* EquippedItem = Inventory->GetEquippedItem(Slot);
+	if (!EquippedItem || EquippedItem->PotentialGrade == EPotentialGrade::None)
+	{
+		return Result;
+	}
+
+	TArray<FPotentialLine> Lines;
+	EPotentialGrade NewGrade = EquippedItem->PotentialGrade;
+	if (CubeType == EPotentialCubeType::Reset)
+	{
+		if (ResetCubes <= 0)
+		{
+			return Result;
+		}
+		--ResetCubes;
+		Lines = FPotentialFormula::RollPotentialLines(NewGrade, PotentialRandomStream);
+	}
+	else
+	{
+		if (RankCubes <= 0)
+		{
+			return Result;
+		}
+		--RankCubes;
+		NewGrade = FPotentialFormula::ApplyRankCube(EquippedItem->PotentialGrade, FPotentialFormula::GetMaxPotentialGrade(EquippedItem->Rarity), PotentialRandomStream, Lines);
+	}
+
+	if (!Inventory->SetEquippedPotential(Slot, NewGrade, Lines))
+	{
+		return Result;
+	}
+
+	Result.bRerolled = true;
+	Result.NewGrade = NewGrade;
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return Result;
+}
+
+bool UIdleGameInstance::SetItemLocked(EItemSlot Slot, bool bLocked)
+{
+	UInventoryComponent* Inventory = FindPlayerInventory();
+	const bool bUpdated = Inventory && Inventory->SetItemLocked(Slot, bLocked);
+	if (bUpdated)
+	{
+		RequestAutosave();
+	}
+	return bUpdated;
 }
 
 FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll()
@@ -822,6 +909,37 @@ FShopPurchaseResult UIdleGameInstance::TryBuyGearRoll(UInventoryComponent* Inven
 	OnShopPurchase.Broadcast(Result);
 	RequestAutosave();
 	return Result;
+}
+
+bool UIdleGameInstance::TryBuyProtectionScroll()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetProtectionScrollCost(GlobalStageIndex), ProtectionScrolls);
+}
+
+bool UIdleGameInstance::TryBuyResetCube()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetResetCubeCost(GlobalStageIndex), ResetCubes);
+}
+
+bool UIdleGameInstance::TryBuyRankCube()
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	return TryBuyShopResource(FShopFormula::GetRankCubeCost(GlobalStageIndex), RankCubes);
+}
+
+bool UIdleGameInstance::TryBuyShopResource(int64 Cost, int64& ResourceCount)
+{
+	if (Cost <= 0 || Gold < Cost || ResourceCount >= MAX_int64)
+	{
+		return false;
+	}
+
+	AddGold(-Cost);
+	++ResourceCount;
+	RequestAutosave();
+	return true;
 }
 
 void UIdleGameInstance::AddRune(const FRuneInstance& Rune)

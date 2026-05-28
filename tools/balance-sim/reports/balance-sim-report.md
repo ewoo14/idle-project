@@ -121,7 +121,8 @@
 - Expected +0 to +50 gold cost: 22717602.46
 - Median sampled Lv50 gold/hour: 654689
 - Expected +0 to +50 cost at median Lv50 gold/hour: 34.7h
-- Failure consumes gold only; no downgrade or destruction is modeled in V1.
+- This table is the pre-risk expected-cost floor: success-rate pressure only.
+- Downgrade, protection, and pity are modeled in the risk section below.
 - V1 enhancement is a long-tail gold sink for infinite growth;
   high-level attempts are expected to outpace sampled Lv50 income and
   keep legendary multi-slot investment open-ended.
@@ -203,6 +204,26 @@
 | Legendary | 16 | 68680000 | 363481639.4 | 555.197h |
 | Transcendent | 32 | 137360000 | 726963278.8 | 1110.395h |
 | Mythic | 64 | 274720000 | 1453926557.61 | 2220.79h |
+
+<!-- markdownlint-enable MD013 -->
+
+## Enhancement Attempt Risk Model
+
+- Source: `resolveEnhanceAttempt` from `server/src/core/formulas/enhance.ts`.
+- Runs per scenario: 1000
+- Safe range: +0 to +9.
+- Risk range: +10 to +49; failed unprotected attempts downgrade by 1 level.
+- Pity threshold: 12 consecutive risk failures force the next attempt to succeed.
+- `risk-level` protection consumes one protection item on risk failure and prevents the downgrade; cost is reported as gold only because protection sourcing is not priced in V1.
+
+<!-- markdownlint-disable MD013 -->
+
+| Rarity | Protection | Median attempts | P90 attempts | Median gold | P90 gold | Median hours | P90 hours | Downgrades | Protections | Pity |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Common | none | 34 | 54 | 599400 | 1099600 | 0.916h | 1.68h | 6 | 0 | 0 |
+| Common | risk-level | 137 | 158 | 18808000 | 22520700 | 28.728h | 34.399h | 0 | 86 | 2 |
+| Legendary | risk-level | 138 | 159 | 301953600 | 367728000 | 461.217h | 561.683h | 0 | 86 | 2 |
+| Mythic | risk-level | 139 | 159 | 1213024000 | 1465433600 | 1852.825h | 2238.366h | 0 | 87 | 2 |
 
 <!-- markdownlint-enable MD013 -->
 

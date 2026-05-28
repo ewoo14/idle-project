@@ -299,6 +299,28 @@ describe("equipment formulas", () => {
     ).toBe(90);
   });
 
+  it("includes potential percent lines in PowerScore and inventory bonuses", () => {
+    const item = {
+      itemId: "rare_potential_sword",
+      slot: 1 as const,
+      rarity: 2 as const,
+      bonusAtk: 100,
+      bonusDef: 0,
+      bonusHp: 50,
+      enhanceLevel: 2,
+      potentialGrade: "Unique" as const,
+      potentialLine1: { stat: "PhysAtkPercent" as const, value: 0.1 },
+      potentialLine2: { stat: "HpPercent" as const, value: 0.08 },
+      potentialLine3: { stat: "CritRatePercent" as const, value: 0.02 },
+    };
+
+    expect(computeItemPowerScore(item)).toBe(158);
+    const bonus = computeInventoryBonus([item]);
+    expect(bonus.bonusAtk).toBe(132);
+    expect(bonus.bonusHp).toBeCloseTo(64.8, 6);
+    expect(bonus.critRate).toBe(0.02);
+  });
+
   it("keeps slot and rarity values aligned to PR 9 enum ranges", () => {
     const slot: ItemSlot = 8;
     const rarity: ItemRarity = 6;

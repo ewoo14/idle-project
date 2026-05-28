@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "Components/ActorComponent.h"
+#include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "ItemSystem/UniqueTraitFormula.h"
 #include "InventoryComponent.generated.h"
@@ -29,6 +30,9 @@ public:
 	FUniqueTraitCoreMultipliers ComputeUniqueTraitMultipliers() const;
 	const FItemInstance* GetEquippedItem(EItemSlot Slot) const;
 	bool EnhanceEquippedItem(EItemSlot Slot);
+	bool ApplyEnhanceOutcome(EItemSlot Slot, const FEnhanceAttemptOutcome& Outcome);
+	bool SetItemLocked(EItemSlot Slot, bool bLocked);
+	bool SetEquippedPotential(EItemSlot Slot, EPotentialGrade Grade, const TArray<FPotentialLine>& Lines);
 	int32 GetEquippedEnhanceLevel(EItemSlot Slot) const;
 	void CaptureState(TArray<FItemInstance>& OutItems, TMap<EItemSlot, int32>& OutEquipped) const;
 	void RestoreState(const TArray<FItemInstance>& InItems, const TMap<EItemSlot, int32>& InEquipped);

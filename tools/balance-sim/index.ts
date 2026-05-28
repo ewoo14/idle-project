@@ -32,11 +32,14 @@ import {
   getMinimumCp,
 } from "../../server/src/core/formulas/dungeon.js";
 import {
+  ENHANCE_PITY_THRESHOLD,
+  ENHANCE_SAFE_MAX_LEVEL,
   type EnhanceItemRarity,
   getEnhanceCost,
   getEnhanceSuccessRate,
   getRarityCostMultiplier,
   MAX_ENHANCE_LEVEL,
+  resolveEnhanceAttempt,
 } from "../../server/src/core/formulas/enhance.js";
 import {
   cumulativeExp,
@@ -279,11 +282,38 @@ export type EnhancementPressure = {
   medianGoldPerHourAtLevel50: number;
   expectedHoursAtMedianGoldPerHour: number;
   rarityScenarios: EnhancementRarityScenario[];
+  riskAttemptModel: EnhancementRiskAttemptModel;
   legendaryEightSlotExpectedGoldCost: number;
   legendaryEightSlotExpectedHoursAtMedianGoldPerHour: number;
   mythicEightSlotExpectedGoldCost: number;
   mythicEightSlotExpectedHoursAtMedianGoldPerHour: number;
   rows: EnhancementPressureRow[];
+};
+
+export type EnhancementProtectionStrategy = "none" | "risk-level";
+
+export type EnhancementRiskAttemptScenario = {
+  rarity: EnhanceItemRarity;
+  protectionStrategy: EnhancementProtectionStrategy;
+  targetLevel: number;
+  medianFinalLevel: number;
+  medianAttemptsToMax: number;
+  p90AttemptsToMax: number;
+  medianGoldCostToMax: number;
+  p90GoldCostToMax: number;
+  medianDowngradesToMax: number;
+  medianProtectionsConsumedToMax: number;
+  medianPityTriggersToMax: number;
+  medianHoursAtMedianGoldPerHour: number;
+  p90HoursAtMedianGoldPerHour: number;
+};
+
+export type EnhancementRiskAttemptModel = {
+  runsPerScenario: number;
+  seed: number;
+  safeMaxLevel: number;
+  pityThreshold: number;
+  scenarios: EnhancementRiskAttemptScenario[];
 };
 
 export type PetFeedPressureRow = {
@@ -541,6 +571,18 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
   "Legendary",
   "Transcendent",
   "Mythic",
+];
+const ENHANCEMENT_RISK_RUNS = 1000;
+const ENHANCEMENT_RISK_SEED = 71;
+const ENHANCEMENT_RISK_SCENARIOS: Array<{
+  rarity: EnhanceItemRarity;
+  protectionStrategy: EnhancementProtectionStrategy;
+  targetLevel: number;
+}> = [
+  { rarity: "Common", protectionStrategy: "none", targetLevel: 20 },
+  { rarity: "Common", protectionStrategy: "risk-level", targetLevel: 50 },
+  { rarity: "Legendary", protectionStrategy: "risk-level", targetLevel: 50 },
+  { rarity: "Mythic", protectionStrategy: "risk-level", targetLevel: 50 },
 ];
 const ITEM_DROP_RARITIES: Exclude<ItemRarity, "None">[] = [
   "Common",
@@ -1236,6 +1278,9 @@ function buildEnhancementPressure(
   const rarityScenarios = ENHANCEMENT_RARITY_SCENARIOS.map((rarity) =>
     buildEnhancementRarityScenario(rarity, medianGoldPerHourAtLevel50),
   );
+  const riskAttemptModel = buildEnhancementRiskAttemptModel(
+    medianGoldPerHourAtLevel50,
+  );
   const legendaryScenario = rarityScenarios.find(
     (scenario) => scenario.rarity === "Legendary",
   );
@@ -1261,6 +1306,7 @@ function buildEnhancementPressure(
       3,
     ),
     rarityScenarios,
+    riskAttemptModel,
     legendaryEightSlotExpectedGoldCost,
     legendaryEightSlotExpectedHoursAtMedianGoldPerHour: round(
       legendaryEightSlotExpectedGoldCost /
@@ -1273,6 +1319,134 @@ function buildEnhancementPressure(
       3,
     ),
     rows,
+  };
+}
+
+type EnhancementRiskAttemptRun = {
+  finalLevel: number;
+  attempts: number;
+  goldCost: number;
+  downgrades: number;
+  protectionsConsumed: number;
+  pityTriggers: number;
+};
+
+function buildEnhancementRiskAttemptModel(
+  medianGoldPerHourAtLevel50: number,
+): EnhancementRiskAttemptModel {
+  return {
+    runsPerScenario: ENHANCEMENT_RISK_RUNS,
+    seed: ENHANCEMENT_RISK_SEED,
+    safeMaxLevel: ENHANCE_SAFE_MAX_LEVEL,
+    pityThreshold: ENHANCE_PITY_THRESHOLD,
+    scenarios: ENHANCEMENT_RISK_SCENARIOS.map((scenario, index) =>
+      buildEnhancementRiskAttemptScenario({
+        ...scenario,
+        medianGoldPerHourAtLevel50,
+        seed: ENHANCEMENT_RISK_SEED + index * 997,
+      }),
+    ),
+  };
+}
+
+function buildEnhancementRiskAttemptScenario(input: {
+  rarity: EnhanceItemRarity;
+  protectionStrategy: EnhancementProtectionStrategy;
+  targetLevel: number;
+  medianGoldPerHourAtLevel50: number;
+  seed: number;
+}): EnhancementRiskAttemptScenario {
+  const random = mulberry32(input.seed);
+  const runs = Array.from({ length: ENHANCEMENT_RISK_RUNS }, () =>
+    simulateEnhancementRiskRun(
+      input.rarity,
+      input.protectionStrategy,
+      input.targetLevel,
+      random,
+    ),
+  );
+  const medianGoldCostToMax = medianBy(runs, (run) => run.goldCost);
+  const p90GoldCostToMax = percentile(
+    runs.map((run) => run.goldCost).sort((left, right) => left - right),
+    0.9,
+  );
+
+  return {
+    rarity: input.rarity,
+    protectionStrategy: input.protectionStrategy,
+    targetLevel: input.targetLevel,
+    medianFinalLevel: medianBy(runs, (run) => run.finalLevel),
+    medianAttemptsToMax: medianBy(runs, (run) => run.attempts),
+    p90AttemptsToMax: percentile(
+      runs.map((run) => run.attempts).sort((left, right) => left - right),
+      0.9,
+    ),
+    medianGoldCostToMax,
+    p90GoldCostToMax,
+    medianDowngradesToMax: medianBy(runs, (run) => run.downgrades),
+    medianProtectionsConsumedToMax: medianBy(
+      runs,
+      (run) => run.protectionsConsumed,
+    ),
+    medianPityTriggersToMax: medianBy(runs, (run) => run.pityTriggers),
+    medianHoursAtMedianGoldPerHour: round(
+      medianGoldCostToMax / Math.max(1, input.medianGoldPerHourAtLevel50),
+      3,
+    ),
+    p90HoursAtMedianGoldPerHour: round(
+      p90GoldCostToMax / Math.max(1, input.medianGoldPerHourAtLevel50),
+      3,
+    ),
+  };
+}
+
+function simulateEnhancementRiskRun(
+  rarity: EnhanceItemRarity,
+  protectionStrategy: EnhancementProtectionStrategy,
+  targetLevel: number,
+  random: () => number,
+): EnhancementRiskAttemptRun {
+  let level = 0;
+  let failStreak = 0;
+  let attempts = 0;
+  let goldCost = 0;
+  let downgrades = 0;
+  let protectionsConsumed = 0;
+  let pityTriggers = 0;
+
+  while (level < targetLevel) {
+    const useProtection =
+      protectionStrategy === "risk-level" && level > ENHANCE_SAFE_MAX_LEVEL;
+    const previousLevel = level;
+    goldCost += getEnhanceCost(level, rarity);
+    attempts += 1;
+    const outcome = resolveEnhanceAttempt({
+      currentLevel: level,
+      failStreak,
+      useProtection,
+      hasProtection: useProtection,
+      roll: random(),
+    });
+    level = outcome.newLevel;
+    failStreak = outcome.newFailStreak;
+    if (outcome.consumedProtection) {
+      protectionsConsumed += 1;
+    }
+    if (outcome.pityTriggered) {
+      pityTriggers += 1;
+    }
+    if (outcome.newLevel < previousLevel) {
+      downgrades += 1;
+    }
+  }
+
+  return {
+    finalLevel: level,
+    attempts,
+    goldCost,
+    downgrades,
+    protectionsConsumed,
+    pityTriggers,
   };
 }
 
@@ -2204,7 +2378,8 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     `- Expected +0 to +50 gold cost: ${report.model.enhancementPressure.expectedGoldCostToMax}`,
     `- Median sampled Lv50 gold/hour: ${report.model.enhancementPressure.medianGoldPerHourAtLevel50}`,
     `- Expected +0 to +50 cost at median Lv50 gold/hour: ${report.model.enhancementPressure.expectedHoursAtMedianGoldPerHour}h`,
-    "- Failure consumes gold only; no downgrade or destruction is modeled in V1.",
+    "- This table is the pre-risk expected-cost floor: success-rate pressure only.",
+    "- Downgrade, protection, and pity are modeled in the risk section below.",
     "- V1 enhancement is a long-tail gold sink for infinite growth;",
     "  high-level attempts are expected to outpace sampled Lv50 income and",
     "  keep legendary multi-slot investment open-ended.",
@@ -2236,6 +2411,26 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.enhancementPressure.rarityScenarios.map(
       (row) =>
         `| ${row.rarity} | ${row.multiplier} | ${row.goldCostFloorToMax} | ${row.expectedGoldCostToMax} | ${row.expectedHoursAtMedianGoldPerHour}h |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Enhancement Attempt Risk Model",
+    "",
+    "- Source: `resolveEnhanceAttempt` from `server/src/core/formulas/enhance.ts`.",
+    `- Runs per scenario: ${report.model.enhancementPressure.riskAttemptModel.runsPerScenario}`,
+    `- Safe range: +0 to +${report.model.enhancementPressure.riskAttemptModel.safeMaxLevel}.`,
+    `- Risk range: +${report.model.enhancementPressure.riskAttemptModel.safeMaxLevel + 1} to +${report.model.enhancementPressure.maxLevel - 1}; failed unprotected attempts downgrade by 1 level.`,
+    `- Pity threshold: ${report.model.enhancementPressure.riskAttemptModel.pityThreshold} consecutive risk failures force the next attempt to succeed.`,
+    "- `risk-level` protection consumes one protection item on risk failure and prevents the downgrade; cost is reported as gold only because protection sourcing is not priced in V1.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Rarity | Protection | Median attempts | P90 attempts | Median gold | P90 gold | Median hours | P90 hours | Downgrades | Protections | Pity |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.enhancementPressure.riskAttemptModel.scenarios.map(
+      (row) =>
+        `| ${row.rarity} | ${row.protectionStrategy} | ${row.medianAttemptsToMax} | ${row.p90AttemptsToMax} | ${row.medianGoldCostToMax} | ${row.p90GoldCostToMax} | ${row.medianHoursAtMedianGoldPerHour}h | ${row.p90HoursAtMedianGoldPerHour}h | ${row.medianDowngradesToMax} | ${row.medianProtectionsConsumedToMax} | ${row.medianPityTriggersToMax} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

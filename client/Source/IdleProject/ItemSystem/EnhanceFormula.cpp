@@ -68,3 +68,37 @@ bool FEnhanceFormula::RollEnhanceSuccess(float SuccessRate, FRandomStream& Strea
 	const float ClampedRate = FMath::Clamp(SuccessRate, 0.0f, 1.0f);
 	return Stream.GetFraction() < ClampedRate;
 }
+
+bool FEnhanceFormula::IsRiskLevel(int32 CurrentLevel)
+{
+	return CurrentLevel > SafeMaxLevel && CurrentLevel < MaxEnhanceLevel;
+}
+
+FEnhanceAttemptOutcome FEnhanceFormula::ResolveAttempt(int32 CurrentLevel, int32 FailStreak, bool bUseProtection, bool bHasProtection, float Roll)
+{
+	const int32 ClampedLevel = FMath::Clamp(CurrentLevel, 0, MaxEnhanceLevel);
+	const int32 ClampedFailStreak = FMath::Max(0, FailStreak);
+	FEnhanceAttemptOutcome Outcome;
+	Outcome.NewLevel = ClampedLevel;
+	Outcome.NewFailStreak = ClampedFailStreak;
+	if (ClampedLevel >= MaxEnhanceLevel)
+	{
+		return Outcome;
+	}
+
+	const bool bRiskLevel = IsRiskLevel(ClampedLevel);
+	Outcome.bAttempted = true;
+	Outcome.bPityTriggered = bRiskLevel && ClampedFailStreak >= PityThreshold;
+	Outcome.bSuccess = Outcome.bPityTriggered || Roll < GetEnhanceSuccessRate(ClampedLevel);
+	if (Outcome.bSuccess)
+	{
+		Outcome.NewLevel = FMath::Min(ClampedLevel + 1, MaxEnhanceLevel);
+		Outcome.NewFailStreak = 0;
+		return Outcome;
+	}
+
+	Outcome.bConsumedProtection = bRiskLevel && bUseProtection && bHasProtection;
+	Outcome.NewLevel = bRiskLevel && !Outcome.bConsumedProtection ? FMath::Max(0, ClampedLevel - 1) : ClampedLevel;
+	Outcome.NewFailStreak = ClampedFailStreak + 1;
+	return Outcome;
+}
