@@ -20,6 +20,9 @@ public:
 	bool TryEquipRune(int32 SlotIndex, int32 OwnedIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	void SetOwnerClassId(EClassId ClassId);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	bool UnequipRune(int32 SlotIndex);
 
 	bool EnhanceRune(int32 OwnedIndex);
@@ -48,6 +51,9 @@ private:
 
 	UPROPERTY()
 	TArray<int32> EquippedSlots;
+
+	UPROPERTY()
+	EClassId OwnerClassId = EClassId::None;
 
 	static bool IsValidRune(const FRuneInstance& Rune);
 	static bool IsValidCodexCell(ERuneType Type, EItemRarity Rarity);

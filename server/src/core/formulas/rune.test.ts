@@ -14,7 +14,7 @@ import {
 
 describe("rune formulas", () => {
   it("matches the UE rune slot count", () => {
-    expect(RUNE_SLOT_COUNT).toBe(6);
+    expect(RUNE_SLOT_COUNT).toBe(7);
   });
 
   it.each([

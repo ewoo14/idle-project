@@ -20,6 +20,7 @@
 #include "ItemSystem/InventoryComponent.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/ShopFormula.h"
+#include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
@@ -224,6 +225,8 @@ const TCHAR* RuneTypeToLocalizationKey(ERuneType Type)
 		return TEXT("RUNE_TYPE_EXP_BOOST");
 	case ERuneType::OfflineEff:
 		return TEXT("RUNE_TYPE_OFFLINE_EFF");
+	case ERuneType::ClassMastery:
+		return TEXT("RUNE_TYPE_CLASS_MASTERY");
 	case ERuneType::None:
 	default:
 		return TEXT("RUNE_TYPE_NONE");
@@ -273,6 +276,11 @@ float GetRuneDisplayValue(const FRuneInstance& Rune)
 	if (FRuneFormula::IsUtilType(Rune.RuneType))
 	{
 		return FRuneFormula::GetUtilRuneValue(Rune.RuneType, Rune.Rarity, Rune.EnhanceLevel);
+	}
+	if (Rune.RuneType == ERuneType::ClassMastery)
+	{
+		const FRuneCoreMultipliers Multipliers = FClassRuneFormula::GetClassMasteryMultipliers(Rune.ClassRestriction, Rune.Rarity, Rune.EnhanceLevel);
+		return FMath::Max(FMath::Max(Multipliers.PhysAtk, Multipliers.MagicAtk), FMath::Max(Multipliers.PhysDef, Multipliers.Hp));
 	}
 	return 0.0f;
 }

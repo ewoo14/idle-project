@@ -240,6 +240,13 @@ void AIdleCharacter::SetClassId(EClassId NewClassId)
 	}
 
 	DefaultClassId = NewClassId;
+	if (UIdleGameInstance* IdleGameInstance = GetGameInstance<UIdleGameInstance>())
+	{
+		if (URuneService* RuneService = IdleGameInstance->GetRuneService())
+		{
+			RuneService->SetOwnerClassId(DefaultClassId);
+		}
+	}
 	if (Skills)
 	{
 		Skills->LoadSkillsForClass(DefaultClassId);

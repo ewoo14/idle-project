@@ -1,5 +1,6 @@
 #include "RuneSystem/RuneService.h"
 
+#include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 
@@ -31,6 +32,19 @@ bool URuneService::TryEquipRune(int32 SlotIndex, int32 OwnedIndex)
 		return false;
 	}
 
+	const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
+	if (SlotIndex == FClassRuneFormula::ClassRuneSlotIndex)
+	{
+		if (Rune.RuneType != ERuneType::ClassMastery || Rune.ClassRestriction != OwnerClassId || OwnerClassId == EClassId::None)
+		{
+			return false;
+		}
+	}
+	else if (Rune.RuneType == ERuneType::ClassMastery)
+	{
+		return false;
+	}
+
 	for (int32& EquippedIndex : EquippedSlots)
 	{
 		if (EquippedIndex == OwnedIndex)
@@ -41,6 +55,20 @@ bool URuneService::TryEquipRune(int32 SlotIndex, int32 OwnedIndex)
 
 	EquippedSlots[SlotIndex] = OwnedIndex;
 	return true;
+}
+
+void URuneService::SetOwnerClassId(EClassId ClassId)
+{
+	OwnerClassId = ClassId >= EClassId::Warrior && ClassId <= EClassId::Summoner ? ClassId : EClassId::None;
+	EnsureSlotCount();
+	const int32 ClassSlotOwnedIndex = EquippedSlots[FClassRuneFormula::ClassRuneSlotIndex];
+	if (OwnerClassId == EClassId::None
+		|| !OwnedRunes.IsValidIndex(ClassSlotOwnedIndex)
+		|| OwnedRunes[ClassSlotOwnedIndex].RuneType != ERuneType::ClassMastery
+		|| OwnedRunes[ClassSlotOwnedIndex].ClassRestriction != OwnerClassId)
+	{
+		EquippedSlots[FClassRuneFormula::ClassRuneSlotIndex] = INDEX_NONE;
+	}
 }
 
 bool URuneService::UnequipRune(int32 SlotIndex)
@@ -109,6 +137,22 @@ FRuneCoreMultipliers URuneService::GetEquippedCoreMultipliers() const
 		}
 
 		const FRuneInstance& Rune = OwnedRunes[OwnedIndex];
+		if (Rune.RuneType == ERuneType::ClassMastery)
+		{
+			if (Rune.ClassRestriction != OwnerClassId || OwnerClassId == EClassId::None)
+			{
+				continue;
+			}
+
+			const FRuneCoreMultipliers Bonus = FClassRuneFormula::GetClassMasteryMultipliers(Rune.ClassRestriction, Rune.Rarity, Rune.EnhanceLevel);
+			Result.PhysAtk += Bonus.PhysAtk;
+			Result.MagicAtk += Bonus.MagicAtk;
+			Result.PhysDef += Bonus.PhysDef;
+			Result.MagicDef += Bonus.MagicDef;
+			Result.Hp += Bonus.Hp;
+			continue;
+		}
+
 		const float Bonus = FRuneFormula::GetCoreRuneMultiplier(Rune.Rarity, Rune.EnhanceLevel);
 		switch (Rune.RuneType)
 		{
@@ -266,6 +310,7 @@ void URuneService::CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>&
 		Entry.RuneType = Rune.RuneType;
 		Entry.Rarity = Rune.Rarity;
 		Entry.EnhanceLevel = FMath::Max(0, Rune.EnhanceLevel);
+		Entry.ClassRestriction = Rune.ClassRestriction;
 		OutRunes.Add(Entry);
 	}
 
@@ -306,6 +351,7 @@ void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TAr
 		Rune.RuneType = Entry.RuneType;
 		Rune.Rarity = Entry.Rarity;
 		Rune.EnhanceLevel = FMath::Max(0, Entry.EnhanceLevel);
+		Rune.ClassRestriction = Entry.ClassRestriction;
 		if (!IsValidRune(Rune))
 		{
 			continue;
@@ -330,7 +376,12 @@ void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TAr
 
 bool URuneService::IsValidRune(const FRuneInstance& Rune)
 {
-	return (FRuneFormula::IsCoreType(Rune.RuneType) || FRuneFormula::IsUtilType(Rune.RuneType))
+	const bool bValidType = FRuneFormula::IsCoreType(Rune.RuneType)
+		|| FRuneFormula::IsUtilType(Rune.RuneType)
+		|| (Rune.RuneType == ERuneType::ClassMastery
+			&& Rune.ClassRestriction >= EClassId::Warrior
+			&& Rune.ClassRestriction <= EClassId::Summoner);
+	return bValidType
 		&& Rune.Rarity >= EItemRarity::Common
 		&& Rune.Rarity <= EItemRarity::Mythic;
 }

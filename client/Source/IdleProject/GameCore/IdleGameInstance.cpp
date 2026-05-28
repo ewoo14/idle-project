@@ -19,6 +19,7 @@
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/ShopFormula.h"
 #include "NetworkClient/ApiClient.h"
+#include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
 
@@ -34,6 +35,7 @@ FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
 		FMath::Max(0.0f, Stats.Con),
 		FMath::Max(0.0f, Stats.Luk));
 }
+
 }
 
 const TCHAR* UIdleGameInstance::SaveSlotName = TEXT("IdleSave");
@@ -325,7 +327,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 
-	SaveGame->SaveVersion = 4;
+	SaveGame->SaveVersion = 5;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -448,6 +450,7 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsureRuneService();
 	if (RuneService)
 	{
+		RuneService->SetOwnerClassId(GetCurrentClassIdForRunes());
 		if (SaveGame->SaveVersion >= 3)
 		{
 			if (SaveGame->SaveVersion >= 4)
@@ -781,6 +784,47 @@ bool UIdleGameInstance::TryBuyRuneRoll()
 
 	AddGold(-Cost);
 	RuneService->AddRune(FRuneFormula::RollShopRune(ProgressIndex, RuneRandomStream));
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryCraftClassRune(EItemRarity Rarity)
+{
+	EnsureRuneService();
+	if (!RuneService)
+	{
+		return false;
+	}
+
+	const EClassId ClassId = GetCurrentClassIdForRunes();
+	const int64 Cost = FClassRuneFormula::GetClassRuneCraftCost(Rarity);
+	if (Cost <= 0 || RuneEssence < Cost)
+	{
+		return false;
+	}
+
+	RuneEssence -= Cost;
+	const int32 ProgressIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	RuneService->AddRune(FClassRuneFormula::MakeClassRune(ClassId, Rarity, ProgressIndex));
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryRollClassRuneDrop(int32 MonsterLevel, bool bIsBoss)
+{
+	EnsureRuneService();
+	if (!RuneService)
+	{
+		return false;
+	}
+
+	FRuneInstance Rune;
+	if (!FClassRuneFormula::RollClassRuneDrop(MonsterLevel, bIsBoss, GetCurrentClassIdForRunes(), RuneRandomStream, Rune))
+	{
+		return false;
+	}
+
+	RuneService->AddRune(Rune);
 	RequestAutosave();
 	return true;
 }
@@ -1226,6 +1270,7 @@ void UIdleGameInstance::InitializeTowerServiceForTests()
 void UIdleGameInstance::InitializeRuneServiceForTests()
 {
 	RuneService = NewObject<URuneService>(this);
+	RuneService->SetOwnerClassId(EClassId::Warrior);
 	RuneEssence = 0;
 	RuneRandomStream.Initialize(12345);
 }
@@ -1239,6 +1284,15 @@ void UIdleGameInstance::AddRuneForTests(const FRuneInstance& Rune)
 void UIdleGameInstance::AddRuneEssenceForTests(int64 Amount)
 {
 	RuneEssence = FMath::Max<int64>(0, RuneEssence + Amount);
+}
+
+void UIdleGameInstance::SetRuneOwnerClassForTests(EClassId ClassId)
+{
+	EnsureRuneService();
+	if (RuneService)
+	{
+		RuneService->SetOwnerClassId(ClassId);
+	}
 }
 #endif
 
@@ -1504,6 +1558,16 @@ void UIdleGameInstance::EnsureRuneService()
 	{
 		RuneService = NewObject<URuneService>(this);
 	}
+	RuneService->SetOwnerClassId(GetCurrentClassIdForRunes());
+}
+
+EClassId UIdleGameInstance::GetCurrentClassIdForRunes() const
+{
+	if (const AIdleCharacter* Character = FindPlayerCharacter())
+	{
+		return Character->GetClassId();
+	}
+	return EClassId::Warrior;
 }
 
 void UIdleGameInstance::EnsureAchievementService()

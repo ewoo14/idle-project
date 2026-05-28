@@ -193,6 +193,11 @@ public:
 	bool TryBuyRuneRoll();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryCraftClassRune(EItemRarity Rarity = EItemRarity::Common);
+
+	bool TryRollClassRuneDrop(int32 MonsterLevel, bool bIsBoss);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	bool TryEquipRune(int32 SlotIndex, int32 OwnedIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
@@ -345,6 +350,7 @@ public:
 #if WITH_DEV_AUTOMATION_TESTS
 	void AddRuneForTests(const FRuneInstance& Rune);
 	void AddRuneEssenceForTests(int64 Amount);
+	void SetRuneOwnerClassForTests(EClassId ClassId);
 #endif
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
@@ -492,6 +498,7 @@ private:
 	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
+	EClassId GetCurrentClassIdForRunes() const;
 	bool ApplyCharacterSaveState(
 		AIdleCharacter* Character,
 		const TArray<FItemInstance>& InventoryItems,

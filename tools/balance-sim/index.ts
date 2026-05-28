@@ -341,6 +341,7 @@ const RUNE_CORE_REVIEW_LEVELS = [0, 10, 50, 100];
 const RUNE_CORE_REVIEW_RARITIES = [1, 3, 6] as const;
 const RUNE_UTIL_REVIEW_TYPES = [6, 7, 8, 9] as const;
 const MYTHIC_RUNE_RARITY = 6;
+const REGULAR_RUNE_SLOT_COUNT = RUNE_SLOT_COUNT - 1;
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -1048,7 +1049,7 @@ function buildRunePressure(): RunePressure {
   );
 
   return {
-    slotCount: RUNE_SLOT_COUNT,
+    slotCount: REGULAR_RUNE_SLOT_COUNT,
     coreRows,
     combatRows: [
       buildCoreCombatPressureRow(1, 100, MYTHIC_RUNE_RARITY, 50, "PhysAtk"),
@@ -1111,7 +1112,7 @@ function buildRuneCorePressureRow(
     rarity: runeRarityName(rarity),
     enhanceLevel,
     singleRuneBonusPercent: round(singleRuneBonus * 100, 3),
-    sixSlotMultiplier: round(1 + singleRuneBonus * RUNE_SLOT_COUNT, 3),
+    sixSlotMultiplier: round(1 + singleRuneBonus * REGULAR_RUNE_SLOT_COUNT, 3),
   };
 }
 
@@ -1127,7 +1128,7 @@ function buildCoreCombatPressureRow(
     magicAtk: level * 16,
   });
   const runeMultiplier =
-    1 + getCoreRuneMultiplier(rarity, enhanceLevel) * RUNE_SLOT_COUNT;
+    1 + getCoreRuneMultiplier(rarity, enhanceLevel) * REGULAR_RUNE_SLOT_COUNT;
   const runeStats = {
     ...baseStats,
     physAtk:
@@ -1145,7 +1146,7 @@ function buildCoreCombatPressureRow(
   const runeDps = effectiveReviewDps(runeStats, classId, level);
 
   return {
-    runeSet: `${RUNE_SLOT_COUNT}x ${runeRarityName(rarity)} +${enhanceLevel} ${lane}`,
+    runeSet: `${REGULAR_RUNE_SLOT_COUNT}x ${runeRarityName(rarity)} +${enhanceLevel} ${lane}`,
     className: CLASS_NAMES[classId],
     level,
     baseCombatPower,
@@ -1164,7 +1165,7 @@ function buildRuneUtilPressureRow(
   const cap = getUtilCap(runeType);
   const enhanceLevel = firstUtilCapLevel(runeType, rarity);
   const singleRuneValue = getUtilRuneValue(runeType, rarity, enhanceLevel);
-  const sixSlotTotal = singleRuneValue * RUNE_SLOT_COUNT;
+  const sixSlotTotal = singleRuneValue * REGULAR_RUNE_SLOT_COUNT;
 
   return {
     runeType: runeTypeName(runeType),

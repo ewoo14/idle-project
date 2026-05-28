@@ -42,7 +42,7 @@ bool FRuneHudViewModelTest::RunTest(const FString& Parameters)
 		12,
 		1);
 
-	TestEqual(TEXT("Rune panel exposes six slots"), ViewModel.Slots.Num(), FRuneFormula::RuneSlotCount);
+	TestEqual(TEXT("Rune panel exposes seven slots"), ViewModel.Slots.Num(), FRuneFormula::RuneSlotCount);
 	TestEqual(TEXT("Rune panel exposes owned rows"), ViewModel.OwnedRows.Num(), 2);
 	TestEqual(TEXT("Selected index is retained"), ViewModel.SelectedOwnedIndex, 1);
 	TestEqual(TEXT("Essence label is localized"), ViewModel.EssenceLabel.ToString(), FString(TEXT("Rune Essence 125")));
