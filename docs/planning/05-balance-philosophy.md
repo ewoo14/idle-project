@@ -1295,3 +1295,56 @@ Guardrails:
 - HUD copy should stay compact as `xN.NN` and show the next 10-floor milestone.
 - Re-run UE automation and server Vitest when changing the step size, bonus
   rate, affected stat list, or CP formula weights.
+
+## PR #61 Rune / Relic Balance Review
+
+PR #61 keeps the rune formula values from the implementation plan and validates
+them through `tools/balance-sim`.
+
+The 1000-run rebirth distribution remains inside the pacing target after adding
+rune pressure reporting:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.919 |
+| median | 5.328 |
+| p90 | 5.751 |
+| min | 4.564 |
+| max | 6.144 |
+
+The median remains inside the 5-10h target, and every sampled run remains inside
+the 3-20h review band. Because rune acquisition and enhancement are not injected
+into the sampled first-rebirth run yet, this result is a baseline pacing guard:
+future rune drop-rate, shop-cost, or essence-income changes must rerun the
+simulator and compare against this distribution.
+
+Core rune growth is intentionally uncapped. A single Mythic core rune reaches
++168% at +50 and +318% at +100. Six same-lane Mythic +50 core runes therefore
+produce an x11.08 stat multiplier on that lane. Under the shared Lv100 review
+loadout this reports:
+
+| Rune set | Class | CP x | DPS x |
+| --- | --- | ---: | ---: |
+| 6x Mythic +50 PhysAtk | Warrior | 4.703 | 12.356 |
+| 6x Mythic +50 MagicAtk | Mage | 4.806 | 12.233 |
+
+This confirms core runes are a long-tail infinite-growth system, not a small
+sidegrade. The risk is acceptable only while essence and gold costs remain the
+primary throttle and while early drop/shop rates do not inject high-rarity,
+high-enhance runes into the first-rebirth window.
+
+Utility runes keep per-rune caps but stack across the six slots:
+
+| Utility | Mythic cap enhance | One-rune cap | Six-slot total | Effective multiplier |
+| --- | ---: | ---: | ---: | ---: |
+| CritDamage | +177 | 100% | 600% | x7 |
+| GoldFind | +377 | 200% | 1200% | x13 |
+| ExpBoost | +377 | 200% | 1200% | x13 |
+| OfflineEff | +127 | 50% | 300% | x4 |
+
+GoldFind, ExpBoost, and OfflineEff caps are economically explosive when a player
+specializes all six slots. Keep them as aspirational late-game builds unless
+future telemetry shows a need for account-level aggregate caps. If first-rebirth
+median time drops below 5h after rune acquisition is wired into the simulator,
+the first tuning candidates are rune drop rate, shop roll cost, and essence
+income rather than the level curve.

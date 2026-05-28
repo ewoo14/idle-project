@@ -337,3 +337,42 @@ export function getShopRuneRollCost(progressIndex: number): number;
 - **스펙 커버리지**: 기획서 DoD 1~8 전부 본 계획에 매핑(데이터모델→§1, 공식→§2, 서비스→§3, 스탯합성→§6, 저장→§4/§8, 서버미러→§9, HUD→designer, 테스트→테스트 케이스). 갭 없음.
 - **placeholder 스캔**: 초기 밸런스 수치 구체 명시(balance 튜닝은 의도적 위임이며 시작값 제공). TBD 없음.
 - **타입 일관성**: `ERuneType`/`FRuneInstance`/`FRuneCoreMultipliers`/`FRuneUtilValues`/`FRuneSaveEntry`/`URuneService` API/`FRuneFormula` static 명칭이 전 섹션 일치. `EquippedSlots`(클라 내부) ↔ `EquippedRuneSlots`(저장 필드) 변환 명시.
+
+## Codex Balance Review Notes
+
+`tools/balance-sim` now imports `server/src/core/formulas/rune.ts` and reports
+PR #61 rune pressure beside the existing rebirth, enhancement, pet, achievement,
+and class-balance sections.
+
+1000-run first-rebirth distribution with seed 23:
+
+| Metric | Hours |
+| --- | ---: |
+| p10 | 4.919 |
+| median | 5.328 |
+| p90 | 5.751 |
+| min | 4.564 |
+| max | 6.144 |
+
+Result: median remains inside the 5-10h target and all sampled runs remain
+inside the 3-20h review band.
+
+Rune impact anchors:
+
+| Anchor | Result |
+| --- | ---: |
+| Mythic +50 core rune, one slot | +168% |
+| Mythic +50 core rune, six same-lane slots | x11.08 |
+| Mythic +100 core rune, six same-lane slots | x20.08 |
+| 6x Mythic +50 PhysAtk Warrior Lv100 DPS | x12.356 |
+| 6x Mythic +50 MagicAtk Mage Lv100 DPS | x12.233 |
+
+Utility caps are per rune, not account-wide aggregate caps. Six capped Mythic
+utility runes can reach CritDamage x7 effective, GoldFind x13, ExpBoost x13,
+and OfflineEff x4. This is acceptable as late-game specialization pressure only
+if rune drop/shop/essence income keeps capped utility sets out of the
+first-rebirth window.
+
+Follow-up tuning trigger: if future simulator versions include rune acquisition
+and the first-rebirth median falls below 5h, tune rune drop chance, shop roll
+cost, or essence income before changing the shared EXP curve.

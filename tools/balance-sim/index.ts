@@ -39,12 +39,19 @@ import {
   computeKillGold,
 } from "../../server/src/core/formulas/reward.js";
 import {
+  getCoreRuneMultiplier,
+  getUtilCap,
+  getUtilRuneValue,
+  RUNE_SLOT_COUNT,
+} from "../../server/src/core/formulas/rune.js";
+import {
   computeMonsterStatMultiplier,
   computeRewardMultiplier,
   DEFAULT_STAGES_PER_CHAPTER,
 } from "../../server/src/core/formulas/stage.js";
 import {
   type ClassId,
+  type DerivedStats,
   defaultPrimaryStats,
   deriveStats,
 } from "../../server/src/core/formulas/stats.js";
@@ -118,6 +125,7 @@ export type BalanceReport = {
       enhancementPressure: EnhancementPressure;
       petFeedPressure: PetFeedPressure;
       achievementPressure: AchievementPressure;
+      runePressure: RunePressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -235,6 +243,55 @@ export type EnhancementRarityScenario = {
   expectedHoursAtMedianGoldPerHour: number;
 };
 
+export type RuneRarityName =
+  | "Common"
+  | "Uncommon"
+  | "Rare"
+  | "Epic"
+  | "Legendary"
+  | "Mythic";
+
+export type RuneTypeName =
+  | "CritDamage"
+  | "GoldFind"
+  | "ExpBoost"
+  | "OfflineEff";
+
+export type RuneCorePressureRow = {
+  rarity: RuneRarityName;
+  enhanceLevel: number;
+  singleRuneBonusPercent: number;
+  sixSlotMultiplier: number;
+};
+
+export type RuneCombatPressureRow = {
+  runeSet: string;
+  className: string;
+  level: number;
+  baseCombatPower: number;
+  runeCombatPower: number;
+  cpMultiplier: number;
+  baseDps: number;
+  runeDps: number;
+  dpsMultiplier: number;
+};
+
+export type RuneUtilPressureRow = {
+  runeType: RuneTypeName;
+  rarity: RuneRarityName;
+  enhanceLevel: number;
+  singleRuneValuePercent: number;
+  sixSlotUncappedTotalPercent: number;
+  effectiveEconomicMultiplier: number;
+};
+
+export type RunePressure = {
+  slotCount: number;
+  coreRows: RuneCorePressureRow[];
+  combatRows: RuneCombatPressureRow[];
+  utilRows: RuneUtilPressureRow[];
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -257,6 +314,10 @@ const ENHANCEMENT_RARITY_SCENARIOS: EnhanceItemRarity[] = [
 const EQUIPMENT_SLOT_COUNT = 8;
 const DOG_GOLD_BONUS_PERCENT = 20;
 const BIRD_DROP_BONUS_PERCENT = 15;
+const RUNE_CORE_REVIEW_LEVELS = [0, 10, 50, 100];
+const RUNE_CORE_REVIEW_RARITIES = [1, 3, 6] as const;
+const RUNE_UTIL_REVIEW_TYPES = [6, 7, 8, 9] as const;
+const MYTHIC_RUNE_RARITY = 6;
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -323,11 +384,13 @@ export function buildBalanceReport(
         "server/src/core/formulas/enhance.ts",
         "server/src/core/formulas/petLevel.ts",
         "server/src/core/formulas/achievement.ts",
+        "server/src/core/formulas/rune.ts",
       ],
       rewardScaling: buildStageRewardComparison(1),
       enhancementPressure: buildEnhancementPressure(distribution.samples),
       petFeedPressure: buildPetFeedPressure(distribution.samples),
       achievementPressure: buildAchievementPressure(),
+      runePressure: buildRunePressure(),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -950,6 +1013,174 @@ function buildAchievementPressure(): AchievementPressure {
   };
 }
 
+function buildRunePressure(): RunePressure {
+  const coreRows = RUNE_CORE_REVIEW_RARITIES.flatMap((rarity) =>
+    RUNE_CORE_REVIEW_LEVELS.map((enhanceLevel) =>
+      buildRuneCorePressureRow(rarity, enhanceLevel),
+    ),
+  );
+
+  return {
+    slotCount: RUNE_SLOT_COUNT,
+    coreRows,
+    combatRows: [
+      buildCoreCombatPressureRow(1, 100, MYTHIC_RUNE_RARITY, 50, "PhysAtk"),
+      buildCoreCombatPressureRow(2, 100, MYTHIC_RUNE_RARITY, 50, "MagicAtk"),
+    ],
+    utilRows: RUNE_UTIL_REVIEW_TYPES.map((runeType) =>
+      buildRuneUtilPressureRow(runeType, MYTHIC_RUNE_RARITY),
+    ),
+  };
+}
+
+function buildRuneCorePressureRow(
+  rarity: number,
+  enhanceLevel: number,
+): RuneCorePressureRow {
+  const singleRuneBonus = getCoreRuneMultiplier(rarity, enhanceLevel);
+  return {
+    rarity: runeRarityName(rarity),
+    enhanceLevel,
+    singleRuneBonusPercent: round(singleRuneBonus * 100, 3),
+    sixSlotMultiplier: round(1 + singleRuneBonus * RUNE_SLOT_COUNT, 3),
+  };
+}
+
+function buildCoreCombatPressureRow(
+  classId: ClassId,
+  level: number,
+  rarity: number,
+  enhanceLevel: number,
+  lane: "PhysAtk" | "MagicAtk",
+): RuneCombatPressureRow {
+  const baseStats = deriveStats(defaultPrimaryStats(classId, level), level, {
+    physAtk: level * 16,
+    magicAtk: level * 16,
+  });
+  const runeMultiplier =
+    1 + getCoreRuneMultiplier(rarity, enhanceLevel) * RUNE_SLOT_COUNT;
+  const runeStats = {
+    ...baseStats,
+    physAtk:
+      lane === "PhysAtk"
+        ? Math.round(baseStats.physAtk * runeMultiplier)
+        : baseStats.physAtk,
+    magicAtk:
+      lane === "MagicAtk"
+        ? Math.round(baseStats.magicAtk * runeMultiplier)
+        : baseStats.magicAtk,
+  };
+  const baseCombatPower = computeCombatPower(baseStats);
+  const runeCombatPower = computeCombatPower(runeStats);
+  const baseDps = effectiveReviewDps(baseStats, classId, level);
+  const runeDps = effectiveReviewDps(runeStats, classId, level);
+
+  return {
+    runeSet: `${RUNE_SLOT_COUNT}x ${runeRarityName(rarity)} +${enhanceLevel} ${lane}`,
+    className: CLASS_NAMES[classId],
+    level,
+    baseCombatPower,
+    runeCombatPower,
+    cpMultiplier: round(runeCombatPower / Math.max(1, baseCombatPower), 3),
+    baseDps,
+    runeDps,
+    dpsMultiplier: round(runeDps / Math.max(1, baseDps), 3),
+  };
+}
+
+function buildRuneUtilPressureRow(
+  runeType: number,
+  rarity: number,
+): RuneUtilPressureRow {
+  const cap = getUtilCap(runeType);
+  const enhanceLevel = firstUtilCapLevel(runeType, rarity);
+  const singleRuneValue = getUtilRuneValue(runeType, rarity, enhanceLevel);
+  const sixSlotTotal = singleRuneValue * RUNE_SLOT_COUNT;
+
+  return {
+    runeType: runeTypeName(runeType),
+    rarity: runeRarityName(rarity),
+    enhanceLevel,
+    singleRuneValuePercent: round(singleRuneValue * 100, 3),
+    sixSlotUncappedTotalPercent: round(sixSlotTotal * 100, 3),
+    effectiveEconomicMultiplier: round(
+      1 + Math.min(sixSlotTotal, cap * RUNE_SLOT_COUNT),
+      3,
+    ),
+  };
+}
+
+function firstUtilCapLevel(runeType: number, rarity: number): number {
+  const baseValue = getUtilRuneValue(runeType, rarity, 0);
+  const cap = getUtilCap(runeType);
+  const step = runeType === 9 ? 0.003 : 0.005;
+  return Math.max(0, Math.ceil((cap - baseValue) / step));
+}
+
+function effectiveReviewDps(
+  stats: DerivedStats,
+  classId: ClassId,
+  level: number,
+): number {
+  const reviewDef = level * CLASS_BALANCE_REVIEW_DEF_PER_LEVEL;
+  const baseHit = computeClassDamage(stats, classId, reviewDef, reviewDef);
+  const damageSkills = getSkillDefinitionsForClass(classId).filter(
+    (skill) => skill.cooldown > 0 && skill.damageCoeff > 0,
+  );
+  const skillDps = damageSkills.reduce(
+    (sum, skill) =>
+      sum +
+      computeClassDamage(
+        {
+          physAtk: stats.physAtk * skill.damageCoeff,
+          magicAtk: stats.magicAtk * skill.damageCoeff,
+        },
+        classId,
+        reviewDef,
+        reviewDef,
+      ) /
+        skill.cooldown,
+    0,
+  );
+  const effectiveAtkSpeed = 1 + (stats.atkSpeed - 1) * 0.6;
+  const critMultiplier = 1 + stats.critRate * (stats.critDmg - 1) * 0.6;
+  return Math.round((baseHit * effectiveAtkSpeed + skillDps) * critMultiplier);
+}
+
+function runeRarityName(rarity: number): RuneRarityName {
+  switch (rarity) {
+    case 1:
+      return "Common";
+    case 2:
+      return "Uncommon";
+    case 3:
+      return "Rare";
+    case 4:
+      return "Epic";
+    case 5:
+      return "Legendary";
+    case 6:
+      return "Mythic";
+    default:
+      throw new Error(`Unsupported rune rarity ${rarity}`);
+  }
+}
+
+function runeTypeName(type: number): RuneTypeName {
+  switch (type) {
+    case 6:
+      return "CritDamage";
+    case 7:
+      return "GoldFind";
+    case 8:
+      return "ExpBoost";
+    case 9:
+      return "OfflineEff";
+    default:
+      throw new Error(`Unsupported rune type ${type}`);
+  }
+}
+
 function summarizeSamples(
   samples: SimulationSample[],
   targetLevel: number,
@@ -1129,6 +1360,43 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.achievementPressure.rows.map(
       (row) =>
         `| ${row.totalPoints} | ${row.legacyMultiplier} | ${row.softCappedMultiplier} | ${row.compositeWithTranscendAndTower} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Rune Growth Pressure",
+    "",
+    `- Rune slots: ${report.model.runePressure.slotCount}`,
+    "- Core rune growth is intentionally uncapped; the table shows one rune's",
+    "  stat bonus and the resulting same-lane 6-slot multiplier.",
+    "- Combat rows apply six matching Mythic +50 core runes to the shared Lv100",
+    "  review loadout. CP and DPS are reported as pressure signals, not new",
+    "  tuning gates.",
+    "- Util rows show the first Mythic enhance level that reaches the per-rune",
+    "  cap. Six capped utility runes are possible and therefore create very",
+    "  large specialized economy multipliers.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Rarity | Enhance | Single rune bonus | 6-slot multiplier |",
+    "| --- | ---: | ---: | ---: |",
+    ...report.model.runePressure.coreRows.map(
+      (row) =>
+        `| ${row.rarity} | +${row.enhanceLevel} | ${row.singleRuneBonusPercent}% | x${row.sixSlotMultiplier} |`,
+    ),
+    "",
+    "| Rune set | Class | Lv | Base CP | Rune CP | CP x | Base DPS | Rune DPS | DPS x |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...report.model.runePressure.combatRows.map(
+      (row) =>
+        `| ${row.runeSet} | ${row.className} | ${row.level} | ${row.baseCombatPower} | ${row.runeCombatPower} | x${row.cpMultiplier} | ${row.baseDps} | ${row.runeDps} | x${row.dpsMultiplier} |`,
+    ),
+    "",
+    "| Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |",
+    "| --- | --- | ---: | ---: | ---: | ---: |",
+    ...report.model.runePressure.utilRows.map(
+      (row) =>
+        `| ${row.runeType} | ${row.rarity} | +${row.enhanceLevel} | ${row.singleRuneValuePercent}% | ${row.sixSlotUncappedTotalPercent}% | x${row.effectiveEconomicMultiplier} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

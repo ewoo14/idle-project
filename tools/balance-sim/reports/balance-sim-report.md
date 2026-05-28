@@ -181,6 +181,49 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Rune Growth Pressure
+
+- Rune slots: 6
+- Core rune growth is intentionally uncapped; the table shows one rune's
+  stat bonus and the resulting same-lane 6-slot multiplier.
+- Combat rows apply six matching Mythic +50 core runes to the shared Lv100
+  review loadout. CP and DPS are reported as pressure signals, not new
+  tuning gates.
+- Util rows show the first Mythic enhance level that reaches the per-rune
+  cap. Six capped utility runes are possible and therefore create very
+  large specialized economy multipliers.
+
+<!-- markdownlint-disable MD013 -->
+
+| Rarity | Enhance | Single rune bonus | 6-slot multiplier |
+| --- | ---: | ---: | ---: |
+| Common | +0 | 2% | x1.12 |
+| Common | +10 | 6% | x1.36 |
+| Common | +50 | 22% | x2.32 |
+| Common | +100 | 42% | x3.52 |
+| Rare | +0 | 5% | x1.3 |
+| Rare | +10 | 14% | x1.84 |
+| Rare | +50 | 50% | x4 |
+| Rare | +100 | 95% | x6.7 |
+| Mythic | +0 | 18% | x2.08 |
+| Mythic | +10 | 48% | x3.88 |
+| Mythic | +50 | 168% | x11.08 |
+| Mythic | +100 | 318% | x20.08 |
+
+| Rune set | Class | Lv | Base CP | Rune CP | CP x | Base DPS | Rune DPS | DPS x |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 6x Mythic +50 PhysAtk | Warrior | 100 | 5444 | 25604 | x4.703 | 4295 | 53071 | x12.356 |
+| 6x Mythic +50 MagicAtk | Mage | 100 | 5519 | 26526 | x4.806 | 4787 | 58561 | x12.233 |
+
+| Util rune | Rarity | Cap enhance | Single rune value | 6-slot total | Effective multiplier |
+| --- | --- | ---: | ---: | ---: | ---: |
+| CritDamage | Mythic | +177 | 100% | 600% | x7 |
+| GoldFind | Mythic | +377 | 200% | 1200% | x13 |
+| ExpBoost | Mythic | +377 | 200% | 1200% | x13 |
+| OfflineEff | Mythic | +127 | 50% | 300% | x4 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Class Balance Snapshot
 
 - Effective DPS uses the class attack route through `computeClassDamage`,
@@ -235,3 +278,4 @@
 - server/src/core/formulas/enhance.ts
 - server/src/core/formulas/petLevel.ts
 - server/src/core/formulas/achievement.ts
+- server/src/core/formulas/rune.ts
