@@ -53,3 +53,9 @@ curl "http://localhost:3000/v1/save/history?characterId=$CHARACTER_ID&limit=10" 
 ```
 
 Rate limit: 저장 30/min/User, 조회 120/min/User.
+## Client save v4 note
+
+`payload.clientSave.SaveVersion` 4 adds `RuneCodex`, a 54-cell rune collection grid
+stored as `FRuneCodexEntry[]` (`RuneType`, `Rarity`, `bUnlocked`). Servers keep this
+inside `clientSave` without interpreting it; clients loading saves with version `<4`
+must treat the codex as an empty grid.

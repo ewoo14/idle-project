@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RuneSystem/RuneCodexTypes.h"
 #include "RuneSystem/RuneTypes.h"
 #include "RuneService.generated.h"
 
@@ -27,18 +28,30 @@ public:
 	FRuneCoreMultipliers GetEquippedCoreMultipliers() const;
 	FRuneUtilValues GetEquippedUtilValues() const;
 	const TArray<FRuneInstance>& GetOwnedRunes() const { return OwnedRunes; }
+	const TArray<FRuneCodexEntry>& GetOwnedCodex() const { return OwnedCodex; }
 	int32 GetEquippedOwnedIndex(int32 SlotIndex) const;
+	void UnlockCodexCell(ERuneType Type, EItemRarity Rarity);
+	FRuneCodexCompletion GetCodexCompletion() const;
+	FRuneCodexBonus GetCodexBonus() const;
 
 	void CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>& OutEquippedSlots) const;
+	void CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>& OutEquippedSlots, TArray<FRuneCodexEntry>& OutCodex) const;
 	void RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TArray<int32>& InEquippedSlots);
+	void RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TArray<int32>& InEquippedSlots, const TArray<FRuneCodexEntry>& InCodex);
 
 private:
 	UPROPERTY()
 	TArray<FRuneInstance> OwnedRunes;
 
 	UPROPERTY()
+	TArray<FRuneCodexEntry> OwnedCodex;
+
+	UPROPERTY()
 	TArray<int32> EquippedSlots;
 
 	static bool IsValidRune(const FRuneInstance& Rune);
+	static bool IsValidCodexCell(ERuneType Type, EItemRarity Rarity);
+	static int32 GetCodexIndex(ERuneType Type, EItemRarity Rarity);
+	void EnsureCodexGrid();
 	void EnsureSlotCount();
 };

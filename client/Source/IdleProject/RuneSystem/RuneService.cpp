@@ -1,10 +1,12 @@
 #include "RuneSystem/RuneService.h"
 
+#include "RuneSystem/RuneCodexFormula.h"
 #include "RuneSystem/RuneFormula.h"
 
 URuneService::URuneService()
 {
 	EnsureSlotCount();
+	EnsureCodexGrid();
 }
 
 void URuneService::AddRune(const FRuneInstance& Rune)
@@ -17,6 +19,7 @@ void URuneService::AddRune(const FRuneInstance& Rune)
 	}
 
 	OwnedRunes.Add(Sanitized);
+	UnlockCodexCell(Sanitized.RuneType, Sanitized.Rarity);
 	EnsureSlotCount();
 }
 
@@ -162,10 +165,11 @@ FRuneUtilValues URuneService::GetEquippedUtilValues() const
 		}
 	}
 
-	Result.CritDamage = FMath::Min(Result.CritDamage, FRuneFormula::GetUtilCap(ERuneType::CritDamage));
-	Result.GoldFind = FMath::Min(Result.GoldFind, FRuneFormula::GetUtilCap(ERuneType::GoldFind));
-	Result.ExpBoost = FMath::Min(Result.ExpBoost, FRuneFormula::GetUtilCap(ERuneType::ExpBoost));
-	Result.OfflineEff = FMath::Min(Result.OfflineEff, FRuneFormula::GetUtilCap(ERuneType::OfflineEff));
+	const float CapExtension = GetCodexBonus().UtilCapExtension;
+	Result.CritDamage = FMath::Min(Result.CritDamage, FRuneFormula::GetUtilCap(ERuneType::CritDamage) + CapExtension);
+	Result.GoldFind = FMath::Min(Result.GoldFind, FRuneFormula::GetUtilCap(ERuneType::GoldFind) + CapExtension);
+	Result.ExpBoost = FMath::Min(Result.ExpBoost, FRuneFormula::GetUtilCap(ERuneType::ExpBoost) + CapExtension);
+	Result.OfflineEff = FMath::Min(Result.OfflineEff, FRuneFormula::GetUtilCap(ERuneType::OfflineEff) + CapExtension);
 	return Result;
 }
 
@@ -174,7 +178,80 @@ int32 URuneService::GetEquippedOwnedIndex(int32 SlotIndex) const
 	return EquippedSlots.IsValidIndex(SlotIndex) ? EquippedSlots[SlotIndex] : INDEX_NONE;
 }
 
+void URuneService::UnlockCodexCell(ERuneType Type, EItemRarity Rarity)
+{
+	if (!IsValidCodexCell(Type, Rarity))
+	{
+		return;
+	}
+
+	EnsureCodexGrid();
+	const int32 CodexIndex = GetCodexIndex(Type, Rarity);
+	if (OwnedCodex.IsValidIndex(CodexIndex))
+	{
+		OwnedCodex[CodexIndex].bUnlocked = true;
+	}
+}
+
+FRuneCodexCompletion URuneService::GetCodexCompletion() const
+{
+	FRuneCodexCompletion Completion;
+	Completion.TotalCells = FRuneCodexFormula::TotalCells;
+	Completion.RowComplete.Init(false, 6);
+
+	TSet<int32> UnlockedKeys;
+	int32 CoreUnlocked = 0;
+	int32 UtilUnlocked = 0;
+	TArray<int32> RowUnlocked;
+	RowUnlocked.Init(0, 6);
+
+	for (const FRuneCodexEntry& Entry : OwnedCodex)
+	{
+		if (!Entry.bUnlocked || !IsValidCodexCell(Entry.RuneType, Entry.Rarity))
+		{
+			continue;
+		}
+
+		const int32 Key = GetCodexIndex(Entry.RuneType, Entry.Rarity);
+		if (UnlockedKeys.Contains(Key))
+		{
+			continue;
+		}
+
+		UnlockedKeys.Add(Key);
+		++Completion.UnlockedCells;
+		++RowUnlocked[static_cast<int32>(Entry.Rarity) - 1];
+		if (FRuneFormula::IsCoreType(Entry.RuneType))
+		{
+			++CoreUnlocked;
+		}
+		else if (FRuneFormula::IsUtilType(Entry.RuneType))
+		{
+			++UtilUnlocked;
+		}
+	}
+
+	for (int32 RowIndex = 0; RowIndex < RowUnlocked.Num(); ++RowIndex)
+	{
+		Completion.RowComplete[RowIndex] = RowUnlocked[RowIndex] == 9;
+	}
+	Completion.bCoreCategoryComplete = CoreUnlocked == FRuneCodexFormula::CoreCategoryCells;
+	Completion.bUtilCategoryComplete = UtilUnlocked == FRuneCodexFormula::UtilCategoryCells;
+	return Completion;
+}
+
+FRuneCodexBonus URuneService::GetCodexBonus() const
+{
+	return FRuneCodexFormula::ComputeBonus(GetCodexCompletion());
+}
+
 void URuneService::CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>& OutEquippedSlots) const
+{
+	TArray<FRuneCodexEntry> IgnoredCodex;
+	CaptureState(OutRunes, OutEquippedSlots, IgnoredCodex);
+}
+
+void URuneService::CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>& OutEquippedSlots, TArray<FRuneCodexEntry>& OutCodex) const
 {
 	OutRunes.Reset();
 	for (const FRuneInstance& Rune : OwnedRunes)
@@ -201,9 +278,23 @@ void URuneService::CaptureState(TArray<FRuneSaveEntry>& OutRunes, TArray<int32>&
 			EquippedIndex = INDEX_NONE;
 		}
 	}
+
+	OutCodex.Reset();
+	for (const FRuneCodexEntry& Entry : OwnedCodex)
+	{
+		if (IsValidCodexCell(Entry.RuneType, Entry.Rarity))
+		{
+			OutCodex.Add(Entry);
+		}
+	}
 }
 
 void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TArray<int32>& InEquippedSlots)
+{
+	RestoreState(InRunes, InEquippedSlots, {});
+}
+
+void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TArray<int32>& InEquippedSlots, const TArray<FRuneCodexEntry>& InCodex)
 {
 	OwnedRunes.Reset();
 	TMap<int32, int32> OldToNewIndex;
@@ -232,6 +323,9 @@ void URuneService::RestoreState(const TArray<FRuneSaveEntry>& InRunes, const TAr
 			EquippedSlots[SlotIndex] = *NewIndex;
 		}
 	}
+
+	OwnedCodex = InCodex;
+	EnsureCodexGrid();
 }
 
 bool URuneService::IsValidRune(const FRuneInstance& Rune)
@@ -239,6 +333,44 @@ bool URuneService::IsValidRune(const FRuneInstance& Rune)
 	return (FRuneFormula::IsCoreType(Rune.RuneType) || FRuneFormula::IsUtilType(Rune.RuneType))
 		&& Rune.Rarity >= EItemRarity::Common
 		&& Rune.Rarity <= EItemRarity::Mythic;
+}
+
+bool URuneService::IsValidCodexCell(ERuneType Type, EItemRarity Rarity)
+{
+	return (FRuneFormula::IsCoreType(Type) || FRuneFormula::IsUtilType(Type))
+		&& Rarity >= EItemRarity::Common
+		&& Rarity <= EItemRarity::Mythic;
+}
+
+int32 URuneService::GetCodexIndex(ERuneType Type, EItemRarity Rarity)
+{
+	return (static_cast<int32>(Type) - static_cast<int32>(ERuneType::PhysAtk)) * 6
+		+ (static_cast<int32>(Rarity) - static_cast<int32>(EItemRarity::Common));
+}
+
+void URuneService::EnsureCodexGrid()
+{
+	TSet<int32> UnlockedKeys;
+	for (const FRuneCodexEntry& Entry : OwnedCodex)
+	{
+		if (Entry.bUnlocked && IsValidCodexCell(Entry.RuneType, Entry.Rarity))
+		{
+			UnlockedKeys.Add(GetCodexIndex(Entry.RuneType, Entry.Rarity));
+		}
+	}
+
+	OwnedCodex.Reset(FRuneCodexFormula::TotalCells);
+	for (int32 TypeValue = static_cast<int32>(ERuneType::PhysAtk); TypeValue <= static_cast<int32>(ERuneType::OfflineEff); ++TypeValue)
+	{
+		for (int32 RarityValue = static_cast<int32>(EItemRarity::Common); RarityValue <= static_cast<int32>(EItemRarity::Mythic); ++RarityValue)
+		{
+			FRuneCodexEntry Entry;
+			Entry.RuneType = static_cast<ERuneType>(TypeValue);
+			Entry.Rarity = static_cast<EItemRarity>(RarityValue);
+			Entry.bUnlocked = UnlockedKeys.Contains(GetCodexIndex(Entry.RuneType, Entry.Rarity));
+			OwnedCodex.Add(Entry);
+		}
+	}
 }
 
 void URuneService::EnsureSlotCount()
