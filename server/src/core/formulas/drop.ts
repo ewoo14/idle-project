@@ -12,6 +12,8 @@ export type ItemRarity =
 
 export type DropRng = () => number;
 
+export type RarityDropChances = Record<ItemRarity, number>;
+
 const ARMOR_SLOTS = new Set<ItemSlot>([2, 3, 4, 5, 6, 7]);
 const toClientFloat = Math.fround;
 const AFFIX_KINDS = [
@@ -251,10 +253,7 @@ export function getRarityStatMultiplier(rarity: ItemRarity): number {
   }
 }
 
-export function rollRarityForLevel(
-  level: number,
-  rng: DropRng = Math.random,
-): ItemRarity {
+export function getRarityDropChances(level: number): RarityDropChances {
   const safeLevel = Math.max(level, 1);
   const levelScale = toClientFloat(
     Math.min(Math.max(toClientFloat(toClientFloat(safeLevel - 1) / 99), 0), 1),
@@ -278,32 +277,50 @@ export function rollRarityForLevel(
   commonChance = toClientFloat(commonChance - mythicChance);
   commonChance = toClientFloat(Math.max(0, commonChance));
 
+  return {
+    None: noneChance,
+    Common: commonChance,
+    Rare: rareChance,
+    Epic: epicChance,
+    Unique: uniqueChance,
+    Legendary: legendaryChance,
+    Transcendent: transcendentChance,
+    Mythic: mythicChance,
+  };
+}
+
+export function rollRarityForLevel(
+  level: number,
+  rng: DropRng = Math.random,
+): ItemRarity {
+  const chances = getRarityDropChances(level);
+
   const roll = toClientFloat(rng());
-  if (roll < noneChance) {
+  if (roll < chances.None) {
     return "None";
   }
-  const commonThreshold = toClientFloat(noneChance + commonChance);
+  const commonThreshold = toClientFloat(chances.None + chances.Common);
   if (roll < commonThreshold) {
     return "Common";
   }
-  const rareThreshold = toClientFloat(commonThreshold + rareChance);
+  const rareThreshold = toClientFloat(commonThreshold + chances.Rare);
   if (roll < rareThreshold) {
     return "Rare";
   }
-  const epicThreshold = toClientFloat(rareThreshold + epicChance);
+  const epicThreshold = toClientFloat(rareThreshold + chances.Epic);
   if (roll < epicThreshold) {
     return "Epic";
   }
-  const uniqueThreshold = toClientFloat(epicThreshold + uniqueChance);
+  const uniqueThreshold = toClientFloat(epicThreshold + chances.Unique);
   if (roll < uniqueThreshold) {
     return "Unique";
   }
-  const legendaryThreshold = toClientFloat(uniqueThreshold + legendaryChance);
+  const legendaryThreshold = toClientFloat(uniqueThreshold + chances.Legendary);
   if (roll < legendaryThreshold) {
     return "Legendary";
   }
   const transcendentThreshold = toClientFloat(
-    legendaryThreshold + transcendentChance,
+    legendaryThreshold + chances.Transcendent,
   );
   if (roll < transcendentThreshold) {
     return "Transcendent";

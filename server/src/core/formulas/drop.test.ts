@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeItemBonus,
   getAffixCount,
+  getRarityDropChances,
   getRarityStatMultiplier,
   rollAffixes,
   rollBaseItem,
@@ -131,6 +132,33 @@ describe("drop formulas", () => {
     expect(
       rollRarityForLevel(100, () => thresholds.transcendentThreshold),
     ).toBe("Mythic");
+  });
+
+  it("exposes level-scaled rarity chances that sum to one", () => {
+    const level1 = getRarityDropChances(1);
+    const level100 = getRarityDropChances(100);
+
+    expect(Object.keys(level100)).toEqual([
+      "None",
+      "Common",
+      "Rare",
+      "Epic",
+      "Unique",
+      "Legendary",
+      "Transcendent",
+      "Mythic",
+    ]);
+    expect(
+      Object.values(level1).reduce((sum, chance) => sum + chance, 0),
+    ).toBeCloseTo(1, 6);
+    expect(
+      Object.values(level100).reduce((sum, chance) => sum + chance, 0),
+    ).toBeCloseTo(1, 6);
+    expect(level100.Unique).toBeGreaterThan(0);
+    expect(level100.Unique).toBeLessThan(level100.Epic);
+    expect(level100.Transcendent).toBeGreaterThan(0);
+    expect(level100.Transcendent).toBeLessThan(level100.Legendary);
+    expect(level100.Mythic).toBeGreaterThan(level1.Mythic);
   });
 
   it("keeps Mythic boundary aligned with client float arithmetic", () => {

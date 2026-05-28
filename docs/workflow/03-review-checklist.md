@@ -326,3 +326,17 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   gradient fallback.
 - [ ] Item rarity `초월` appears only in item/rune context and does not reuse or
   replace prestige `TRANSCEND_*` copy.
+
+## PR #65 Balance Checklist Addendum (Section 5)
+
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes item drop
+  rarity pressure for the seven active rarity rows and confirms Lv100 total
+  probability is 100%.
+- [ ] Unique drop pressure stays below Epic, and Transcendent drop pressure
+  stays below Legendary.
+- [ ] Rarity enhancement pressure reports Common/Rare/Epic/Unique/Legendary/
+  Transcendent/Mythic with the x2 multiplier curve through Mythic 64x.
+- [ ] Rune codex pressure reports 63 total cells, 35 core cells, 28 utility
+  cells, and the full-codex +71.2% core stat pressure.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target.

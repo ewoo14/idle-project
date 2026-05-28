@@ -31,6 +31,7 @@ the rule source:
 - `server/src/core/formulas/offline.ts`
 - `server/src/core/formulas/reward.ts`
 - `server/src/core/formulas/stage.ts`
+- `server/src/core/formulas/drop.ts`
 - `server/src/core/formulas/enhance.ts`
 - `server/src/core/formulas/achievement.ts`
 
@@ -53,6 +54,12 @@ PR #39 extends that pressure check with rarity-scaled scenarios for Common,
 Rare, Epic, and Legendary. PR #44 expands the detail table to +0 through +50.
 PR #45 adds Mythic to the rarity summary and keeps eight-slot Legendary/Mythic
 estimates for high-rarity long-tail sink pressure.
+
+PR #65 expands rarity reporting to seven active item tiers. The simulator
+imports `drop.ts`, reports Lv1/Lv100 item drop rarity pressure, confirms Lv100
+probability sums to 100%, and keeps Unique below Epic and Transcendent below
+Legendary drop pressure. The same PR updates enhancement scenarios to
+Common/Rare/Epic/Unique/Legendary/Transcendent/Mythic with Mythic at 64x.
 
 PR #42 adds pet feed pressure. The simulator imports `petLevel.ts`, reports the
 Lv0 to Lv10 feed-cost path, and compares the dog gold-bonus payback against the
@@ -81,9 +88,9 @@ current production formulas against the rebirth target in
 Seed `23`, 1000 runs:
 
 - p10: 4.9h
-- median: 5.324h
-- p90: 5.758h
-- min/max: 4.582h / 6.128h
+- median: 5.328h
+- p90: 5.751h
+- min/max: 4.564h / 6.144h
 
 The median is inside the 5-10h target and the full distribution is inside the
 3-20h acceptable range, so this slice keeps the current EXP curve unchanged.
@@ -95,16 +102,23 @@ EXP coefficients.
 Enhancement V1 pressure, using the current +0 to +50 formula:
 
 - minimum all-success cost: 4,292,500 gold
-- expected cost: 22,717,602.91 gold
+- expected cost: 22,717,602.46 gold
 - expected cost at median sampled Lv50 gold/hour: 34.7h
 - Legendary expected cost: 363,481,639.40 gold, or 555.197h at the sampled median
   Lv50 gold/hour
 - eight Legendary slots: 2,907,853,115.20 expected gold, or 4441.579h at the sampled
   median Lv50 gold/hour
-- Mythic expected cost: 726,963,278.80 gold, or 1110.395h at the sampled median
+- Mythic expected cost: 1,453,926,557.61 gold, or 2220.79h at the sampled median
   Lv50 gold/hour
-- eight Mythic slots: 5,815,706,230.40 expected gold, or 8883.159h at the sampled
+- eight Mythic slots: 11,631,412,460.88 expected gold, or 17766.317h at the sampled
   median Lv50 gold/hour
+
+Item drop rarity pressure at Lv100:
+
+- total probability: 100%
+- Common/Rare/Epic/Unique/Legendary/Transcendent/Mythic:
+  56.8% / 30% / 6% / 2.5% / 1.5% / 0.7% / 0.5%
+- Unique remains below Epic, and Transcendent remains below Legendary.
 
 This makes Common enhancement a long-tail gold sink in the current model while
 making high-rarity enhancement an open-ended midgame/endgame pressure target.

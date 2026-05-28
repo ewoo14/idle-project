@@ -36,6 +36,30 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Item Drop Rarity Pressure
+
+- Source: `server/src/core/formulas/drop.ts`.
+- Level 1 total probability: 100%
+- Level 100 total probability: 100%
+- Unique and Transcendent are interpolation tiers: Unique stays below
+  Epic drop pressure, and Transcendent stays below Legendary drop pressure.
+- This table reports rarity pressure only; the sampled first-rebirth
+  distribution still uses the existing equipmentMultiplier abstraction.
+
+<!-- markdownlint-disable MD013 -->
+
+| Rarity | Stat x | Lv1 chance | Lv100 chance | Affixes |
+| --- | ---: | ---: | ---: | ---: |
+| Common | 1 | 70% | 56.8% | 0 |
+| Rare | 1.7 | 28% | 30% | 1 |
+| Epic | 2.3 | 0% | 6% | 2 |
+| Unique | 2.75 | 0% | 2.5% | 2 |
+| Legendary | 3.2 | 0% | 1.5% | 2-3 |
+| Transcendent | 3.85 | 0% | 0.7% | 2-3 |
+| Mythic | 4.5 | 0% | 0.5% | 3 |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Enhancement Spend Pressure
 
 - Max level: +50
@@ -111,18 +135,20 @@
   stay unchanged.
 - Eight Legendary slots: 2,907,853,115.20 expected gold,
   4441.579h at sampled median Lv50 gold/hour.
-- Eight Mythic slots: 5,815,706,230.40 expected gold,
-  8883.159h at sampled median Lv50 gold/hour.
+- Eight Mythic slots: 11,631,412,460.88 expected gold,
+  17766.317h at sampled median Lv50 gold/hour.
 
 <!-- markdownlint-disable MD013 -->
 
 | Rarity | Multiplier | Minimum +0 to +50 gold | Expected +0 to +50 gold | Hours at median Lv50 gold/hour |
 | --- | ---: | ---: | ---: | ---: |
 | Common | 1 | 4292500 | 22717602.46 | 34.7h |
-| Rare | 4 | 17170000 | 90870409.85 | 138.799h |
-| Epic | 8 | 34340000 | 181740819.7 | 277.599h |
+| Rare | 2 | 8585000 | 45435204.93 | 69.4h |
+| Epic | 4 | 17170000 | 90870409.85 | 138.799h |
+| Unique | 8 | 34340000 | 181740819.7 | 277.599h |
 | Legendary | 16 | 68680000 | 363481639.4 | 555.197h |
-| Mythic | 32 | 137360000 | 726963278.8 | 1110.395h |
+| Transcendent | 32 | 137360000 | 726963278.8 | 1110.395h |
+| Mythic | 64 | 274720000 | 1453926557.61 | 2220.79h |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -201,10 +227,14 @@
 | Common | +10 | 6% | x1.36 |
 | Common | +50 | 22% | x2.32 |
 | Common | +100 | 42% | x3.52 |
-| Rare | +0 | 5% | x1.3 |
-| Rare | +10 | 14% | x1.84 |
-| Rare | +50 | 50% | x4 |
-| Rare | +100 | 95% | x6.7 |
+| Epic | +0 | 8% | x1.48 |
+| Epic | +10 | 22% | x2.32 |
+| Epic | +50 | 78% | x5.68 |
+| Epic | +100 | 148% | x9.88 |
+| Legendary | +0 | 12% | x1.72 |
+| Legendary | +10 | 32% | x2.92 |
+| Legendary | +50 | 112% | x7.72 |
+| Legendary | +100 | 212% | x13.72 |
 | Mythic | +0 | 18% | x2.08 |
 | Mythic | +10 | 48% | x3.88 |
 | Mythic | +50 | 168% | x11.08 |
@@ -279,15 +309,15 @@
 
 ## Rune Codex Collection Pressure
 
-- Total cells: 54
+- Total cells: 63
 - Per-cell core bonus: +0.4%
-- All-cell core bonus: +21.6%
-- All row-completion bonuses: +31%
+- All-cell core bonus: +25.2%
+- All row-completion bonuses: +41%
 - Core category completion bonus: +5%
 - Util category cap extension: +10%
-- Full codex core bonus: +57.6%
+- Full codex core bonus: +71.2%
 - Base median first-rebirth time: 5.328h
-- Projected full-codex median if applied directly to first rebirth DPS: 3.381h (-36.5%).
+- Projected full-codex median if applied directly to first rebirth DPS: 3.112h (-41.6%).
 - Not injected into the sampled first-rebirth run. The 1000-run median
   remains the baseline guard until rune acquisition/drop rates are wired
   into the simulation model.
@@ -343,6 +373,7 @@
 - server/src/core/formulas/offline.ts
 - server/src/core/formulas/reward.ts
 - server/src/core/formulas/stage.ts
+- server/src/core/formulas/drop.ts
 - server/src/core/formulas/enhance.ts
 - server/src/core/formulas/petLevel.ts
 - server/src/core/formulas/achievement.ts

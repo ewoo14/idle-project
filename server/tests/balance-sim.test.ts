@@ -47,12 +47,58 @@ describe("balance simulator", () => {
       "server/src/core/formulas/enhance.ts",
     );
     expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/drop.ts",
+    );
+    expect(report.json.model.formulas).toContain(
       "server/src/core/formulas/achievement.ts",
     );
     expect(report.markdown).toContain("# Balance Simulator V1");
     expect(report.markdown).toContain("median");
     expect(report.markdown).toContain("Sensitivity");
     expect(report.markdown).toContain("EXP curve");
+  });
+
+  it("reports seven-rarity item drop pressure through the shared drop formula", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.dropRarityPressure.rows).toHaveLength(7);
+    expect(report.json.model.dropRarityPressure.totalChanceAtLevel100).toBe(1);
+    expect(
+      report.json.model.dropRarityPressure.rows.map((row) => row.rarity),
+    ).toEqual([
+      "Common",
+      "Rare",
+      "Epic",
+      "Unique",
+      "Legendary",
+      "Transcendent",
+      "Mythic",
+    ]);
+    expect(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Unique",
+      )?.chanceAtLevel100Percent,
+    ).toBeLessThan(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Epic",
+      )?.chanceAtLevel100Percent ?? 0,
+    );
+    expect(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Transcendent",
+      )?.chanceAtLevel100Percent,
+    ).toBeLessThan(
+      report.json.model.dropRarityPressure.rows.find(
+        (row) => row.rarity === "Legendary",
+      )?.chanceAtLevel100Percent ?? 0,
+    );
+    expect(report.markdown).toContain("## Item Drop Rarity Pressure");
+    expect(report.markdown).toContain("Level 100 total probability: 100%");
+    expect(report.markdown).toContain("| Unique | 2.75 | 0% | 2.5% | 2 |");
+    expect(report.markdown).toContain(
+      "| Transcendent | 3.85 | 0% | 0.7% | 2-3 |",
+    );
   });
 
   it("reports achievement soft-cap pressure against transcend and tower multipliers", () => {
