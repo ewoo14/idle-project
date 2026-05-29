@@ -193,6 +193,19 @@ export const guildMembers = pgTable(
       .notNull()
       .default(0n),
     lastAttendanceDate: text("last_attendance_date"),
+    // 자동 기여 주간 상한 추적(새 week_id 진입 시 0 으로 리셋).
+    weeklyAutoContribution: bigint("weekly_auto_contribution", {
+      mode: "bigint",
+    })
+      .notNull()
+      .default(0n),
+    // 헌납 일일 상한 추적(UTC date 변경 시 0 으로 리셋).
+    lastDonationDate: text("last_donation_date"),
+    dailyDonation: bigint("daily_donation", { mode: "bigint" })
+      .notNull()
+      .default(0n),
+    // 멤버별 주간 리셋 마커(ISO week). 멤버 활동 시 주가 바뀌면 weekly 컬럼을 lazy 리셋.
+    weeklyResetId: text("weekly_reset_id"),
   },
   (table) => ({
     guildMembersGuild: index("guild_members_guild_idx").on(table.guildId),
