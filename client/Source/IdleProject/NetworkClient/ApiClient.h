@@ -30,6 +30,8 @@ public:
 	void DownloadSave(const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	void FetchLeaderboard(ELeaderboardKind Kind, int32 Season, TFunction<void(bool, FString)> Callback);
 	void FetchMyRank(ELeaderboardKind Kind, int32 Season, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void FetchWeeklyDamageLeaderboard(const FString& Week, TFunction<void(bool, FString)> Callback);
+	void FetchMyWeeklyRank(const FString& Week, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool RequestQuestList(const FString& CharacterId);

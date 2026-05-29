@@ -284,6 +284,41 @@ void UApiClient::FetchMyRank(ELeaderboardKind Kind, int32 Season, const FString&
 	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
 }
 
+void UApiClient::FetchWeeklyDamageLeaderboard(const FString& Week, TFunction<void(bool, FString)> Callback)
+{
+	if (Week.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid week"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(
+		TEXT("/v1/leaderboard/weekly?week=%s&limit=100"),
+		*Week);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::FetchMyWeeklyRank(const FString& Week, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (Week.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid weekly rank input"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(
+		TEXT("/v1/leaderboard/weekly/me?week=%s&characterId=%s"),
+		*Week,
+		*CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
 {
 	const FString Path = FString::Printf(

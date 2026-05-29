@@ -7,7 +7,8 @@ UENUM(BlueprintType)
 enum class ELeaderboardKind : uint8
 {
 	Power = 0,
-	Rebirth = 1
+	Rebirth = 1,
+	WeeklyDamage = 2
 };
 
 USTRUCT(BlueprintType)

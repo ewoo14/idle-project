@@ -11,6 +11,7 @@
 #include "GameCore/LeaderboardService.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
+#include "GameCore/QuestService.h"
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameCore/TranscendFormula.h"
@@ -392,8 +393,64 @@ void UIdleGameInstance::RefreshLeaderboard(ELeaderboardKind Kind)
 	}
 
 	EnsureLeaderboardService();
+	if (!LeaderboardService)
+	{
+		return;
+	}
+
+	if (Kind == ELeaderboardKind::WeeklyDamage)
+	{
+		const FString Week = UQuestService::GetCurrentUtcWeekString();
+		TWeakObjectPtr<UIdleGameInstance> WeakWeeklyThis(this);
+		ApiClient->FetchWeeklyDamageLeaderboard(Week, [WeakWeeklyThis](bool bSuccess, FString Body) mutable
+		{
+			if (UIdleGameInstance* StrongThis = WeakWeeklyThis.Get())
+			{
+				StrongThis->EnsureLeaderboardService();
+				if (StrongThis->LeaderboardService)
+				{
+					StrongThis->LeaderboardService->ParseListJson(bSuccess ? Body : FString(), ELeaderboardKind::WeeklyDamage);
+				}
+			}
+		});
+
+		ApiClient->EnsureCharacter([WeakWeeklyThis, Week](bool bCharacterOk, FString CharacterId) mutable
+		{
+			UIdleGameInstance* StrongThis = WeakWeeklyThis.Get();
+			if (!StrongThis)
+			{
+				return;
+			}
+
+			StrongThis->EnsureLeaderboardService();
+			if (!StrongThis->ApiClient || !StrongThis->LeaderboardService)
+			{
+				return;
+			}
+
+			if (!bCharacterOk || CharacterId.IsEmpty())
+			{
+				StrongThis->LeaderboardService->ParseMyRankJson(FString(), ELeaderboardKind::WeeklyDamage);
+				return;
+			}
+
+			StrongThis->ApiClient->FetchMyWeeklyRank(Week, CharacterId, [WeakWeeklyThis](bool bSuccess, FString Body) mutable
+			{
+				if (UIdleGameInstance* StrongThis = WeakWeeklyThis.Get())
+				{
+					StrongThis->EnsureLeaderboardService();
+					if (StrongThis->LeaderboardService)
+					{
+						StrongThis->LeaderboardService->ParseMyRankJson(bSuccess ? Body : FString(), ELeaderboardKind::WeeklyDamage);
+					}
+				}
+			});
+		});
+		return;
+	}
+
 	EnsureSeasonService();
-	if (!LeaderboardService || !SeasonService)
+	if (!SeasonService)
 	{
 		return;
 	}
