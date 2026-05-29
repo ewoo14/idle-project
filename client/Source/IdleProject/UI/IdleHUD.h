@@ -16,6 +16,7 @@
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
+class UBuffService;
 class UDungeonService;
 class AIdleCharacter;
 class AIdleMonster;
@@ -334,6 +335,30 @@ struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
 	bool bLastResultError = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDConsumableRowViewModel
+{
+	EConsumableType Type = EConsumableType::AttackTonic;
+	FText NameLabel;
+	FText EffectLabel;
+	FText CountLabel;
+	FText ActionLabel;
+	FText RemainingLabel;
+	FName UseHitBoxName;
+	int32 Count = 0;
+	int64 RemainingSec = 0;
+	bool bCanUse = false;
+	bool bActive = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDConsumablePanelViewModel
+{
+	FText Title;
+	FText ActiveBuffTitle;
+	FText EmptyActiveBuffLabel;
+	TArray<FIdleHUDConsumableRowViewModel> Rows;
+	TArray<FIdleHUDConsumableRowViewModel> ActiveBuffRows;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneSlotViewModel
 {
 	int32 SlotIndex = INDEX_NONE;
@@ -619,6 +644,7 @@ IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const U
 IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const UInventoryComponent& Inventory, int64 Gold, int64 ProtectionScrolls, FText FeedbackLabel, bool bFeedbackSuccess);
 IDLEPROJECT_API FIdleHUDPotentialPanelViewModel BuildPotentialPanelViewModel(const UInventoryComponent& Inventory, int64 ResetCubes, int64 RankCubes);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult);
+IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -731,6 +757,9 @@ private:
 	void TryBuyProtectionScroll();
 	void TryBuyResetCube();
 	void TryBuyRankCube();
+	void DrawConsumablePanel();
+	void DrawConsumableRow(const FIdleHUDConsumableRowViewModel& Row, float X, float Y, float Width, float Height);
+	void TryUseConsumableFromHitBox(FName BoxName);
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);

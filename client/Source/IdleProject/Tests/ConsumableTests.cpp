@@ -9,6 +9,8 @@
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameFramework/PlayerController.h"
+#include "Internationalization/IdleLocalization.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -199,6 +201,45 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Seeded transcend consumable save applies"), TranscendGameInstance->ApplyFromSave(TranscendSave));
 	TestTrue(TEXT("Transcend succeeds"), TranscendGameInstance->Transcend());
 	TestEqual(TEXT("Transcend keeps consumable stock"), TranscendGameInstance->GetBuffService()->GetCount(EConsumableType::GuardTonic), 2);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FConsumableHudViewModelTest,
+	"IdleProject.UI.HUD.ConsumablePanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FConsumableHudViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UBuffService* Service = NewObject<UBuffService>();
+	Service->Initialize();
+	Service->AddConsumable(EConsumableType::AttackTonic, 2);
+	Service->AddConsumable(EConsumableType::GoldFeast, 1);
+	TestTrue(TEXT("Gold feast activates for HUD"), Service->UseConsumable(EConsumableType::GoldFeast, 1000));
+
+	const FIdleHUDConsumablePanelViewModel ViewModel = IdleProject::UI::BuildConsumablePanelViewModel(*Service, 1300);
+	TestEqual(TEXT("Consumable panel title is localized"), ViewModel.Title.ToString(), FString(TEXT("Consumables")));
+	TestEqual(TEXT("Consumable panel exposes six rows"), ViewModel.Rows.Num(), 6);
+	TestEqual(TEXT("Active buff bar exposes one active row"), ViewModel.ActiveBuffRows.Num(), 1);
+
+	const FIdleHUDConsumableRowViewModel& AttackRow = ViewModel.Rows[0];
+	TestEqual(TEXT("Attack tonic row keeps enum order"), static_cast<int32>(AttackRow.Type), static_cast<int32>(EConsumableType::AttackTonic));
+	TestEqual(TEXT("Attack tonic name is localized"), AttackRow.NameLabel.ToString(), FString(TEXT("Attack Tonic")));
+	TestEqual(TEXT("Attack tonic effect is localized"), AttackRow.EffectLabel.ToString(), FString(TEXT("PATK/MATK +30% for 30m")));
+	TestEqual(TEXT("Attack tonic count is localized"), AttackRow.CountLabel.ToString(), FString(TEXT("Owned 2")));
+	TestEqual(TEXT("Attack tonic use action is localized"), AttackRow.ActionLabel.ToString(), FString(TEXT("Use")));
+	TestTrue(TEXT("Attack tonic is usable with stock"), AttackRow.bCanUse);
+	TestEqual(TEXT("Attack tonic hitbox is deterministic"), AttackRow.UseHitBoxName, FName(TEXT("ConsumableUse_0")));
+
+	const FIdleHUDConsumableRowViewModel& GoldRow = ViewModel.Rows[4];
+	TestTrue(TEXT("Gold feast row shows active state"), GoldRow.bActive);
+	TestEqual(TEXT("Gold feast remaining time is formatted"), GoldRow.RemainingLabel.ToString(), FString(TEXT("25:00")));
+	TestEqual(TEXT("Active buff bar uses same remaining time"), ViewModel.ActiveBuffRows[0].RemainingLabel.ToString(), FString(TEXT("25:00")));
+	TestEqual(TEXT("Active buff bar uses localized effect copy"), ViewModel.ActiveBuffRows[0].EffectLabel.ToString(), FString(TEXT("Gold +50% for 30m")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 

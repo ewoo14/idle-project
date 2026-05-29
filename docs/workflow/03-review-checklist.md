@@ -491,6 +491,23 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
   this PR adds no binary art assets.
 
+## PR #73 Designer Checklist Addendum (Section 1)
+
+- [ ] Consumables HUD renders six localized rows in AttackTonic, GuardTonic,
+  AllStatElixir, FortuneScroll, GoldFeast, WisdomBooster order with name,
+  effect, owned count, use action, and active countdown.
+- [ ] Active buff bar shows localized buff name and `GetBuffRemainingSec`
+  countdown without replacing stat/economy getter ownership.
+- [ ] HUD ViewModel uses `UBuffService::GetCount`, `IsBuffActive`, and
+  `GetBuffRemainingSec`; use hitboxes call `UIdleGameInstance::TryUseConsumable`.
+- [ ] Panel uses only existing `docs/planning/ui-tokens.json` colors and remains
+  readable at 1080p, 1440p, and 4K with no new color token.
+- [ ] ko/en `UI.csv` includes paired consumable names, effect labels, active
+  buff labels, count format, and use action covered by
+  `IdleProject.Localization.CsvIntegrity`.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
 ## PR #72 Balance Checklist Addendum (Section 5)
 
 - [ ] `docs/planning/mastery-v1-balance-note.md` documents the mastery XP curve,

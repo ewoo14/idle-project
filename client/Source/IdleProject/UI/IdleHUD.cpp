@@ -11,6 +11,8 @@
 #include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "EngineUtils.h"
+#include "GameCore/BuffService.h"
+#include "GameCore/ConsumableFormula.h"
 #include "GameCore/DungeonFormula.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/PetLevelFormula.h"
@@ -55,6 +57,7 @@ const FString RuneEnhanceHitBoxPrefix(TEXT("RuneEnhance_"));
 const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
+const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName ShopProtectionScrollHitBoxName(TEXT("ShopProtectionScroll"));
 const FName ShopResetCubeHitBoxName(TEXT("ShopResetCube"));
@@ -102,6 +105,12 @@ FString FormatElapsedHoursMinutes(int64 CappedSeconds)
 	const int64 Hours = ClampedSeconds / 3600;
 	const int64 Minutes = (ClampedSeconds % 3600) / 60;
 	return FString::Printf(TEXT("%lld:%02lld"), Hours, Minutes);
+}
+
+FString FormatMinutesSeconds(int64 Seconds)
+{
+	const int64 ClampedSeconds = FMath::Max<int64>(0, Seconds);
+	return FString::Printf(TEXT("%lld:%02lld"), ClampedSeconds / 60, ClampedSeconds % 60);
 }
 
 FText FormatLocalizedUI(const TCHAR* Key, TFunctionRef<void(FFormatNamedArguments&)> BuildArgs)
@@ -181,6 +190,71 @@ FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 
 	{
 		Args.Add(ArgName, FText::AsNumber(Value));
 	});
+}
+
+const EConsumableType* GetConsumableDisplayOrder()
+{
+	static const EConsumableType Order[] = {
+		EConsumableType::AttackTonic,
+		EConsumableType::GuardTonic,
+		EConsumableType::AllStatElixir,
+		EConsumableType::FortuneScroll,
+		EConsumableType::GoldFeast,
+		EConsumableType::WisdomBooster,
+	};
+	return Order;
+}
+
+constexpr int32 GetConsumableDisplayCount()
+{
+	return 6;
+}
+
+const TCHAR* ConsumableNameKey(EConsumableType Type)
+{
+	switch (Type)
+	{
+	case EConsumableType::AttackTonic:
+		return TEXT("CONSUMABLE_ATTACK_TONIC_NAME");
+	case EConsumableType::GuardTonic:
+		return TEXT("CONSUMABLE_GUARD_TONIC_NAME");
+	case EConsumableType::AllStatElixir:
+		return TEXT("CONSUMABLE_ALL_STAT_ELIXIR_NAME");
+	case EConsumableType::FortuneScroll:
+		return TEXT("CONSUMABLE_FORTUNE_SCROLL_NAME");
+	case EConsumableType::GoldFeast:
+		return TEXT("CONSUMABLE_GOLD_FEAST_NAME");
+	case EConsumableType::WisdomBooster:
+		return TEXT("CONSUMABLE_WISDOM_BOOSTER_NAME");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+const TCHAR* ConsumableEffectKey(EConsumableType Type)
+{
+	switch (Type)
+	{
+	case EConsumableType::AttackTonic:
+		return TEXT("CONSUMABLE_ATTACK_TONIC_EFFECT");
+	case EConsumableType::GuardTonic:
+		return TEXT("CONSUMABLE_GUARD_TONIC_EFFECT");
+	case EConsumableType::AllStatElixir:
+		return TEXT("CONSUMABLE_ALL_STAT_ELIXIR_EFFECT");
+	case EConsumableType::FortuneScroll:
+		return TEXT("CONSUMABLE_FORTUNE_SCROLL_EFFECT");
+	case EConsumableType::GoldFeast:
+		return TEXT("CONSUMABLE_GOLD_FEAST_EFFECT");
+	case EConsumableType::WisdomBooster:
+		return TEXT("CONSUMABLE_WISDOM_BOOSTER_EFFECT");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+FName MakeConsumableUseHitBoxName(EConsumableType Type)
+{
+	return FName(*FString::Printf(TEXT("%s%d"), *ConsumableUseHitBoxPrefix, static_cast<int32>(Type)));
 }
 
 const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
@@ -1778,6 +1852,39 @@ FIdleHUDShopPanelViewModel IdleProject::UI::BuildShopPanelViewModel(int64 GearRo
 	return ViewModel;
 }
 
+FIdleHUDConsumablePanelViewModel IdleProject::UI::BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec)
+{
+	FIdleHUDConsumablePanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("CONSUMABLE_PANEL_TITLE"));
+	ViewModel.ActiveBuffTitle = IdleProject::Localization::UI(TEXT("CONSUMABLE_ACTIVE_BUFF_TITLE"));
+	ViewModel.EmptyActiveBuffLabel = IdleProject::Localization::UI(TEXT("CONSUMABLE_ACTIVE_BUFF_EMPTY"));
+
+	const EConsumableType* Order = GetConsumableDisplayOrder();
+	for (int32 Index = 0; Index < GetConsumableDisplayCount(); ++Index)
+	{
+		const EConsumableType Type = Order[Index];
+		FIdleHUDConsumableRowViewModel Row;
+		Row.Type = Type;
+		Row.NameLabel = IdleProject::Localization::UI(ConsumableNameKey(Type));
+		Row.EffectLabel = IdleProject::Localization::UI(ConsumableEffectKey(Type));
+		Row.Count = BuffService.GetCount(Type);
+		Row.CountLabel = FormatLocalizedUIWithNumber(TEXT("CONSUMABLE_COUNT_FORMAT"), TEXT("Count"), Row.Count);
+		Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_USE"));
+		Row.UseHitBoxName = MakeConsumableUseHitBoxName(Type);
+		Row.RemainingSec = BuffService.GetBuffRemainingSec(Type, NowUnixSec);
+		Row.RemainingLabel = FText::FromString(FormatMinutesSeconds(Row.RemainingSec));
+		Row.bCanUse = Row.Count > 0;
+		Row.bActive = BuffService.IsBuffActive(Type, NowUnixSec);
+		ViewModel.Rows.Add(Row);
+		if (Row.bActive)
+		{
+			ViewModel.ActiveBuffRows.Add(Row);
+		}
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex)
 {
 	FIdleHUDRuneViewModel ViewModel;
@@ -2871,6 +2978,7 @@ void AIdleHUD::DrawHUD()
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
+	DrawConsumablePanel();
 	DrawRunePanel();
 	DrawRuneCodexPanel();
 	DrawEnhancePanel();
@@ -3005,6 +3113,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(DungeonEnterHitBoxPrefix))
 	{
 		TryRunDungeonFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(ConsumableUseHitBoxPrefix))
+	{
+		TryUseConsumableFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -3969,6 +4082,126 @@ void AIdleHUD::TryBuyRankCube()
 		IdleGameInstance->TryBuyRankCube();
 	}
 	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawConsumablePanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || !IdleGameInstance->GetBuffService())
+	{
+		return;
+	}
+
+	const FIdleHUDConsumablePanelViewModel ViewModel = BuildConsumablePanelViewModel(
+		*IdleGameInstance->GetBuffService(),
+		UIdleGameInstance::GetCurrentUnixSeconds());
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.20f, 300.0f * Scale, 360.0f * Scale);
+	const float RowHeight = 42.0f * Scale;
+	const float RowGap = 5.0f * Scale;
+	const float ActiveHeight = 34.0f * Scale;
+	const float Padding = 12.0f * Scale;
+	const float PanelHeight = 54.0f * Scale + ActiveHeight + Padding + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 360.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.ActiveBuffTitle.ToString(), Theme::AccentGold, X + Padding, Y + 42.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+
+	const float ActiveY = Y + 66.0f * Scale;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.82f), X + Padding, ActiveY, PanelWidth - Padding * 2.0f, ActiveHeight);
+	if (ViewModel.ActiveBuffRows.Num() == 0)
+	{
+		DrawText(ViewModel.EmptyActiveBuffLabel.ToString(), Theme::TextMuted, X + Padding + 8.0f * Scale, ActiveY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	}
+	else
+	{
+		const FIdleHUDConsumableRowViewModel& ActiveRow = ViewModel.ActiveBuffRows[0];
+		DrawRect(Theme::AccentGold, X + Padding, ActiveY, 4.0f * Scale, ActiveHeight);
+		DrawText(ActiveRow.NameLabel.ToString(), Theme::TextPrimary, X + Padding + 12.0f * Scale, ActiveY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+		DrawText(ActiveRow.RemainingLabel.ToString(), Theme::AccentGold, X + PanelWidth - Padding - 48.0f * Scale, ActiveY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	}
+
+	float RowY = ActiveY + ActiveHeight + Padding;
+	for (const FIdleHUDConsumableRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawConsumableRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawConsumableRow(const FIdleHUDConsumableRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = FMath::Clamp(Canvas ? Canvas->SizeY / 1080.0f : 1.0f, 1.0f, 2.0f);
+	const float ButtonWidth = 54.0f * Scale;
+	const float ButtonHeight = 24.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 6.0f * Scale;
+	const float ButtonY = Y + (Height - ButtonHeight) * 0.5f;
+	const FLinearColor AccentColor = Row.bActive ? Theme::AccentGold : (Row.bCanUse ? Theme::AccentBlue : Theme::TextMuted);
+
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.84f), X, Y, Width, Height);
+	DrawRect(AccentColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.NameLabel.ToString(), Theme::TextPrimary, X + 12.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.EffectLabel.ToString(), Theme::TextMuted, X + 12.0f * Scale, Y + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.CountLabel.ToString(), Theme::TextMuted, ButtonX - 62.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	if (Row.bActive)
+	{
+		DrawText(Row.RemainingLabel.ToString(), Theme::AccentGold, ButtonX - 62.0f * Scale, Y + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	}
+
+	DrawRect(Row.bCanUse ? Theme::AccentGold : Theme::BgPanel.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanUse ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	if (Row.bCanUse)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.UseHitBoxName, true, 89);
+	}
+}
+
+void AIdleHUD::TryUseConsumableFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FString Raw = BoxName.ToString();
+	const FString TypeValue = Raw.RightChop(ConsumableUseHitBoxPrefix.Len());
+	int32 ParsedType = INDEX_NONE;
+	if (!LexTryParseString(ParsedType, *TypeValue))
+	{
+		return;
+	}
+
+	const EConsumableType Type = static_cast<EConsumableType>(ParsedType);
+	if (IdleGameInstance->TryUseConsumable(Type))
+	{
+		RefreshMouseInteraction();
+	}
 }
 
 void AIdleHUD::DrawRunePanel()
@@ -6102,7 +6335,8 @@ void AIdleHUD::RefreshMouseInteraction()
 	const bool bTranscendReady = IdleGameInstance && IdleGameInstance->CanTranscend();
 	const bool bHasRunePanel = IdleGameInstance && IdleGameInstance->GetRuneService();
 	const bool bHasDungeonPanel = IdleGameInstance && IdleGameInstance->GetDungeonService();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
+	const bool bHasConsumablePanel = IdleGameInstance && IdleGameInstance->GetBuffService();
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bHasConsumablePanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

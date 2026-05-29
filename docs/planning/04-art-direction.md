@@ -260,3 +260,21 @@ and existing right-side shop/enhancement/quest stack.
 
 No binary art assets were added; existing `.gitattributes` LFS patterns continue
 to cover future `.uasset`, `.png`, and other exported UI assets.
+
+## PR #73 Consumables HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Consumables HUD V1 adds a
+compact right-side utility panel for six timed buff items and a small active
+buff bar. The panel uses only the existing `--bg-panel`, `--bg-primary`,
+`--text-primary`, `--text-muted`, `--accent-gold`, and `--accent-blue` tokens.
+No new color token is required in `docs/planning/ui-tokens.json`.
+
+Rows stay in fixed type order: Attack Tonic, Guard Tonic, All-Stat Elixir,
+Fortune Scroll, Gold Feast, and Wisdom Booster. Each row shows localized name,
+effect, owned count, use action, and countdown when active. The active buff bar
+uses `GetBuffRemainingSec` formatted as `MM:SS`, while row state comes from
+`GetCount` and `IsBuffActive` on `UBuffService`.
+
+The panel keeps the Canvas-height 1.0-2.0 scale clamp for 1080p, 1440p, and 4K.
+No binary art assets were added; existing `.gitattributes` LFS patterns continue
+to cover future exported `.uasset` and `.png` UI assets.
