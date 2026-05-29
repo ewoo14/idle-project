@@ -26,13 +26,17 @@ PR #54부터 현재 클라 성장 상태를 반영해 `level`은 1~1000, `maxEqu
   "payload": {
     "level": 10,
     "rebirthCount": 0,
-    "maxEquipmentGrade": 6,
+    "maxEquipmentGrade": 7,
     "totalExp": 12345,
     "gold": 1000,
     "lastSeenUnixSec": 1760000000,
     "transcendCount": 1,
     "towerHighestFloor": 25,
-    "skillPoints": 12
+    "skillPoints": 12,
+    "weeklyBossDamage": 4500,
+    "weeklyBossWeekId": "2026-W22",
+    "weeklyBossChallengesUsed": 3,
+    "weeklyBossClaimedMilestones": 2
   }
 }
 ```
@@ -67,3 +71,15 @@ Valid values are `0=None`, `1=Offense`, `2=Bastion`, `3=Vitality`, and
 `4=Fortune`. Servers keep the field inside `clientSave` without interpreting it;
 clients loading saves with version `<6` must treat missing rune-set data as
 `None`, which contributes no set bonus.
+
+## Client save v15 note
+
+`payload.clientSave.SaveVersion` 15 adds weekly boss state:
+`WeeklyBossWeekId`, `WeeklyBossDamage`, `WeeklyBossChallengesUsed`, and
+`WeeklyBossClaimedMilestones`. Servers also accept the summary fields
+`weeklyBossWeekId`, `weeklyBossDamage`, `weeklyBossChallengesUsed`, and
+`weeklyBossClaimedMilestones` at the top level of `payload` for cloud progress
+validation. `weeklyBossChallengesUsed` is capped at 7, and `weeklyBossWeekId`
+must be a 1-32 character string. Clients loading saves with version `<15` must
+treat weekly boss state as the current UTC week with zero damage, zero
+challenges used, and zero claimed milestones.

@@ -1,5 +1,6 @@
 export const SAVE_LEVEL_MAX = 1000;
 export const SAVE_MAX_EQUIPMENT_GRADE = 7;
+export const SAVE_WEEKLY_CHALLENGE_LIMIT = 7;
 
 export const getSaveSchema = {
   querystring: {
@@ -57,6 +58,14 @@ export const putSaveSchema = {
               },
             },
           },
+          weeklyBossDamage: { type: "integer", minimum: 0 },
+          weeklyBossWeekId: { type: "string", minLength: 1, maxLength: 32 },
+          weeklyBossChallengesUsed: {
+            type: "integer",
+            minimum: 0,
+            maximum: SAVE_WEEKLY_CHALLENGE_LIMIT,
+          },
+          weeklyBossClaimedMilestones: { type: "integer", minimum: 0 },
         },
       },
     },

@@ -48,3 +48,4 @@ export * from "./tower.js";
 export * from "./towerMilestone.js";
 export * from "./transcend.js";
 export * from "./uniqueTrait.js";
+export * from "./weeklyBoss.js";

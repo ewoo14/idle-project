@@ -14,6 +14,8 @@
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameCore/TranscendFormula.h"
+#include "GameCore/WeeklyBossFormula.h"
+#include "GameCore/WeeklyBossService.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
@@ -117,6 +119,7 @@ void UIdleGameInstance::Init()
 	EnsureMasteryService();
 	EnsureLeaderboardService();
 	EnsureBuffService();
+	EnsureWeeklyBossService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
@@ -149,6 +152,7 @@ void UIdleGameInstance::Shutdown()
 	MasteryService = nullptr;
 	LeaderboardService = nullptr;
 	BuffService = nullptr;
+	WeeklyBossService = nullptr;
 	Super::Shutdown();
 }
 
@@ -459,8 +463,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAchievementService();
 	EnsureMasteryService();
 	EnsureBuffService();
+	EnsureWeeklyBossService();
 
-	SaveGame->SaveVersion = 14;
+	SaveGame->SaveVersion = 15;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -561,6 +566,15 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (BuffService)
 	{
 		SaveGame->Consumables = BuffService->ExportSave();
+	}
+
+	if (WeeklyBossService)
+	{
+		const FWeeklyBossSaveState WeeklyBossState = WeeklyBossService->ExportSave();
+		SaveGame->WeeklyBossWeekId = WeeklyBossState.WeekId;
+		SaveGame->WeeklyBossDamage = WeeklyBossState.Damage;
+		SaveGame->WeeklyBossChallengesUsed = WeeklyBossState.ChallengesUsed;
+		SaveGame->WeeklyBossClaimedMilestones = WeeklyBossState.ClaimedMilestones;
 	}
 
 	return true;
@@ -675,6 +689,23 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (BuffService)
 	{
 		BuffService->ImportSave(SaveGame->SaveVersion >= 14 ? SaveGame->Consumables : TArray<FConsumableSaveEntry>());
+	}
+
+	EnsureWeeklyBossService();
+	if (WeeklyBossService)
+	{
+		if (SaveGame->SaveVersion >= 15)
+		{
+			WeeklyBossService->ImportSave(
+				SaveGame->WeeklyBossWeekId,
+				SaveGame->WeeklyBossDamage,
+				SaveGame->WeeklyBossChallengesUsed,
+				SaveGame->WeeklyBossClaimedMilestones);
+		}
+		else
+		{
+			WeeklyBossService->ImportSave(UQuestService::GetCurrentUtcWeekString(), 0, 0, 0);
+		}
 	}
 
 	if (SaveGame->SaveVersion >= 2)
@@ -863,6 +894,43 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type, int32 Tier
 	}
 	RequestAutosave();
 	return Result;
+}
+
+FWeeklyBossChallengeResult UIdleGameInstance::TryChallengeWeeklyBoss()
+{
+	EnsureWeeklyBossService();
+
+	FWeeklyBossChallengeResult Result;
+	const AIdleCharacter* Character = FindPlayerCharacter();
+	if (!WeeklyBossService || !Character)
+	{
+		return Result;
+	}
+
+	Result = WeeklyBossService->Challenge(Character->GetCombatPower(), UQuestService::GetCurrentUtcWeekString());
+	if (Result.bSuccess)
+	{
+		RequestAutosave();
+	}
+	return Result;
+}
+
+bool UIdleGameInstance::ClaimWeeklyBossMilestone(int32 Milestone)
+{
+	EnsureWeeklyBossService();
+	if (!WeeklyBossService || !WeeklyBossService->ClaimMilestone(Milestone))
+	{
+		return false;
+	}
+
+	AddGold(FWeeklyBossFormula::MilestoneGoldReward(Milestone));
+	const int64 EssenceReward = FWeeklyBossFormula::MilestoneEssenceReward(Milestone);
+	if (EssenceReward > 0)
+	{
+		RuneEssence = RuneEssence > MAX_int64 - EssenceReward ? MAX_int64 : RuneEssence + EssenceReward;
+	}
+	RequestAutosave();
+	return true;
 }
 
 FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection)
@@ -1739,6 +1807,12 @@ void UIdleGameInstance::InitializeDungeonServiceForTests(const FString& CurrentU
 	DungeonService->EnsureDailyReset(CurrentUtcDate);
 }
 
+void UIdleGameInstance::InitializeWeeklyBossServiceForTests(const FString& CurrentWeek)
+{
+	WeeklyBossService = NewObject<UWeeklyBossService>(this);
+	WeeklyBossService->EnsureWeek(CurrentWeek);
+}
+
 void UIdleGameInstance::InitializeRuneServiceForTests()
 {
 	RuneService = NewObject<URuneService>(this);
@@ -2139,6 +2213,15 @@ void UIdleGameInstance::EnsureBuffService()
 	{
 		BuffService = NewObject<UBuffService>(this);
 		BuffService->Initialize();
+	}
+}
+
+void UIdleGameInstance::EnsureWeeklyBossService()
+{
+	if (!WeeklyBossService)
+	{
+		WeeklyBossService = NewObject<UWeeklyBossService>(this);
+		WeeklyBossService->EnsureWeek(UQuestService::GetCurrentUtcWeekString());
 	}
 }
 

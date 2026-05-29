@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 14;
+	int32 SaveVersion = 15;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -135,6 +135,18 @@ public:
 
 	UPROPERTY()
 	TArray<FConsumableSaveEntry> Consumables;
+
+	UPROPERTY()
+	FString WeeklyBossWeekId;
+
+	UPROPERTY()
+	int64 WeeklyBossDamage = 0;
+
+	UPROPERTY()
+	int32 WeeklyBossChallengesUsed = 0;
+
+	UPROPERTY()
+	int32 WeeklyBossClaimedMilestones = 0;
 
 	UPROPERTY()
 	TArray<FRuneSaveEntry> Runes;
