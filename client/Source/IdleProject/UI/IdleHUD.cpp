@@ -15,6 +15,7 @@
 #include "GameCore/ConsumableFormula.h"
 #include "GameCore/DungeonFormula.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/LeaderboardService.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/TowerMilestoneFormula.h"
@@ -59,6 +60,9 @@ const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
 const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
+const FName LeaderboardPowerTabHitBoxName(TEXT("LeaderboardTabPower"));
+const FName LeaderboardRebirthTabHitBoxName(TEXT("LeaderboardTabRebirth"));
+const FName LeaderboardRefreshHitBoxName(TEXT("LeaderboardRefresh"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName ShopProtectionScrollHitBoxName(TEXT("ShopProtectionScroll"));
 const FName ShopResetCubeHitBoxName(TEXT("ShopResetCube"));
@@ -127,6 +131,40 @@ FText FormatLocalizedUIWithInt64(const TCHAR* Key, const TCHAR* ArgName, int64 V
 	{
 		Args.Add(ArgName, FText::FromString(FormatIntegerWithCommas(Value)));
 	});
+}
+
+FText FormatLeaderboardRankLabel(int32 Rank)
+{
+	return Rank > 0 ? FText::FromString(FString::Printf(TEXT("#%d"), Rank)) : IdleProject::Localization::UI(TEXT("NONE_DASH"));
+}
+
+FText FormatLeaderboardScoreLabel(int64 Score)
+{
+	return FormatLocalizedUIWithInt64(TEXT("LEADERBOARD_SCORE_FORMAT"), TEXT("Score"), Score);
+}
+
+FText FormatLeaderboardCharacterLabel(const FString& CharacterId)
+{
+	if (CharacterId.IsEmpty())
+	{
+		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
+	}
+	if (CharacterId.Len() <= 10)
+	{
+		return FText::FromString(CharacterId);
+	}
+	return FText::FromString(FString::Printf(TEXT("%s...%s"), *CharacterId.Left(6), *CharacterId.Right(4)));
+}
+
+FIdleHUDLeaderboardRowViewModel BuildLeaderboardRow(const FLeaderboardEntry& Entry, const FString& MyCharacterId)
+{
+	FIdleHUDLeaderboardRowViewModel Row;
+	Row.CharacterId = Entry.CharacterId;
+	Row.CharacterLabel = FormatLeaderboardCharacterLabel(Entry.CharacterId);
+	Row.RankLabel = FormatLeaderboardRankLabel(Entry.Rank);
+	Row.ScoreLabel = FormatLeaderboardScoreLabel(Entry.Score);
+	Row.bSelf = !MyCharacterId.IsEmpty() && Entry.CharacterId == MyCharacterId;
+	return Row;
 }
 
 FText FormatPercentLabel(const TCHAR* Key, float Rate)
@@ -1985,6 +2023,35 @@ FIdleHUDConsumablePanelViewModel IdleProject::UI::BuildConsumablePanelViewModel(
 	return ViewModel;
 }
 
+FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, bool bLoading, bool bOffline)
+{
+	FIdleHUDLeaderboardPanelViewModel ViewModel;
+	ViewModel.ActiveKind = Kind;
+	ViewModel.bLoading = bLoading;
+	ViewModel.bOffline = bOffline;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("LEADERBOARD_PANEL_TITLE"));
+	ViewModel.SeasonLabel = FormatLocalizedUIWithNumber(TEXT("LEADERBOARD_SEASON_FORMAT"), TEXT("Season"), SeasonId);
+	ViewModel.PowerTabLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_TAB_POWER"));
+	ViewModel.RebirthTabLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_TAB_REBIRTH"));
+	ViewModel.MyRankTitle = IdleProject::Localization::UI(TEXT("LEADERBOARD_MY_RANK"));
+	ViewModel.EmptyLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_EMPTY"));
+	ViewModel.OfflineLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_OFFLINE"));
+	ViewModel.LoadingLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_LOADING"));
+	ViewModel.RefreshLabel = IdleProject::Localization::UI(TEXT("ACTION_REFRESH"));
+
+	const FLeaderboardEntry MyEntry = LeaderboardService.GetMyEntry(Kind);
+	ViewModel.MyEntry = BuildLeaderboardRow(MyEntry, MyEntry.CharacterId);
+	ViewModel.MyEntry.bSelf = MyEntry.Rank > 0 || !MyEntry.CharacterId.IsEmpty();
+
+	const TArray<FLeaderboardEntry> Entries = LeaderboardService.GetEntries(Kind);
+	for (const FLeaderboardEntry& Entry : Entries)
+	{
+		ViewModel.Rows.Add(BuildLeaderboardRow(Entry, MyEntry.CharacterId));
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex)
 {
 	FIdleHUDRuneViewModel ViewModel;
@@ -3139,6 +3206,7 @@ void AIdleHUD::DrawHUD()
 	DrawStatInfoPanel();
 	DrawShopPanel();
 	DrawConsumablePanel();
+	DrawLeaderboardPanel();
 	DrawRunePanel();
 	DrawRuneCodexPanel();
 	DrawEnhancePanel();
@@ -3278,6 +3346,21 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(ConsumableUseHitBoxPrefix))
 	{
 		TryUseConsumableFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == LeaderboardPowerTabHitBoxName)
+	{
+		SelectLeaderboardKind(ELeaderboardKind::Power);
+		return;
+	}
+	if (BoxName == LeaderboardRebirthTabHitBoxName)
+	{
+		SelectLeaderboardKind(ELeaderboardKind::Rebirth);
+		return;
+	}
+	if (BoxName == LeaderboardRefreshHitBoxName)
+	{
+		RefreshSelectedLeaderboard();
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -4362,6 +4445,126 @@ void AIdleHUD::TryUseConsumableFromHitBox(FName BoxName)
 	{
 		RefreshMouseInteraction();
 	}
+}
+
+void AIdleHUD::DrawLeaderboardPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const ULeaderboardService* LeaderboardService = IdleGameInstance ? IdleGameInstance->GetLeaderboardService() : nullptr;
+	if (!IdleGameInstance || !LeaderboardService)
+	{
+		return;
+	}
+
+	const USeasonService* SeasonService = IdleGameInstance->GetSeasonService();
+	const int32 SeasonId = SeasonService ? SeasonService->GetSeasonId() : 0;
+	const bool bOffline = IdleGameInstance->GetCloudSyncState() == ECloudSyncState::Offline;
+	const bool bShowLoading = bLeaderboardLoading;
+	const FIdleHUDLeaderboardPanelViewModel ViewModel = BuildLeaderboardPanelViewModel(*LeaderboardService, SelectedLeaderboardKind, SeasonId, bShowLoading, bOffline);
+	bLeaderboardLoading = false;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	const float RowHeight = 30.0f * Scale;
+	const float RowGap = 4.0f * Scale;
+	const float Padding = 12.0f * Scale;
+	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 8);
+	const float PanelHeight = 118.0f * Scale + RowHeight + Padding + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 688.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.SeasonLabel.ToString(), Theme::TextMuted, X + Padding, Y + 36.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+
+	const float ButtonHeight = 24.0f * Scale;
+	const float TabWidth = 82.0f * Scale;
+	const float TabY = Y + 58.0f * Scale;
+	const FLinearColor PowerColor = ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::AccentGold : Theme::BgPrimary;
+	const FLinearColor RebirthColor = ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::AccentGold : Theme::BgPrimary;
+	DrawRect(PowerColor, X + Padding, TabY, TabWidth, ButtonHeight);
+	DrawRect(RebirthColor, X + Padding + TabWidth + 6.0f * Scale, TabY, TabWidth, ButtonHeight);
+	DrawText(ViewModel.PowerTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::BgPrimary : Theme::TextMuted, X + Padding + 12.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(ViewModel.RebirthTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::BgPrimary : Theme::TextMuted, X + Padding + TabWidth + 18.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	AddHitBox(FVector2D(X + Padding, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardPowerTabHitBoxName, true, 90);
+	AddHitBox(FVector2D(X + Padding + TabWidth + 6.0f * Scale, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardRebirthTabHitBoxName, true, 91);
+
+	const float RefreshWidth = 74.0f * Scale;
+	const float RefreshX = X + PanelWidth - Padding - RefreshWidth;
+	DrawRect(Theme::AccentBlue, RefreshX, TabY, RefreshWidth, ButtonHeight);
+	DrawText(ViewModel.RefreshLabel.ToString(), Theme::BgPrimary, RefreshX + 12.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	AddHitBox(FVector2D(RefreshX, TabY), FVector2D(RefreshWidth, ButtonHeight), LeaderboardRefreshHitBoxName, true, 92);
+
+	const FText StateLabel = ViewModel.bLoading ? ViewModel.LoadingLabel : (ViewModel.bOffline ? ViewModel.OfflineLabel : FText::GetEmpty());
+	if (!StateLabel.IsEmpty())
+	{
+		DrawText(StateLabel.ToString(), ViewModel.bOffline ? Theme::AccentRed : Theme::AccentBlue, X + Padding, Y + 88.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	}
+
+	const float MyRowY = Y + 108.0f * Scale;
+	DrawText(ViewModel.MyRankTitle.ToString(), Theme::AccentGold, X + Padding, MyRowY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawLeaderboardRow(ViewModel.MyEntry, X + Padding + 74.0f * Scale, MyRowY - 6.0f * Scale, PanelWidth - Padding * 2.0f - 74.0f * Scale, RowHeight);
+
+	float RowY = MyRowY + RowHeight + Padding;
+	if (VisibleRows == 0)
+	{
+		DrawText(ViewModel.EmptyLabel.ToString(), Theme::TextMuted, X + Padding, RowY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	}
+	for (int32 Index = 0; Index < VisibleRows; ++Index)
+	{
+		DrawLeaderboardRow(ViewModel.Rows[Index], X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawLeaderboardRow(const FIdleHUDLeaderboardRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 30.0f;
+	const FLinearColor AccentColor = Row.bSelf ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.52f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(Row.bSelf ? 0.96f : 0.84f), X, Y, Width, Height);
+	DrawRect(AccentColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.RankLabel.ToString(), Row.bSelf ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.CharacterLabel.ToString(), Theme::TextMuted, X + 58.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.ScoreLabel.ToString(), Row.bSelf ? Theme::AccentGold : Theme::AccentBlue, X + Width - 104.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+}
+
+void AIdleHUD::SelectLeaderboardKind(ELeaderboardKind Kind)
+{
+	SelectedLeaderboardKind = Kind;
+	RefreshSelectedLeaderboard();
+}
+
+void AIdleHUD::RefreshSelectedLeaderboard()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		bLeaderboardLoading = true;
+		IdleGameInstance->RefreshLeaderboard(SelectedLeaderboardKind);
+	}
+	RefreshMouseInteraction();
 }
 
 void AIdleHUD::DrawRunePanel()
@@ -6553,7 +6756,8 @@ void AIdleHUD::RefreshMouseInteraction()
 	const bool bHasRunePanel = IdleGameInstance && IdleGameInstance->GetRuneService();
 	const bool bHasDungeonPanel = IdleGameInstance && IdleGameInstance->GetDungeonService();
 	const bool bHasConsumablePanel = IdleGameInstance && IdleGameInstance->GetBuffService();
-	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bHasConsumablePanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
+	const bool bHasLeaderboardPanel = IdleGameInstance && IdleGameInstance->GetLeaderboardService();
+	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bHasConsumablePanel || bHasLeaderboardPanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
 }

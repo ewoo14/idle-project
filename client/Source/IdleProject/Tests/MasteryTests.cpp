@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 
+#include "IdleGameInstanceTestHelpers.h"
 #include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/IdleMonster.h"
@@ -25,14 +26,6 @@
 
 namespace
 {
-struct FIdleGameInstanceWorldContextAccessor : UIdleGameInstance
-{
-	static void Attach(UIdleGameInstance* Instance, FWorldContext* Context)
-	{
-		static_cast<FIdleGameInstanceWorldContextAccessor*>(Instance)->WorldContext = Context;
-	}
-};
-
 struct FIdleMonsterDeathAccessor : AIdleMonster
 {
 	static void Trigger(AIdleMonster* Monster)

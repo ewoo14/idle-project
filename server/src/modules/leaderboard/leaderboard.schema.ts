@@ -8,3 +8,14 @@ export const leaderboardQuerySchema = {
     },
   },
 } as const;
+
+export const myRankQuerySchema = {
+  querystring: {
+    type: "object",
+    required: ["season", "characterId"],
+    properties: {
+      season: { type: "integer", minimum: 1 },
+      characterId: { type: "string", format: "uuid" },
+    },
+  },
+} as const;
