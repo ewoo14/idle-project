@@ -44,6 +44,7 @@ export * from "./skillRank.js";
 export * from "./stage.js";
 export * from "./statPoints.js";
 export * from "./stats.js";
+export * from "./title.js";
 export * from "./tower.js";
 export * from "./towerMilestone.js";
 export * from "./transcend.js";
