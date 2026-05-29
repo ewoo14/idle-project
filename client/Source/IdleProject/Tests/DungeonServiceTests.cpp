@@ -4,6 +4,8 @@
 #include "GameCore/DungeonService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "Internationalization/IdleLocalization.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -101,6 +103,44 @@ bool FIdleGameInstanceDungeonSaveMigrationTest::RunTest(const FString& Parameter
 	TestEqual(TEXT("Captured save writes V14"), Captured->SaveVersion, static_cast<int32>(14));
 	TestEqual(TEXT("Captured dungeon entry array has three rows"), Captured->DungeonEntriesUsed.Num(), 3);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDungeonHudTierViewModelTest,
+	"IdleProject.UI.HUD.DungeonTierPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDungeonHudTierViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UDungeonService* Dungeons = NewObject<UDungeonService>();
+	const FIdleHUDDungeonPanelViewModel ViewModel = IdleProject::UI::BuildDungeonPanelViewModel(*Dungeons, 400, TEXT("2026-05-29"));
+
+	TestEqual(TEXT("Dungeon panel exposes three rows"), ViewModel.Rows.Num(), 3);
+	if (ViewModel.Rows.Num() < 1)
+	{
+		return false;
+	}
+
+	const FIdleHUDDungeonRowViewModel& GoldRow = ViewModel.Rows[0];
+	TestEqual(TEXT("Gold row selects the highest accessible tier"), GoldRow.SelectedTier, 3);
+	TestEqual(TEXT("Gold row exposes max accessible tier"), GoldRow.MaxAccessibleTier, 3);
+	TestEqual(TEXT("Selected tier CP requirement is exposed"), GoldRow.RequiredPower, static_cast<int64>(400));
+	TestEqual(TEXT("Next locked tier CP requirement is exposed"), GoldRow.NextTierRequirement, static_cast<int64>(800));
+	TestEqual(TEXT("Tier label is localized"), GoldRow.TierLabel.ToString(), FString(TEXT("Tier 3 / 3")));
+	TestEqual(TEXT("Next tier label is localized"), GoldRow.NextTierLabel.ToString(), FString(TEXT("Next Tier CP 800")));
+	TestEqual(TEXT("Reward preview uses selected tier multiplier"), GoldRow.RewardLabel.ToString(), FString(TEXT("Reward Gold +120,000")));
+	TestEqual(TEXT("Enter hitbox carries selected tier"), GoldRow.EnterHitBoxName, FName(TEXT("DungeonEnter_1_3")));
+
+	const FIdleHUDDungeonPanelViewModel LockedViewModel = IdleProject::UI::BuildDungeonPanelViewModel(*Dungeons, 99, TEXT("2026-05-29"));
+	TestEqual(TEXT("Locked gold row keeps tier one selected"), LockedViewModel.Rows[0].SelectedTier, 1);
+	TestEqual(TEXT("Locked gold row exposes zero max tier"), LockedViewModel.Rows[0].MaxAccessibleTier, 0);
+	TestEqual(TEXT("Locked gold row shows tier one requirement"), LockedViewModel.Rows[0].RequiredPower, static_cast<int64>(100));
+	TestTrue(TEXT("Locked gold row needs CP"), LockedViewModel.Rows[0].bNeedsPower);
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
