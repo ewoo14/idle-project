@@ -92,6 +92,16 @@ float UMasteryService::GetLocalBonus(EMasteryTrack Track) const
 	return FMasteryFormula::GetLocalBonus(Track, GetTrackLevel(Track));
 }
 
+float UMasteryService::GetLocalBonus2(EMasteryTrack Track) const
+{
+	return FMasteryFormula::GetLocalBonus2(Track, GetTrackLevel(Track));
+}
+
+int32 UMasteryService::GetAbyssBonusEntries() const
+{
+	return FMasteryFormula::GetAbyssBonusEntries(GetTrackLevel(EMasteryTrack::Abyss));
+}
+
 TArray<FMasterySaveEntry> UMasteryService::ExportSave() const
 {
 	TArray<FMasterySaveEntry> Entries;

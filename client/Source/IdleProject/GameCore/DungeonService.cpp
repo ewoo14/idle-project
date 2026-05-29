@@ -11,14 +11,14 @@ FString NormalizeDungeonDate(const FString& TodayUtc)
 }
 }
 
-FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc, int32 Tier)
+FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc, int32 Tier, int32 BonusEntries)
 {
 	FDungeonRunResult Result;
 	Result.Type = Type;
 	Result.Tier = Tier;
 
 	EnsureDailyReset(TodayUtc);
-	if (GetRemainingEntries(Type, TodayUtc) <= 0)
+	if (GetRemainingEntries(Type, TodayUtc, BonusEntries) <= 0)
 	{
 		return Result;
 	}
@@ -29,7 +29,9 @@ FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 Combat
 		return Result;
 	}
 
-	const int32 Used = FMath::Clamp(EntriesUsed.FindRef(Type), 0, FDungeonFormula::GetDailyEntryLimit(Type));
+	// 심연 마스터리 2종(BonusEntries)으로 확장된 한도까지 입장 사용량을 클램프.
+	const int32 EffectiveLimit = FDungeonFormula::GetDailyEntryLimit(Type) + FMath::Max(0, BonusEntries);
+	const int32 Used = FMath::Clamp(EntriesUsed.FindRef(Type), 0, EffectiveLimit);
 	EntriesUsed.Add(Type, Used + 1);
 	return Result;
 }
@@ -44,14 +46,16 @@ int32 UDungeonService::GetMaxAccessibleTier(EDungeonType Type, int64 CombatPower
 	return FDungeonFormula::GetMaxAccessibleTier(Type, CombatPower);
 }
 
-int32 UDungeonService::GetRemainingEntries(EDungeonType Type, const FString& TodayUtc) const
+int32 UDungeonService::GetRemainingEntries(EDungeonType Type, const FString& TodayUtc, int32 BonusEntries) const
 {
-	const int32 Limit = FDungeonFormula::GetDailyEntryLimit(Type);
-	if (Limit <= 0)
+	const int32 BaseLimit = FDungeonFormula::GetDailyEntryLimit(Type);
+	if (BaseLimit <= 0)
 	{
 		return 0;
 	}
 
+	// 심연 마스터리 2종: 기본 한도에 정수 보너스 입장(+N)을 더함.
+	const int32 Limit = BaseLimit + FMath::Max(0, BonusEntries);
 	const FString ResetDate = NormalizeDungeonDate(TodayUtc);
 	if (DailyResetDate != ResetDate)
 	{

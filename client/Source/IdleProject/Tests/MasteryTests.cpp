@@ -7,20 +7,26 @@
 #include "CombatSystem/SkillComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "CombatSystem/CombatComponent.h"
 #include "GameCore/DungeonFormula.h"
+#include "GameCore/DungeonService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/MasteryFormula.h"
 #include "GameCore/MasteryService.h"
+#include "GameCore/OfflineRewardFormula.h"
+#include "GameCore/PetLevelFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
 #include "GameCore/RewardFormula.h"
 #include "GameFramework/PlayerController.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/GoldDrop.h"
+#include "ItemSystem/ShopFormula.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -66,6 +72,16 @@ FItemInstance MakeMasteryEnhanceItem(FName ItemId, EItemSlot Slot, EItemRarity R
 	Item.DisplayName = FText::FromName(ItemId);
 	Item.BonusAtk = 10.0f;
 	return Item;
+}
+
+int64 MasteryXpForLevel(int32 TargetLevel)
+{
+	int64 Total = 0;
+	for (int32 Level = 0; Level < FMath::Max(0, TargetLevel); ++Level)
+	{
+		Total += FMasteryFormula::XpToNext(Level);
+	}
+	return Total;
 }
 
 TArray<EMasteryTrack> AllMasteryTracks()
@@ -125,6 +141,37 @@ bool FMasteryFormulaTest::RunTest(const FString& Parameters)
 	const float EquipmentMaxIntBonus = FMasteryFormula::GetLocalBonus(EMasteryTrack::Equipment, MAX_int32);
 	TestEqual(TEXT("Equipment local bonus uses fifty percent cap formula"), EquipmentMaxIntBonus, FMath::Min(0.5f, 0.01f * FMath::Loge(1.0f + static_cast<float>(MAX_int32))));
 	TestTrue(TEXT("Equipment local bonus never exceeds fifty percent"), EquipmentMaxIntBonus <= 0.5f);
+
+	// V2 로컬 보너스(2종) — 1종과 동일 ln 곡선·계수.
+	for (const EMasteryTrack Track : AllMasteryTracks())
+	{
+		TestEqual(TEXT("Local bonus2 starts at zero"), FMasteryFormula::GetLocalBonus2(Track, 0), 0.0f);
+		TestEqual(TEXT("Negative local bonus2 starts at zero"), FMasteryFormula::GetLocalBonus2(Track, -1), 0.0f);
+		TestTrue(TEXT("Local bonus2 is monotonic"), FMasteryFormula::GetLocalBonus2(Track, 30) > FMasteryFormula::GetLocalBonus2(Track, 1));
+	}
+	// 비클램프 트랙(Combat/Abyss/Rune/Explore)은 1종과 동일 float 앵커.
+	for (const EMasteryTrack Track : { EMasteryTrack::Combat, EMasteryTrack::Abyss, EMasteryTrack::Rune, EMasteryTrack::Explore })
+	{
+		TestEqual(TEXT("Local bonus2 level 1 parity anchor"), FMasteryFormula::GetLocalBonus2(Track, 1), 0.006931471638381481f);
+		TestEqual(TEXT("Local bonus2 level 30 parity anchor"), FMasteryFormula::GetLocalBonus2(Track, 30), 0.034339871257543564f);
+		TestEqual(TEXT("Local bonus2 level 100 parity anchor"), FMasteryFormula::GetLocalBonus2(Track, 100), 0.04615120589733124f);
+	}
+	// Equipment/Beast 2종은 비용 절감이라 0.5 상한 클램프.
+	const float EquipmentMaxIntBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Equipment, MAX_int32);
+	const float BeastMaxIntBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Beast, MAX_int32);
+	TestTrue(TEXT("Equipment local bonus2 never exceeds fifty percent"), EquipmentMaxIntBonus2 <= 0.5f);
+	TestTrue(TEXT("Beast local bonus2 never exceeds fifty percent"), BeastMaxIntBonus2 <= 0.5f);
+	TestEqual(TEXT("Equipment local bonus2 caps at fifty percent"), EquipmentMaxIntBonus2, FMath::Min(0.5f, 0.01f * FMath::Loge(1.0f + static_cast<float>(MAX_int32))));
+	TestEqual(TEXT("Beast local bonus2 caps at fifty percent"), BeastMaxIntBonus2, FMath::Min(0.5f, 0.01f * FMath::Loge(1.0f + static_cast<float>(MAX_int32))));
+
+	// 심연 2종: 던전 일일 입장 정수 보너스 임계(floor(level/50), 상한 +3).
+	TestEqual(TEXT("Abyss bonus entries are zero at level 0"), FMasteryFormula::GetAbyssBonusEntries(0), 0);
+	TestEqual(TEXT("Abyss bonus entries are zero below first threshold"), FMasteryFormula::GetAbyssBonusEntries(49), 0);
+	TestEqual(TEXT("Abyss bonus entries reach one at level 50"), FMasteryFormula::GetAbyssBonusEntries(50), 1);
+	TestEqual(TEXT("Abyss bonus entries reach two at level 100"), FMasteryFormula::GetAbyssBonusEntries(100), 2);
+	TestEqual(TEXT("Abyss bonus entries reach three at level 150"), FMasteryFormula::GetAbyssBonusEntries(150), 3);
+	TestEqual(TEXT("Abyss bonus entries cap at three"), FMasteryFormula::GetAbyssBonusEntries(MAX_int32), 3);
+	TestEqual(TEXT("Negative abyss bonus entries clamp to zero"), FMasteryFormula::GetAbyssBonusEntries(-100), 0);
 	return true;
 }
 
@@ -239,7 +286,7 @@ bool FMasteryGameInstanceHooksTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture writes v15"), CapturedSave->SaveVersion, 15);
+	TestEqual(TEXT("Capture writes v16"), CapturedSave->SaveVersion, 16);
 	TestEqual(TEXT("Mastery save includes six tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	UIdleGameInstance* RestoredGameInstance = NewObject<UIdleGameInstance>();
@@ -546,6 +593,251 @@ bool FMasteryLocalBonusApplicationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Rune local bonus increases physical attack through rune core path"), RuneCharacter->GetCurrentDerivedStats().PhysAtk > ExpectedZeroRune.PhysAtk);
 	GEngine->DestroyWorldContext(RuneWorld);
 	RuneWorld->DestroyWorld(false);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryLocalBonus2ApplicationTest,
+	"IdleProject.Mastery.LocalBonus2Application",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMasteryLocalBonus2ApplicationTest::RunTest(const FString& Parameters)
+{
+	// 전투/룬 2종 효과를 분명히 검증하기 위해 충분히 높은 레벨에서 비율을 키운다(로그 곡선이라 저레벨은 반올림에 묻힘).
+	const int32 HighLevel = 100;
+	const int64 HighLevelXp = MasteryXpForLevel(HighLevel);
+	const float CombatBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Combat, HighLevel);
+	const float EquipmentBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Equipment, 1);
+	const float RuneBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Rune, HighLevel);
+	const float BeastBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Beast, 1);
+	const float ExploreBonus2 = FMasteryFormula::GetLocalBonus2(EMasteryTrack::Explore, 1);
+
+	// 처치 골드 헬퍼: 동일 RNG 시드로 몬스터를 처치하고 GoldDrop->Amount 를 추출. 기준/마스터리 인스턴스 비교용.
+	const auto CaptureKillGold = [](UIdleGameInstance* GameInstance, int32 Seed) -> int64
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+		if (!World)
+		{
+			return -1;
+		}
+		FWorldContext* Context = AttachGameInstanceToTestWorld(GameInstance, World);
+		if (!Context)
+		{
+			World->DestroyWorld(false);
+			return -1;
+		}
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AIdleMonster* Monster = World->SpawnActor<AIdleMonster>(AIdleMonster::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+		if (!Monster)
+		{
+			GEngine->DestroyWorldContext(World);
+			World->DestroyWorld(false);
+			return -1;
+		}
+		Monster->SetStageGlobalIndex(1);
+		FMath::RandInit(Seed);
+		FIdleMonsterDeathAccessor::Trigger(Monster);
+		int64 Amount = -1;
+		for (TActorIterator<AGoldDrop> It(World); It; ++It)
+		{
+			Amount = It->Amount;
+			break;
+		}
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return Amount;
+	};
+
+	// ── 전투 2종: 처치 골드 보상 ×(1 + GetLocalBonus2(Combat)). 기준(0레벨) 대비 마스터리 인스턴스 비교. ──
+	{
+		const int32 Seed = 424242;
+		UIdleGameInstance* BaseGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* BaseSave = NewObject<UIdleSaveGame>();
+		BaseSave->bHasSave = true;
+		BaseSave->SaveVersion = 16;
+		TestTrue(TEXT("Base combat gold save applies"), BaseGameInstance->ApplyFromSave(BaseSave));
+		const int64 BaseGold = CaptureKillGold(BaseGameInstance, Seed);
+
+		UIdleGameInstance* CombatGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Combat, HighLevelXp));
+		TestTrue(TEXT("Combat gold2 mastery save applies"), CombatGameInstance->ApplyFromSave(Save));
+		const int64 MasteryGold = CaptureKillGold(CombatGameInstance, Seed);
+
+		TestTrue(TEXT("Combat gold2 captured base drop"), BaseGold > 0);
+		TestEqual(TEXT("Combat local bonus2 scales kill gold once"), MasteryGold, FMath::RoundToInt64(static_cast<double>(BaseGold) * (1.0 + static_cast<double>(CombatBonus2))));
+		TestTrue(TEXT("Combat local bonus2 increases gold above base"), MasteryGold > BaseGold);
+	}
+
+	// ── 장비 2종: 잠재 큐브(재설정/등급) 골드 가격 ×(1 - GetLocalBonus2(Equipment)). ──
+	{
+		UIdleGameInstance* EquipGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Equipment));
+		TestTrue(TEXT("Equipment cube2 mastery save applies"), EquipGameInstance->ApplyFromSave(Save));
+		const int64 BaseResetCost = FShopFormula::GetResetCubeCost(0);
+		const int64 ExpectedResetCost = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseResetCost) * (1.0 - static_cast<double>(EquipmentBonus2))));
+		EquipGameInstance->AddGold(BaseResetCost);
+		TestTrue(TEXT("Reset cube purchase succeeds with mastery"), EquipGameInstance->TryBuyResetCube());
+		TestTrue(TEXT("Equipment local bonus2 reduces reset cube cost"), ExpectedResetCost < BaseResetCost);
+		TestEqual(TEXT("Equipment local bonus2 leaves reduced cube cost as remaining gold"), EquipGameInstance->GetGold(), BaseResetCost - ExpectedResetCost);
+
+		const int64 BaseRankCost = FShopFormula::GetRankCubeCost(0);
+		const int64 ExpectedRankCost = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseRankCost) * (1.0 - static_cast<double>(EquipmentBonus2))));
+		UIdleGameInstance* RankGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* RankSave = NewObject<UIdleSaveGame>();
+		RankSave->bHasSave = true;
+		RankSave->SaveVersion = 16;
+		RankSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Equipment));
+		TestTrue(TEXT("Rank cube2 mastery save applies"), RankGameInstance->ApplyFromSave(RankSave));
+		RankGameInstance->AddGold(BaseRankCost);
+		TestTrue(TEXT("Rank cube purchase succeeds with mastery"), RankGameInstance->TryBuyRankCube());
+		TestEqual(TEXT("Equipment local bonus2 reduces rank cube cost"), RankGameInstance->GetGold(), BaseRankCost - ExpectedRankCost);
+
+		// 회귀: 마스터리 0레벨이면 큐브 가격 절감 없음.
+		UIdleGameInstance* PlainGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* PlainSave = NewObject<UIdleSaveGame>();
+		PlainSave->bHasSave = true;
+		PlainSave->SaveVersion = 16;
+		TestTrue(TEXT("Plain cube save applies"), PlainGameInstance->ApplyFromSave(PlainSave));
+		PlainGameInstance->AddGold(BaseResetCost);
+		TestTrue(TEXT("Plain reset cube purchase succeeds"), PlainGameInstance->TryBuyResetCube());
+		TestEqual(TEXT("Zero equipment mastery keeps full cube cost"), PlainGameInstance->GetGold(), static_cast<int64>(0));
+	}
+
+	// ── 룬 2종: 분해 에센스 획득 ×(1 + GetLocalBonus2(Rune)). 기준 인스턴스와 비교. ──
+	{
+		UWorld* RuneWorld = UWorld::CreateWorld(EWorldType::Game, false);
+		TestNotNull(TEXT("Rune essence2 world exists"), RuneWorld);
+		if (!RuneWorld)
+		{
+			return false;
+		}
+		// 마스터리 적용 인스턴스(고레벨 — 로그 곡선상 저레벨은 반올림에 묻힘). Mythic 룬으로 기준 환급량을 키운다.
+		UIdleGameInstance* RuneGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Rune, HighLevelXp));
+		TestTrue(TEXT("Rune essence2 mastery save applies"), RuneGameInstance->ApplyFromSave(Save));
+		AttachGameInstanceToTestWorld(RuneGameInstance, RuneWorld);
+		RuneGameInstance->InitializeRuneServiceForTests();
+		FRuneInstance RuneA;
+		RuneA.RuneId = TEXT("essence_rune_a");
+		RuneA.RuneType = ERuneType::PhysAtk;
+		RuneA.Rarity = EItemRarity::Mythic;
+		FRuneInstance RuneB = RuneA;
+		RuneB.RuneId = TEXT("essence_rune_b");
+		RuneGameInstance->AddRune(RuneA);
+		RuneGameInstance->AddRune(RuneB);
+		const int64 EssenceBefore = RuneGameInstance->GetRuneEssence();
+		TestTrue(TEXT("Mastery rune disenchant succeeds"), RuneGameInstance->TryDisenchantRune(1));
+		const int64 MasteryRefund = RuneGameInstance->GetRuneEssence() - EssenceBefore;
+
+		// 기준(마스터리 0레벨) 인스턴스 — 동일 룬 분해 환급량.
+		UIdleGameInstance* BaseRuneGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* BaseSave = NewObject<UIdleSaveGame>();
+		BaseSave->bHasSave = true;
+		BaseSave->SaveVersion = 16;
+		TestTrue(TEXT("Base rune save applies"), BaseRuneGameInstance->ApplyFromSave(BaseSave));
+		AttachGameInstanceToTestWorld(BaseRuneGameInstance, RuneWorld);
+		BaseRuneGameInstance->InitializeRuneServiceForTests();
+		BaseRuneGameInstance->AddRune(RuneA);
+		BaseRuneGameInstance->AddRune(RuneB);
+		const int64 BaseEssenceBefore = BaseRuneGameInstance->GetRuneEssence();
+		TestTrue(TEXT("Base rune disenchant succeeds"), BaseRuneGameInstance->TryDisenchantRune(1));
+		const int64 BaseRefund = BaseRuneGameInstance->GetRuneEssence() - BaseEssenceBefore;
+
+		const int64 ExpectedRefund = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseRefund) * (1.0 + static_cast<double>(RuneBonus2))));
+		TestEqual(TEXT("Rune local bonus2 scales disenchant essence by formula"), MasteryRefund, ExpectedRefund);
+		TestTrue(TEXT("Rune local bonus2 increases essence above base refund"), MasteryRefund > BaseRefund);
+
+		GEngine->DestroyWorldContext(RuneWorld);
+		RuneWorld->DestroyWorld(false);
+	}
+
+	// ── 야성 2종: 펫 먹이 골드 비용 ×(1 - GetLocalBonus2(Beast)). ──
+	{
+		UIdleGameInstance* BeastGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Beast));
+		TestTrue(TEXT("Beast feed2 mastery save applies"), BeastGameInstance->ApplyFromSave(Save));
+		BeastGameInstance->InitializePetSeasonServicesForTests();
+		TestTrue(TEXT("Dog equips for beast feed2"), BeastGameInstance->EquipPet(TEXT("dog")));
+		const int64 BaseFeedCost = FPetLevelFormula::GetFeedCost(0);
+		const int64 ExpectedFeedCost = FMath::Max<int64>(1, FMath::RoundToInt64(static_cast<double>(BaseFeedCost) * (1.0 - static_cast<double>(BeastBonus2))));
+		BeastGameInstance->AddGold(BaseFeedCost);
+		const FPetFeedResult Feed = BeastGameInstance->TryFeedPet(TEXT("dog"));
+		TestTrue(TEXT("Beast feed2 succeeds at reduced cost"), Feed.bFed);
+		TestTrue(TEXT("Beast local bonus2 reduces feed cost"), ExpectedFeedCost < BaseFeedCost);
+		TestEqual(TEXT("Beast local bonus2 charges reduced feed cost"), Feed.GoldSpent, ExpectedFeedCost);
+		TestEqual(TEXT("Beast local bonus2 leaves change after reduced feed"), BeastGameInstance->GetGold(), BaseFeedCost - ExpectedFeedCost);
+	}
+
+	// ── 탐험 2종: 오프라인 보상 ×(1 + GetLocalBonus2(Explore)). 기준 인스턴스와 비교. ──
+	{
+		const int64 LastSeen = 1000;
+		const int64 Now = LastSeen + FOfflineRewardFormula::OFFLINE_CAP_SECONDS;
+
+		UIdleGameInstance* ExploreGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->CharacterLevel = 100;
+		Save->LastSeenUnixSec = LastSeen;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Explore));
+		TestTrue(TEXT("Explore offline2 mastery save applies"), ExploreGameInstance->ApplyFromSave(Save));
+		const FOfflineRewardResult MasteryReward = ExploreGameInstance->PreviewOfflineRewards(Now, 0);
+
+		UIdleGameInstance* BaseGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* BaseSave = NewObject<UIdleSaveGame>();
+		BaseSave->bHasSave = true;
+		BaseSave->SaveVersion = 16;
+		BaseSave->CharacterLevel = 100;
+		BaseSave->LastSeenUnixSec = LastSeen;
+		TestTrue(TEXT("Base offline save applies"), BaseGameInstance->ApplyFromSave(BaseSave));
+		const FOfflineRewardResult BaseReward = BaseGameInstance->PreviewOfflineRewards(Now, 0);
+
+		const int64 ExpectedGold = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseReward.Gold) * (1.0 + static_cast<double>(ExploreBonus2))));
+		const int64 ExpectedExp = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseReward.Exp) * (1.0 + static_cast<double>(ExploreBonus2))));
+		TestTrue(TEXT("Offline base reward is positive"), BaseReward.Gold > 0);
+		TestEqual(TEXT("Explore local bonus2 scales offline gold by formula"), MasteryReward.Gold, ExpectedGold);
+		TestEqual(TEXT("Explore local bonus2 scales offline exp by formula"), MasteryReward.Exp, ExpectedExp);
+		TestTrue(TEXT("Explore local bonus2 increases offline gold above base"), MasteryReward.Gold > BaseReward.Gold);
+	}
+
+	// ── 심연 2종: 던전 일일 입장 +N(정수). 레벨 50 임계에서 +1 노출. ──
+	{
+		UIdleGameInstance* AbyssGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+		Save->bHasSave = true;
+		Save->SaveVersion = 16;
+		Save->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Abyss, MasteryXpForLevel(50)));
+		TestTrue(TEXT("Abyss entries2 mastery save applies"), AbyssGameInstance->ApplyFromSave(Save));
+		UMasteryService* Mastery = AbyssGameInstance->GetMasteryService();
+		TestNotNull(TEXT("Abyss entries2 mastery service exists"), Mastery);
+		if (Mastery)
+		{
+			TestEqual(TEXT("Abyss mastery reaches level 50"), Mastery->GetTrackLevel(EMasteryTrack::Abyss), 50);
+			TestEqual(TEXT("Abyss level 50 grants one bonus dungeon entry"), Mastery->GetAbyssBonusEntries(), 1);
+		}
+
+		// 0레벨 회귀: 보너스 입장 없음.
+		UIdleGameInstance* PlainGameInstance = NewObject<UIdleGameInstance>();
+		UIdleSaveGame* PlainSave = NewObject<UIdleSaveGame>();
+		PlainSave->bHasSave = true;
+		PlainSave->SaveVersion = 16;
+		TestTrue(TEXT("Plain abyss save applies"), PlainGameInstance->ApplyFromSave(PlainSave));
+		TestEqual(TEXT("Zero abyss mastery grants no bonus entry"), PlainGameInstance->GetMasteryService() ? PlainGameInstance->GetMasteryService()->GetAbyssBonusEntries() : -1, 0);
+	}
 
 	return true;
 }

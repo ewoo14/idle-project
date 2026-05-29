@@ -401,6 +401,28 @@ const TCHAR* MasteryLocalBonusTooltipKey(EMasteryTrack Track)
 	}
 }
 
+// V2(2종) 로컬 보너스 포맷 키. 심연은 던전 입장 +N(정수), 나머지는 % 포맷.
+const TCHAR* MasteryLocalBonus2FormatKey(EMasteryTrack Track)
+{
+	switch (Track)
+	{
+	case EMasteryTrack::Combat:
+		return TEXT("MASTERY_LOCAL_BONUS2_COMBAT_FORMAT");
+	case EMasteryTrack::Equipment:
+		return TEXT("MASTERY_LOCAL_BONUS2_EQUIPMENT_FORMAT");
+	case EMasteryTrack::Abyss:
+		return TEXT("MASTERY_LOCAL_BONUS2_ABYSS_FORMAT");
+	case EMasteryTrack::Rune:
+		return TEXT("MASTERY_LOCAL_BONUS2_RUNE_FORMAT");
+	case EMasteryTrack::Beast:
+		return TEXT("MASTERY_LOCAL_BONUS2_BEAST_FORMAT");
+	case EMasteryTrack::Explore:
+		return TEXT("MASTERY_LOCAL_BONUS2_EXPLORE_FORMAT");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
 FName MakeConsumableUseHitBoxName(EConsumableType Type, EConsumableGrade Grade)
 {
 	return FName(*FString::Printf(TEXT("%s%d_%d"), *ConsumableUseHitBoxPrefix, static_cast<int32>(Type), static_cast<int32>(Grade)));
@@ -2820,6 +2842,9 @@ FIdleHUDMasteryPanelViewModel IdleProject::UI::BuildMasteryPanelViewModel(const 
 		const FMasteryLevelInfo Info = MasteryService.GetTrackLevelInfo(Track);
 		const float LocalBonus = MasteryService.GetLocalBonus(Track);
 		const int32 LocalBonusPercent = FMath::RoundToInt(FMath::Max(0.0f, LocalBonus) * 100.0f);
+		const float LocalBonus2 = MasteryService.GetLocalBonus2(Track);
+		const int32 LocalBonus2Percent = FMath::RoundToInt(FMath::Max(0.0f, LocalBonus2) * 100.0f);
+		const int32 AbyssBonusEntries = Track == EMasteryTrack::Abyss ? MasteryService.GetAbyssBonusEntries() : 0;
 		const float ProgressRatio = Info.XpToNext > 0
 			? FMath::Clamp(static_cast<float>(Info.XpIntoLevel) / static_cast<float>(Info.XpToNext), 0.0f, 1.0f)
 			: 0.0f;
@@ -2844,9 +2869,25 @@ FIdleHUDMasteryPanelViewModel IdleProject::UI::BuildMasteryPanelViewModel(const 
 		{
 			Args.Add(TEXT("Percent"), FText::AsNumber(LocalBonusPercent));
 		});
+		if (Track == EMasteryTrack::Abyss)
+		{
+			Row.LocalBonus2Label = FormatLocalizedUI(MasteryLocalBonus2FormatKey(Track), [AbyssBonusEntries](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Entries"), FText::AsNumber(AbyssBonusEntries));
+			});
+		}
+		else
+		{
+			Row.LocalBonus2Label = FormatLocalizedUI(MasteryLocalBonus2FormatKey(Track), [LocalBonus2Percent](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Percent"), FText::AsNumber(LocalBonus2Percent));
+			});
+		}
 		Row.TooltipLabel = IdleProject::Localization::UI(MasteryLocalBonusTooltipKey(Track));
 		Row.ProgressRatio = ProgressRatio;
 		Row.LocalBonusPercent = LocalBonusPercent;
+		Row.LocalBonus2Percent = LocalBonus2Percent;
+		Row.LocalBonus2AbyssEntries = AbyssBonusEntries;
 		ViewModel.Rows.Add(Row);
 	}
 
@@ -6670,7 +6711,7 @@ void AIdleHUD::DrawMasteryPanel()
 	const FIdleHUDMasteryPanelViewModel ViewModel = BuildMasteryPanelViewModel(*MasteryService);
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
-	const float RowHeight = 42.0f * Scale;
+	const float RowHeight = 56.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = 72.0f * Scale + ViewModel.Rows.Num() * RowHeight + Padding;
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
@@ -6698,8 +6739,9 @@ void AIdleHUD::DrawMasteryPanel()
 		DrawText(Row.TrackLabel.ToString(), Theme::TextPrimary, RowX + 8.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
 		DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, RowX + 78.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 		DrawText(Row.LocalBonusLabel.ToString(), Theme::AccentGold, RowX + 132.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+		DrawText(Row.LocalBonus2Label.ToString(), Theme::AccentBlue, RowX + 132.0f * Scale, RowY + 21.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 		DrawText(Row.XpLabel.ToString(), Theme::TextMuted, RowX + 8.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
-		DrawText(Row.TooltipLabel.ToString(), Theme::TextMuted, RowX + 132.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		DrawText(Row.TooltipLabel.ToString(), Theme::TextMuted, RowX + 8.0f * Scale, RowY + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
 		RowY += RowHeight;
 	}
 }

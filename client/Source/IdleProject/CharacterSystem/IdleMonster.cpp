@@ -155,7 +155,12 @@ void AIdleMonster::HandleDeath(AActor* DyingActor)
 	{
 		const int64 BaseGoldAmount = FRewardFormula::ComputeKillGold(static_cast<int64>(10 + FMath::RandRange(0, 5)), StageGlobalIndex, bIsBoss, bIsElite);
 		const int64 RuneGoldAmount = GameInstance ? FMath::RoundToInt64(static_cast<double>(BaseGoldAmount) * (1.0 + static_cast<double>(GameInstance->GetRuneGoldFindBonus()))) : BaseGoldAmount;
-		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(RuneGoldAmount) : RuneGoldAmount;
+		// 전투 마스터리 2종: 처치 골드 보상 ×(1 + GetLocalBonus2(Combat)). 1종 EXP 보너스와 별도 단일 적용.
+		const float CombatGoldMasteryBonus = (GameInstance && GameInstance->GetMasteryService())
+			? GameInstance->GetMasteryService()->GetLocalBonus2(EMasteryTrack::Combat)
+			: 0.0f;
+		const int64 CombatMasteryGoldAmount = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(RuneGoldAmount) * (1.0 + static_cast<double>(CombatGoldMasteryBonus))));
+		GoldDrop->Amount = GameInstance ? GameInstance->ApplyEquippedPetGoldBonus(CombatMasteryGoldAmount) : CombatMasteryGoldAmount;
 	}
 
 	const float DropChance = GameInstance ? GameInstance->ApplyEquippedPetDropBonusChance(0.05f) : 0.05f;

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  abyssBonusEntries,
   coreStatMultiplier,
   critRateAdd,
   dropRateAdd,
   expBoostPct,
   goldFindPct,
   localBonus,
+  localBonus2,
 } from "./mastery.js";
 
 type MasteryParityAnchor = {
@@ -115,5 +117,35 @@ describe("mastery formula parity with FMasteryFormula", () => {
     expect(localBonus(1, 1e30)).toBe(
       Math.min(0.5, Math.fround(0.01 * Math.log(1 + 1e30))),
     );
+  });
+
+  it.each(anchors)("matches C++ localBonus2 float anchors at level $level", ({
+    level,
+    localBonus: expectedLocal,
+  }) => {
+    // V2는 1종과 동일 곡선 — 비클램프 트랙(Combat/Abyss/Rune/Explore)에서 동일 float 앵커.
+    for (const track of [0, 2, 3, 5]) {
+      expect(localBonus2(track, level)).toBe(expectedLocal);
+    }
+    // Equipment(1)·Beast(4)는 비용 절감 0.50 클램프 — 앵커 레벨에서는 미달이라 동일 값.
+    expect(localBonus2(1, level)).toBe(expectedLocal);
+    expect(localBonus2(4, level)).toBe(expectedLocal);
+  });
+
+  it("caps Equipment and Beast localBonus2 cost reduction at 0.50", () => {
+    expect(localBonus2(1, 1e30)).toBe(0.5);
+    expect(localBonus2(4, 1e30)).toBe(0.5);
+    expect(localBonus2(1, 1e30)).toBe(
+      Math.min(0.5, Math.fround(0.01 * Math.log(1 + 1e30))),
+    );
+  });
+
+  it("mirrors FMasteryFormula::GetAbyssBonusEntries integer thresholds", () => {
+    expect(abyssBonusEntries(0)).toBe(0);
+    expect(abyssBonusEntries(49)).toBe(0);
+    expect(abyssBonusEntries(50)).toBe(1);
+    expect(abyssBonusEntries(100)).toBe(2);
+    expect(abyssBonusEntries(150)).toBe(3);
+    expect(abyssBonusEntries(1e9)).toBe(3);
   });
 });

@@ -661,6 +661,7 @@ private:
 	void EnsureWeeklyBossService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
+	int64 ApplyEquipmentCubeCostReduction(int64 BaseCost);
 	UFUNCTION()
 	void HandleChapterBossDefeated(int32 ClearedChapter);
 	void LoadLanguage();

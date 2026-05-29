@@ -61,6 +61,24 @@ export function localBonus(track: number, level: number): number {
   return track === 1 ? Math.min(0.5, raw) : raw;
 }
 
+// V2 로컬 보너스(트랙당 2종째). 1종과 동일 ln 곡선·계수(0.01).
+// Equipment(track 1, 큐브 가격 절감)·Beast(track 4, 펫 먹이 비용 절감)는 0.5 상한 클램프.
+export function localBonus2(track: number, level: number): number {
+  const safeLevel = Math.max(0, Math.floor(level));
+  if (safeLevel <= 0) {
+    return 0;
+  }
+
+  const raw = Math.fround(0.01 * Math.log(1 + safeLevel));
+  return track === 1 || track === 4 ? Math.min(0.5, raw) : raw;
+}
+
+// 심연(track 2) 2종: 던전 일일 입장 추가 정수 보너스. floor(level/50), 상한 +3.
+export function abyssBonusEntries(level: number): number {
+  const safeLevel = Math.max(0, Math.floor(level));
+  return Math.min(3, Math.floor(safeLevel / 50));
+}
+
 export function worldPower(trackLevels: number[]): number {
   return trackLevels.reduce((acc, lv) => acc + Math.max(0, Math.floor(lv)), 0);
 }
