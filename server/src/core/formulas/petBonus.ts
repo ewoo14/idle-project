@@ -74,3 +74,19 @@ export function getEffectiveBonusPercent(
 ): number {
   return Math.fround(Math.fround(basePercent) * getBonusMultiplier(level));
 }
+
+// 펫 진화(별/Star) parity 상수 — 클라(PetLevelFormula)와 1:1.
+// 진화 비용은 골드 기하 증가(무한 sink), 별 배수는 선형 무한.
+export const PET_EVOLVE_BASE = 50000;
+export const PET_EVOLVE_GROWTH = 1.8;
+export const PET_STAR_STEP = 0.15;
+
+// 다음 별로 진화하는 데 필요한 골드 비용. 기하 증가(무한 sink), 음수 별은 0성 처리.
+export function getPetEvolveCost(star: number): number {
+  return Math.floor(PET_EVOLVE_BASE * PET_EVOLVE_GROWTH ** Math.max(0, star));
+}
+
+// 장착 펫 보너스에 곱하는 별 배수. 선형 무한(star0=1.0), 음수 별은 0성 처리.
+export function getPetStarMultiplier(star: number): number {
+  return Math.fround(1 + PET_STAR_STEP * Math.max(0, star));
+}

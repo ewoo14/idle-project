@@ -7,6 +7,7 @@ void UPetService::InitializeDefaultPets()
 	BuildDefaultDefinitions();
 	OwnedPetIds.Empty();
 	PetLevels.Empty();
+	PetStars.Empty();
 	OwnedPetIds.Add(TEXT("dog"));
 	OwnedPetIds.Add(TEXT("bird"));
 	PetLevels.FindOrAdd(TEXT("dog"), 0);
@@ -52,12 +53,23 @@ int32 UPetService::GetPetLevel(const FString& PetId) const
 	return Level ? *Level : 0;
 }
 
+int32 UPetService::GetPetStar(const FString& PetId) const
+{
+	const int32* Star = PetStars.Find(PetId);
+	return Star ? *Star : 0;
+}
+
 void UPetService::RestoreState(const FString& PetId, const TMap<FString, int32>& Levels)
 {
 	RestoreState(PetId, TSet<FString>(), Levels);
 }
 
 void UPetService::RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels)
+{
+	RestoreState(PetId, InOwnedPetIds, Levels, TMap<FString, int32>());
+}
+
+void UPetService::RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels, const TMap<FString, int32>& Stars)
 {
 	InitializeDefaultPets();
 	if (!InOwnedPetIds.IsEmpty())
@@ -85,6 +97,15 @@ void UPetService::RestoreState(const FString& PetId, const TSet<FString>& InOwne
 		}
 	}
 
+	for (const TPair<FString, int32>& Pair : Stars)
+	{
+		if (OwnedPetIds.Contains(Pair.Key) && DefinitionById.Contains(Pair.Key))
+		{
+			// 별은 무한 성장(상한 없음). 음수만 0성으로 가드.
+			PetStars.FindOrAdd(Pair.Key) = FMath::Max(0, Pair.Value);
+		}
+	}
+
 	if (OwnedPetIds.Contains(PetId) && DefinitionById.Contains(PetId))
 	{
 		EquippedPetId = PetId;
@@ -105,6 +126,18 @@ bool UPetService::FeedPet(const FString& PetId)
 	}
 
 	++Level;
+	return true;
+}
+
+bool UPetService::EvolvePet(const FString& PetId)
+{
+	if (!OwnedPetIds.Contains(PetId) || !DefinitionById.Contains(PetId))
+	{
+		return false;
+	}
+
+	int32& Star = PetStars.FindOrAdd(PetId, 0);
+	++Star;
 	return true;
 }
 
@@ -141,7 +174,9 @@ FPetStatBonus UPetService::GetEquippedPetStatBonus() const
 		return Bonus;
 	}
 
-	const float Ratio = Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId)) / 100.0f;
+	// 최종 보너스 = (정의 percent × 레벨 배수) × 별 배수. 별 배수는 장착 펫만, 여기 1곳에서만 곱(이중 계산 금지).
+	const float StarMultiplier = FPetLevelFormula::GetPetStarMultiplier(GetPetStar(EquippedPetId));
+	const float Ratio = Pet->BonusPercent * FPetLevelFormula::GetBonusMultiplier(GetPetLevel(EquippedPetId)) * StarMultiplier / 100.0f;
 	switch (Pet->BonusType)
 	{
 	case EPetBonusType::PhysAtk:

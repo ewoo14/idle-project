@@ -232,6 +232,111 @@ bool FIdleGameInstancePetFeedTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetEvolveFormulaTest,
+	"IdleProject.GameCore.PetLevelFormula.Evolve",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetEvolveFormulaTest::RunTest(const FString& Parameters)
+{
+	// 진화 비용 parity — 서버 getPetEvolveCost 표값(floor(50000 * 1.8^star)).
+	TestEqual(TEXT("Star zero evolve cost mirrors server base"), FPetLevelFormula::GetPetEvolveCost(0), static_cast<int64>(50000));
+	TestEqual(TEXT("Star one evolve cost mirrors server geometric"), FPetLevelFormula::GetPetEvolveCost(1), static_cast<int64>(90000));
+	TestEqual(TEXT("Star two evolve cost mirrors server geometric"), FPetLevelFormula::GetPetEvolveCost(2), static_cast<int64>(162000));
+	TestEqual(TEXT("Star three evolve cost mirrors server geometric"), FPetLevelFormula::GetPetEvolveCost(3), static_cast<int64>(291600));
+	TestEqual(TEXT("Negative star clamps to star zero cost"), FPetLevelFormula::GetPetEvolveCost(-3), static_cast<int64>(50000));
+	TestTrue(TEXT("Evolve cost increases monotonically"), FPetLevelFormula::GetPetEvolveCost(5) > FPetLevelFormula::GetPetEvolveCost(4));
+
+	// 별 배수 parity — 서버 getPetStarMultiplier(1 + 0.15 * star).
+	TestEqual(TEXT("Star zero multiplier is one"), FPetLevelFormula::GetPetStarMultiplier(0), 1.0f);
+	TestEqual(TEXT("Star one multiplier adds one step"), FPetLevelFormula::GetPetStarMultiplier(1), 1.15f);
+	TestEqual(TEXT("Star two multiplier adds two steps"), FPetLevelFormula::GetPetStarMultiplier(2), 1.30f);
+	TestEqual(TEXT("Star four multiplier scales linearly"), FPetLevelFormula::GetPetStarMultiplier(4), 1.60f);
+	TestEqual(TEXT("Negative star multiplier clamps to one"), FPetLevelFormula::GetPetStarMultiplier(-2), 1.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPetServiceEvolveTest,
+	"IdleProject.GameCore.PetService.Evolve",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPetServiceEvolveTest::RunTest(const FString& Parameters)
+{
+	UPetService* Pets = NewObject<UPetService>();
+	Pets->InitializeDefaultPets();
+
+	TestEqual(TEXT("Owned pet starts at star zero"), Pets->GetPetStar(TEXT("dog")), 0);
+	TestEqual(TEXT("Unknown pet reports star zero"), Pets->GetPetStar(TEXT("slime")), 0);
+
+	TestTrue(TEXT("Owned pet can be evolved"), Pets->EvolvePet(TEXT("dog")));
+	TestEqual(TEXT("Evolve increments star"), Pets->GetPetStar(TEXT("dog")), 1);
+	TestTrue(TEXT("Owned pet evolves again"), Pets->EvolvePet(TEXT("dog")));
+	TestEqual(TEXT("Second evolve increments star"), Pets->GetPetStar(TEXT("dog")), 2);
+
+	TestFalse(TEXT("Unowned defined pet cannot be evolved"), Pets->EvolvePet(TEXT("cat")));
+	TestEqual(TEXT("Rejected evolve leaves star zero"), Pets->GetPetStar(TEXT("cat")), 0);
+	TestFalse(TEXT("Unknown pet cannot be evolved"), Pets->EvolvePet(TEXT("slime")));
+
+	// 별 배수는 GetEquippedPetStatBonus 에만 반영(장착 펫). 레벨과 직교: 레벨 고정 후 별만 올려 보너스 증가 확인.
+	TestTrue(TEXT("Wolf unlock succeeds for star bonus check"), Pets->TryUnlockPet(TEXT("wolf")));
+	TestTrue(TEXT("Wolf equip succeeds for star bonus check"), Pets->EquipPet(TEXT("wolf")));
+	const FPetStatBonus StarZeroBonus = Pets->GetEquippedPetStatBonus();
+	TestEqual(TEXT("Star zero wolf keeps base physical attack ratio"), StarZeroBonus.PhysAtkPct, 0.10f);
+
+	TestTrue(TEXT("Wolf evolves to star one"), Pets->EvolvePet(TEXT("wolf")));
+	const FPetStatBonus StarOneBonus = Pets->GetEquippedPetStatBonus();
+	// 0.10 * 1.15 = 0.115, 레벨 배수(star0=1.0) 직교.
+	TestEqual(TEXT("Star one wolf scales physical attack ratio by star multiplier"), StarOneBonus.PhysAtkPct, 0.115f);
+	TestTrue(TEXT("Star one wolf bonus strictly exceeds star zero"), StarOneBonus.PhysAtkPct > StarZeroBonus.PhysAtkPct);
+
+	// 비장착 펫 별 변화는 장착 보너스에 영향 없음(장착 펫만 곱).
+	TestTrue(TEXT("Dog star is two but dog is not equipped"), Pets->GetPetStar(TEXT("dog")) == 2);
+	const FPetStatBonus StillWolfBonus = Pets->GetEquippedPetStatBonus();
+	TestEqual(TEXT("Unequipped dog stars do not affect equipped wolf bonus"), StillWolfBonus.PhysAtkPct, 0.115f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstancePetEvolveTest,
+	"IdleProject.GameCore.IdleGameInstance.PetEvolve",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstancePetEvolveTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializePetSeasonServicesForTests();
+
+	// 골드 부족 시 진화 거부, 골드 불변.
+	TestFalse(TEXT("Insufficient gold blocks evolve"), GameInstance->EvolvePet(TEXT("dog")));
+	TestEqual(TEXT("Failed evolve leaves star zero"), GameInstance->GetPetService()->GetPetStar(TEXT("dog")), 0);
+	TestEqual(TEXT("Failed evolve spends no gold"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	// 정확히 비용만큼 충전 → 단일 차감.
+	GameInstance->AddGold(FPetLevelFormula::GetPetEvolveCost(0));
+	TestTrue(TEXT("Sufficient gold evolves pet"), GameInstance->EvolvePet(TEXT("dog")));
+	TestEqual(TEXT("Evolve increments star"), GameInstance->GetPetService()->GetPetStar(TEXT("dog")), 1);
+	TestEqual(TEXT("Evolve deducts cost exactly once"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	// 미보유 펫 진화 거부, 골드 불변.
+	GameInstance->AddGold(FPetLevelFormula::GetPetEvolveCost(0));
+	const int64 GoldBeforeLockedEvolve = GameInstance->GetGold();
+	TestFalse(TEXT("Unowned pet cannot be evolved through game instance"), GameInstance->EvolvePet(TEXT("cat")));
+	TestEqual(TEXT("Unowned evolve spends no gold"), GameInstance->GetGold(), GoldBeforeLockedEvolve);
+
+	// 두 번째 진화는 별1 비용으로 차감(비용이 별 따라 증가).
+	const int64 GoldBeforeSecond = GameInstance->GetGold();
+	const int64 SecondCost = FPetLevelFormula::GetPetEvolveCost(1);
+	GameInstance->AddGold(SecondCost - GoldBeforeSecond);
+	TestTrue(TEXT("Second evolve succeeds with next-star cost"), GameInstance->EvolvePet(TEXT("dog")));
+	TestEqual(TEXT("Second evolve increments star to two"), GameInstance->GetPetService()->GetPetStar(TEXT("dog")), 2);
+	TestEqual(TEXT("Second evolve deducts next-star cost exactly"), GameInstance->GetGold(), static_cast<int64>(0));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSeasonServiceTierClaimTest,
 	"IdleProject.GameCore.SeasonService.TierClaim",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -374,6 +479,10 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 		[Pets](const FString& PetId)
 		{
 			return Pets->IsPetOwned(PetId);
+		},
+		[Pets](const FString& PetId)
+		{
+			return Pets->GetPetStar(PetId);
 		});
 
 	TestEqual(TEXT("Pet HUD shows expanded pet catalog"), PetPanel.Rows.Num(), 10);
@@ -396,6 +505,12 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Locked cat row disables feed"), PetPanel.Rows[2].bFeedDisabled);
 	TestEqual(TEXT("Locked cat row uses localized locked action"), PetPanel.Rows[2].ActionLabel.ToString(), FString(TEXT("Locked")));
 	TestEqual(TEXT("Locked cat row uses localized locked status"), PetPanel.Rows[2].StatusLabel.ToString(), FString(TEXT("Locked")));
+	TestTrue(TEXT("Dog row shows zero-star label"), PetPanel.Rows[0].StarLabel.ToString().Contains(TEXT("0")));
+	TestTrue(TEXT("Dog row exposes evolve cost label"), PetPanel.Rows[0].EvolveCostLabel.ToString().Contains(TEXT("50,000")));
+	TestTrue(TEXT("Dog row exposes next-star effect label"), PetPanel.Rows[0].EvolveEffectLabel.ToString().Contains(TEXT("15%")));
+	TestTrue(TEXT("Dog row exposes evolve action label"), PetPanel.Rows[0].EvolveActionLabel.ToString().Len() > 0);
+	TestFalse(TEXT("Dog row cannot evolve when gold is below the evolve cost"), PetPanel.Rows[0].bCanEvolve);
+	TestFalse(TEXT("Locked cat row cannot evolve"), PetPanel.Rows[2].bCanEvolve);
 	TestTrue(TEXT("Equipped pet summary includes scaled gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("22%")));
 	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
 

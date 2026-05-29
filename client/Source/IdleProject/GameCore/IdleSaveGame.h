@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 19;
+	int32 SaveVersion = 20;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -90,6 +90,10 @@ public:
 
 	UPROPERTY()
 	TMap<FString, int32> PetLevels;
+
+	// 펫 진화 별 수치(SaveVer 20). PetLevels 와 동일 직렬화 방식. <20 세이브는 빈 맵(0성).
+	UPROPERTY()
+	TMap<FString, int32> PetStars;
 
 	UPROPERTY()
 	TArray<FItemInstance> InventoryItems;

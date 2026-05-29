@@ -84,14 +84,24 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	int32 GetPetLevel(const FString& PetId) const;
 
+	// 펫 진화 별 수치. 누락 펫은 0성. 음수 가드 없음(맵에는 항상 0 이상 저장).
+	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
+	int32 GetPetStar(const FString& PetId) const;
+
 	const TMap<FString, int32>& GetPetLevels() const { return PetLevels; }
+	const TMap<FString, int32>& GetPetStars() const { return PetStars; }
 	const TSet<FString>& GetOwnedPetIds() const { return OwnedPetIds; }
 
 	void RestoreState(const FString& PetId, const TMap<FString, int32>& Levels);
 	void RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels);
+	void RestoreState(const FString& PetId, const TSet<FString>& InOwnedPetIds, const TMap<FString, int32>& Levels, const TMap<FString, int32>& Stars);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool FeedPet(const FString& PetId);
+
+	// 보유 펫의 별을 1 증가. 골드 검증/차감은 GameInstance 책임. 미보유/미정의는 거부.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool EvolvePet(const FString& PetId);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Pet")
 	float GetEquippedPetGoldBonusPercent() const;
@@ -116,6 +126,7 @@ private:
 	TMap<FString, FPetDefinition> DefinitionById;
 	TSet<FString> OwnedPetIds;
 	TMap<FString, int32> PetLevels;
+	TMap<FString, int32> PetStars;
 	FString EquippedPetId;
 
 	void BuildDefaultDefinitions();

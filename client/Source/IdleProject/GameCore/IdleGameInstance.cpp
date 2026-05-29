@@ -1716,7 +1716,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureWeeklyBossService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 19;
+	SaveGame->SaveVersion = 20;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1769,6 +1769,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->EquippedPetId = PetService->GetEquippedPetId();
 		SaveGame->OwnedPetIds = PetService->GetOwnedPetIds();
 		SaveGame->PetLevels = PetService->GetPetLevels();
+		SaveGame->PetStars = PetService->GetPetStars();
 	}
 
 	if (UInventoryComponent* Inventory = FindPlayerInventory())
@@ -1962,7 +1963,9 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsurePetService();
 	if (PetService)
 	{
-		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->OwnedPetIds, SaveGame->PetLevels);
+		// SaveVer 20+ 만 PetStars 복원, 이전 버전은 빈 맵(0성)으로 회귀 안전.
+		const TMap<FString, int32> RestoredPetStars = SaveGame->SaveVersion >= 20 ? SaveGame->PetStars : TMap<FString, int32>();
+		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->OwnedPetIds, SaveGame->PetLevels, RestoredPetStars);
 	}
 
 	EnsureMasteryService();
@@ -3365,6 +3368,39 @@ bool UIdleGameInstance::TryUnlockPet(const FString& PetId)
 		return false;
 	}
 
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::EvolvePet(const FString& PetId)
+{
+	EnsurePetService();
+	if (!PetService || !PetService->IsPetOwned(PetId))
+	{
+		return false;
+	}
+
+	// 현재 별 기준 진화 비용 산출 → 골드 검증 → 단일 차감.
+	const int32 CurrentStar = PetService->GetPetStar(PetId);
+	const int64 Cost = FPetLevelFormula::GetPetEvolveCost(CurrentStar);
+	if (Cost <= 0 || GetGold() < Cost)
+	{
+		return false;
+	}
+
+	AddGold(-Cost);
+	if (!PetService->EvolvePet(PetId))
+	{
+		// 진화 실패 시 차감 골드 복원(이론상 IsPetOwned 통과 후 도달 불가, 방어적).
+		AddGold(Cost);
+		return false;
+	}
+
+	// 장착 펫 별 배수 반영(GetEquippedPetStatBonus 경유).
+	if (PetService->GetEquippedPetId() == PetId)
+	{
+		RefreshPlayerCharacterStats();
+	}
 	RequestAutosave();
 	return true;
 }
