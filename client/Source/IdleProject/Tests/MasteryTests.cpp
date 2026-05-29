@@ -53,6 +53,10 @@ bool FMasteryServiceTest::RunTest(const FString& Parameters)
 	Service->AddXp(EMasteryTrack::Combat, 250);
 	TestEqual(TEXT("250 combat xp reaches level 2"), Service->GetTrackLevel(EMasteryTrack::Combat), 2);
 	TestEqual(TEXT("Combat total xp is stored"), Service->GetTrackTotalXp(EMasteryTrack::Combat), static_cast<int64>(250));
+	const FMasteryLevelInfo CombatLevelInfo = Service->GetTrackLevelInfo(EMasteryTrack::Combat);
+	TestEqual(TEXT("Level info exposes current level"), CombatLevelInfo.Level, 2);
+	TestEqual(TEXT("Level info exposes xp into level"), CombatLevelInfo.XpIntoLevel, static_cast<int64>(36));
+	TestEqual(TEXT("Level info exposes xp to next"), CombatLevelInfo.XpToNext, FMasteryFormula::XpToNext(2));
 
 	Service->AddXp(EMasteryTrack::Beast, 1000);
 	const FMasteryGlobalBonus Bonus = Service->GetGlobalBonus();

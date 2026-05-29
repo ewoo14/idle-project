@@ -461,3 +461,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   stage multipliers, weak-element mappings, or reward bonus constants.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target.
+
+## PR #72 Designer Checklist Addendum (Section 1)
+
+- [ ] Mastery HUD renders six localized rows in Combat, Equipment, Abyss, Rune,
+  Beast, Explore order with level, XP bar, `xpIntoLevel / xpToNext`, and current
+  bonus summary.
+- [ ] Header shows localized `MASTERY_PANEL_TITLE` and
+  `MASTERY_WORLD_POWER_FORMAT` beside the CP hierarchy without replacing CP.
+- [ ] HUD ViewModel uses `UMasteryService::GetTrackLevelInfo` for XP bar state
+  and existing BlueprintPure getters for World Power and global bonus summaries.
+- [ ] Panel uses only existing `docs/planning/ui-tokens.json` colors and remains
+  readable at 1080p, 1440p, and 4K with no hard-coded color additions.
+- [ ] ko/en `UI.csv` includes paired Mastery title, track, level, XP, bonus, and
+  tooltip keys covered by `IdleProject.Localization.CsvIntegrity`.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.

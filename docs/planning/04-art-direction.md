@@ -239,3 +239,24 @@ weakness keeps `ELEMENT_DARK`, the `ElementDark` theme token, and the compact
 `D` glyph chip; no hard-coded Chapter 4 copy, color, or binary art asset is
 introduced. Existing `.gitattributes` LFS patterns continue to cover future
 `.uasset` and `.png` UI exports.
+
+## PR #72 Unified Mastery HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Unified Mastery HUD V1 adds a
+right-side utility panel for six permanent mastery tracks: Combat, Equipment,
+Abyss, Rune, Beast, and Explore. The panel uses the existing `--bg-panel`,
+`--bg-primary`, `--accent-gold`, `--accent-blue`, `--text-primary`, and
+`--text-muted` tokens only. World Power uses `--accent-gold` in the header and
+should read as a permanent progression value beside CP, not as a replacement for
+combat power.
+
+Each row keeps a fixed height and shows localized track name, level, XP bar,
+`xpIntoLevel / xpToNext`, and one current bonus summary. The XP bar uses
+`--accent-blue`, while completed or level-up emphasis may use `--accent-gold`.
+Tooltips explain locked or empty tracks and World Power persistence through
+rebirth and transcendence. The panel keeps the Canvas-height scale clamp at
+1.0-2.0 for 1080p, 1440p, and 4K and avoids overlap with the bottom skill HUD
+and existing right-side shop/enhancement/quest stack.
+
+No binary art assets were added; existing `.gitattributes` LFS patterns continue
+to cover future `.uasset`, `.png`, and other exported UI assets.

@@ -26,6 +26,9 @@ public:
 	int64 GetTrackTotalXp(EMasteryTrack Track) const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
+	FMasteryLevelInfo GetTrackLevelInfo(EMasteryTrack Track) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
 	int64 GetWorldPower() const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")

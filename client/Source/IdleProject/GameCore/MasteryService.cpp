@@ -41,6 +41,21 @@ int64 UMasteryService::GetTrackTotalXp(EMasteryTrack Track) const
 	return Index == INDEX_NONE ? 0 : TrackXp[Index];
 }
 
+FMasteryLevelInfo UMasteryService::GetTrackLevelInfo(EMasteryTrack Track) const
+{
+	FMasteryLevelInfo Info;
+	const int32 Index = ToIndex(Track);
+	if (Index == INDEX_NONE)
+	{
+		Info.XpToNext = FMasteryFormula::XpToNext(0);
+		return Info;
+	}
+
+	Info.TotalXp = TrackXp[Index];
+	FMasteryFormula::LevelFromTotalXp(Info.TotalXp, Info.Level, Info.XpIntoLevel, Info.XpToNext);
+	return Info;
+}
+
 int64 UMasteryService::GetWorldPower() const
 {
 	int64 Total = 0;

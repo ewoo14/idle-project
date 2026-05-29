@@ -49,3 +49,21 @@ struct IDLEPROJECT_API FMasteryGlobalBonus
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Mastery")
 	int64 WorldPower = 0;
 };
+
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FMasteryLevelInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Mastery")
+	int32 Level = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Mastery")
+	int64 TotalXp = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Mastery")
+	int64 XpIntoLevel = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Mastery")
+	int64 XpToNext = 0;
+};
