@@ -467,12 +467,12 @@
 
 <!-- markdownlint-disable MD013 -->
 
-| Dungeon | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Gold | 100 | 100 | 20000 gold | 60000 gold | 0.092 |
-| Gold | 5500 | 100 | 148324 gold | 444972 gold | 0.68 |
-| Exp | 5500 | 250 | 93808 exp | 281424 exp | 0.385 |
-| Essence | 5500 | 500 | 40 essence | 120 essence | n/a |
+| Dungeon | Tier | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gold | 1 | 100 | 100 | 20000 gold | 60000 gold | 0.092 |
+| Gold | 5 | 1600 | 100 | 400000 gold | 1200000 gold | 1.833 |
+| Exp | 5 | 4000 | 250 | 400000 exp | 1200000 exp | 1.643 |
+| Essence | 5 | 8000 | 500 | 240 essence | 720 essence | n/a |
 
 <!-- markdownlint-enable MD013 -->
 

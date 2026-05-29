@@ -2016,3 +2016,38 @@ Guardrails:
 - Re-run `cd server; npm run test -- tests/balance-sim.test.ts` and
   `cd server; npm run balance:sim` after changing local-bonus constants or
   injecting mastery acquisition into the sampled run.
+
+## PR #75 Dungeon Tiers Balance Review
+
+PR #75 adds infinite difficulty tiers to the three PR #68 daily dungeons. The
+detailed review artifact is
+`docs/planning/dungeon-tiers-balance-note.md`.
+
+Formula anchors:
+
+- `TIER_CP_FACTOR = 2.0`.
+- `TierCpRequirement(type, tier) = MinimumCp(type) * 2^(tier - 1)`.
+- `TierRewardMultiplier(tier) = max(1, tier)`.
+- `Reward(type, cp, tier) = BaseReward * sqrt(cp / MinimumCp) * tier`, with
+  tier 1 preserving the PR #68 reward surface.
+
+At the exact tier 5 gates, Gold requires 1600 CP and pays 400,000 gold/run, Exp
+requires 4000 CP and pays 400,000 EXP/run, and Essence requires 8000 CP and
+pays 240 essence/run. Three daily tier 5 Gold or Exp entries are larger than
+one sampled Lv50 income hour, but that pressure is tied to a 16x minimum-CP
+gate and remains outside first-rebirth timing until unlock timing and expected
+daily usage are modeled.
+
+The current 1000-run first-rebirth simulator output is unchanged: p10 4.919h,
+median 5.328h, p90 5.751h, min 4.564h, max 6.144h. Median remains inside the
+5-10h target and every sampled run remains inside the 3-20h review band.
+
+Guardrails:
+
+- Keep tier rewards single-application: base dungeon reward, then tier
+  multiplier, then source-specific bonuses such as PR #74 Abyss local mastery.
+- Do not apply Abyss local mastery both before and after tier multiplication.
+- Keep the three-entry daily limit shared across tiers; do not add a separate
+  per-tier entry budget in PR #75.
+- Do not tune first-rebirth pacing from tier pressure until dungeon acquisition
+  timing enters `tools/balance-sim`.
