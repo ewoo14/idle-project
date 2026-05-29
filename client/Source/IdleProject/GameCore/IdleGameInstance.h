@@ -489,6 +489,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Title")
 	float GetTitleCritDamageBonus() const;
 
+	// 잠재 V2: 장착 장비 잠재 AllStatPercent 합을 곱 배수(1.0 + 합)로 반환. RefreshDerivedStats 전역 배수 단일 지점에서만 소비(이중 적용 금지 #72).
+	UFUNCTION(BlueprintPure, Category = "Idle|Item")
+	float GetEquippedPotentialAllStatMultiplier() const;
+
+	// 잠재 V2: 장착 장비 잠재 GoldFindPercent 합(비율). AddGold 골드 배수 단일 지점에서만 소비.
+	UFUNCTION(BlueprintPure, Category = "Idle|Item")
+	float GetEquippedPotentialGoldFindPercent() const;
+
+	// 잠재 V2: 장착 장비 잠재 DropRatePercent 합(비율). 펫 Drop 보너스 집계(ApplyEquippedPetDropBonusChance) 단일 지점에서만 소비.
+	UFUNCTION(BlueprintPure, Category = "Idle|Item")
+	float GetEquippedPotentialDropRatePercent() const;
+
 	// 칭호 장착/해제 진입점. 성공 시 캐릭터 스탯 갱신 + 자동 저장 요청.
 	UFUNCTION(BlueprintCallable, Category = "Idle|Title")
 	bool EquipTitle(const FString& TitleId);

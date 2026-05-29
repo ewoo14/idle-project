@@ -102,7 +102,9 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 		float PotentialCritRate = 0.0f;
 		float PotentialAtkSpeed = 0.0f;
 		float PotentialCritDmg = 0.0f;
-		for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3 })
+		// 잠재 V2: Transcendent 4번째 줄 포함 순회. 전투 8종 경로 불변(신규 옵션 3종은 여기 미합산 —
+		// AllStat/Gold/Drop 은 각 단일 집계 지점에서만 소비, 이중 적용 금지 #72).
+		for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3, Item.PotentialLine4 })
 		{
 			switch (Line.Stat)
 			{
@@ -130,6 +132,10 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 			case EPotentialStat::CritDmgPercent:
 				PotentialCritDmg += Line.Value;
 				break;
+			// 잠재 V2 신규 옵션은 전투 스탯 보너스 경로에서 제외(경제/전역 단일 집계 지점에서만 적용).
+			case EPotentialStat::AllStatPercent:
+			case EPotentialStat::GoldFindPercent:
+			case EPotentialStat::DropRatePercent:
 			case EPotentialStat::None:
 			default:
 				break;
@@ -157,6 +163,40 @@ FDerivedStats UInventoryComponent::ComputeEquipmentBonus() const
 	Bonus.CritDmg += SetBonus.CritDmg;
 
 	return Bonus;
+}
+
+FEquippedPotentialEconomyBonus UInventoryComponent::ComputeEquippedPotentialEconomyBonus() const
+{
+	// 잠재 V2: 장착 장비 잠재 신규 옵션 3종 합산. 4줄(Transcendent) 모두 순회.
+	// 반환 구조의 각 필드는 호출측 단일 지점에서만 소비(AllStat→RefreshDerivedStats, Gold→AddGold, Drop→펫 Drop 집계).
+	FEquippedPotentialEconomyBonus Result;
+	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
+	{
+		if (!Items.IsValidIndex(Pair.Value))
+		{
+			continue;
+		}
+
+		const FItemInstance& Item = Items[Pair.Value];
+		for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3, Item.PotentialLine4 })
+		{
+			switch (Line.Stat)
+			{
+			case EPotentialStat::AllStatPercent:
+				Result.AllStatPercent += Line.Value;
+				break;
+			case EPotentialStat::GoldFindPercent:
+				Result.GoldFindPercent += Line.Value;
+				break;
+			case EPotentialStat::DropRatePercent:
+				Result.DropRatePercent += Line.Value;
+				break;
+			default:
+				break;
+			}
+		}
+	}
+	return Result;
 }
 
 FUniqueTraitCoreMultipliers UInventoryComponent::ComputeUniqueTraitMultipliers() const
@@ -244,6 +284,8 @@ bool UInventoryComponent::SetEquippedPotential(EItemSlot Slot, EPotentialGrade G
 	Item.PotentialLine1 = Lines.IsValidIndex(0) ? Lines[0] : FPotentialLine();
 	Item.PotentialLine2 = Lines.IsValidIndex(1) ? Lines[1] : FPotentialLine();
 	Item.PotentialLine3 = Lines.IsValidIndex(2) ? Lines[2] : FPotentialLine();
+	// 잠재 V2: Transcendent 4번째 줄(하위 등급 롤은 인덱스 3 없음 → 기본값으로 초기화/소거).
+	Item.PotentialLine4 = Lines.IsValidIndex(3) ? Lines[3] : FPotentialLine();
 	OnEquippedChanged.Broadcast(Slot);
 	return true;
 }

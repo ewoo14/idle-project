@@ -186,7 +186,9 @@ void AIdleCharacter::RefreshDerivedStats()
 	const float MasteryCoreMultiplier = IdleGameInstance ? IdleGameInstance->GetMasteryCoreStatMultiplier() : 1.0f;
 	// 칭호 AllStatPct 전역 스탯 배수(장착 1개, 단일 적용 지점 — 마스터리/펫 배수 옆 합산, 이중 적용 금지 #72).
 	const float TitleAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetTitleAllStatMultiplier() : 1.0f;
-	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier * TitleAllStatMultiplier;
+	// 잠재 V2: 장착 장비 잠재 AllStatPercent 전역 스탯 배수(칭호 AllStat 옆 동일 단일 지점, 이중 적용 금지 #72).
+	const float PotentialAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetEquippedPotentialAllStatMultiplier() : 1.0f;
+	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier * TitleAllStatMultiplier * PotentialAllStatMultiplier;
 	Derived.Hp *= StatMultiplier;
 	Derived.PhysAtk *= StatMultiplier;
 	Derived.MagicAtk *= StatMultiplier;
