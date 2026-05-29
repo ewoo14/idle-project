@@ -342,7 +342,9 @@ struct IDLEPROJECT_API FIdleHUDShopPanelViewModel
 struct IDLEPROJECT_API FIdleHUDConsumableRowViewModel
 {
 	EConsumableType Type = EConsumableType::AttackTonic;
+	EConsumableGrade Grade = EConsumableGrade::Standard;
 	FText NameLabel;
+	FText GradeLabel;
 	FText EffectLabel;
 	FText CountLabel;
 	FText ActionLabel;

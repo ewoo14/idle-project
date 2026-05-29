@@ -249,6 +249,7 @@ describe("SaveService", () => {
         additionalProperties: false,
         properties: {
           type: { type: "integer", minimum: 0, maximum: 5 },
+          grade: { type: "integer", minimum: 0, maximum: 2 },
           count: { type: "integer", minimum: 0 },
           buffEndUnixSec: { type: "integer", minimum: 0 },
         },

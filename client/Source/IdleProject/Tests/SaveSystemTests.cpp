@@ -72,7 +72,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V15"), SaveGame->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("SaveVersion starts at V16"), SaveGame->SaveVersion, static_cast<int32>(16));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -156,7 +156,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Captured save writes V16"), CapturedSave->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -249,7 +249,7 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Capture after legacy migration writes V16"), CapturedSave->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
@@ -282,7 +282,7 @@ bool FIdleSaveSystemMasteryV12MigrationTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v12 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Migrated capture writes v16"), CapturedSave->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Migrated capture writes all mastery tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	return true;
@@ -306,8 +306,49 @@ bool FIdleSaveSystemConsumableV13MigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v13 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated consumable capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Migrated consumable capture writes v16"), CapturedSave->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Migrated capture has no consumable stock"), CapturedSave->Consumables.Num(), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemConsumableGradeV15MigrationTest,
+	"IdleProject.GameCore.SaveSystem.ConsumableGradeV15Migration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemConsumableGradeV15MigrationTest::RunTest(const FString& Parameters)
+{
+	// v15 엔트리는 Grade 필드가 없어 구조체 기본값 Standard(1) 가 그대로 남아야 합니다.
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->SaveVersion = 15;
+	LegacySave->bHasSave = true;
+	FConsumableSaveEntry LegacyEntry;
+	LegacyEntry.Type = static_cast<uint8>(EConsumableType::AttackTonic);
+	LegacyEntry.Count = 3;
+	LegacyEntry.BuffEndUnixSec = 0;
+	TestEqual(TEXT("v15 entry defaults to Standard grade"), LegacyEntry.Grade, static_cast<uint8>(EConsumableGrade::Standard));
+	LegacySave->Consumables.Add(LegacyEntry);
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave accepts v15 consumable save"), GameInstance->ApplyFromSave(LegacySave));
+	UBuffService* BuffService = GameInstance->GetBuffService();
+	TestNotNull(TEXT("Buff service exists after v15 migration"), BuffService);
+	if (!BuffService)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("v15 stock migrates into Standard grade"), BuffService->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Standard), 3);
+	TestEqual(TEXT("v15 migration leaves Lesser grade empty"), BuffService->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Lesser), 0);
+	TestEqual(TEXT("v15 migration leaves Greater grade empty"), BuffService->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Greater), 0);
+
+	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Capture after v15 grade migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
+	TestEqual(TEXT("v15 grade migration capture writes v16"), CapturedSave->SaveVersion, static_cast<int32>(16));
+	TestEqual(TEXT("v15 migrated capture keeps a single entry"), CapturedSave->Consumables.Num(), 1);
+	TestEqual(TEXT("v15 migrated capture records Standard grade"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Grade : 255, static_cast<uint8>(EConsumableGrade::Standard));
+	TestEqual(TEXT("v15 migrated capture keeps stock"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Count : -1, 3);
 
 	return true;
 }
@@ -330,7 +371,7 @@ bool FIdleSaveSystemWeeklyBossV14MigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v14 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated weekly boss capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Migrated weekly boss capture writes v16"), CapturedSave->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Migrated weekly boss damage remains zero"), CapturedSave->WeeklyBossDamage, static_cast<int64>(0));
 
 	return true;
@@ -848,6 +889,7 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->SeasonClaimedTiers.Add(1);
 	FConsumableSaveEntry ConsumableEntry;
 	ConsumableEntry.Type = static_cast<uint8>(EConsumableType::WisdomBooster);
+	ConsumableEntry.Grade = static_cast<uint8>(EConsumableGrade::Greater);
 	ConsumableEntry.Count = 4;
 	ConsumableEntry.BuffEndUnixSec = 1234569999;
 	SourceSave->Consumables.Add(ConsumableEntry);
@@ -898,6 +940,7 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Consumable payload survives cloud payload"), RestoredSave->Consumables.Num(), 1);
 	TestEqual(TEXT("Consumable type survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Type : 255, static_cast<uint8>(EConsumableType::WisdomBooster));
 	TestEqual(TEXT("Consumable count survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Count : -1, 4);
+	TestEqual(TEXT("Consumable grade survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Grade : 255, static_cast<uint8>(EConsumableGrade::Greater));
 	TestEqual(TEXT("Weekly boss week survives cloud payload"), RestoredSave->WeeklyBossWeekId, SourceSave->WeeklyBossWeekId);
 	TestEqual(TEXT("Weekly boss damage survives cloud payload"), RestoredSave->WeeklyBossDamage, SourceSave->WeeklyBossDamage);
 	TestEqual(TEXT("Weekly boss challenges survive cloud payload"), RestoredSave->WeeklyBossChallengesUsed, SourceSave->WeeklyBossChallengesUsed);
