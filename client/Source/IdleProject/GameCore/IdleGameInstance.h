@@ -7,6 +7,7 @@
 #include "GameCore/AchievementService.h"
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonService.h"
+#include "GameCore/GuildTypes.h"
 #include "GameCore/LeaderboardTypes.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/OfflineRewardFormula.h"
@@ -23,6 +24,7 @@
 
 class UApiClient;
 class UBuffService;
+class UGuildService;
 class UInventoryComponent;
 class ULeaderboardService;
 class AIdleCharacter;
@@ -179,6 +181,31 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UWeeklyBossService* GetWeeklyBossService() const { return WeeklyBossService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UGuildService* GetGuildService() const { return GuildService; }
+
+	/** 로그인/세이브 시 서버 `GET /v1/guilds/me` 스냅샷을 받아 GuildService 캐시에 반영. */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
+	void RefreshGuildSnapshot();
+
+	// ── 길드 패널 UI 액션 배선(서버 권위 — 완료 시 스냅샷 재동기화) ───────────────
+	/** 길드 목록 조회(무소속 화면). 파싱된 요약 배열을 콜백으로 전달(UI 캐시용). */
+	void GuildPanelRefreshList(const FString& Query, TFunction<void(bool, const TArray<FGuildSummary>&)> OnComplete);
+	/** 길드 생성 → 성공 시 스냅샷 갱신. */
+	void GuildPanelCreate(const FString& Name, TFunction<void(bool)> OnComplete);
+	/** 길드 가입(자유=즉시/승인=신청) → 성공 시 스냅샷 갱신. */
+	void GuildPanelJoin(const FString& GuildId, TFunction<void(bool)> OnComplete);
+	/** 길드 탈퇴(길드장은 서버 위임/해산 규칙) → 성공 시 스냅샷 갱신. */
+	void GuildPanelLeave(const FString& GuildId, TFunction<void(bool)> OnComplete);
+	/** 가입 신청 승인 → 성공 시 스냅샷 갱신. */
+	void GuildPanelApprove(const FString& GuildId, const FString& TargetCharacterId, TFunction<void(bool)> OnComplete);
+	/** 가입 신청 거절 → 성공 시 스냅샷 갱신. */
+	void GuildPanelReject(const FString& GuildId, const FString& TargetCharacterId, TFunction<void(bool)> OnComplete);
+	/** 멤버 계급 승강(길드장만) → 성공 시 스냅샷 갱신. */
+	void GuildPanelSetRank(const FString& GuildId, const FString& TargetCharacterId, EGuildRank NewRank, TFunction<void(bool)> OnComplete);
+	/** 길드 설정(가입 모드 토글 등, 길드장/부) → 성공 시 스냅샷 갱신. */
+	void GuildPanelUpdateJoinMode(const FString& GuildId, EGuildJoinMode NewJoinMode, TFunction<void(bool)> OnComplete);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -451,6 +478,8 @@ public:
 
 	void InitializeWeeklyBossServiceForTests(const FString& CurrentWeek);
 
+	void InitializeGuildServiceForTests();
+
 	void InitializeRuneServiceForTests();
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -565,6 +594,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UWeeklyBossService> WeeklyBossService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UGuildService> GuildService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -659,6 +691,7 @@ private:
 	void EnsureLeaderboardService();
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();
+	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	int64 ApplyEquipmentCubeCostReduction(int64 BaseCost);

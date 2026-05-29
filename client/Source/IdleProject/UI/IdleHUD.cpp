@@ -14,6 +14,8 @@
 #include "GameCore/BuffService.h"
 #include "GameCore/ConsumableFormula.h"
 #include "GameCore/DungeonFormula.h"
+#include "GameCore/GuildFormula.h"
+#include "GameCore/GuildService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/LeaderboardService.h"
 #include "GameCore/MasteryService.h"
@@ -77,6 +79,19 @@ const FName ShopRuneRollHitBoxName(TEXT("ShopRuneRoll"));
 const FName CraftClassRuneHitBoxName(TEXT("CraftClassRune"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
+// 길드 패널(PR-G1) — 고유 prefix(Guild~)로 jumbo ODR 회피.
+const FName GuildRefreshListHitBoxName(TEXT("GuildRefreshList"));
+const FName GuildCreateNameCycleHitBoxName(TEXT("GuildCreateNameCycle"));
+const FName GuildCreateHitBoxName(TEXT("GuildCreate"));
+const FName GuildLeaveHitBoxName(TEXT("GuildLeave"));
+const FName GuildToggleJoinModeHitBoxName(TEXT("GuildToggleJoinMode"));
+const FString GuildJoinHitBoxPrefix(TEXT("GuildJoin_"));
+const FString GuildApproveHitBoxPrefix(TEXT("GuildApprove_"));
+const FString GuildRejectHitBoxPrefix(TEXT("GuildReject_"));
+const FString GuildPromoteHitBoxPrefix(TEXT("GuildPromote_"));
+const FString GuildDemoteHitBoxPrefix(TEXT("GuildDemote_"));
+constexpr int32 GuildCreateNamePresetCount = 8;
+constexpr float GuildFeedbackDurationSeconds = 2.4f;
 constexpr int32 RebirthRequiredLevel = 100;
 constexpr float FloatingDamageLifetimeSeconds = 1.0f;
 constexpr float FloatingDamageRisePixels = 32.0f;
@@ -172,6 +187,47 @@ FIdleHUDLeaderboardRowViewModel BuildLeaderboardRow(const FLeaderboardEntry& Ent
 	Row.ScoreLabel = FormatLeaderboardScoreLabel(Entry.Score);
 	Row.bSelf = !MyCharacterId.IsEmpty() && Entry.CharacterId == MyCharacterId;
 	return Row;
+}
+
+// ── 길드 패널 헬퍼(PR-G1) — 고유 prefix(Guild~)로 jumbo ODR 회피 ─────────────
+const TCHAR* GuildRankToLocalizationKey(EGuildRank Rank)
+{
+	switch (Rank)
+	{
+	case EGuildRank::Master:
+		return TEXT("GUILD_RANK_MASTER");
+	case EGuildRank::Vice:
+		return TEXT("GUILD_RANK_VICE");
+	case EGuildRank::Officer:
+		return TEXT("GUILD_RANK_OFFICER");
+	default:
+		return TEXT("GUILD_RANK_MEMBER");
+	}
+}
+
+FText GuildJoinModeLabel(EGuildJoinMode JoinMode)
+{
+	return IdleProject::Localization::UI(JoinMode == EGuildJoinMode::Approval ? TEXT("GUILD_JOINMODE_APPROVAL") : TEXT("GUILD_JOINMODE_OPEN"));
+}
+
+FText GuildPresetCreateName(int32 PresetIndex)
+{
+	const int32 Clamped = ((PresetIndex % GuildCreateNamePresetCount) + GuildCreateNamePresetCount) % GuildCreateNamePresetCount;
+	const FString Key = FString::Printf(TEXT("GUILD_PRESET_NAME_%d"), Clamped + 1);
+	return IdleProject::Localization::UI(*Key);
+}
+
+FText GuildShortCharacterLabel(const FString& CharacterId)
+{
+	if (CharacterId.IsEmpty())
+	{
+		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
+	}
+	if (CharacterId.Len() <= 10)
+	{
+		return FText::FromString(CharacterId);
+	}
+	return FText::FromString(FString::Printf(TEXT("%s...%s"), *CharacterId.Left(6), *CharacterId.Right(4)));
 }
 
 FText FormatPercentLabel(const TCHAR* Key, float Rate)
@@ -2184,6 +2240,149 @@ FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewMode
 	return ViewModel;
 }
 
+FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline)
+{
+	FIdleHUDGuildPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("GUILD_PANEL_TITLE"));
+	ViewModel.RefreshLabel = IdleProject::Localization::UI(TEXT("GUILD_REFRESH"));
+	ViewModel.bOffline = bOffline;
+	ViewModel.bLoading = bLoading;
+	ViewModel.StateLabel = bLoading
+		? IdleProject::Localization::UI(TEXT("GUILD_LOADING"))
+		: (bOffline ? IdleProject::Localization::UI(TEXT("GUILD_OFFLINE")) : FText::GetEmpty());
+	ViewModel.bHasGuild = GuildService.HasGuild();
+
+	if (!ViewModel.bHasGuild)
+	{
+		// ── 무소속 화면: 길드 목록 + 생성 ──
+		ViewModel.NoneTitle = IdleProject::Localization::UI(TEXT("GUILD_NONE_TITLE"));
+		ViewModel.ListEmptyLabel = IdleProject::Localization::UI(TEXT("GUILD_LIST_EMPTY"));
+		for (const FGuildSummary& Summary : BrowseList)
+		{
+			FIdleHUDGuildListRowViewModel Row;
+			Row.GuildId = Summary.Id;
+			Row.NameLabel = FText::FromString(Summary.Name);
+			Row.InfoLabel = FormatLocalizedUI(TEXT("GUILD_LIST_ROW_FORMAT"), [&Summary](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Level"), FText::AsNumber(Summary.Level));
+				Args.Add(TEXT("Count"), FText::AsNumber(Summary.MemberCount));
+			});
+			Row.bApproval = Summary.JoinMode == EGuildJoinMode::Approval;
+			Row.JoinLabel = IdleProject::Localization::UI(Row.bApproval ? TEXT("GUILD_JOIN_REQUEST") : TEXT("GUILD_JOIN"));
+			Row.JoinHitBoxName = FName(*(GuildJoinHitBoxPrefix + Summary.Id));
+			ViewModel.ListRows.Add(MoveTemp(Row));
+		}
+
+		ViewModel.CreateTitle = IdleProject::Localization::UI(TEXT("GUILD_CREATE_TITLE"));
+		const FText PendingName = PendingCreateName.IsEmpty() ? IdleProject::Localization::UI(TEXT("NONE_DASH")) : FText::FromString(PendingCreateName);
+		ViewModel.CreateNameLabel = FormatLocalizedUI(TEXT("GUILD_CREATE_NAME_FORMAT"), [&PendingName](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Name"), PendingName);
+		});
+		ViewModel.CreateNameCycleLabel = IdleProject::Localization::UI(TEXT("GUILD_CREATE_NAME_CYCLE"));
+		ViewModel.CreateLabel = IdleProject::Localization::UI(TEXT("GUILD_CREATE"));
+		ViewModel.CreateNameCycleHitBoxName = GuildCreateNameCycleHitBoxName;
+		ViewModel.CreateHitBoxName = GuildCreateHitBoxName;
+		return ViewModel;
+	}
+
+	// ── 내 길드 화면 ──
+	const FGuildSummary Summary = GuildService.GetGuildSummary();
+	const EGuildRank MyRank = GuildService.GetMyRank();
+	ViewModel.MyTitle = IdleProject::Localization::UI(TEXT("GUILD_MY_TITLE"));
+	ViewModel.GuildNameLabel = FText::FromString(Summary.Name);
+	ViewModel.SummaryLabel = FormatLocalizedUI(TEXT("GUILD_SUMMARY_FORMAT"), [&Summary](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Level"), FText::AsNumber(Summary.Level));
+		Args.Add(TEXT("Count"), FText::AsNumber(Summary.MemberCount));
+		Args.Add(TEXT("Mode"), GuildJoinModeLabel(Summary.JoinMode));
+	});
+	ViewModel.MyRankBadgeLabel = IdleProject::Localization::UI(GuildRankToLocalizationKey(MyRank));
+	ViewModel.LeaveLabel = IdleProject::Localization::UI(TEXT("GUILD_LEAVE"));
+	ViewModel.LeaveHitBoxName = GuildLeaveHitBoxName;
+	ViewModel.MemberListTitle = IdleProject::Localization::UI(TEXT("GUILD_MEMBER_LIST_TITLE"));
+
+	const TArray<FGuildMemberInfo>& Members = GuildService.GetMembers();
+	const int32 MemberCount = Summary.MemberCount > 0 ? Summary.MemberCount : Members.Num();
+	const bool bManage = MyRank == EGuildRank::Master;
+
+	// 현재 계급별 인원(승급 정원 검증용).
+	int32 ViceCount = 0;
+	int32 OfficerCount = 0;
+	for (const FGuildMemberInfo& Member : Members)
+	{
+		if (Member.Rank == EGuildRank::Vice)
+		{
+			++ViceCount;
+		}
+		else if (Member.Rank == EGuildRank::Officer)
+		{
+			++OfficerCount;
+		}
+	}
+
+	for (const FGuildMemberInfo& Member : Members)
+	{
+		FIdleHUDGuildMemberRowViewModel Row;
+		Row.CharacterId = Member.CharacterId;
+		Row.NicknameLabel = Member.Nickname.IsEmpty() ? GuildShortCharacterLabel(Member.CharacterId) : FText::FromString(Member.Nickname);
+		Row.Rank = Member.Rank;
+		Row.RankBadgeLabel = IdleProject::Localization::UI(GuildRankToLocalizationKey(Member.Rank));
+
+		// 길드장 관리: 본인/길드장 외 멤버에 승급/강등 노출.
+		if (bManage && Member.Rank != EGuildRank::Master)
+		{
+			// 승급 대상 계급: Member→Officer, Officer→Vice.
+			if (Member.Rank == EGuildRank::Member || Member.Rank == EGuildRank::Officer)
+			{
+				Row.bShowPromote = true;
+				Row.PromoteTargetRank = Member.Rank == EGuildRank::Member ? EGuildRank::Officer : EGuildRank::Vice;
+				Row.PromoteHitBoxName = FName(*(GuildPromoteHitBoxPrefix + Member.CharacterId));
+
+				const bool bUnlocked = FGuildFormula::IsRankUnlocked(Row.PromoteTargetRank, MemberCount);
+				const int32 TargetCap = FGuildFormula::GetRankSlotCap(Row.PromoteTargetRank);
+				const int32 TargetCount = Row.PromoteTargetRank == EGuildRank::Vice ? ViceCount : OfficerCount;
+				const bool bSlotFree = TargetCount < TargetCap;
+				Row.bCanPromote = bUnlocked && bSlotFree;
+				Row.PromoteLabel = !bUnlocked
+					? IdleProject::Localization::UI(TEXT("GUILD_RANK_LOCKED"))
+					: (!bSlotFree ? IdleProject::Localization::UI(TEXT("GUILD_RANK_FULL")) : IdleProject::Localization::UI(TEXT("GUILD_PROMOTE")));
+			}
+
+			// 강등: Vice/Officer → Member.
+			if (Member.Rank == EGuildRank::Vice || Member.Rank == EGuildRank::Officer)
+			{
+				Row.bShowDemote = true;
+				Row.DemoteHitBoxName = FName(*(GuildDemoteHitBoxPrefix + Member.CharacterId));
+			}
+		}
+		ViewModel.MemberRows.Add(MoveTemp(Row));
+	}
+
+	// ── 길드장 관리(설정 토글 + 승인 큐) ──
+	ViewModel.bShowManage = bManage;
+	if (bManage)
+	{
+		ViewModel.ManageTitle = IdleProject::Localization::UI(TEXT("GUILD_MANAGE_TITLE"));
+		ViewModel.ToggleJoinModeLabel = IdleProject::Localization::UI(TEXT("GUILD_SETTINGS_TOGGLE_JOINMODE"));
+		ViewModel.ToggleJoinModeHitBoxName = GuildToggleJoinModeHitBoxName;
+		ViewModel.RequestsTitle = IdleProject::Localization::UI(TEXT("GUILD_REQUESTS_TITLE"));
+		ViewModel.RequestsEmptyLabel = IdleProject::Localization::UI(TEXT("GUILD_REQUESTS_EMPTY"));
+
+		for (const FGuildJoinRequestInfo& Request : GuildService.GetRequests())
+		{
+			FIdleHUDGuildRequestRowViewModel Row;
+			Row.CharacterId = Request.CharacterId;
+			Row.CharacterLabel = GuildShortCharacterLabel(Request.CharacterId);
+			Row.ApproveHitBoxName = FName(*(GuildApproveHitBoxPrefix + Request.CharacterId));
+			Row.RejectHitBoxName = FName(*(GuildRejectHitBoxPrefix + Request.CharacterId));
+			ViewModel.RequestRows.Add(MoveTemp(Row));
+		}
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex)
 {
 	FIdleHUDRuneViewModel ViewModel;
@@ -3435,6 +3634,7 @@ void AIdleHUD::DrawHUD()
 	DrawShopPanel();
 	DrawConsumablePanel();
 	DrawLeaderboardPanel();
+	DrawGuildPanel();
 	DrawRunePanel();
 	DrawRuneCodexPanel();
 	DrawEnhancePanel();
@@ -3604,6 +3804,56 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == LeaderboardRefreshHitBoxName)
 	{
 		RefreshSelectedLeaderboard();
+		return;
+	}
+	if (BoxName == GuildRefreshListHitBoxName)
+	{
+		RefreshGuildBrowseList();
+		return;
+	}
+	if (BoxName == GuildCreateNameCycleHitBoxName)
+	{
+		CycleGuildCreateName();
+		return;
+	}
+	if (BoxName == GuildCreateHitBoxName)
+	{
+		TryCreateGuild();
+		return;
+	}
+	if (BoxName == GuildLeaveHitBoxName)
+	{
+		TryLeaveGuild();
+		return;
+	}
+	if (BoxName == GuildToggleJoinModeHitBoxName)
+	{
+		ToggleGuildJoinMode();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildJoinHitBoxPrefix))
+	{
+		JoinGuildFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildApproveHitBoxPrefix))
+	{
+		ApproveGuildRequestFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildRejectHitBoxPrefix))
+	{
+		RejectGuildRequestFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildPromoteHitBoxPrefix))
+	{
+		SetGuildMemberRankFromHitBox(BoxName, true);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildDemoteHitBoxPrefix))
+	{
+		SetGuildMemberRankFromHitBox(BoxName, false);
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -6626,6 +6876,600 @@ void AIdleHUD::ClaimWeeklyBossFromHitBox(FName BoxName)
 	{
 		WeeklyBossFeedbackStartTime = World->GetTimeSeconds();
 	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawGuildPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService)
+	{
+		return;
+	}
+
+	const bool bOffline = IdleGameInstance->GetCloudSyncState() == ECloudSyncState::Offline;
+	const FString PendingCreateName = GuildPresetCreateName(GuildCreateNamePresetIndex).ToString();
+	const FIdleHUDGuildPanelViewModel ViewModel = BuildGuildPanelViewModel(*GuildService, GuildBrowseList, PendingCreateName, bGuildBrowseLoading || bGuildActionPending, bOffline);
+
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - GuildFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !GuildFeedbackLabel.IsEmpty() && FeedbackElapsed <= GuildFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	const float Padding = 14.0f * Scale;
+	const float RowHeight = 34.0f * Scale;
+	const float RowGap = 5.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const float X = 28.0f * Scale;
+	const float Y = 120.0f * Scale;
+
+	// 화면 상태별 가시 행 수로 패널 높이 산출.
+	float PanelHeight = 0.0f;
+	if (!ViewModel.bHasGuild)
+	{
+		const int32 VisibleList = FMath::Min(ViewModel.ListRows.Num(), 6);
+		PanelHeight = 84.0f * Scale
+			+ FMath::Max(1, VisibleList) * (RowHeight + RowGap)
+			+ 78.0f * Scale; // 생성 영역
+	}
+	else
+	{
+		const int32 VisibleMembers = FMath::Min(ViewModel.MemberRows.Num(), 8);
+		PanelHeight = 110.0f * Scale + VisibleMembers * (RowHeight + RowGap);
+		if (ViewModel.bShowManage)
+		{
+			const int32 VisibleReq = FMath::Min(ViewModel.RequestRows.Num(), 4);
+			PanelHeight += 64.0f * Scale + FMath::Max(1, VisibleReq) * (RowHeight + RowGap);
+		}
+	}
+	PanelHeight += bShowFeedback ? 24.0f * Scale : 0.0f;
+	PanelHeight += Padding;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::Auth, X, Y, PanelWidth, Border);
+	DrawRect(Theme::Auth, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::Auth, X, Y, Border, PanelHeight);
+	DrawRect(Theme::Auth, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+
+	// 새로고침(무소속 목록 갱신은 항상 가능 — 내 길드면 스냅샷 갱신 의미로 동일 버튼).
+	const float RefreshWidth = 74.0f * Scale;
+	const float RefreshX = X + PanelWidth - Padding - RefreshWidth;
+	const float RefreshY = Y + 10.0f * Scale;
+	DrawRect(Theme::AccentBlue, RefreshX, RefreshY, RefreshWidth, ButtonHeight);
+	DrawText(ViewModel.RefreshLabel.ToString(), Theme::BgPrimary, RefreshX + 10.0f * Scale, RefreshY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	AddHitBox(FVector2D(RefreshX, RefreshY), FVector2D(RefreshWidth, ButtonHeight), GuildRefreshListHitBoxName, true, 92);
+
+	if (!ViewModel.StateLabel.IsEmpty())
+	{
+		DrawText(ViewModel.StateLabel.ToString(), ViewModel.bOffline ? Theme::AccentRed : Theme::AccentBlue, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	}
+
+	float CursorY = Y + 58.0f * Scale;
+
+	if (!ViewModel.bHasGuild)
+	{
+		DrawText(ViewModel.NoneTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+		CursorY += 24.0f * Scale;
+
+		const int32 VisibleList = FMath::Min(ViewModel.ListRows.Num(), 6);
+		if (VisibleList == 0)
+		{
+			DrawText(ViewModel.ListEmptyLabel.ToString(), Theme::TextMuted, X + Padding, CursorY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+			CursorY += RowHeight + RowGap;
+		}
+		for (int32 Index = 0; Index < VisibleList; ++Index)
+		{
+			DrawGuildListRow(ViewModel.ListRows[Index], X + Padding, CursorY, PanelWidth - Padding * 2.0f, RowHeight);
+			CursorY += RowHeight + RowGap;
+		}
+
+		// 생성 영역.
+		CursorY += 8.0f * Scale;
+		DrawText(ViewModel.CreateTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+		CursorY += 22.0f * Scale;
+		DrawText(ViewModel.CreateNameLabel.ToString(), Theme::TextPrimary, X + Padding, CursorY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+
+		const float CreateButtonWidth = 72.0f * Scale;
+		const float CycleWidth = 84.0f * Scale;
+		const float CreateX = X + PanelWidth - Padding - CreateButtonWidth;
+		const float CycleX = CreateX - 8.0f * Scale - CycleWidth;
+		const bool bCanCreate = !bGuildActionPending && !bOffline;
+		DrawRect(Theme::BgPrimary, CycleX, CursorY, CycleWidth, ButtonHeight);
+		DrawText(ViewModel.CreateNameCycleLabel.ToString(), Theme::TextMuted, CycleX + 8.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		AddHitBox(FVector2D(CycleX, CursorY), FVector2D(CycleWidth, ButtonHeight), GuildCreateNameCycleHitBoxName, true, 90);
+		DrawRect(bCanCreate ? Theme::AccentGold : Theme::BgPrimary, CreateX, CursorY, CreateButtonWidth, ButtonHeight);
+		DrawText(ViewModel.CreateLabel.ToString(), bCanCreate ? Theme::BgPrimary : Theme::TextMuted, CreateX + 12.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+		if (bCanCreate)
+		{
+			AddHitBox(FVector2D(CreateX, CursorY), FVector2D(CreateButtonWidth, ButtonHeight), GuildCreateHitBoxName, true, 90);
+		}
+		CursorY += ButtonHeight + RowGap;
+	}
+	else
+	{
+		// 내 길드 요약.
+		DrawText(ViewModel.GuildNameLabel.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetMediumFont() : nullptr, 0.74f * Scale);
+		DrawText(ViewModel.MyRankBadgeLabel.ToString(), Theme::Auth, X + PanelWidth - Padding - 96.0f * Scale, CursorY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+		CursorY += 24.0f * Scale;
+		DrawText(ViewModel.SummaryLabel.ToString(), Theme::TextMuted, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+
+		// 탈퇴 버튼.
+		const float LeaveWidth = 64.0f * Scale;
+		const float LeaveX = X + PanelWidth - Padding - LeaveWidth;
+		const bool bCanLeave = !bGuildActionPending && !bOffline;
+		DrawRect(bCanLeave ? Theme::AccentRed : Theme::BgPrimary, LeaveX, CursorY - 4.0f * Scale, LeaveWidth, ButtonHeight);
+		DrawText(ViewModel.LeaveLabel.ToString(), bCanLeave ? Theme::TextPrimary : Theme::TextMuted, LeaveX + 14.0f * Scale, CursorY + 1.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+		if (bCanLeave)
+		{
+			AddHitBox(FVector2D(LeaveX, CursorY - 4.0f * Scale), FVector2D(LeaveWidth, ButtonHeight), GuildLeaveHitBoxName, true, 90);
+		}
+		CursorY += 26.0f * Scale;
+
+		DrawText(ViewModel.MemberListTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		CursorY += 22.0f * Scale;
+		const int32 VisibleMembers = FMath::Min(ViewModel.MemberRows.Num(), 8);
+		for (int32 Index = 0; Index < VisibleMembers; ++Index)
+		{
+			DrawGuildMemberRow(ViewModel.MemberRows[Index], X + Padding, CursorY, PanelWidth - Padding * 2.0f, RowHeight);
+			CursorY += RowHeight + RowGap;
+		}
+
+		// 길드장 관리.
+		if (ViewModel.bShowManage)
+		{
+			CursorY += 8.0f * Scale;
+			DrawText(ViewModel.ManageTitle.ToString(), Theme::Auth, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+
+			const float ToggleWidth = 110.0f * Scale;
+			const float ToggleX = X + PanelWidth - Padding - ToggleWidth;
+			const bool bCanToggle = !bGuildActionPending && !bOffline;
+			DrawRect(bCanToggle ? Theme::AccentBlue : Theme::BgPrimary, ToggleX, CursorY - 4.0f * Scale, ToggleWidth, ButtonHeight);
+			DrawText(ViewModel.ToggleJoinModeLabel.ToString(), bCanToggle ? Theme::BgPrimary : Theme::TextMuted, ToggleX + 8.0f * Scale, CursorY + 1.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+			if (bCanToggle)
+			{
+				AddHitBox(FVector2D(ToggleX, CursorY - 4.0f * Scale), FVector2D(ToggleWidth, ButtonHeight), GuildToggleJoinModeHitBoxName, true, 90);
+			}
+			CursorY += 24.0f * Scale;
+
+			DrawText(ViewModel.RequestsTitle.ToString(), Theme::TextMuted, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+			CursorY += 20.0f * Scale;
+			const int32 VisibleReq = FMath::Min(ViewModel.RequestRows.Num(), 4);
+			if (VisibleReq == 0)
+			{
+				DrawText(ViewModel.RequestsEmptyLabel.ToString(), Theme::TextMuted.CopyWithNewOpacity(0.7f), X + Padding, CursorY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+				CursorY += RowHeight + RowGap;
+			}
+			for (int32 Index = 0; Index < VisibleReq; ++Index)
+			{
+				DrawGuildRequestRow(ViewModel.RequestRows[Index], X + Padding, CursorY, PanelWidth - Padding * 2.0f, RowHeight);
+				CursorY += RowHeight + RowGap;
+			}
+		}
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(GuildFeedbackLabel.ToString(), bGuildFeedbackSuccess ? Theme::AccentGold : Theme::AccentRed, X + Padding, CursorY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawGuildListRow(const FIdleHUDGuildListRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	DrawRect(Row.bApproval ? Theme::AccentBlue : Theme::AccentGold, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.NameLabel.ToString(), Theme::TextPrimary, X + 10.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.InfoLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+
+	const float ButtonWidth = 60.0f * Scale;
+	const float ButtonHeight = 24.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 6.0f * Scale;
+	const float ButtonY = Y + (Height - ButtonHeight) * 0.5f;
+	const bool bEnabled = !bGuildActionPending;
+	DrawRect(bEnabled ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.JoinLabel.ToString(), bEnabled ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	if (bEnabled)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.JoinHitBoxName, true, 91);
+	}
+}
+
+void AIdleHUD::DrawGuildMemberRow(const FIdleHUDGuildMemberRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	const FLinearColor RankColor = Row.Rank == EGuildRank::Master
+		? Theme::AccentGold
+		: (Row.Rank == EGuildRank::Vice ? Theme::Auth : (Row.Rank == EGuildRank::Officer ? Theme::AccentBlue : Theme::TextMuted));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.86f), X, Y, Width, Height);
+	DrawRect(RankColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.NicknameLabel.ToString(), Theme::TextPrimary, X + 10.0f * Scale, Y + 9.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.RankBadgeLabel.ToString(), RankColor, X + 130.0f * Scale, Y + 9.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+
+	// 길드장 관리 버튼(승급/강등).
+	const float BtnWidth = 52.0f * Scale;
+	const float BtnHeight = 22.0f * Scale;
+	const float BtnY = Y + (Height - BtnHeight) * 0.5f;
+	float BtnX = X + Width - BtnWidth - 6.0f * Scale;
+
+	if (Row.bShowDemote)
+	{
+		const bool bEnabled = !bGuildActionPending;
+		DrawRect(bEnabled ? Theme::AccentRed : Theme::BgPanel, BtnX, BtnY, BtnWidth, BtnHeight);
+		DrawText(IdleProject::Localization::UI(TEXT("GUILD_DEMOTE")).ToString(), bEnabled ? Theme::TextPrimary : Theme::TextMuted, BtnX + 8.0f * Scale, BtnY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+		if (bEnabled)
+		{
+			AddHitBox(FVector2D(BtnX, BtnY), FVector2D(BtnWidth, BtnHeight), Row.DemoteHitBoxName, true, 91);
+		}
+		BtnX -= BtnWidth + 6.0f * Scale;
+	}
+
+	if (Row.bShowPromote)
+	{
+		const bool bEnabled = Row.bCanPromote && !bGuildActionPending;
+		DrawRect(bEnabled ? Theme::AccentGold : Theme::BgPanel, BtnX, BtnY, BtnWidth, BtnHeight);
+		DrawText(Row.PromoteLabel.ToString(), bEnabled ? Theme::BgPrimary : Theme::TextMuted, BtnX + 6.0f * Scale, BtnY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.46f * Scale);
+		if (bEnabled)
+		{
+			AddHitBox(FVector2D(BtnX, BtnY), FVector2D(BtnWidth, BtnHeight), Row.PromoteHitBoxName, true, 91);
+		}
+	}
+}
+
+void AIdleHUD::DrawGuildRequestRow(const FIdleHUDGuildRequestRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.86f), X, Y, Width, Height);
+	DrawRect(Theme::AccentBlue, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.CharacterLabel.ToString(), Theme::TextPrimary, X + 10.0f * Scale, Y + 9.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+
+	const float BtnWidth = 52.0f * Scale;
+	const float BtnHeight = 22.0f * Scale;
+	const float BtnY = Y + (Height - BtnHeight) * 0.5f;
+	const float RejectX = X + Width - BtnWidth - 6.0f * Scale;
+	const float ApproveX = RejectX - BtnWidth - 6.0f * Scale;
+	const bool bEnabled = !bGuildActionPending;
+
+	DrawRect(bEnabled ? Theme::AccentGold : Theme::BgPanel, ApproveX, BtnY, BtnWidth, BtnHeight);
+	DrawText(IdleProject::Localization::UI(TEXT("GUILD_APPROVE")).ToString(), bEnabled ? Theme::BgPrimary : Theme::TextMuted, ApproveX + 8.0f * Scale, BtnY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	DrawRect(bEnabled ? Theme::AccentRed : Theme::BgPanel, RejectX, BtnY, BtnWidth, BtnHeight);
+	DrawText(IdleProject::Localization::UI(TEXT("GUILD_REJECT")).ToString(), bEnabled ? Theme::TextPrimary : Theme::TextMuted, RejectX + 8.0f * Scale, BtnY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	if (bEnabled)
+	{
+		AddHitBox(FVector2D(ApproveX, BtnY), FVector2D(BtnWidth, BtnHeight), Row.ApproveHitBoxName, true, 91);
+		AddHitBox(FVector2D(RejectX, BtnY), FVector2D(BtnWidth, BtnHeight), Row.RejectHitBoxName, true, 91);
+	}
+}
+
+void AIdleHUD::SetGuildFeedback(const TCHAR* Key, bool bSuccess)
+{
+	GuildFeedbackLabel = IdleProject::Localization::UI(Key);
+	bGuildFeedbackSuccess = bSuccess;
+	if (const UWorld* World = GetWorld())
+	{
+		GuildFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::RefreshGuildBrowseList()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	// 내 길드 상태면 스냅샷만 갱신(목록 불필요), 무소속이면 목록 조회.
+	const UGuildService* GuildService = IdleGameInstance->GetGuildService();
+	if (GuildService && GuildService->HasGuild())
+	{
+		IdleGameInstance->RefreshGuildSnapshot();
+		RefreshMouseInteraction();
+		return;
+	}
+
+	bGuildBrowseLoading = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelRefreshList(FString(), [WeakThis](bool bSuccess, const TArray<FGuildSummary>& Summaries)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildBrowseLoading = false;
+			if (bSuccess)
+			{
+				StrongThis->GuildBrowseList = Summaries;
+			}
+			StrongThis->RefreshMouseInteraction();
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::CycleGuildCreateName()
+{
+	GuildCreateNamePresetIndex = (GuildCreateNamePresetIndex + 1) % GuildCreateNamePresetCount;
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryCreateGuild()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString Name = GuildPresetCreateName(GuildCreateNamePresetIndex).ToString();
+	if (Name.IsEmpty())
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelCreate(Name, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_CREATED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::JoinGuildFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = BoxName.ToString().RightChop(GuildJoinHitBoxPrefix.Len());
+	if (GuildId.IsEmpty())
+	{
+		return;
+	}
+
+	// 가입 모드 판정(목록 캐시에서 조회 — 승인제면 신청 피드백).
+	bool bApproval = false;
+	for (const FGuildSummary& Summary : GuildBrowseList)
+	{
+		if (Summary.Id == GuildId)
+		{
+			bApproval = Summary.JoinMode == EGuildJoinMode::Approval;
+			break;
+		}
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelJoin(GuildId, [WeakThis, bApproval](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			const TCHAR* Key = !bSuccess
+				? TEXT("GUILD_FEEDBACK_FAILED")
+				: (bApproval ? TEXT("GUILD_FEEDBACK_REQUESTED") : TEXT("GUILD_FEEDBACK_JOINED"));
+			StrongThis->SetGuildFeedback(Key, bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryLeaveGuild()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	if (GuildId.IsEmpty())
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelLeave(GuildId, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_LEFT") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ToggleGuildJoinMode()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	if (GuildId.IsEmpty())
+	{
+		return;
+	}
+
+	const EGuildJoinMode Current = GuildService->GetGuildSummary().JoinMode;
+	const EGuildJoinMode Next = Current == EGuildJoinMode::Open ? EGuildJoinMode::Approval : EGuildJoinMode::Open;
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelUpdateJoinMode(GuildId, Next, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_UPDATED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ApproveGuildRequestFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	const FString TargetCharacterId = BoxName.ToString().RightChop(GuildApproveHitBoxPrefix.Len());
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelApprove(GuildId, TargetCharacterId, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_APPROVED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::RejectGuildRequestFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	const FString TargetCharacterId = BoxName.ToString().RightChop(GuildRejectHitBoxPrefix.Len());
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelReject(GuildId, TargetCharacterId, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_REJECTED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::SetGuildMemberRankFromHitBox(FName BoxName, bool bPromote)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	const FString& Prefix = bPromote ? GuildPromoteHitBoxPrefix : GuildDemoteHitBoxPrefix;
+	const FString TargetCharacterId = BoxName.ToString().RightChop(Prefix.Len());
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		return;
+	}
+
+	// 대상의 현재 계급에서 다음 계급 산출(승급: Member→Officer→Vice / 강등: 모두→Member).
+	EGuildRank CurrentRank = EGuildRank::Member;
+	for (const FGuildMemberInfo& Member : GuildService->GetMembers())
+	{
+		if (Member.CharacterId == TargetCharacterId)
+		{
+			CurrentRank = Member.Rank;
+			break;
+		}
+	}
+
+	EGuildRank NewRank = EGuildRank::Member;
+	if (bPromote)
+	{
+		NewRank = CurrentRank == EGuildRank::Member ? EGuildRank::Officer : EGuildRank::Vice;
+	}
+	else
+	{
+		NewRank = EGuildRank::Member;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelSetRank(GuildId, TargetCharacterId, NewRank, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_RANK_CHANGED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
 	RefreshMouseInteraction();
 }
 

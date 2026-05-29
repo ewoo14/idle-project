@@ -154,3 +154,69 @@ export const seasonState = pgTable(
     ),
   }),
 );
+
+// 길드 본체. member_count 는 멤버 수 denorm(가입/탈퇴 트랜잭션에서 원자적 ±1).
+export const guilds = pgTable("guilds", {
+  id: uuid("id").primaryKey(),
+  name: varchar("name", { length: 16 }).notNull().unique(),
+  notice: text("notice").notNull().default(""),
+  joinMode: text("join_mode").notNull().default("open"),
+  level: integer("level").notNull().default(1),
+  exp: bigint("exp", { mode: "bigint" }).notNull().default(0n),
+  masterCharacterId: uuid("master_character_id")
+    .notNull()
+    .references(() => characters.id, { onDelete: "cascade" }),
+  memberCount: integer("member_count").notNull().default(1),
+  weekId: text("week_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// 멤버십·기여. character_id PK = 1캐릭터 1길드 보장.
+export const guildMembers = pgTable(
+  "guild_members",
+  {
+    guildId: uuid("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    rank: text("rank").notNull().default("member"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow(),
+    weeklyContribution: bigint("weekly_contribution", { mode: "bigint" })
+      .notNull()
+      .default(0n),
+    totalContribution: bigint("total_contribution", { mode: "bigint" })
+      .notNull()
+      .default(0n),
+    contributionPoints: bigint("contribution_points", { mode: "bigint" })
+      .notNull()
+      .default(0n),
+    lastAttendanceDate: text("last_attendance_date"),
+  },
+  (table) => ({
+    guildMembersGuild: index("guild_members_guild_idx").on(table.guildId),
+  }),
+);
+
+// 승인제(approval) 가입 신청 큐.
+export const guildJoinRequests = pgTable(
+  "guild_join_requests",
+  {
+    guildId: uuid("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => ({
+    guildJoinRequestsPk: primaryKey({
+      columns: [table.guildId, table.characterId],
+    }),
+    guildJoinRequestsCharacter: index("guild_join_requests_character_idx").on(
+      table.characterId,
+    ),
+  }),
+);

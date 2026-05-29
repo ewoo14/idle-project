@@ -1,5 +1,6 @@
 #include "NetworkClient/ApiClient.h"
 
+#include "GenericPlatform/GenericPlatformHttp.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
@@ -319,6 +320,172 @@ void UApiClient::FetchMyWeeklyRank(const FString& Week, const FString& Character
 	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
 }
 
+void UApiClient::CreateGuild(const FString& CharacterId, const FString& Name, TFunction<void(bool, FString)> Callback)
+{
+	if (CharacterId.IsEmpty() || Name.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid create guild input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	JsonObject->SetStringField(TEXT("name"), Name);
+	SendRequestWithCallback(TEXT("POST"), TEXT("/v1/guilds/"), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::ListGuilds(const FString& Query, int32 Limit, int32 Offset, TFunction<void(bool, FString)> Callback)
+{
+	const int32 SafeLimit = FMath::Clamp(Limit <= 0 ? 20 : Limit, 1, 100);
+	const int32 SafeOffset = FMath::Max(0, Offset);
+	FString Path = FString::Printf(TEXT("/v1/guilds?limit=%d&offset=%d"), SafeLimit, SafeOffset);
+	if (!Query.IsEmpty())
+	{
+		Path += FString::Printf(TEXT("&q=%s"), *FGenericPlatformHttp::UrlEncode(Query));
+	}
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::GetGuild(const FString& GuildId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild id"));
+		}
+		return;
+	}
+	SendRequestWithCallback(TEXT("GET"), FString::Printf(TEXT("/v1/guilds/%s"), *GuildId), FString(), MoveTemp(Callback));
+}
+
+void UApiClient::GetMyGuild(const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid character id"));
+		}
+		return;
+	}
+	const FString Path = FString::Printf(TEXT("/v1/guilds/me?characterId=%s"), *CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::JoinGuild(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid join guild input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/join"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::LeaveGuild(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid leave guild input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/leave"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::ApproveRequest(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty() || ActorCharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid approve request input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), ActorCharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/requests/%s/approve"), *GuildId, *TargetCharacterId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::RejectRequest(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty() || ActorCharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid reject request input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), ActorCharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/requests/%s/reject"), *GuildId, *TargetCharacterId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::SetMemberRank(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, const FString& Rank, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || TargetCharacterId.IsEmpty() || ActorCharacterId.IsEmpty() || Rank.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid set rank input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), ActorCharacterId);
+	JsonObject->SetStringField(TEXT("rank"), Rank);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/members/%s/rank"), *GuildId, *TargetCharacterId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::UpdateGuildSettings(const FString& GuildId, const FString& ActorCharacterId, const FString& Name, const FString& Notice, const FString& JoinMode, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || ActorCharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid update settings input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), ActorCharacterId);
+	// 비어 있지 않은 필드만 패치(서버는 undefined 미포함 필드를 무시).
+	if (!Name.IsEmpty())
+	{
+		JsonObject->SetStringField(TEXT("name"), Name);
+	}
+	if (!Notice.IsEmpty())
+	{
+		JsonObject->SetStringField(TEXT("notice"), Notice);
+	}
+	if (!JoinMode.IsEmpty())
+	{
+		JsonObject->SetStringField(TEXT("joinMode"), JoinMode);
+	}
+	SendRequestWithCallback(TEXT("PATCH"), FString::Printf(TEXT("/v1/guilds/%s"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
 {
 	const FString Path = FString::Printf(
@@ -549,7 +716,7 @@ bool UApiClient::SendRequest(const FString& Verb, const FString& Path, const FSt
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
 	}
 
-	if (Verb == TEXT("POST") || Verb == TEXT("PUT"))
+	if (Verb == TEXT("POST") || Verb == TEXT("PUT") || Verb == TEXT("PATCH"))
 	{
 		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 		Request->SetContentAsString(JsonBody);
@@ -570,7 +737,7 @@ bool UApiClient::SendRequestWithCallback(const FString& Verb, const FString& Pat
 		Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *AuthToken));
 	}
 
-	if (Verb == TEXT("POST") || Verb == TEXT("PUT"))
+	if (Verb == TEXT("POST") || Verb == TEXT("PUT") || Verb == TEXT("PATCH"))
 	{
 		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
 		Request->SetContentAsString(JsonBody);

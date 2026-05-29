@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 16;
+	int32 SaveVersion = 17;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -168,4 +168,11 @@ public:
 
 	UPROPERTY()
 	int64 RankCubes = 0;
+
+	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
+	UPROPERTY()
+	FString CachedGuildId;
+
+	UPROPERTY()
+	uint8 CachedGuildRank = 0;
 };
