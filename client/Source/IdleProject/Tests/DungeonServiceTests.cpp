@@ -4,10 +4,50 @@
 #include "GameCore/DungeonService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/MasteryFormula.h"
 #include "Internationalization/IdleLocalization.h"
+#include "CharacterSystem/IdleCharacter.h"
+#include "CharacterSystem/LevelFormulas.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+struct FIdleGameInstanceWorldContextAccessor : UIdleGameInstance
+{
+	static void Attach(UIdleGameInstance* Instance, FWorldContext* Context)
+	{
+		static_cast<FIdleGameInstanceWorldContextAccessor*>(Instance)->WorldContext = Context;
+	}
+};
+
+FWorldContext* AttachGameInstanceToDungeonTestWorld(UIdleGameInstance* GameInstance, UWorld* World)
+{
+	if (!GEngine || !GameInstance || !World)
+	{
+		return nullptr;
+	}
+
+	FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
+	Context.SetCurrentWorld(World);
+	Context.OwningGameInstance = GameInstance;
+	FIdleGameInstanceWorldContextAccessor::Attach(GameInstance, &Context);
+	World->SetGameInstance(GameInstance);
+	return &Context;
+}
+
+FMasterySaveEntry MakeDungeonMasteryEntry(EMasteryTrack Track, int64 TotalXp = FMasteryFormula::XpToNext(0))
+{
+	FMasterySaveEntry Entry;
+	Entry.Track = static_cast<uint8>(Track);
+	Entry.TotalXp = TotalXp;
+	return Entry;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDungeonServiceRunLimitResetTest,
@@ -55,6 +95,45 @@ bool FDungeonServiceRunLimitResetTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDungeonServiceTierGateAndEntryTest,
+	"IdleProject.GameCore.Dungeon.ServiceTierGateAndEntry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDungeonServiceTierGateAndEntryTest::RunTest(const FString& Parameters)
+{
+	UDungeonService* Dungeons = NewObject<UDungeonService>();
+	const FString Today = TEXT("2026-05-29");
+	Dungeons->EnsureDailyReset(Today);
+
+	for (const EDungeonType Type : { EDungeonType::Gold, EDungeonType::Exp, EDungeonType::Essence })
+	{
+		const int64 MinCp = FDungeonFormula::GetMinimumCp(Type);
+		TestEqual(TEXT("CP below minimum unlocks zero tiers"), Dungeons->GetMaxAccessibleTier(Type, MinCp - 1), 0);
+		TestEqual(TEXT("CP at minimum unlocks tier one"), Dungeons->GetMaxAccessibleTier(Type, MinCp), 1);
+		TestEqual(TEXT("CP at four times minimum unlocks tier three"), Dungeons->GetMaxAccessibleTier(Type, MinCp * 4), 3);
+		TestEqual(TEXT("Tier one requirement equals minimum CP"), Dungeons->GetTierCpRequirement(Type, 1), MinCp);
+		TestEqual(TEXT("Tier three requirement is four times minimum CP"), Dungeons->GetTierCpRequirement(Type, 3), MinCp * 4);
+	}
+
+	const int64 EssenceTierThreeRequirement = Dungeons->GetTierCpRequirement(EDungeonType::Essence, 3);
+	const FDungeonRunResult OneBelow = Dungeons->TryRunDungeon(EDungeonType::Essence, EssenceTierThreeRequirement - 1, Today, 3);
+	TestFalse(TEXT("One below tier requirement fails"), OneBelow.bSuccess);
+	TestEqual(TEXT("One below tier requirement grants zero essence"), OneBelow.EssenceReward, static_cast<int64>(0));
+	TestEqual(TEXT("Failed tier gate consumes no daily entry"), Dungeons->GetRemainingEntries(EDungeonType::Essence, Today), 3);
+
+	const FDungeonRunResult AtRequirement = Dungeons->TryRunDungeon(EDungeonType::Essence, EssenceTierThreeRequirement, Today, 3);
+	TestTrue(TEXT("At tier requirement succeeds"), AtRequirement.bSuccess);
+	TestEqual(TEXT("At tier requirement consumes one shared entry"), Dungeons->GetRemainingEntries(EDungeonType::Essence, Today), 2);
+	TestEqual(TEXT("Tier three reward is the formula tier multiplier"), AtRequirement.EssenceReward, FDungeonFormula::GetRewardForCp(EDungeonType::Essence, EssenceTierThreeRequirement, 1).EssenceReward * FDungeonFormula::GetTierRewardMultiplier(3));
+
+	const FDungeonRunResult TierOneDefault = FDungeonFormula::GetRewardForCp(EDungeonType::Exp, 1000);
+	const FDungeonRunResult TierOneExplicit = FDungeonFormula::GetRewardForCp(EDungeonType::Exp, 1000, 1);
+	TestEqual(TEXT("Tier one remains compatible with the legacy default call"), TierOneExplicit.ExpReward, TierOneDefault.ExpReward);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDungeonServiceCaptureRestoreTest,
 	"IdleProject.GameCore.Dungeon.CaptureRestore",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -77,6 +156,69 @@ bool FDungeonServiceCaptureRestoreTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Exp unused count remains full"), Restored->GetRemainingEntries(EDungeonType::Exp, TEXT("2026-05-28")), 3);
 	TestEqual(TEXT("Essence used count round trips"), Restored->GetRemainingEntries(EDungeonType::Essence, TEXT("2026-05-28")), 2);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleGameInstanceDungeonAbyssTierBonusTest,
+	"IdleProject.GameCore.Dungeon.AbyssTierBonus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleGameInstanceDungeonAbyssTierBonusTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient dungeon world exists"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+	Save->bHasSave = true;
+	Save->SaveVersion = 14;
+	Save->Mastery.Add(MakeDungeonMasteryEntry(EMasteryTrack::Abyss));
+	TestTrue(TEXT("Abyss mastery save applies"), GameInstance->ApplyFromSave(Save));
+
+	FWorldContext* WorldContext = AttachGameInstanceToDungeonTestWorld(GameInstance, World);
+	TestNotNull(TEXT("Dungeon test world context exists"), WorldContext);
+	if (!WorldContext)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	GameInstance->InitializeDungeonServiceForTests(TEXT("2026-05-29"));
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	APlayerController* PlayerController = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Dungeon bonus character exists"), Character);
+	TestNotNull(TEXT("Dungeon bonus controller exists"), PlayerController);
+	if (!Character || !PlayerController)
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+
+	World->AddController(PlayerController);
+	PlayerController->Possess(Character);
+	GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+	Character->RefreshDerivedStats();
+
+	const int64 CombatPower = Character->GetCombatPower();
+	const int32 Tier = 3;
+	TestTrue(TEXT("Test character can enter tier three gold dungeon"), CombatPower >= FDungeonFormula::GetTierCpRequirement(EDungeonType::Gold, Tier));
+
+	const FDungeonRunResult BaseTierReward = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, CombatPower, Tier);
+	const float AbyssLocalBonus = FMasteryFormula::GetLocalBonus(EMasteryTrack::Abyss, 1);
+	const FDungeonRunResult MasteryTierReward = GameInstance->TryRunDungeon(EDungeonType::Gold, Tier);
+	TestTrue(TEXT("Abyss tier dungeon run succeeds"), MasteryTierReward.bSuccess);
+	TestEqual(TEXT("Abyss local bonus applies once after tier multiplication"), MasteryTierReward.GoldReward, FMath::RoundToInt64(static_cast<double>(BaseTierReward.GoldReward) * (1.0 + static_cast<double>(AbyssLocalBonus))));
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
 	return true;
 }
 
