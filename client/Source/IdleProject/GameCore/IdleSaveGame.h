@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 20;
+	int32 SaveVersion = 21;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -172,6 +172,13 @@ public:
 
 	UPROPERTY()
 	int64 RankCubes = 0;
+
+	// ── 칭호(SaveVer 21) — 해금 id 집합 + 장착 1개. 클라 로컬 권위. <21 세이브는 빈 값(회귀 안전) ──
+	UPROPERTY()
+	TSet<FString> UnlockedTitleIds;
+
+	UPROPERTY()
+	FString EquippedTitleId;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()

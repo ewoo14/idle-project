@@ -184,7 +184,9 @@ void AIdleCharacter::RefreshDerivedStats()
 	const float TowerMultiplier = IdleGameInstance ? IdleGameInstance->GetTowerMilestoneMultiplier() : 1.0f;
 	const float AchievementMultiplier = IdleGameInstance ? IdleGameInstance->GetAchievementStatMultiplier() : 1.0f;
 	const float MasteryCoreMultiplier = IdleGameInstance ? IdleGameInstance->GetMasteryCoreStatMultiplier() : 1.0f;
-	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier;
+	// 칭호 AllStatPct 전역 스탯 배수(장착 1개, 단일 적용 지점 — 마스터리/펫 배수 옆 합산, 이중 적용 금지 #72).
+	const float TitleAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetTitleAllStatMultiplier() : 1.0f;
+	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier * TitleAllStatMultiplier;
 	Derived.Hp *= StatMultiplier;
 	Derived.PhysAtk *= StatMultiplier;
 	Derived.MagicAtk *= StatMultiplier;
@@ -221,6 +223,9 @@ void AIdleCharacter::RefreshDerivedStats()
 		{
 			Derived.CritRate += MasteryService->GetGlobalBonus().CritRateAdd;
 		}
+
+		// 칭호 CritDmgPct 가산(장착 1개, 단일 적용 지점 — 룬 CritDamage 가산과 동일 차원, 이중 적용 금지 #72).
+		Derived.CritDmg += IdleGameInstance->GetTitleCritDamageBonus();
 
 		const FPetStatBonus PetStatBonus = IdleGameInstance->GetEquippedPetStatBonus();
 		Derived.PhysAtk *= 1.0f + PetStatBonus.PhysAtkPct;
