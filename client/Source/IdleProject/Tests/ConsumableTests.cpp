@@ -68,6 +68,8 @@ bool FConsumableFormulaAnchorsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Gold feast percent"), FConsumableFormula::GetBuffPercent(EConsumableType::GoldFeast), 0.50f);
 	TestEqual(TEXT("Wisdom booster percent"), FConsumableFormula::GetBuffPercent(EConsumableType::WisdomBooster), 0.50f);
 	TestEqual(TEXT("All V1 consumables last 30 minutes"), FConsumableFormula::GetBuffDurationSec(EConsumableType::AttackTonic), static_cast<int64>(1800));
+	TestEqual(TEXT("Unknown consumable percent is zero"), FConsumableFormula::GetBuffPercent(static_cast<EConsumableType>(99)), 0.0f);
+	TestEqual(TEXT("Unknown consumable duration is zero"), FConsumableFormula::GetBuffDurationSec(static_cast<EConsumableType>(99)), static_cast<int64>(0));
 	return true;
 }
 
@@ -83,6 +85,11 @@ bool FConsumableBuffServiceLifecycleTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Initial count is zero"), Service->GetCount(EConsumableType::AttackTonic), 0);
 	TestFalse(TEXT("Use without stock fails"), Service->UseConsumable(EConsumableType::AttackTonic, 1000));
+	Service->AddConsumable(EConsumableType::AttackTonic, 0);
+	Service->AddConsumable(EConsumableType::AttackTonic, -3);
+	Service->AddConsumable(static_cast<EConsumableType>(99), 5);
+	TestEqual(TEXT("Zero, negative, and invalid adds are ignored"), Service->GetCount(EConsumableType::AttackTonic), 0);
+	TestFalse(TEXT("Invalid use fails without side effects"), Service->UseConsumable(static_cast<EConsumableType>(99), 1000));
 
 	Service->AddConsumable(EConsumableType::AttackTonic, 2);
 	TestEqual(TEXT("AddConsumable increases count"), Service->GetCount(EConsumableType::AttackTonic), 2);
@@ -97,11 +104,38 @@ bool FConsumableBuffServiceLifecycleTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Second use extends from now"), Service->UseConsumable(EConsumableType::AttackTonic, 2000));
 	TestEqual(TEXT("Reused buff end is now plus duration"), Service->GetBuffRemainingSec(EConsumableType::AttackTonic, 2000), static_cast<int64>(1800));
 
+	Service->AddConsumable(EConsumableType::GuardTonic, 1);
+	TestTrue(TEXT("Different buff type can run at the same time"), Service->UseConsumable(EConsumableType::GuardTonic, 2100));
+	TestTrue(TEXT("Attack tonic remains active with guard tonic"), Service->IsBuffActive(EConsumableType::AttackTonic, 2100));
+	TestTrue(TEXT("Guard tonic is active independently"), Service->IsBuffActive(EConsumableType::GuardTonic, 2100));
+	TestEqual(TEXT("Guard multiplier is exposed independently"), Service->GetBuffStatMultiplier(EConsumableType::GuardTonic, 2100), 1.30f);
+
 	Service->AddConsumable(EConsumableType::GoldFeast, 1);
 	TestTrue(TEXT("Gold feast can be activated"), Service->UseConsumable(EConsumableType::GoldFeast, 3000));
 	TestEqual(TEXT("Gold buff exposes percent while active"), Service->GetGoldBuffPct(3000), 0.50f);
 	TestEqual(TEXT("Gold buff expires to zero"), Service->GetGoldBuffPct(4800), 0.0f);
 
+	FConsumableSaveEntry NegativeEntry;
+	NegativeEntry.Type = static_cast<uint8>(EConsumableType::WisdomBooster);
+	NegativeEntry.Count = -5;
+	NegativeEntry.BuffEndUnixSec = -10;
+	FConsumableSaveEntry InvalidEntry;
+	InvalidEntry.Type = 99;
+	InvalidEntry.Count = 3;
+	InvalidEntry.BuffEndUnixSec = 5000;
+	TArray<FConsumableSaveEntry> ClampEntries;
+	ClampEntries.Add(NegativeEntry);
+	ClampEntries.Add(InvalidEntry);
+	Service->ImportSave(ClampEntries);
+	TestEqual(TEXT("Negative imported count clamps to zero"), Service->GetCount(EConsumableType::WisdomBooster), 0);
+	TestFalse(TEXT("Negative imported end time is inactive"), Service->IsBuffActive(EConsumableType::WisdomBooster, 0));
+	TestEqual(TEXT("Invalid imported type is ignored"), Service->GetCount(static_cast<EConsumableType>(99)), 0);
+
+	Service->Initialize();
+	Service->AddConsumable(EConsumableType::AttackTonic, 1);
+	TestTrue(TEXT("Attack tonic reactivates after import clamp checks"), Service->UseConsumable(EConsumableType::AttackTonic, 2000));
+	Service->AddConsumable(EConsumableType::GoldFeast, 1);
+	TestTrue(TEXT("Gold feast reactivates after import clamp checks"), Service->UseConsumable(EConsumableType::GoldFeast, 3000));
 	TArray<FConsumableSaveEntry> Saved = Service->ExportSave();
 	UBuffService* Restored = NewObject<UBuffService>();
 	Restored->Initialize();
@@ -153,6 +187,19 @@ bool FConsumableGameInstanceHooksTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Attack tonic does not buff HP"), AttackBuffedStats.Hp, BaseStats.Hp);
 	TestTrue(TEXT("Combat power increases while attack tonic is active"), Character->GetCombatPower() > BasePower);
 
+	GameInstance->AddConsumable(EConsumableType::GuardTonic, 1);
+	TestTrue(TEXT("Guard tonic activates with attack tonic"), GameInstance->TryUseConsumable(EConsumableType::GuardTonic));
+	const FDerivedStats GuardBuffedStats = Character->GetCurrentDerivedStats();
+	TestTrue(TEXT("Guard tonic increases HP"), GuardBuffedStats.Hp > AttackBuffedStats.Hp);
+	TestTrue(TEXT("Guard tonic increases physical defense"), GuardBuffedStats.PhysDef > AttackBuffedStats.PhysDef);
+	TestEqual(TEXT("Guard tonic does not double-apply attack"), GuardBuffedStats.PhysAtk, AttackBuffedStats.PhysAtk);
+
+	GameInstance->AddConsumable(EConsumableType::AllStatElixir, 1);
+	TestTrue(TEXT("All stat elixir activates with existing stat buffs"), GameInstance->TryUseConsumable(EConsumableType::AllStatElixir));
+	const FDerivedStats AllStatBuffedStats = Character->GetCurrentDerivedStats();
+	TestTrue(TEXT("All stat elixir increases attack on top of attack tonic"), AllStatBuffedStats.PhysAtk > GuardBuffedStats.PhysAtk);
+	TestTrue(TEXT("All stat elixir increases HP on top of guard tonic"), AllStatBuffedStats.Hp > GuardBuffedStats.Hp);
+
 	GameInstance->AddConsumable(EConsumableType::GoldFeast, 1);
 	TestTrue(TEXT("Gold feast activates"), GameInstance->TryUseConsumable(EConsumableType::GoldFeast));
 	GameInstance->AddGold(100);
@@ -162,6 +209,26 @@ bool FConsumableGameInstanceHooksTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Wisdom booster activates"), GameInstance->TryUseConsumable(EConsumableType::WisdomBooster));
 	GameInstance->AddExp(99);
 	TestEqual(TEXT("Wisdom booster applies once in AddExp"), GameInstance->GetCurrentExp(), static_cast<int64>(149));
+
+	const float BaseDropChance = 0.05f;
+	TestEqual(TEXT("Drop chance has no consumable bonus before fortune scroll"), GameInstance->ApplyEquippedPetDropBonusChance(BaseDropChance), BaseDropChance);
+	GameInstance->AddConsumable(EConsumableType::FortuneScroll, 1);
+	TestTrue(TEXT("Fortune scroll activates"), GameInstance->TryUseConsumable(EConsumableType::FortuneScroll));
+	TestEqual(TEXT("Fortune scroll applies once in drop chance path"), GameInstance->ApplyEquippedPetDropBonusChance(BaseDropChance), BaseDropChance + 0.30f);
+
+	UIdleSaveGame* ExpiredSave = NewObject<UIdleSaveGame>();
+	ExpiredSave->bHasSave = true;
+	ExpiredSave->SaveVersion = 14;
+	FConsumableSaveEntry ExpiredEntry;
+	ExpiredEntry.Type = static_cast<uint8>(EConsumableType::AttackTonic);
+	ExpiredEntry.Count = 0;
+	ExpiredEntry.BuffEndUnixSec = 1;
+	ExpiredSave->Consumables.Add(ExpiredEntry);
+	TestTrue(TEXT("Expired consumable save applies"), GameInstance->ApplyFromSave(ExpiredSave));
+	Character->SetClassId(EClassId::Warrior);
+	const FDerivedStats ExpiredStats = Character->GetCurrentDerivedStats();
+	TestEqual(TEXT("Expired attack tonic restores physical attack baseline"), ExpiredStats.PhysAtk, BaseStats.PhysAtk);
+	TestEqual(TEXT("Expired attack tonic restores combat power baseline"), Character->GetCombatPower(), BasePower);
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
@@ -189,8 +256,10 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Seeded consumable save applies"), GameInstance->ApplyFromSave(Save));
 	TestEqual(TEXT("Guard tonic stock restored"), GameInstance->GetBuffService()->GetCount(EConsumableType::GuardTonic), 2);
+	TestTrue(TEXT("Guard tonic active timestamp restored"), GameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
 	TestTrue(TEXT("Rebirth succeeds"), GameInstance->Rebirth());
 	TestEqual(TEXT("Rebirth keeps consumable stock"), GameInstance->GetBuffService()->GetCount(EConsumableType::GuardTonic), 2);
+	TestTrue(TEXT("Rebirth keeps active buff timestamp"), GameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
 
 	UIdleGameInstance* TranscendGameInstance = NewObject<UIdleGameInstance>();
 	UIdleSaveGame* TranscendSave = NewObject<UIdleSaveGame>();
@@ -201,6 +270,23 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Seeded transcend consumable save applies"), TranscendGameInstance->ApplyFromSave(TranscendSave));
 	TestTrue(TEXT("Transcend succeeds"), TranscendGameInstance->Transcend());
 	TestEqual(TEXT("Transcend keeps consumable stock"), TranscendGameInstance->GetBuffService()->GetCount(EConsumableType::GuardTonic), 2);
+	TestTrue(TEXT("Transcend keeps active buff timestamp"), TranscendGameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
+
+	UIdleGameInstance* LegacyGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->bHasSave = true;
+	LegacySave->SaveVersion = 13;
+	LegacySave->Consumables.Add(Entry);
+	TestTrue(TEXT("Legacy v13 save applies"), LegacyGameInstance->ApplyFromSave(LegacySave));
+	TestEqual(TEXT("v13 consumable inventory migrates to zero"), LegacyGameInstance->GetBuffService()->GetCount(EConsumableType::GuardTonic), 0);
+	TestFalse(TEXT("v13 active buff timestamp migrates to inactive"), LegacyGameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
+
+	UIdleSaveGame* RoundTripSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("v14 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
+	TestEqual(TEXT("Captured save version is v14"), RoundTripSave->SaveVersion, 14);
+	TestEqual(TEXT("Captured consumable payload has guard entry"), RoundTripSave->Consumables.Num(), 1);
+	TestEqual(TEXT("Captured consumable count persists"), RoundTripSave->Consumables[0].Count, 2);
+	TestEqual(TEXT("Captured active end timestamp persists"), RoundTripSave->Consumables[0].BuffEndUnixSec, static_cast<int64>(12345));
 	return true;
 }
 
