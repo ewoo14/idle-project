@@ -15,6 +15,7 @@
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
+#include "GameCore/WeeklyBossTypes.h"
 #include "ItemSystem/ItemTypes.h"
 #include "RuneSystem/RuneTypes.h"
 #include "TimerManager.h"
@@ -27,6 +28,7 @@ class ULeaderboardService;
 class AIdleCharacter;
 class UIdleSaveGame;
 class URuneService;
+class UWeeklyBossService;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnExpChanged, int64, CurrentExp, int64, NextExp);
@@ -175,6 +177,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UBuffService* GetBuffService() const { return BuffService; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UWeeklyBossService* GetWeeklyBossService() const { return WeeklyBossService; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
 
@@ -217,6 +222,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Dungeon")
 	FDungeonRunResult TryRunDungeon(EDungeonType Type, int32 Tier = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|WeeklyBoss")
+	FWeeklyBossChallengeResult TryChallengeWeeklyBoss();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|WeeklyBoss")
+	bool ClaimWeeklyBossMilestone(int32 Milestone);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection = false);
@@ -434,6 +445,8 @@ public:
 
 	void InitializeDungeonServiceForTests(const FString& CurrentUtcDate);
 
+	void InitializeWeeklyBossServiceForTests(const FString& CurrentWeek);
+
 	void InitializeRuneServiceForTests();
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -545,6 +558,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UBuffService> BuffService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UWeeklyBossService> WeeklyBossService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -638,6 +654,7 @@ private:
 	void EnsureMasteryService();
 	void EnsureLeaderboardService();
 	void EnsureBuffService();
+	void EnsureWeeklyBossService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	UFUNCTION()

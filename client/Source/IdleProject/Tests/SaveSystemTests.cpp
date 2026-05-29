@@ -14,6 +14,7 @@
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TowerService.h"
+#include "GameCore/WeeklyBossService.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "CombatSystem/SkillComponent.h"
@@ -71,7 +72,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V14"), SaveGame->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("SaveVersion starts at V15"), SaveGame->SaveVersion, static_cast<int32>(15));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -82,6 +83,9 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fresh save has no season tokens"), SaveGame->SeasonTokens, 0);
 	TestEqual(TEXT("Fresh save has no mastery payload until capture"), SaveGame->Mastery.Num(), 0);
 	TestEqual(TEXT("Fresh save has no consumable payload until capture"), SaveGame->Consumables.Num(), 0);
+	TestEqual(TEXT("Fresh save has no weekly boss damage"), SaveGame->WeeklyBossDamage, static_cast<int64>(0));
+	TestEqual(TEXT("Fresh save has no weekly boss attempts used"), SaveGame->WeeklyBossChallengesUsed, static_cast<int32>(0));
+	TestEqual(TEXT("Fresh save has no weekly boss claimed milestones"), SaveGame->WeeklyBossClaimedMilestones, static_cast<int32>(0));
 
 	return true;
 }
@@ -134,6 +138,10 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	ConsumableEntry.Count = 3;
 	ConsumableEntry.BuffEndUnixSec = 1234569000;
 	SourceSave->Consumables.Add(ConsumableEntry);
+	SourceSave->WeeklyBossWeekId = TEXT("2026-W22");
+	SourceSave->WeeklyBossDamage = 4500;
+	SourceSave->WeeklyBossChallengesUsed = 3;
+	SourceSave->WeeklyBossClaimedMilestones = 2;
 
 	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
 	TestNotNull(TEXT("Game instance is created"), GameInstance);
@@ -148,7 +156,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V14"), CapturedSave->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("Captured save writes V15"), CapturedSave->SaveVersion, static_cast<int32>(15));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -188,6 +196,10 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Consumable type round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Type : 255, static_cast<uint8>(EConsumableType::GoldFeast));
 	TestEqual(TEXT("Consumable count round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Count : -1, 3);
 	TestEqual(TEXT("Consumable buff end round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].BuffEndUnixSec : -1, static_cast<int64>(1234569000));
+	TestEqual(TEXT("Weekly boss week id round trips"), CapturedSave->WeeklyBossWeekId, SourceSave->WeeklyBossWeekId);
+	TestEqual(TEXT("Weekly boss damage round trips"), CapturedSave->WeeklyBossDamage, SourceSave->WeeklyBossDamage);
+	TestEqual(TEXT("Weekly boss challenges used round trip"), CapturedSave->WeeklyBossChallengesUsed, SourceSave->WeeklyBossChallengesUsed);
+	TestEqual(TEXT("Weekly boss claimed milestones round trip"), CapturedSave->WeeklyBossClaimedMilestones, SourceSave->WeeklyBossClaimedMilestones);
 
 	const UStageService* StageService = GameInstance->GetStageService();
 	TestNotNull(TEXT("ApplyFromSave ensures stage service"), StageService);
@@ -237,15 +249,15 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V14"), CapturedSave->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("Capture after legacy migration writes V15"), CapturedSave->SaveVersion, static_cast<int32>(15));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
-	TestTrue(TEXT("Reapplying captured v14 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	TestTrue(TEXT("Reapplying captured v15 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V14 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V14 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V15 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V15 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }
@@ -270,7 +282,7 @@ bool FIdleSaveSystemMasteryV12MigrationTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v12 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated capture writes v14"), CapturedSave->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("Migrated capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
 	TestEqual(TEXT("Migrated capture writes all mastery tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	return true;
@@ -294,8 +306,32 @@ bool FIdleSaveSystemConsumableV13MigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v13 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated consumable capture writes v14"), CapturedSave->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("Migrated consumable capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
 	TestEqual(TEXT("Migrated capture has no consumable stock"), CapturedSave->Consumables.Num(), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemWeeklyBossV14MigrationTest,
+	"IdleProject.GameCore.SaveSystem.WeeklyBossV14Migration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemWeeklyBossV14MigrationTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->SaveVersion = 14;
+	LegacySave->bHasSave = true;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave accepts v14 save without weekly boss"), GameInstance->ApplyFromSave(LegacySave));
+	TestNotNull(TEXT("Weekly boss service is created for migrated saves"), GameInstance->GetWeeklyBossService());
+	TestEqual(TEXT("Migrated weekly boss damage starts at zero"), GameInstance->GetWeeklyBossService() ? GameInstance->GetWeeklyBossService()->GetDamage() : -1, static_cast<int64>(0));
+
+	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Capture after v14 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
+	TestEqual(TEXT("Migrated weekly boss capture writes v15"), CapturedSave->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Migrated weekly boss damage remains zero"), CapturedSave->WeeklyBossDamage, static_cast<int64>(0));
 
 	return true;
 }
@@ -815,6 +851,10 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	ConsumableEntry.Count = 4;
 	ConsumableEntry.BuffEndUnixSec = 1234569999;
 	SourceSave->Consumables.Add(ConsumableEntry);
+	SourceSave->WeeklyBossWeekId = TEXT("2026-W22");
+	SourceSave->WeeklyBossDamage = 4500;
+	SourceSave->WeeklyBossChallengesUsed = 3;
+	SourceSave->WeeklyBossClaimedMilestones = 2;
 
 	FString PayloadJson;
 	TestTrue(TEXT("Cloud payload serializes populated local save"), FCloudSavePayloadMapper::SaveToPayloadJson(*SourceSave, PayloadJson));
@@ -826,6 +866,10 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Payload includes mastery world power"), PayloadJson.Contains(TEXT("\"worldPower\":2")));
 	TestTrue(TEXT("Payload includes mastery levels"), PayloadJson.Contains(TEXT("\"masteryLevels\":[2,0,0,0,0,0]")));
 	TestTrue(TEXT("Payload includes consumables in full save"), PayloadJson.Contains(TEXT("\"Consumables\"")));
+	TestTrue(TEXT("Payload includes weekly boss damage extension field"), PayloadJson.Contains(TEXT("\"weeklyBossDamage\":4500")));
+	TestTrue(TEXT("Payload includes weekly boss week extension field"), PayloadJson.Contains(TEXT("\"weeklyBossWeekId\":\"2026-W22\"")));
+	TestTrue(TEXT("Payload includes weekly boss challenge extension field"), PayloadJson.Contains(TEXT("\"weeklyBossChallengesUsed\":3")));
+	TestTrue(TEXT("Payload includes weekly boss claimed extension field"), PayloadJson.Contains(TEXT("\"weeklyBossClaimedMilestones\":2")));
 
 	UIdleSaveGame* RestoredSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Cloud payload deserializes into local save"), FCloudSavePayloadMapper::PayloadJsonToSave(PayloadJson, *RestoredSave));
@@ -854,6 +898,10 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Consumable payload survives cloud payload"), RestoredSave->Consumables.Num(), 1);
 	TestEqual(TEXT("Consumable type survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Type : 255, static_cast<uint8>(EConsumableType::WisdomBooster));
 	TestEqual(TEXT("Consumable count survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Count : -1, 4);
+	TestEqual(TEXT("Weekly boss week survives cloud payload"), RestoredSave->WeeklyBossWeekId, SourceSave->WeeklyBossWeekId);
+	TestEqual(TEXT("Weekly boss damage survives cloud payload"), RestoredSave->WeeklyBossDamage, SourceSave->WeeklyBossDamage);
+	TestEqual(TEXT("Weekly boss challenges survive cloud payload"), RestoredSave->WeeklyBossChallengesUsed, SourceSave->WeeklyBossChallengesUsed);
+	TestEqual(TEXT("Weekly boss claimed milestones survive cloud payload"), RestoredSave->WeeklyBossClaimedMilestones, SourceSave->WeeklyBossClaimedMilestones);
 	TestTrue(TEXT("Season claimed tiers survive cloud payload"), RestoredSave->SeasonClaimedTiers.Contains(1));
 
 	FCloudSaveProgressSnapshot Snapshot;

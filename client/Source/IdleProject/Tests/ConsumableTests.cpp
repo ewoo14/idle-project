@@ -282,8 +282,8 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("v13 active buff timestamp migrates to inactive"), LegacyGameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
 
 	UIdleSaveGame* RoundTripSave = NewObject<UIdleSaveGame>();
-	TestTrue(TEXT("v14 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
-	TestEqual(TEXT("Captured save version is v14"), RoundTripSave->SaveVersion, 14);
+	TestTrue(TEXT("v15 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
+	TestEqual(TEXT("Captured save version is v15"), RoundTripSave->SaveVersion, 15);
 	TestEqual(TEXT("Captured consumable payload has guard entry"), RoundTripSave->Consumables.Num(), 1);
 	TestEqual(TEXT("Captured consumable count persists"), RoundTripSave->Consumables[0].Count, 2);
 	TestEqual(TEXT("Captured active end timestamp persists"), RoundTripSave->Consumables[0].BuffEndUnixSec, static_cast<int64>(12345));

@@ -20,6 +20,8 @@
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
+#include "GameCore/WeeklyBossFormula.h"
+#include "GameCore/WeeklyBossService.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
@@ -60,9 +62,11 @@ const FString RuneDisenchantHitBoxPrefix(TEXT("RuneDisenchant_"));
 const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
 const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
+const FString WeeklyBossClaimHitBoxPrefix(TEXT("WeeklyBossClaim_"));
 const FName LeaderboardPowerTabHitBoxName(TEXT("LeaderboardTabPower"));
 const FName LeaderboardRebirthTabHitBoxName(TEXT("LeaderboardTabRebirth"));
 const FName LeaderboardRefreshHitBoxName(TEXT("LeaderboardRefresh"));
+const FName WeeklyBossChallengeHitBoxName(TEXT("WeeklyBossChallenge"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
 const FName ShopProtectionScrollHitBoxName(TEXT("ShopProtectionScroll"));
 const FName ShopResetCubeHitBoxName(TEXT("ShopResetCube"));
@@ -83,6 +87,7 @@ constexpr float TranscendFeedbackDurationSeconds = 2.4f;
 constexpr float TowerFeedbackDurationSeconds = 2.4f;
 constexpr float DungeonFeedbackDurationSeconds = 2.4f;
 constexpr float AchievementFeedbackDurationSeconds = 2.4f;
+constexpr float WeeklyBossFeedbackDurationSeconds = 2.4f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
 
@@ -229,6 +234,18 @@ FText FormatLocalizedUIWithNumber(const TCHAR* Key, const TCHAR* ArgName, int32 
 	{
 		Args.Add(ArgName, FText::AsNumber(Value));
 	});
+}
+
+FName MakeWeeklyBossClaimHitBoxName(int32 Milestone)
+{
+	return FName(*FString::Printf(TEXT("%s%d"), *WeeklyBossClaimHitBoxPrefix, Milestone));
+}
+
+int32 WeeklyBossMilestoneFromHitBoxName(FName BoxName)
+{
+	FString MilestoneText = BoxName.ToString();
+	MilestoneText.RemoveFromStart(WeeklyBossClaimHitBoxPrefix);
+	return FCString::Atoi(*MilestoneText);
 }
 
 const EConsumableType* GetConsumableDisplayOrder()
@@ -2539,6 +2556,81 @@ FIdleHUDDungeonPanelViewModel IdleProject::UI::BuildDungeonPanelViewModel(const 
 	return ViewModel;
 }
 
+FIdleHUDWeeklyBossPanelViewModel IdleProject::UI::BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService)
+{
+	FIdleHUDWeeklyBossPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_PANEL_TITLE"));
+	ViewModel.ChallengeLabel = IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_CHALLENGE"));
+	ViewModel.ChallengeHitBoxName = WeeklyBossChallengeHitBoxName;
+	ViewModel.Damage = WeeklyBossService.GetDamage();
+	ViewModel.RemainingChallenges = WeeklyBossService.GetRemainingChallenges();
+	ViewModel.ReachedMilestones = WeeklyBossService.GetReachedMilestones();
+	ViewModel.ClaimedMilestones = WeeklyBossService.GetClaimedMilestones();
+	ViewModel.bCanChallenge = ViewModel.RemainingChallenges > 0;
+
+	const int32 NextMilestone = FMath::Max(1, ViewModel.ReachedMilestones + 1);
+	ViewModel.NextMilestoneThreshold = FWeeklyBossFormula::MilestoneThreshold(NextMilestone);
+	ViewModel.ProgressRatio = ViewModel.NextMilestoneThreshold > 0
+		? FMath::Clamp(static_cast<float>(ViewModel.Damage) / static_cast<float>(ViewModel.NextMilestoneThreshold), 0.0f, 1.0f)
+		: 0.0f;
+
+	ViewModel.WeekLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_WEEK_FORMAT"), [&WeeklyBossService](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Week"), FText::FromString(WeeklyBossService.GetWeekId()));
+	});
+	ViewModel.DamageLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_DAMAGE_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Damage"), FText::FromString(FormatIntegerWithCommas(ViewModel.Damage)));
+		Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(ViewModel.NextMilestoneThreshold)));
+	});
+	ViewModel.RemainingLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_REMAINING_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Remaining"), FText::AsNumber(ViewModel.RemainingChallenges));
+		Args.Add(TEXT("Limit"), FText::AsNumber(FWeeklyBossFormula::WeeklyChallengeLimit));
+	});
+	ViewModel.MilestoneSummaryLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_MILESTONE_SUMMARY_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Reached"), FText::AsNumber(ViewModel.ReachedMilestones));
+		Args.Add(TEXT("Claimed"), FText::AsNumber(ViewModel.ClaimedMilestones));
+	});
+	ViewModel.ResetLabel = IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_RESET_WEEKLY"));
+
+	const int32 FirstDisplayedMilestone = FMath::Max(1, ViewModel.ClaimedMilestones + 1);
+	constexpr int32 DisplayMilestoneCount = 5;
+	for (int32 Offset = 0; Offset < DisplayMilestoneCount; ++Offset)
+	{
+		FIdleHUDWeeklyBossMilestoneRowViewModel Row;
+		Row.Milestone = FirstDisplayedMilestone + Offset;
+		Row.Threshold = FWeeklyBossFormula::MilestoneThreshold(Row.Milestone);
+		Row.GoldReward = FWeeklyBossFormula::MilestoneGoldReward(Row.Milestone);
+		Row.EssenceReward = FWeeklyBossFormula::MilestoneEssenceReward(Row.Milestone);
+		Row.bReached = Row.Milestone <= ViewModel.ReachedMilestones;
+		Row.bClaimed = Row.Milestone <= ViewModel.ClaimedMilestones;
+		Row.bCanClaim = Row.bReached && !Row.bClaimed;
+		Row.ClaimHitBoxName = MakeWeeklyBossClaimHitBoxName(Row.Milestone);
+		Row.ActionLabel = IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_CLAIM"));
+		Row.MilestoneLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_MILESTONE_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Milestone"), FText::AsNumber(Row.Milestone));
+		});
+		Row.ThresholdLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_THRESHOLD_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(Row.Threshold)));
+		});
+		Row.RewardLabel = FormatLocalizedUI(TEXT("WEEKLY_BOSS_REWARD_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Row.GoldReward)));
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Row.EssenceReward)));
+		});
+		Row.StatusLabel = Row.bClaimed
+			? IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_STATUS_CLAIMED"))
+			: (Row.bReached ? IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_STATUS_REACHED")) : IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_STATUS_LOCKED")));
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UAchievementService& AchievementService)
 {
 	FIdleHUDAchievementViewModel ViewModel;
@@ -3200,6 +3292,7 @@ void AIdleHUD::DrawHUD()
 	DrawTranscendPanel();
 	DrawTowerPanel();
 	DrawDungeonPanel();
+	DrawWeeklyBossPanel();
 	DrawAchievementPanel();
 	DrawMasteryPanel();
 	DrawStatAllocationPanel();
@@ -3341,6 +3434,16 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(DungeonEnterHitBoxPrefix))
 	{
 		TryRunDungeonFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == WeeklyBossChallengeHitBoxName)
+	{
+		TryChallengeWeeklyBoss();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(WeeklyBossClaimHitBoxPrefix))
+	{
+		ClaimWeeklyBossFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(ConsumableUseHitBoxPrefix))
@@ -6202,6 +6305,168 @@ void AIdleHUD::TryRunDungeonFromHitBox(FName BoxName)
 	if (const UWorld* World = GetWorld())
 	{
 		DungeonFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawWeeklyBossPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UWeeklyBossService* WeeklyBossService = IdleGameInstance ? IdleGameInstance->GetWeeklyBossService() : nullptr;
+	if (!WeeklyBossService)
+	{
+		return;
+	}
+
+	const FIdleHUDWeeklyBossPanelViewModel ViewModel = BuildWeeklyBossPanelViewModel(*WeeklyBossService);
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - WeeklyBossFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !WeeklyBossFeedbackLabel.IsEmpty() && FeedbackElapsed <= WeeklyBossFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	const float RowHeight = 44.0f * Scale;
+	const float RowGap = 6.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 4);
+	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
+	const float PanelHeight = 132.0f * Scale + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding + FeedbackHeight;
+	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
+	const float Y = 650.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.WeekLabel.ToString(), Theme::TextMuted, X + 150.0f * Scale, Y + 13.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(ViewModel.DamageLabel.ToString(), Theme::AccentBlue, X + Padding, Y + 40.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(ViewModel.RemainingLabel.ToString(), ViewModel.bCanChallenge ? Theme::AccentGold : Theme::AccentRed, X + Padding, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.MilestoneSummaryLabel.ToString(), Theme::TextMuted, X + 152.0f * Scale, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+
+	const float BarX = X + Padding;
+	const float BarY = Y + 88.0f * Scale;
+	const float BarWidth = PanelWidth - Padding * 2.0f - 98.0f * Scale;
+	const float BarHeight = 10.0f * Scale;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), BarX, BarY, BarWidth, BarHeight);
+	DrawRect(Theme::AccentBlue, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
+	DrawText(ViewModel.ResetLabel.ToString(), Theme::TextMuted, BarX, BarY + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+
+	const float ButtonWidth = 88.0f * Scale;
+	const float ButtonHeight = 30.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + 82.0f * Scale;
+	DrawRect(ViewModel.bCanChallenge ? Theme::AccentGold : Theme::BgPrimary, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ChallengeLabel.ToString(), ViewModel.bCanChallenge ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 13.0f * Scale, ButtonY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	if (ViewModel.bCanChallenge)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ChallengeHitBoxName, true, 86);
+	}
+
+	float RowY = Y + 122.0f * Scale;
+	for (int32 Index = 0; Index < VisibleRows; ++Index)
+	{
+		DrawWeeklyBossMilestoneRow(ViewModel.Rows[Index], X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(WeeklyBossFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, RowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawWeeklyBossMilestoneRow(const FIdleHUDWeeklyBossMilestoneRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 44.0f;
+	const FLinearColor StateColor = Row.bCanClaim
+		? Theme::AccentGold
+		: (Row.bReached ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.62f));
+
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.MilestoneLabel.ToString(), Row.bCanClaim ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.ThresholdLabel.ToString(), Theme::TextMuted, X + 86.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.StatusLabel.ToString(), StateColor, X + 180.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+
+	const float ButtonWidth = 58.0f * Scale;
+	const float ButtonHeight = 24.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 10.0f * Scale;
+	DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	if (Row.bCanClaim)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.ClaimHitBoxName, true, 86);
+	}
+}
+
+void AIdleHUD::TryChallengeWeeklyBoss()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FWeeklyBossChallengeResult Result = IdleGameInstance->TryChallengeWeeklyBoss();
+	WeeklyBossFeedbackLabel = Result.bSuccess
+		? FormatLocalizedUI(TEXT("WEEKLY_BOSS_CHALLENGE_RESULT_FORMAT"), [&Result](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Damage"), FText::FromString(FormatIntegerWithCommas(Result.DamageDealt)));
+			Args.Add(TEXT("Reached"), FText::AsNumber(Result.ReachedMilestones));
+		})
+		: IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_CHALLENGE_BLOCKED"));
+	if (const UWorld* World = GetWorld())
+	{
+		WeeklyBossFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ClaimWeeklyBossFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const int32 Milestone = WeeklyBossMilestoneFromHitBoxName(BoxName);
+	const bool bClaimed = IdleGameInstance->ClaimWeeklyBossMilestone(Milestone);
+	WeeklyBossFeedbackLabel = bClaimed
+		? FormatLocalizedUI(TEXT("WEEKLY_BOSS_CLAIM_RESULT_FORMAT"), [Milestone](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Milestone"), FText::AsNumber(Milestone));
+			Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(FWeeklyBossFormula::MilestoneGoldReward(Milestone))));
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(FWeeklyBossFormula::MilestoneEssenceReward(Milestone))));
+		})
+		: IdleProject::Localization::UI(TEXT("WEEKLY_BOSS_CLAIM_BLOCKED"));
+	if (const UWorld* World = GetWorld())
+	{
+		WeeklyBossFeedbackStartTime = World->GetTimeSeconds();
 	}
 	RefreshMouseInteraction();
 }

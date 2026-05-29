@@ -27,6 +27,7 @@ class UInventoryComponent;
 class UMasteryService;
 class URuneService;
 class USkillComponent;
+class UWeeklyBossService;
 class SIdleHUDWidget;
 
 struct IDLEPROJECT_API FIdleHUDSkillSlotViewModel
@@ -389,6 +390,43 @@ struct IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel
 	bool bOffline = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDWeeklyBossMilestoneRowViewModel
+{
+	int32 Milestone = 0;
+	FText MilestoneLabel;
+	FText ThresholdLabel;
+	FText RewardLabel;
+	FText StatusLabel;
+	FText ActionLabel;
+	FName ClaimHitBoxName;
+	int64 Threshold = 0;
+	int64 GoldReward = 0;
+	int64 EssenceReward = 0;
+	bool bReached = false;
+	bool bClaimed = false;
+	bool bCanClaim = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel
+{
+	FText Title;
+	FText WeekLabel;
+	FText DamageLabel;
+	FText RemainingLabel;
+	FText MilestoneSummaryLabel;
+	FText ResetLabel;
+	FText ChallengeLabel;
+	FName ChallengeHitBoxName;
+	int64 Damage = 0;
+	int64 NextMilestoneThreshold = 0;
+	int32 RemainingChallenges = 0;
+	int32 ReachedMilestones = 0;
+	int32 ClaimedMilestones = 0;
+	float ProgressRatio = 0.0f;
+	bool bCanChallenge = false;
+	TArray<FIdleHUDWeeklyBossMilestoneRowViewModel> Rows;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneSlotViewModel
 {
 	int32 SlotIndex = INDEX_NONE;
@@ -701,6 +739,7 @@ IDLEPROJECT_API FIdleHUDPotentialPanelViewModel BuildPotentialPanelViewModel(con
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, bool bLoading, bool bOffline);
+IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -821,6 +860,10 @@ private:
 	void DrawLeaderboardRow(const FIdleHUDLeaderboardRowViewModel& Row, float X, float Y, float Width, float Height);
 	void SelectLeaderboardKind(ELeaderboardKind Kind);
 	void RefreshSelectedLeaderboard();
+	void DrawWeeklyBossPanel();
+	void DrawWeeklyBossMilestoneRow(const FIdleHUDWeeklyBossMilestoneRowViewModel& Row, float X, float Y, float Width, float Height);
+	void TryChallengeWeeklyBoss();
+	void ClaimWeeklyBossFromHitBox(FName BoxName);
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
@@ -912,6 +955,7 @@ private:
 	FText TowerFeedbackLabel;
 	FText DungeonFeedbackLabel;
 	FText AchievementFeedbackLabel;
+	FText WeeklyBossFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
@@ -922,6 +966,7 @@ private:
 	float TowerFeedbackStartTime = -1000.0f;
 	float DungeonFeedbackStartTime = -1000.0f;
 	float AchievementFeedbackStartTime = -1000.0f;
+	float WeeklyBossFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;

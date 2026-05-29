@@ -119,6 +119,26 @@
       "claimColor": "{color.accent.gold}",
       "panelColor": "{color.bg.panel}",
       "rowColor": "{color.bg.primary}"
+    },
+    "weeklyBoss": {
+      "anchor": "center",
+      "topPx1080": 650,
+      "widthViewportRatio": 0.24,
+      "minWidthPx1080": 360,
+      "maxWidthPx1080": 460,
+      "headerHeightPx1080": 122,
+      "rowHeightPx1080": 44,
+      "visibleMilestoneRows": 4,
+      "scaleByCanvasHeight": {
+        "baseHeight": 1080,
+        "min": 1.0,
+        "max": 2.0
+      },
+      "panelColor": "{color.bg.panel}",
+      "rowColor": "{color.bg.primary}",
+      "progressColor": "{color.accent.blue}",
+      "claimColor": "{color.accent.gold}",
+      "blockedColor": "{color.accent.red}"
     }
   },
   "$todo": [

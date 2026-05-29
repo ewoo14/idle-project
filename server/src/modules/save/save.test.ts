@@ -183,6 +183,10 @@ describe("SaveService", () => {
         worldPower: 21,
         masteryLevels: [1, 2, 3, 4, 5, 6],
         consumables: [{ type: 4, count: 2, buffEndUnixSec: 1_234_567_890 }],
+        weeklyBossDamage: 4500,
+        weeklyBossWeekId: "2026-W22",
+        weeklyBossChallengesUsed: 3,
+        weeklyBossClaimedMilestones: 2,
         customClientField: "kept",
       },
     });
@@ -249,6 +253,24 @@ describe("SaveService", () => {
           buffEndUnixSec: { type: "integer", minimum: 0 },
         },
       },
+    });
+    expect(payloadSchema.properties.weeklyBossDamage).toEqual({
+      type: "integer",
+      minimum: 0,
+    });
+    expect(payloadSchema.properties.weeklyBossWeekId).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 32,
+    });
+    expect(payloadSchema.properties.weeklyBossChallengesUsed).toEqual({
+      type: "integer",
+      minimum: 0,
+      maximum: 7,
+    });
+    expect(payloadSchema.properties.weeklyBossClaimedMilestones).toEqual({
+      type: "integer",
+      minimum: 0,
     });
     expect(payloadSchema.additionalProperties).toBe(true);
   });

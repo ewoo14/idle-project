@@ -67,6 +67,10 @@ bool FCloudSavePayloadMapper::SaveToPayloadJson(const UIdleSaveGame& SaveGame, F
 	Payload->SetNumberField(TEXT("transcendCount"), FMath::Max(0, SaveGame.TranscendCount));
 	Payload->SetNumberField(TEXT("towerHighestFloor"), FMath::Max(0, SaveGame.TowerHighestFloor));
 	Payload->SetNumberField(TEXT("skillPoints"), FMath::Max(0, SaveGame.SkillPoints));
+	Payload->SetNumberField(TEXT("weeklyBossDamage"), static_cast<double>(FMath::Max<int64>(0, SaveGame.WeeklyBossDamage)));
+	Payload->SetStringField(TEXT("weeklyBossWeekId"), SaveGame.WeeklyBossWeekId);
+	Payload->SetNumberField(TEXT("weeklyBossChallengesUsed"), FMath::Clamp(SaveGame.WeeklyBossChallengesUsed, 0, 7));
+	Payload->SetNumberField(TEXT("weeklyBossClaimedMilestones"), FMath::Max(0, SaveGame.WeeklyBossClaimedMilestones));
 	const TArray<int32> MasteryLevels = ComputeMasteryLevels(SaveGame);
 	int64 WorldPower = 0;
 	TArray<TSharedPtr<FJsonValue>> MasteryLevelValues;
@@ -128,6 +132,23 @@ bool FCloudSavePayloadMapper::PayloadJsonToSave(const FString& PayloadJson, UIdl
 	if (Payload->TryGetNumberField(TEXT("skillPoints"), NumericValue))
 	{
 		OutSaveGame.SkillPoints = FMath::Max(0, static_cast<int32>(NumericValue));
+	}
+	if (Payload->TryGetNumberField(TEXT("weeklyBossDamage"), NumericValue))
+	{
+		OutSaveGame.WeeklyBossDamage = FMath::Max<int64>(0, static_cast<int64>(NumericValue));
+	}
+	FString StringValue;
+	if (Payload->TryGetStringField(TEXT("weeklyBossWeekId"), StringValue))
+	{
+		OutSaveGame.WeeklyBossWeekId = StringValue;
+	}
+	if (Payload->TryGetNumberField(TEXT("weeklyBossChallengesUsed"), NumericValue))
+	{
+		OutSaveGame.WeeklyBossChallengesUsed = FMath::Clamp(static_cast<int32>(NumericValue), 0, 7);
+	}
+	if (Payload->TryGetNumberField(TEXT("weeklyBossClaimedMilestones"), NumericValue))
+	{
+		OutSaveGame.WeeklyBossClaimedMilestones = FMath::Max(0, static_cast<int32>(NumericValue));
 	}
 
 	return true;
