@@ -52,6 +52,9 @@ const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
 const FString PetFeedHitBoxPrefix(TEXT("PetFeed_"));
 const FString PetEvolveHitBoxPrefix(TEXT("PetEvolve_"));
+// 칭호 패널(칭호 시스템) — 고유 Title~ prefix 로 jumbo ODR 회피.
+const FString TitleEquipHitBoxPrefix(TEXT("TitleEquip_"));
+const FName TitleUnequipHitBoxName(TEXT("TitleUnequip"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
@@ -1140,6 +1143,107 @@ FText PetBonusTypeToLabel(EPetBonusType Type, float BonusPercent)
 	}
 }
 
+// 칭호 id → 이름 로컬키 매핑(서버 카탈로그 18종). TitleService 의 Name 은 id 미러이므로 UI 가 키로 변환한다.
+const TCHAR* TitleIdToNameLocalizationKey(const FString& TitleId)
+{
+	static const TMap<FString, const TCHAR*> Map = {
+		{ TEXT("monster_hunter"), TEXT("TITLE_NAME_MONSTER_HUNTER") },
+		{ TEXT("boss_slayer"), TEXT("TITLE_NAME_BOSS_SLAYER") },
+		{ TEXT("monster_annihilator"), TEXT("TITLE_NAME_MONSTER_ANNIHILATOR") },
+		{ TEXT("boss_executioner"), TEXT("TITLE_NAME_BOSS_EXECUTIONER") },
+		{ TEXT("rebirth_master"), TEXT("TITLE_NAME_REBIRTH_MASTER") },
+		{ TEXT("transcendent"), TEXT("TITLE_NAME_TRANSCENDENT") },
+		{ TEXT("stage_conqueror"), TEXT("TITLE_NAME_STAGE_CONQUEROR") },
+		{ TEXT("level_legend"), TEXT("TITLE_NAME_LEVEL_LEGEND") },
+		{ TEXT("tower_conqueror"), TEXT("TITLE_NAME_TOWER_CONQUEROR") },
+		{ TEXT("tower_overlord"), TEXT("TITLE_NAME_TOWER_OVERLORD") },
+		{ TEXT("collector"), TEXT("TITLE_NAME_COLLECTOR") },
+		{ TEXT("unique_seeker"), TEXT("TITLE_NAME_UNIQUE_SEEKER") },
+		{ TEXT("gold_king"), TEXT("TITLE_NAME_GOLD_KING") },
+		{ TEXT("pet_whisperer"), TEXT("TITLE_NAME_PET_WHISPERER") },
+		{ TEXT("quest_champion"), TEXT("TITLE_NAME_QUEST_CHAMPION") },
+		{ TEXT("enhance_artisan"), TEXT("TITLE_NAME_ENHANCE_ARTISAN") },
+		{ TEXT("enhance_grandmaster"), TEXT("TITLE_NAME_ENHANCE_GRANDMASTER") },
+		{ TEXT("veteran"), TEXT("TITLE_NAME_VETERAN") },
+	};
+	if (const TCHAR* const* Found = Map.Find(TitleId))
+	{
+		return *Found;
+	}
+	return TEXT("NONE_DASH");
+}
+
+FText TitleIdToNameLabel(const FString& TitleId)
+{
+	return IdleProject::Localization::UI(TitleIdToNameLocalizationKey(TitleId));
+}
+
+// 칭호 해금 메트릭 → 표시명 로컬키. 카탈로그에서 실제 사용하는 메트릭만 매핑(그 외는 대시).
+const TCHAR* TitleMetricToLocalizationKey(EAchievementMetric Metric)
+{
+	switch (Metric)
+	{
+	case EAchievementMetric::MonstersKilled:
+		return TEXT("TITLE_METRIC_MONSTERS_KILLED");
+	case EAchievementMetric::BossesKilled:
+		return TEXT("TITLE_METRIC_BOSSES_KILLED");
+	case EAchievementMetric::HighestLevelReached:
+		return TEXT("TITLE_METRIC_HIGHEST_LEVEL");
+	case EAchievementMetric::StagesCleared:
+		return TEXT("TITLE_METRIC_STAGES_CLEARED");
+	case EAchievementMetric::RebirthCount:
+		return TEXT("TITLE_METRIC_REBIRTH_COUNT");
+	case EAchievementMetric::TranscendCount:
+		return TEXT("TITLE_METRIC_TRANSCEND_COUNT");
+	case EAchievementMetric::TowerHighestFloor:
+		return TEXT("TITLE_METRIC_TOWER_FLOOR");
+	case EAchievementMetric::HighestEnhanceLevel:
+		return TEXT("TITLE_METRIC_HIGHEST_ENHANCE");
+	case EAchievementMetric::ItemsCollected:
+		return TEXT("TITLE_METRIC_ITEMS_COLLECTED");
+	case EAchievementMetric::UniqueItemsFound:
+		return TEXT("TITLE_METRIC_UNIQUE_ITEMS");
+	case EAchievementMetric::GoldEarned:
+		return TEXT("TITLE_METRIC_GOLD_EARNED");
+	case EAchievementMetric::HighestPetLevel:
+		return TEXT("TITLE_METRIC_HIGHEST_PET_LEVEL");
+	case EAchievementMetric::QuestsCompleted:
+		return TEXT("TITLE_METRIC_QUESTS_COMPLETED");
+	case EAchievementMetric::DaysPlayed:
+		return TEXT("TITLE_METRIC_DAYS_PLAYED");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+// 칭호 보너스(타입+비율) → 표시 라벨. BonusValue 는 비율(0.03)이므로 ×100 해 %로 표기.
+FText TitleBonusToLabel(ETitleBonus Type, float BonusValue)
+{
+	const FString Percent = FString::Printf(TEXT("%.0f%%"), BonusValue * 100.0f);
+	auto FormatTitleBonus = [&Percent](const TCHAR* Key)
+	{
+		return FormatLocalizedUI(Key, [&Percent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::FromString(Percent));
+		});
+	};
+
+	switch (Type)
+	{
+	case ETitleBonus::AllStatPct:
+		return FormatTitleBonus(TEXT("TITLE_BONUS_ALL_STAT_FORMAT"));
+	case ETitleBonus::GoldPct:
+		return FormatTitleBonus(TEXT("TITLE_BONUS_GOLD_FORMAT"));
+	case ETitleBonus::ExpPct:
+		return FormatTitleBonus(TEXT("TITLE_BONUS_EXP_FORMAT"));
+	case ETitleBonus::CritDmgPct:
+		return FormatTitleBonus(TEXT("TITLE_BONUS_CRIT_DMG_FORMAT"));
+	case ETitleBonus::None:
+	default:
+		return IdleProject::Localization::UI(TEXT("NONE_DASH"));
+	}
+}
+
 FText BuildPetLevelLabel(int32 Level)
 {
 	return FormatLocalizedUI(TEXT("PET_LEVEL_FORMAT"), [Level](FFormatNamedArguments& Args)
@@ -1307,6 +1411,11 @@ FName MakePetFeedHitBoxName(const FString& PetId)
 FName MakePetEvolveHitBoxName(const FString& PetId)
 {
 	return FName(*(PetEvolveHitBoxPrefix + PetId));
+}
+
+FName MakeTitleEquipHitBoxName(const FString& TitleId)
+{
+	return FName(*(TitleEquipHitBoxPrefix + TitleId));
 }
 
 FName MakeSeasonClaimHitBoxName(int32 Tier)
@@ -3444,6 +3553,67 @@ FIdleHUDMasteryPanelViewModel IdleProject::UI::BuildMasteryPanelViewModel(const 
 	return ViewModel;
 }
 
+FIdleHUDTitlePanelViewModel IdleProject::UI::BuildTitlePanelViewModel(const UTitleService& TitleService, const UAchievementService& AchievementService)
+{
+	FIdleHUDTitlePanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("TITLE_PANEL_TITLE"));
+
+	const FString& EquippedId = TitleService.GetEquippedTitleId();
+	ViewModel.EquippedLabel = EquippedId.IsEmpty()
+		? IdleProject::Localization::UI(TEXT("TITLE_EQUIPPED_NONE"))
+		: FormatLocalizedUI(TEXT("TITLE_EQUIPPED_FORMAT"), [&EquippedId](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("TitleName"), TitleIdToNameLabel(EquippedId));
+		});
+
+	const TArray<FTitleDefinition>& Definitions = TitleService.GetDefinitions();
+	ViewModel.Rows.Reserve(Definitions.Num());
+	for (const FTitleDefinition& Definition : Definitions)
+	{
+		const bool bUnlocked = TitleService.IsUnlocked(Definition.TitleId);
+		const bool bEquipped = Definition.TitleId == EquippedId;
+		const int64 CurrentValue = AchievementService.GetMetricValue(Definition.Metric);
+
+		FIdleHUDTitleRowViewModel Row;
+		Row.TitleId = Definition.TitleId;
+		Row.Name = TitleIdToNameLabel(Definition.TitleId);
+		Row.BonusLabel = TitleBonusToLabel(Definition.BonusType, Definition.BonusValue);
+		Row.bUnlocked = bUnlocked;
+		Row.bEquipped = bEquipped;
+		Row.bCanEquip = bUnlocked && !bEquipped;
+		Row.StatusLabel = bUnlocked
+			? IdleProject::Localization::UI(TEXT("TITLE_STATUS_UNLOCKED"))
+			: IdleProject::Localization::UI(TEXT("TITLE_STATUS_LOCKED"));
+
+		// 미해금 행: 해금 조건(메트릭+임계) + 진행(현재/임계). 해금 행은 진행 표시 생략.
+		const FText MetricLabel = IdleProject::Localization::UI(TitleMetricToLocalizationKey(Definition.Metric));
+		Row.ConditionLabel = FormatLocalizedUI(TEXT("TITLE_UNLOCK_CONDITION_FORMAT"), [&MetricLabel, &Definition](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Metric"), MetricLabel);
+			Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(Definition.Threshold)));
+		});
+		Row.ProgressLabel = FormatLocalizedUI(TEXT("TITLE_PROGRESS_FORMAT"), [CurrentValue, &Definition](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Current"), FText::FromString(FormatIntegerWithCommas(CurrentValue)));
+			Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(Definition.Threshold)));
+		});
+		Row.ProgressRatio = Definition.Threshold > 0
+			? FMath::Clamp(static_cast<float>(CurrentValue) / static_cast<float>(Definition.Threshold), 0.0f, 1.0f)
+			: (bUnlocked ? 1.0f : 0.0f);
+
+		// 액션 라벨: 장착중=해제, 해금=장착, 미해금=잠김.
+		Row.ActionLabel = bEquipped
+			? IdleProject::Localization::UI(TEXT("TITLE_ACTION_UNEQUIP"))
+			: (bUnlocked
+				? IdleProject::Localization::UI(TEXT("ACTION_EQUIP"))
+				: IdleProject::Localization::UI(TEXT("TITLE_STATUS_LOCKED")));
+
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FText IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier)
 {
 	const FAchievementDefinition* Definition = FindAchievementDefinitionById(AchievementId);
@@ -3998,6 +4168,7 @@ void AIdleHUD::DrawHUD()
 	DrawPotentialPanel();
 	DrawClassSelectionPanel();
 	DrawPetPanel();
+	DrawTitlePanel();
 	DrawSeasonPassPanel();
 	DrawQuestLog();
 	DrawOfflineRewardModal();
@@ -4036,6 +4207,16 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(PetEvolveHitBoxPrefix))
 	{
 		TryEvolvePetFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == TitleUnequipHitBoxName)
+	{
+		UnequipTitleAction();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(TitleEquipHitBoxPrefix))
+	{
+		EquipTitleFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(SeasonClaimHitBoxPrefix))
@@ -8897,6 +9078,145 @@ void AIdleHUD::TryEvolvePetFromHitBox(FName BoxName)
 		const UWorld* World = GetWorld();
 		PetFeedbackStartTime = World ? World->GetTimeSeconds() : 0.0f;
 	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawTitlePanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UTitleService* TitleService = IdleGameInstance ? IdleGameInstance->GetTitleService() : nullptr;
+	const UAchievementService* AchievementService = IdleGameInstance ? IdleGameInstance->GetAchievementService() : nullptr;
+	if (!TitleService || !AchievementService)
+	{
+		return;
+	}
+
+	const FIdleHUDTitlePanelViewModel ViewModel = BuildTitlePanelViewModel(*TitleService, *AchievementService);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 470.0f * Scale;
+	const float HeaderHeight = 44.0f * Scale;
+	const float RowHeight = 44.0f * Scale;
+	const float RowGap = 4.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 28.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.EquippedLabel.ToString(), Theme::AccentGold, X + 96.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDTitleRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawTitleRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawTitleRow(const FIdleHUDTitleRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 44.0f;
+	// 장착=골드, 해금=블루, 미해금=흐린 회색으로 상태 막대를 칠한다.
+	const FLinearColor StateColor = Row.bEquipped
+		? Theme::AccentGold
+		: (Row.bUnlocked ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.45f));
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	// 1행: 이름 + 보너스. 해금 칭호는 이름을 강조색으로.
+	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : (Row.bUnlocked ? Theme::TextPrimary : Theme::TextMuted), X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.BonusLabel.ToString(), Theme::AccentGold, X + 150.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+
+	// 2행: 해금 칭호는 상태(해금), 미해금은 해금 조건 + 진행도 막대.
+	if (Row.bUnlocked)
+	{
+		DrawText(Row.StatusLabel.ToString(), Theme::AccentBlue, X + 10.0f * Scale, Y + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	}
+	else
+	{
+		DrawText(Row.ConditionLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 21.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		const float BarY = Y + 36.0f * Scale;
+		const float BarWidth = 190.0f * Scale;
+		DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.80f), X + 10.0f * Scale, BarY, BarWidth, 4.0f * Scale);
+		DrawRect(Theme::AccentBlue, X + 10.0f * Scale, BarY, BarWidth * Row.ProgressRatio, 4.0f * Scale);
+		DrawText(Row.ProgressLabel.ToString(), Theme::TextMuted, X + 210.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	}
+
+	// 장착/해제 버튼: 장착중=해제(블루), 해금=장착(골드), 미해금=비활성.
+	const float ButtonWidth = 60.0f * Scale;
+	const float ButtonHeight = 20.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 6.0f * Scale;
+	const float ButtonY = Y + 12.0f * Scale;
+	if (Row.bEquipped)
+	{
+		DrawRect(Theme::AccentBlue, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+		DrawText(Row.ActionLabel.ToString(), Theme::BgPrimary, ButtonX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), TitleUnequipHitBoxName, true, 85);
+	}
+	else
+	{
+		DrawRect(Row.bCanEquip ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+		DrawText(Row.ActionLabel.ToString(), Row.bCanEquip ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 6.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		if (Row.bCanEquip)
+		{
+			AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeTitleEquipHitBoxName(Row.TitleId), true, 85);
+		}
+	}
+}
+
+void AIdleHUD::EquipTitleFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString TitleId = BoxName.ToString();
+	TitleId.RightChopInline(TitleEquipHitBoxPrefix.Len());
+	if (!TitleId.IsEmpty())
+	{
+		IdleGameInstance->EquipTitle(TitleId);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::UnequipTitleAction()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	IdleGameInstance->UnequipTitle();
 	RefreshMouseInteraction();
 }
 
