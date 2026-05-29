@@ -27,17 +27,17 @@ getDungeonReward(type, cp, tier):
 
 ## Task 1: 서버 미러 + parity (backend)
 **Files:** Modify `server/src/core/formulas/dungeon.ts` + `dungeon.test.ts`.
-- [ ] 실패 테스트: `getTierCpRequirement`(tier1=minCp, tier2=2×minCp, tier3=4×minCp), `getMaxAccessibleTier`(cp<minCp→0, cp=minCp→1, cp=4×minCp→3 경계), `getDungeonReward(type,cp,tier)` = 기존×tier, tier 접근불가→0, **tier1 = 기존 getDungeonReward(type,cp) 동일**.
-- [ ] 구현: 계약대로(`Math.fround`/`Math.log`). 기존 2-인자 호출 호환(tier 기본 1).
-- [ ] `cd server; npm run lint && npm run test -- dungeon && npm run build` GREEN(**lint 필수**).
+- [x] 실패 테스트: `getTierCpRequirement`(tier1=minCp, tier2=2×minCp, tier3=4×minCp), `getMaxAccessibleTier`(cp<minCp→0, cp=minCp→1, cp=4×minCp→3 경계), `getDungeonReward(type,cp,tier)` = 기존×tier, tier 접근불가→0, **tier1 = 기존 getDungeonReward(type,cp) 동일**.
+- [x] 구현: 계약대로(`Math.fround`/`Math.log`). 기존 2-인자 호출 호환(tier 기본 1).
+- [x] `cd server; npm run lint && npm run test -- dungeon && npm run build` GREEN(**lint 필수**).
 - [ ] 커밋 `feat: 던전 티어 서버 미러 (PR #75)`.
 
 ## Task 2: 클라 미러 + 서비스 + Automation (character)
 **Files:** Modify 클라 던전 reward 계산부(`UDungeonService` / 던전 공식), `GameCore/DungeonService.h/.cpp`, `GameCore/IdleGameInstance.cpp/.h`, `Tests/DungeonServiceTests.cpp`.
-- [ ] 클라 던전 보상 공식에 tier 반영(서버 dungeon.ts와 동일값). `GetTierCpRequirement(type,tier)`/`GetMaxAccessibleTier(type,cp)` 추가.
-- [ ] `UDungeonService::TryRunDungeon(EDungeonType, int64 CombatPower, const FString& TodayUtc, int32 Tier)` — tier 접근 가능(CP≥요구치) + 입장 잔여 가드, 보상 × tier 배수. 기존 시그니처는 tier 기본 1 유지(회귀).
-- [ ] `GameInstance::TryRunDungeon(EDungeonType Type, int32 Tier=1)` — CP 조회 후 서비스 호출. #74 심연 마스터리 로컬 보너스는 기존 적용 지점 유지(티어 배수 후 적용, 단일).
-- [ ] Automation: tier 게이트(CP 미달 0)·보상 스케일·**tier1 회귀(#68 기존 동일)**·MaxAccessibleTier 경계·서버 parity 앵커.
+- [x] 클라 던전 보상 공식에 tier 반영(서버 dungeon.ts와 동일값). `GetTierCpRequirement(type,tier)`/`GetMaxAccessibleTier(type,cp)` 추가.
+- [x] `UDungeonService::TryRunDungeon(EDungeonType, int64 CombatPower, const FString& TodayUtc, int32 Tier)` — tier 접근 가능(CP≥요구치) + 입장 잔여 가드, 보상 × tier 배수. 기존 시그니처는 tier 기본 1 유지(회귀).
+- [x] `GameInstance::TryRunDungeon(EDungeonType Type, int32 Tier=1)` — CP 조회 후 서비스 호출. #74 심연 마스터리 로컬 보너스는 기존 적용 지점 유지(티어 배수 후 적용, 단일).
+- [x] Automation: tier 게이트(CP 미달 0)·보상 스케일·**tier1 회귀(#68 기존 동일)**·MaxAccessibleTier 경계·서버 parity 앵커.
 - [ ] 커밋 `feat: 던전 티어 클라 + 서비스 (PR #75)`.
 
 ## Task 3: UI 티어 선택 (designer)

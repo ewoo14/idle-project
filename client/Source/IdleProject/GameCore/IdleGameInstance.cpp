@@ -746,12 +746,13 @@ int64 UIdleGameInstance::ClimbTower()
 	return Reward;
 }
 
-FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
+FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type, int32 Tier)
 {
 	EnsureDungeonService();
 	EnsureMasteryService();
 	FDungeonRunResult Result;
 	Result.Type = Type;
+	Result.Tier = Tier;
 
 	const AIdleCharacter* Character = FindPlayerCharacter();
 	if (!DungeonService || !Character)
@@ -759,7 +760,7 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
 		return Result;
 	}
 
-	Result = DungeonService->TryRunDungeon(Type, Character->GetCombatPower(), UQuestService::GetCurrentUtcDateString());
+	Result = DungeonService->TryRunDungeon(Type, Character->GetCombatPower(), UQuestService::GetCurrentUtcDateString(), Tier);
 	if (!Result.bSuccess)
 	{
 		return Result;

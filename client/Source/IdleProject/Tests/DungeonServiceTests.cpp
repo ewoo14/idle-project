@@ -34,6 +34,17 @@ bool FDungeonServiceRunLimitResetTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Below CP gate fails"), LowCp.bSuccess);
 	TestEqual(TEXT("Failed CP gate consumes no essence entry"), Dungeons->GetRemainingEntries(EDungeonType::Essence, TEXT("2026-05-28")), 3);
 
+	const FDungeonRunResult LockedTier = Dungeons->TryRunDungeon(EDungeonType::Essence, 999, TEXT("2026-05-28"), 2);
+	TestFalse(TEXT("Locked tier fails"), LockedTier.bSuccess);
+	TestEqual(TEXT("Locked tier consumes no essence entry"), Dungeons->GetRemainingEntries(EDungeonType::Essence, TEXT("2026-05-28")), 3);
+
+	const FDungeonRunResult TierOne = Dungeons->TryRunDungeon(EDungeonType::Essence, 2000, TEXT("2026-05-28"), 1);
+	TestTrue(TEXT("Tier one run succeeds"), TierOne.bSuccess);
+	const FDungeonRunResult TierThree = Dungeons->TryRunDungeon(EDungeonType::Essence, 2000, TEXT("2026-05-28"), 3);
+	TestTrue(TEXT("Tier three run succeeds"), TierThree.bSuccess);
+	TestEqual(TEXT("Tier three triples tier one reward"), TierThree.EssenceReward, TierOne.EssenceReward * 3);
+	TestEqual(TEXT("Dungeon entries are shared across tiers"), Dungeons->GetRemainingEntries(EDungeonType::Essence, TEXT("2026-05-28")), 1);
+
 	Dungeons->EnsureDailyReset(TEXT("2026-05-29"));
 	TestEqual(TEXT("Next UTC date resets gold entries"), Dungeons->GetRemainingEntries(EDungeonType::Gold, TEXT("2026-05-29")), 3);
 	TestEqual(TEXT("Next UTC date keeps independent essence entries full"), Dungeons->GetRemainingEntries(EDungeonType::Essence, TEXT("2026-05-29")), 3);

@@ -11,10 +11,11 @@ FString NormalizeDungeonDate(const FString& TodayUtc)
 }
 }
 
-FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc)
+FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc, int32 Tier)
 {
 	FDungeonRunResult Result;
 	Result.Type = Type;
+	Result.Tier = Tier;
 
 	EnsureDailyReset(TodayUtc);
 	if (GetRemainingEntries(Type, TodayUtc) <= 0)
@@ -22,7 +23,7 @@ FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 Combat
 		return Result;
 	}
 
-	Result = FDungeonFormula::GetRewardForCp(Type, CombatPower);
+	Result = FDungeonFormula::GetRewardForCp(Type, CombatPower, Tier);
 	if (!Result.bSuccess)
 	{
 		return Result;
@@ -31,6 +32,16 @@ FDungeonRunResult UDungeonService::TryRunDungeon(EDungeonType Type, int64 Combat
 	const int32 Used = FMath::Clamp(EntriesUsed.FindRef(Type), 0, FDungeonFormula::GetDailyEntryLimit(Type));
 	EntriesUsed.Add(Type, Used + 1);
 	return Result;
+}
+
+int64 UDungeonService::GetTierCpRequirement(EDungeonType Type, int32 Tier) const
+{
+	return FDungeonFormula::GetTierCpRequirement(Type, Tier);
+}
+
+int32 UDungeonService::GetMaxAccessibleTier(EDungeonType Type, int64 CombatPower) const
+{
+	return FDungeonFormula::GetMaxAccessibleTier(Type, CombatPower);
 }
 
 int32 UDungeonService::GetRemainingEntries(EDungeonType Type, const FString& TodayUtc) const
