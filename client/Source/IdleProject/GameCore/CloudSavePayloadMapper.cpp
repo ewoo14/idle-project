@@ -71,6 +71,8 @@ bool FCloudSavePayloadMapper::SaveToPayloadJson(const UIdleSaveGame& SaveGame, F
 	Payload->SetStringField(TEXT("weeklyBossWeekId"), SaveGame.WeeklyBossWeekId);
 	Payload->SetNumberField(TEXT("weeklyBossChallengesUsed"), FMath::Clamp(SaveGame.WeeklyBossChallengesUsed, 0, 7));
 	Payload->SetNumberField(TEXT("weeklyBossClaimedMilestones"), FMath::Max(0, SaveGame.WeeklyBossClaimedMilestones));
+	Payload->SetStringField(TEXT("cachedGuildId"), SaveGame.CachedGuildId);
+	Payload->SetNumberField(TEXT("cachedGuildRank"), static_cast<int32>(SaveGame.CachedGuildRank));
 	const TArray<int32> MasteryLevels = ComputeMasteryLevels(SaveGame);
 	int64 WorldPower = 0;
 	TArray<TSharedPtr<FJsonValue>> MasteryLevelValues;
@@ -162,6 +164,14 @@ bool FCloudSavePayloadMapper::PayloadJsonToSave(const FString& PayloadJson, UIdl
 	if (Payload->TryGetNumberField(TEXT("weeklyBossClaimedMilestones"), NumericValue))
 	{
 		OutSaveGame.WeeklyBossClaimedMilestones = FMath::Max(0, static_cast<int32>(NumericValue));
+	}
+	if (Payload->TryGetStringField(TEXT("cachedGuildId"), StringValue))
+	{
+		OutSaveGame.CachedGuildId = StringValue;
+	}
+	if (Payload->TryGetNumberField(TEXT("cachedGuildRank"), NumericValue))
+	{
+		OutSaveGame.CachedGuildRank = static_cast<uint8>(FMath::Clamp(static_cast<int32>(NumericValue), 0, 3));
 	}
 
 	return true;

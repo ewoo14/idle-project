@@ -32,6 +32,18 @@ public:
 	void FetchMyRank(ELeaderboardKind Kind, int32 Season, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	void FetchWeeklyDamageLeaderboard(const FString& Week, TFunction<void(bool, FString)> Callback);
 	void FetchMyWeeklyRank(const FString& Week, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+
+	// ── 길드 `/v1/guilds` (콜백형, {ok,data} 래퍼) — 서버 권위 멤버십 ────────────
+	void CreateGuild(const FString& CharacterId, const FString& Name, TFunction<void(bool, FString)> Callback);
+	void ListGuilds(const FString& Query, int32 Limit, int32 Offset, TFunction<void(bool, FString)> Callback);
+	void GetGuild(const FString& GuildId, TFunction<void(bool, FString)> Callback);
+	void GetMyGuild(const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void JoinGuild(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void LeaveGuild(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void ApproveRequest(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, TFunction<void(bool, FString)> Callback);
+	void RejectRequest(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, TFunction<void(bool, FString)> Callback);
+	void SetMemberRank(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, const FString& Rank, TFunction<void(bool, FString)> Callback);
+	void UpdateGuildSettings(const FString& GuildId, const FString& ActorCharacterId, const FString& Name, const FString& Notice, const FString& JoinMode, TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool RequestQuestList(const FString& CharacterId);

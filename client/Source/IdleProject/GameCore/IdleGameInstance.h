@@ -7,6 +7,7 @@
 #include "GameCore/AchievementService.h"
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonService.h"
+#include "GameCore/GuildTypes.h"
 #include "GameCore/LeaderboardTypes.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/OfflineRewardFormula.h"
@@ -23,6 +24,7 @@
 
 class UApiClient;
 class UBuffService;
+class UGuildService;
 class UInventoryComponent;
 class ULeaderboardService;
 class AIdleCharacter;
@@ -179,6 +181,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UWeeklyBossService* GetWeeklyBossService() const { return WeeklyBossService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UGuildService* GetGuildService() const { return GuildService; }
+
+	/** 로그인/세이브 시 서버 `GET /v1/guilds/me` 스냅샷을 받아 GuildService 캐시에 반영. */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
+	void RefreshGuildSnapshot();
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -451,6 +460,8 @@ public:
 
 	void InitializeWeeklyBossServiceForTests(const FString& CurrentWeek);
 
+	void InitializeGuildServiceForTests();
+
 	void InitializeRuneServiceForTests();
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -565,6 +576,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UWeeklyBossService> WeeklyBossService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UGuildService> GuildService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -659,6 +673,7 @@ private:
 	void EnsureLeaderboardService();
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();
+	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	int64 ApplyEquipmentCubeCostReduction(int64 BaseCost);

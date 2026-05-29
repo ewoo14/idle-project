@@ -15,6 +15,7 @@
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
 #include "GameCore/TranscendFormula.h"
+#include "GameCore/GuildService.h"
 #include "GameCore/WeeklyBossFormula.h"
 #include "GameCore/WeeklyBossService.h"
 #include "GameFramework/PlayerController.h"
@@ -121,6 +122,7 @@ void UIdleGameInstance::Init()
 	EnsureLeaderboardService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
+	EnsureGuildService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
@@ -132,6 +134,7 @@ void UIdleGameInstance::Init()
 	SyncFromCloud();
 	ApiClient->RequestPetList();
 	ApiClient->RequestSeasonState();
+	RefreshGuildSnapshot();
 }
 
 void UIdleGameInstance::Shutdown()
@@ -154,6 +157,7 @@ void UIdleGameInstance::Shutdown()
 	LeaderboardService = nullptr;
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
+	GuildService = nullptr;
 	Super::Shutdown();
 }
 
@@ -508,6 +512,47 @@ void UIdleGameInstance::RefreshLeaderboard(ELeaderboardKind Kind)
 	});
 }
 
+void UIdleGameInstance::RefreshGuildSnapshot()
+{
+	EnsureGuildService();
+
+	if (!ApiClient)
+	{
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			return;
+		}
+
+		if (!bCharacterOk || CharacterId.IsEmpty())
+		{
+			return;
+		}
+
+		StrongThis->ApiClient->GetMyGuild(CharacterId, [WeakThis](bool bSuccess, FString Body) mutable
+		{
+			UIdleGameInstance* StrongInner = WeakThis.Get();
+			if (!StrongInner)
+			{
+				return;
+			}
+
+			StrongInner->EnsureGuildService();
+			if (StrongInner->GuildService)
+			{
+				// 서버 권위 — 성공 시 스냅샷 캐시 갱신(무소속이면 false 로 캐시 비움).
+				StrongInner->GuildService->ParseSnapshotJson(bSuccess ? Body : FString());
+			}
+		});
+	});
+}
+
 bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 {
 	if (!SaveGame)
@@ -526,8 +571,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureMasteryService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
+	EnsureGuildService();
 
-	SaveGame->SaveVersion = 16;
+	SaveGame->SaveVersion = 17;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -637,6 +683,15 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->WeeklyBossDamage = WeeklyBossState.Damage;
 		SaveGame->WeeklyBossChallengesUsed = WeeklyBossState.ChallengesUsed;
 		SaveGame->WeeklyBossClaimedMilestones = WeeklyBossState.ClaimedMilestones;
+	}
+
+	if (GuildService)
+	{
+		FString GuildId;
+		uint8 GuildRank = 0;
+		GuildService->ExportSave(GuildId, GuildRank);
+		SaveGame->CachedGuildId = GuildId;
+		SaveGame->CachedGuildRank = GuildRank;
 	}
 
 	return true;
@@ -767,6 +822,19 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		else
 		{
 			WeeklyBossService->ImportSave(UQuestService::GetCurrentUtcWeekString(), 0, 0, 0);
+		}
+	}
+
+	EnsureGuildService();
+	if (GuildService)
+	{
+		if (SaveGame->SaveVersion >= 17)
+		{
+			GuildService->ImportSave(SaveGame->CachedGuildId, SaveGame->CachedGuildRank);
+		}
+		else
+		{
+			GuildService->ImportSave(FString(), 0);
 		}
 	}
 
@@ -1932,6 +2000,12 @@ void UIdleGameInstance::InitializeWeeklyBossServiceForTests(const FString& Curre
 	WeeklyBossService->EnsureWeek(CurrentWeek);
 }
 
+void UIdleGameInstance::InitializeGuildServiceForTests()
+{
+	GuildService = NewObject<UGuildService>(this);
+	GuildService->ClearSnapshot();
+}
+
 void UIdleGameInstance::InitializeRuneServiceForTests()
 {
 	RuneService = NewObject<URuneService>(this);
@@ -2347,6 +2421,14 @@ void UIdleGameInstance::EnsureWeeklyBossService()
 	{
 		WeeklyBossService = NewObject<UWeeklyBossService>(this);
 		WeeklyBossService->EnsureWeek(UQuestService::GetCurrentUtcWeekString());
+	}
+}
+
+void UIdleGameInstance::EnsureGuildService()
+{
+	if (!GuildService)
+	{
+		GuildService = NewObject<UGuildService>(this);
 	}
 }
 
