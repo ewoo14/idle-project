@@ -174,3 +174,47 @@ export const guildShopBuySchema = {
   body: characterBody,
   response: okResponse,
 } as const;
+
+// ── PR-G3: 길드 보스 / 주간 랭킹 ─────────────────────────────────────────────
+
+// 보스 도전 — CP 는 클라 권위(서버는 신뢰하되 주간 도전 횟수로 어뷰즈 억제).
+export const guildBossChallengeSchema = {
+  params: guildIdParams,
+  body: {
+    type: "object",
+    required: ["characterId", "cp"],
+    additionalProperties: false,
+    properties: {
+      characterId: uuid,
+      cp: { type: "integer", minimum: 0 },
+    },
+  },
+  response: okResponse,
+} as const;
+
+// 보스 격파 보상 수령(멤버 본인) — body 는 characterId 만.
+export const guildBossClaimSchema = {
+  params: guildIdParams,
+  body: characterBody,
+  response: okResponse,
+} as const;
+
+// 보스 상태 조회(멤버) — querystring 으로 characterId.
+export const guildBossSchema = {
+  params: guildIdParams,
+  querystring: characterBody,
+  response: okResponse,
+} as const;
+
+// 주간 길드 랭킹(누구나) — characterId 지정 시 내 길드 순위도 반환.
+export const guildRankingsSchema = {
+  querystring: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      characterId: uuid,
+      limit: { type: "integer", minimum: 1, maximum: 100 },
+    },
+  },
+  response: okResponse,
+} as const;

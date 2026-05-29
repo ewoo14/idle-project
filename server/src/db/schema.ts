@@ -206,9 +206,52 @@ export const guildMembers = pgTable(
       .default(0n),
     // 멤버별 주간 리셋 마커(ISO week). 멤버 활동 시 주가 바뀌면 weekly 컬럼을 lazy 리셋.
     weeklyResetId: text("weekly_reset_id"),
+    // PR-G3: 주간 보스 도전 횟수(weekly_reset_id 기준 lazy 리셋).
+    weeklyBossChallenges: integer("weekly_boss_challenges")
+      .notNull()
+      .default(0),
+    // PR-G3: 보스 격파 보상 수령 마일스톤(boss_claim_week_id 가 현재 주와 다르면 0 부터).
+    bossClaimedCount: integer("boss_claimed_count").notNull().default(0),
+    bossClaimWeekId: text("boss_claim_week_id"),
   },
   (table) => ({
     guildMembersGuild: index("guild_members_guild_idx").on(table.guildId),
+  }),
+);
+
+// PR-G3: 공유 HP 풀 길드 보스(길드당 1행, 주간 단위 누적/격파).
+export const guildBoss = pgTable("guild_boss", {
+  guildId: uuid("guild_id")
+    .primaryKey()
+    .references(() => guilds.id, { onDelete: "cascade" }),
+  weekId: text("week_id").notNull(),
+  accumDamage: bigint("accum_damage", { mode: "bigint" }).notNull().default(0n),
+  defeatedCount: integer("defeated_count").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+// PR-G3: 보스 데미지 기여(주간 내부 랭킹용).
+export const guildBossContrib = pgTable(
+  "guild_boss_contrib",
+  {
+    guildId: uuid("guild_id")
+      .notNull()
+      .references(() => guilds.id, { onDelete: "cascade" }),
+    weekId: text("week_id").notNull(),
+    characterId: uuid("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    damage: bigint("damage", { mode: "bigint" }).notNull().default(0n),
+  },
+  (table) => ({
+    guildBossContribPk: primaryKey({
+      columns: [table.guildId, table.weekId, table.characterId],
+    }),
+    guildBossContribGuildWeek: index("guild_boss_contrib_guild_week").on(
+      table.guildId,
+      table.weekId,
+      table.damage,
+    ),
   }),
 );
 
