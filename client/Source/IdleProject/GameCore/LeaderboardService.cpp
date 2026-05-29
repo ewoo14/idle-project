@@ -81,13 +81,18 @@ TArray<FLeaderboardEntry> ULeaderboardService::ParseListJson(const FString& Json
 		}
 	}
 
-	if (Kind == ELeaderboardKind::Power)
+	switch (Kind)
 	{
+	case ELeaderboardKind::Power:
 		PowerEntries = ParsedEntries;
-	}
-	else
-	{
+		break;
+	case ELeaderboardKind::WeeklyDamage:
+		WeeklyDamageEntries = ParsedEntries;
+		break;
+	case ELeaderboardKind::Rebirth:
+	default:
 		RebirthEntries = ParsedEntries;
+		break;
 	}
 
 	return ParsedEntries;
@@ -108,13 +113,18 @@ FLeaderboardEntry ULeaderboardService::ParseMyRankJson(const FString& JsonBody, 
 		ParsedEntry = ParseEntryObject(*DataObject);
 	}
 
-	if (Kind == ELeaderboardKind::Power)
+	switch (Kind)
 	{
+	case ELeaderboardKind::Power:
 		PowerMyEntry = ParsedEntry;
-	}
-	else
-	{
+		break;
+	case ELeaderboardKind::WeeklyDamage:
+		WeeklyDamageMyEntry = ParsedEntry;
+		break;
+	case ELeaderboardKind::Rebirth:
+	default:
 		RebirthMyEntry = ParsedEntry;
+		break;
 	}
 
 	return ParsedEntry;
@@ -122,10 +132,28 @@ FLeaderboardEntry ULeaderboardService::ParseMyRankJson(const FString& JsonBody, 
 
 TArray<FLeaderboardEntry> ULeaderboardService::GetEntries(ELeaderboardKind Kind) const
 {
-	return Kind == ELeaderboardKind::Power ? PowerEntries : RebirthEntries;
+	switch (Kind)
+	{
+	case ELeaderboardKind::Power:
+		return PowerEntries;
+	case ELeaderboardKind::WeeklyDamage:
+		return WeeklyDamageEntries;
+	case ELeaderboardKind::Rebirth:
+	default:
+		return RebirthEntries;
+	}
 }
 
 FLeaderboardEntry ULeaderboardService::GetMyEntry(ELeaderboardKind Kind) const
 {
-	return Kind == ELeaderboardKind::Power ? PowerMyEntry : RebirthMyEntry;
+	switch (Kind)
+	{
+	case ELeaderboardKind::Power:
+		return PowerMyEntry;
+	case ELeaderboardKind::WeeklyDamage:
+		return WeeklyDamageMyEntry;
+	case ELeaderboardKind::Rebirth:
+	default:
+		return RebirthMyEntry;
+	}
 }

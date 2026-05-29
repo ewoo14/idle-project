@@ -31,8 +31,14 @@ private:
 	TArray<FLeaderboardEntry> RebirthEntries;
 
 	UPROPERTY()
+	TArray<FLeaderboardEntry> WeeklyDamageEntries;
+
+	UPROPERTY()
 	FLeaderboardEntry PowerMyEntry;
 
 	UPROPERTY()
 	FLeaderboardEntry RebirthMyEntry;
+
+	UPROPERTY()
+	FLeaderboardEntry WeeklyDamageMyEntry;
 };

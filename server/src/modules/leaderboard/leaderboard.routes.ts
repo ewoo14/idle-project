@@ -9,6 +9,8 @@ import {
 import {
   leaderboardQuerySchema,
   myRankQuerySchema,
+  weeklyMyRankQuerySchema,
+  weeklyQuerySchema,
 } from "./leaderboard.schema.js";
 import {
   type LeaderboardRow,
@@ -80,6 +82,32 @@ export async function leaderboardRoutes(
         query.season,
         query.characterId,
       );
+      return { ok: true, data: serializeMyRank(data) };
+    },
+  );
+
+  app.get(
+    "/weekly",
+    {
+      schema: weeklyQuerySchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const query = request.query as { week: string; limit?: number };
+      const data = await service.getWeekly(query.week, query.limit ?? 100);
+      return { ok: true, data: data.map(serializeLeaderboardRow) };
+    },
+  );
+
+  app.get(
+    "/weekly/me",
+    {
+      schema: weeklyMyRankQuerySchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const query = request.query as { week: string; characterId: string };
+      const data = await service.getMyWeeklyRank(query.week, query.characterId);
       return { ok: true, data: serializeMyRank(data) };
     },
   );

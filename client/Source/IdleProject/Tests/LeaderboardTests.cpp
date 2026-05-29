@@ -157,6 +157,7 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 		*Service,
 		ELeaderboardKind::Power,
 		7,
+		TEXT("2026-W22"),
 		false,
 		false);
 
@@ -164,6 +165,8 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Leaderboard season label formats"), ViewModel.SeasonLabel.ToString(), FString(TEXT("Season 7")));
 	TestEqual(TEXT("Power tab label localizes"), ViewModel.PowerTabLabel.ToString(), FString(TEXT("Power")));
 	TestEqual(TEXT("Rebirth tab label localizes"), ViewModel.RebirthTabLabel.ToString(), FString(TEXT("Rebirth")));
+	TestEqual(TEXT("Weekly tab label localizes"), ViewModel.WeeklyTabLabel.ToString(), FString(TEXT("Weekly Boss")));
+	TestEqual(TEXT("Weekly week label formats"), ViewModel.WeekLabel.ToString(), FString(TEXT("This Week 2026-W22")));
 	TestEqual(TEXT("Top entries become rows"), ViewModel.Rows.Num(), 2);
 	TestEqual(TEXT("Top row rank formats"), ViewModel.Rows[0].RankLabel.ToString(), FString(TEXT("#1")));
 	TestEqual(TEXT("Top row score formats"), ViewModel.Rows[0].ScoreLabel.ToString(), FString(TEXT("Score 1,500")));
@@ -177,6 +180,7 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 		*Service,
 		ELeaderboardKind::Rebirth,
 		7,
+		TEXT("2026-W22"),
 		true,
 		true);
 	TestTrue(TEXT("Offline state is exposed"), OfflineViewModel.bOffline);
@@ -184,7 +188,123 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Offline label localizes"), OfflineViewModel.OfflineLabel.ToString(), FString(TEXT("Offline")));
 	TestEqual(TEXT("Loading label localizes"), OfflineViewModel.LoadingLabel.ToString(), FString(TEXT("Loading...")));
 
+	// 주간 보스 종류: 주간 데미지 엔트리를 점수=데미지(천단위 콤마)로 노출하는지 검증
+	Service->ParseListJson(TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"boss-a\",\"score\":1234567,\"rank\":1},{\"characterId\":\"self\",\"score\":99000,\"rank\":4}]}"), ELeaderboardKind::WeeklyDamage);
+	Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":{\"characterId\":\"self\",\"score\":99000,\"rank\":4}}"), ELeaderboardKind::WeeklyDamage);
+	const FIdleHUDLeaderboardPanelViewModel WeeklyViewModel = IdleProject::UI::BuildLeaderboardPanelViewModel(
+		*Service,
+		ELeaderboardKind::WeeklyDamage,
+		7,
+		TEXT("2026-W22"),
+		false,
+		false);
+	TestEqual(TEXT("Weekly active kind is exposed"), static_cast<int32>(WeeklyViewModel.ActiveKind), static_cast<int32>(ELeaderboardKind::WeeklyDamage));
+	TestEqual(TEXT("Weekly week label formats on active tab"), WeeklyViewModel.WeekLabel.ToString(), FString(TEXT("This Week 2026-W22")));
+	TestEqual(TEXT("Weekly damage rows become entries"), WeeklyViewModel.Rows.Num(), 2);
+	TestEqual(TEXT("Weekly top damage formats with commas"), WeeklyViewModel.Rows[0].ScoreLabel.ToString(), FString(TEXT("Score 1,234,567")));
+	TestTrue(TEXT("My weekly row is highlighted"), WeeklyViewModel.Rows[1].bSelf);
+	TestEqual(TEXT("My weekly rank row formats"), WeeklyViewModel.MyEntry.RankLabel.ToString(), FString(TEXT("#4")));
+
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardServiceParseWeeklyDamageListTest,
+	"IdleProject.Leaderboard.ParseWeeklyDamageListJson",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardServiceParseWeeklyDamageListTest::RunTest(const FString& Parameters)
+{
+	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	const FString Json = TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"boss-a\",\"score\":\"987654321098765\",\"rank\":1},{\"characterId\":\"boss-b\",\"score\":4294967296,\"rank\":2}]}");
+
+	const TArray<FLeaderboardEntry> Entries = Service->ParseListJson(Json, ELeaderboardKind::WeeklyDamage);
+
+	TestEqual(TEXT("Two weekly damage entries parse"), Entries.Num(), 2);
+	if (Entries.Num() != 2)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("First weekly character id parses"), Entries[0].CharacterId, FString(TEXT("boss-a")));
+	TestEqual(TEXT("Weekly string int64 damage parses"), Entries[0].Score, static_cast<int64>(987654321098765LL));
+	TestEqual(TEXT("First weekly rank parses"), Entries[0].Rank, 1);
+	TestEqual(TEXT("Numeric weekly damage above int32 parses"), Entries[1].Score, static_cast<int64>(4294967296LL));
+	TestEqual(TEXT("Weekly entries are cached"), Service->GetEntries(ELeaderboardKind::WeeklyDamage).Num(), 2);
+	TestEqual(TEXT("Power cache remains independent of weekly"), Service->GetEntries(ELeaderboardKind::Power).Num(), 0);
+	TestEqual(TEXT("Rebirth cache remains independent of weekly"), Service->GetEntries(ELeaderboardKind::Rebirth).Num(), 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardServiceParseMyWeeklyRankTest,
+	"IdleProject.Leaderboard.ParseMyWeeklyRankJson",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardServiceParseMyWeeklyRankTest::RunTest(const FString& Parameters)
+{
+	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	const FString Json = TEXT("{\"ok\":true,\"data\":{\"characterId\":\"self\",\"score\":\"55555555555\",\"rank\":7}}");
+
+	const FLeaderboardEntry Entry = Service->ParseMyRankJson(Json, ELeaderboardKind::WeeklyDamage);
+
+	TestEqual(TEXT("My weekly character id parses"), Entry.CharacterId, FString(TEXT("self")));
+	TestEqual(TEXT("My weekly int64 damage parses"), Entry.Score, static_cast<int64>(55555555555LL));
+	TestEqual(TEXT("My weekly rank parses"), Entry.Rank, 7);
+	TestEqual(TEXT("My weekly rank caches"), Service->GetMyEntry(ELeaderboardKind::WeeklyDamage).Rank, 7);
+	TestEqual(TEXT("Power my rank remains default after weekly"), Service->GetMyEntry(ELeaderboardKind::Power).Rank, 0);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardServiceWeeklyDamageGracefulTest,
+	"IdleProject.Leaderboard.WeeklyDamageGracefulJson",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardServiceWeeklyDamageGracefulTest::RunTest(const FString& Parameters)
+{
+	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	Service->ParseListJson(TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"cached\",\"score\":\"99\",\"rank\":1}]}"), ELeaderboardKind::WeeklyDamage);
+	Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":{\"characterId\":\"cached\",\"score\":\"99\",\"rank\":1}}"), ELeaderboardKind::WeeklyDamage);
+
+	TestEqual(TEXT("Invalid weekly list returns empty array"), Service->ParseListJson(TEXT("{bad json"), ELeaderboardKind::WeeklyDamage).Num(), 0);
+	TestEqual(TEXT("Invalid weekly list clears cached rows gracefully"), Service->GetEntries(ELeaderboardKind::WeeklyDamage).Num(), 0);
+	TestEqual(TEXT("Non-ok weekly list returns empty array"), Service->ParseListJson(TEXT("{\"ok\":false,\"data\":[]}"), ELeaderboardKind::WeeklyDamage).Num(), 0);
+
+	const FLeaderboardEntry Missing = Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":null}"), ELeaderboardKind::WeeklyDamage);
+	TestEqual(TEXT("Missing weekly rank uses rank zero"), Missing.Rank, 0);
+	TestEqual(TEXT("Missing weekly rank uses zero damage"), Missing.Score, static_cast<int64>(0));
+	TestTrue(TEXT("Missing weekly rank has no character id"), Missing.CharacterId.IsEmpty());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardRefreshWeeklyDamageNoApiClientGracefulTest,
+	"IdleProject.Leaderboard.RefreshWeeklyDamageNoApiClientGraceful",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardRefreshWeeklyDamageNoApiClientGracefulTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	FIdleGameInstanceWorldContextAccessor::Attach(GameInstance, nullptr);
+
+	GameInstance->RefreshLeaderboard(ELeaderboardKind::WeeklyDamage);
+
+	ULeaderboardService* Service = GameInstance->GetLeaderboardService();
+	TestNotNull(TEXT("Weekly refresh creates service without ApiClient"), Service);
+	if (!Service)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("No ApiClient leaves weekly top list empty"), Service->GetEntries(ELeaderboardKind::WeeklyDamage).Num(), 0);
+	TestEqual(TEXT("No ApiClient leaves weekly my rank at zero"), Service->GetMyEntry(ELeaderboardKind::WeeklyDamage).Rank, 0);
+	TestEqual(TEXT("No ApiClient leaves weekly my damage at zero"), Service->GetMyEntry(ELeaderboardKind::WeeklyDamage).Score, static_cast<int64>(0));
+
 	return true;
 }
 

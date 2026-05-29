@@ -315,6 +315,61 @@ describe("SaveService", () => {
     });
   });
 
+  it("records weekly boss damage on the leaderboard when payload carries a week id", async () => {
+    const leaderboard = createLeaderboard();
+    const service = new SaveService(createRepo(), leaderboard);
+
+    await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: {
+        level: 10,
+        rebirthCount: 2,
+        maxEquipmentGrade: 1,
+        weeklyBossWeekId: "2026-W22",
+        weeklyBossDamage: 4500,
+      },
+    });
+
+    expect(leaderboard.updateWeeklyDamage).toHaveBeenCalledWith({
+      characterId: character.id,
+      weekId: "2026-W22",
+      damage: 4500n,
+    });
+  });
+
+  it("skips weekly boss damage recording when the week id is absent", async () => {
+    const leaderboard = createLeaderboard();
+    const service = new SaveService(createRepo(), leaderboard);
+
+    await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: { level: 10, rebirthCount: 2, maxEquipmentGrade: 1 },
+    });
+
+    expect(leaderboard.updateWeeklyDamage).not.toHaveBeenCalled();
+  });
+
+  it("skips weekly boss damage recording when the week id is empty", async () => {
+    const leaderboard = createLeaderboard();
+    const service = new SaveService(createRepo(), leaderboard);
+
+    await service.upload(userId(), {
+      characterId: character.id,
+      version: 1,
+      payload: {
+        level: 10,
+        rebirthCount: 2,
+        maxEquipmentGrade: 1,
+        weeklyBossWeekId: "",
+        weeklyBossDamage: 4500,
+      },
+    });
+
+    expect(leaderboard.updateWeeklyDamage).not.toHaveBeenCalled();
+  });
+
   it("normalizes history limit to 1-50", async () => {
     const repo = createRepo();
     const service = new SaveService(repo, createLeaderboard());
@@ -337,6 +392,7 @@ function createLeaderboard() {
   return {
     updatePower: vi.fn(),
     updateRebirth: vi.fn(),
+    updateWeeklyDamage: vi.fn(),
   };
 }
 

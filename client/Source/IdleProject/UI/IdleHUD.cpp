@@ -18,6 +18,7 @@
 #include "GameCore/LeaderboardService.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
+#include "GameCore/QuestService.h"
 #include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
 #include "GameCore/WeeklyBossFormula.h"
@@ -65,6 +66,7 @@ const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
 const FString WeeklyBossClaimHitBoxPrefix(TEXT("WeeklyBossClaim_"));
 const FName LeaderboardPowerTabHitBoxName(TEXT("LeaderboardTabPower"));
 const FName LeaderboardRebirthTabHitBoxName(TEXT("LeaderboardTabRebirth"));
+const FName LeaderboardWeeklyTabHitBoxName(TEXT("LeaderboardTabWeekly"));
 const FName LeaderboardRefreshHitBoxName(TEXT("LeaderboardRefresh"));
 const FName WeeklyBossChallengeHitBoxName(TEXT("WeeklyBossChallenge"));
 const FName ShopGearRollHitBoxName(TEXT("ShopGearRoll"));
@@ -2040,7 +2042,7 @@ FIdleHUDConsumablePanelViewModel IdleProject::UI::BuildConsumablePanelViewModel(
 	return ViewModel;
 }
 
-FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, bool bLoading, bool bOffline)
+FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline)
 {
 	FIdleHUDLeaderboardPanelViewModel ViewModel;
 	ViewModel.ActiveKind = Kind;
@@ -2050,6 +2052,11 @@ FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewMode
 	ViewModel.SeasonLabel = FormatLocalizedUIWithNumber(TEXT("LEADERBOARD_SEASON_FORMAT"), TEXT("Season"), SeasonId);
 	ViewModel.PowerTabLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_TAB_POWER"));
 	ViewModel.RebirthTabLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_TAB_REBIRTH"));
+	ViewModel.WeeklyTabLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_TAB_WEEKLY"));
+	ViewModel.WeekLabel = FormatLocalizedUI(TEXT("LEADERBOARD_WEEK_FORMAT"), [&WeekId](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Week"), FText::FromString(WeekId));
+	});
 	ViewModel.MyRankTitle = IdleProject::Localization::UI(TEXT("LEADERBOARD_MY_RANK"));
 	ViewModel.EmptyLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_EMPTY"));
 	ViewModel.OfflineLabel = IdleProject::Localization::UI(TEXT("LEADERBOARD_OFFLINE"));
@@ -3456,6 +3463,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		SelectLeaderboardKind(ELeaderboardKind::Power);
 		return;
 	}
+	if (BoxName == LeaderboardWeeklyTabHitBoxName)
+	{
+		SelectLeaderboardKind(ELeaderboardKind::WeeklyDamage);
+		return;
+	}
 	if (BoxName == LeaderboardRebirthTabHitBoxName)
 	{
 		SelectLeaderboardKind(ELeaderboardKind::Rebirth);
@@ -4572,7 +4584,8 @@ void AIdleHUD::DrawLeaderboardPanel()
 	const int32 SeasonId = SeasonService ? SeasonService->GetSeasonId() : 0;
 	const bool bOffline = IdleGameInstance->GetCloudSyncState() == ECloudSyncState::Offline;
 	const bool bShowLoading = bLeaderboardLoading;
-	const FIdleHUDLeaderboardPanelViewModel ViewModel = BuildLeaderboardPanelViewModel(*LeaderboardService, SelectedLeaderboardKind, SeasonId, bShowLoading, bOffline);
+	const FString WeekId = UQuestService::GetCurrentUtcWeekString();
+	const FIdleHUDLeaderboardPanelViewModel ViewModel = BuildLeaderboardPanelViewModel(*LeaderboardService, SelectedLeaderboardKind, SeasonId, WeekId, bShowLoading, bOffline);
 	bLeaderboardLoading = false;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
@@ -4596,22 +4609,41 @@ void AIdleHUD::DrawLeaderboardPanel()
 	DrawText(ViewModel.SeasonLabel.ToString(), Theme::TextMuted, X + Padding, Y + 36.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 
 	const float ButtonHeight = 24.0f * Scale;
-	const float TabWidth = 82.0f * Scale;
-	const float TabY = Y + 58.0f * Scale;
-	const FLinearColor PowerColor = ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::AccentGold : Theme::BgPrimary;
-	const FLinearColor RebirthColor = ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::AccentGold : Theme::BgPrimary;
-	DrawRect(PowerColor, X + Padding, TabY, TabWidth, ButtonHeight);
-	DrawRect(RebirthColor, X + Padding + TabWidth + 6.0f * Scale, TabY, TabWidth, ButtonHeight);
-	DrawText(ViewModel.PowerTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::BgPrimary : Theme::TextMuted, X + Padding + 12.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
-	DrawText(ViewModel.RebirthTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::BgPrimary : Theme::TextMuted, X + Padding + TabWidth + 18.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
-	AddHitBox(FVector2D(X + Padding, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardPowerTabHitBoxName, true, 90);
-	AddHitBox(FVector2D(X + Padding + TabWidth + 6.0f * Scale, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardRebirthTabHitBoxName, true, 91);
 
+	// 새로고침 버튼: 상단 우측(타이틀 줄)으로 이동해 탭 3개 공간 확보
 	const float RefreshWidth = 74.0f * Scale;
 	const float RefreshX = X + PanelWidth - Padding - RefreshWidth;
-	DrawRect(Theme::AccentBlue, RefreshX, TabY, RefreshWidth, ButtonHeight);
-	DrawText(ViewModel.RefreshLabel.ToString(), Theme::BgPrimary, RefreshX + 12.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
-	AddHitBox(FVector2D(RefreshX, TabY), FVector2D(RefreshWidth, ButtonHeight), LeaderboardRefreshHitBoxName, true, 92);
+	const float RefreshY = Y + 10.0f * Scale;
+	DrawRect(Theme::AccentBlue, RefreshX, RefreshY, RefreshWidth, ButtonHeight);
+	DrawText(ViewModel.RefreshLabel.ToString(), Theme::BgPrimary, RefreshX + 12.0f * Scale, RefreshY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	AddHitBox(FVector2D(RefreshX, RefreshY), FVector2D(RefreshWidth, ButtonHeight), LeaderboardRefreshHitBoxName, true, 92);
+
+	// 탭 3개(전투력/환생/주간 보스)를 한 줄에 균등 배치
+	const float TabGap = 6.0f * Scale;
+	const float TabRowWidth = PanelWidth - Padding * 2.0f;
+	const float TabWidth = (TabRowWidth - TabGap * 2.0f) / 3.0f;
+	const float TabY = Y + 58.0f * Scale;
+	const float PowerTabX = X + Padding;
+	const float RebirthTabX = PowerTabX + TabWidth + TabGap;
+	const float WeeklyTabX = RebirthTabX + TabWidth + TabGap;
+	const FLinearColor PowerColor = ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::AccentGold : Theme::BgPrimary;
+	const FLinearColor RebirthColor = ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::AccentGold : Theme::BgPrimary;
+	const FLinearColor WeeklyColor = ViewModel.ActiveKind == ELeaderboardKind::WeeklyDamage ? Theme::AccentGold : Theme::BgPrimary;
+	DrawRect(PowerColor, PowerTabX, TabY, TabWidth, ButtonHeight);
+	DrawRect(RebirthColor, RebirthTabX, TabY, TabWidth, ButtonHeight);
+	DrawRect(WeeklyColor, WeeklyTabX, TabY, TabWidth, ButtonHeight);
+	DrawText(ViewModel.PowerTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Power ? Theme::BgPrimary : Theme::TextMuted, PowerTabX + 8.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(ViewModel.RebirthTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::Rebirth ? Theme::BgPrimary : Theme::TextMuted, RebirthTabX + 8.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(ViewModel.WeeklyTabLabel.ToString(), ViewModel.ActiveKind == ELeaderboardKind::WeeklyDamage ? Theme::BgPrimary : Theme::TextMuted, WeeklyTabX + 8.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	AddHitBox(FVector2D(PowerTabX, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardPowerTabHitBoxName, true, 90);
+	AddHitBox(FVector2D(RebirthTabX, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardRebirthTabHitBoxName, true, 91);
+	AddHitBox(FVector2D(WeeklyTabX, TabY), FVector2D(TabWidth, ButtonHeight), LeaderboardWeeklyTabHitBoxName, true, 93);
+
+	// 주간 보스 탭일 때 현재 주 라벨 표시(시즌 라벨 옆)
+	if (ViewModel.ActiveKind == ELeaderboardKind::WeeklyDamage)
+	{
+		DrawText(ViewModel.WeekLabel.ToString(), Theme::AccentGold, X + Padding + 140.0f * Scale, Y + 36.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	}
 
 	const FText StateLabel = ViewModel.bLoading ? ViewModel.LoadingLabel : (ViewModel.bOffline ? ViewModel.OfflineLabel : FText::GetEmpty());
 	if (!StateLabel.IsEmpty())

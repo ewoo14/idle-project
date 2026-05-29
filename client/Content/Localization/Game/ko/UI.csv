@@ -2,6 +2,8 @@ Namespace,Key,SourceString,Comment
 UI,LEADERBOARD_PANEL_TITLE,"리더보드","Leaderboard HUD"
 UI,LEADERBOARD_TAB_POWER,"전투력","Leaderboard HUD"
 UI,LEADERBOARD_TAB_REBIRTH,"환생","Leaderboard HUD"
+UI,LEADERBOARD_TAB_WEEKLY,"주간 보스","Leaderboard HUD"
+UI,LEADERBOARD_WEEK_FORMAT,"이번 주 {Week}","Leaderboard HUD"
 UI,LEADERBOARD_SEASON_FORMAT,"시즌 {Season}","Leaderboard HUD"
 UI,LEADERBOARD_MY_RANK,"내 순위","Leaderboard HUD"
 UI,LEADERBOARD_SCORE_FORMAT,"점수 {Score}","Leaderboard HUD"
