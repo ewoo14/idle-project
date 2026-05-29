@@ -918,16 +918,27 @@ FWeeklyBossChallengeResult UIdleGameInstance::TryChallengeWeeklyBoss()
 bool UIdleGameInstance::ClaimWeeklyBossMilestone(int32 Milestone)
 {
 	EnsureWeeklyBossService();
-	if (!WeeklyBossService || !WeeklyBossService->ClaimMilestone(Milestone))
+	if (!WeeklyBossService)
 	{
 		return false;
 	}
 
-	AddGold(FWeeklyBossFormula::MilestoneGoldReward(Milestone));
-	const int64 EssenceReward = FWeeklyBossFormula::MilestoneEssenceReward(Milestone);
-	if (EssenceReward > 0)
+	const int32 PreviousClaimed = WeeklyBossService->GetClaimedMilestones();
+	if (!WeeklyBossService->ClaimMilestone(Milestone))
 	{
-		RuneEssence = RuneEssence > MAX_int64 - EssenceReward ? MAX_int64 : RuneEssence + EssenceReward;
+		return false;
+	}
+
+	// 이전 수령분 다음부터 요청 마일스톤까지 누적 지급한다(상위 마일스톤을 바로
+	// 수령해도 중간 마일스톤 보상이 유실되지 않도록).
+	for (int32 N = PreviousClaimed + 1; N <= Milestone; ++N)
+	{
+		AddGold(FWeeklyBossFormula::MilestoneGoldReward(N));
+		const int64 EssenceReward = FWeeklyBossFormula::MilestoneEssenceReward(N);
+		if (EssenceReward > 0)
+		{
+			RuneEssence = RuneEssence > MAX_int64 - EssenceReward ? MAX_int64 : RuneEssence + EssenceReward;
+		}
 	}
 	RequestAutosave();
 	return true;
