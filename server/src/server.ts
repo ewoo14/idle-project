@@ -5,6 +5,7 @@ import type { Redis } from "ioredis";
 import { logger } from "./core/logger.js";
 import { authRoutes } from "./modules/auth/auth.routes.js";
 import { characterRoutes } from "./modules/character/character.routes.js";
+import { guildRoutes } from "./modules/guild/guild.routes.js";
 import { leaderboardRoutes } from "./modules/leaderboard/leaderboard.routes.js";
 import { offlineRoutes } from "./modules/offline/offline.routes.js";
 import { petRoutes } from "./modules/pet/pet.routes.js";
@@ -35,6 +36,7 @@ export async function buildServer(opts: { redis: Redis }) {
   await app.register(petRoutes, { prefix: "/v1/pets" });
   await app.register(questRoutes, { prefix: "/v1/quests" });
   await app.register(seasonRoutes, { prefix: "/v1/season" });
+  await app.register(guildRoutes, { prefix: "/v1/guilds" });
   await app.register(leaderboardRoutes, {
     prefix: "/v1/leaderboard",
     redis: opts.redis,
