@@ -121,11 +121,26 @@ bool FPotentialFormulaRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unique caps at Legendary"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Unique), EPotentialGrade::Legendary);
 	TestEqual(TEXT("Legendary has three lines"), FPotentialFormula::GetPotentialLineCount(EPotentialGrade::Legendary), 3);
 
+	// 잠재 V2: 고레어도(Legendary/Transcendent/Mythic) → Transcendent 상한, Epic → Unique 등 단조 검증(서버 parity).
+	TestEqual(TEXT("Epic caps at Unique"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Epic), EPotentialGrade::Unique);
+	TestEqual(TEXT("Legendary caps at Transcendent"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Legendary), EPotentialGrade::Transcendent);
+	TestEqual(TEXT("Transcendent rarity caps at Transcendent"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Transcendent), EPotentialGrade::Transcendent);
+	TestEqual(TEXT("Mythic caps at Transcendent"), FPotentialFormula::GetMaxPotentialGrade(EItemRarity::Mythic), EPotentialGrade::Transcendent);
+	// 잠재 V2: Transcendent 4줄.
+	TestEqual(TEXT("Transcendent has four lines"), FPotentialFormula::GetPotentialLineCount(EPotentialGrade::Transcendent), 4);
+
 	float MinValue = 0.0f;
 	float MaxValue = 0.0f;
 	FPotentialFormula::GetPotentialRollRange(EPotentialGrade::Unique, MinValue, MaxValue);
 	TestEqual(TEXT("Unique min roll"), MinValue, 0.06f);
 	TestEqual(TEXT("Unique max roll"), MaxValue, 0.10f);
+
+	// 잠재 V2: Transcendent = Legendary × 1.3 상향(0.13 ~ 0.195). 서버 getPotentialRollRange parity.
+	float TransMin = 0.0f;
+	float TransMax = 0.0f;
+	FPotentialFormula::GetPotentialRollRange(EPotentialGrade::Transcendent, TransMin, TransMax);
+	TestEqual(TEXT("Transcendent min roll is 0.13"), TransMin, 0.13f);
+	TestEqual(TEXT("Transcendent max roll is 0.195"), TransMax, 0.195f);
 
 	FRandomStream Rng(7101);
 	const TArray<FPotentialLine> Lines = FPotentialFormula::RollPotentialLines(EPotentialGrade::Unique, Rng);
@@ -134,6 +149,226 @@ bool FPotentialFormulaRulesTest::RunTest(const FString& Parameters)
 	{
 		TestTrue(TEXT("Potential stat is populated"), Line.Stat != EPotentialStat::None);
 		TestTrue(TEXT("Potential value stays in range"), Line.Value >= 0.06f && Line.Value <= 0.10f);
+	}
+	return true;
+}
+
+namespace
+{
+// 잠재 V2: 신규 옵션 값 배수(서버 NEW_OPTION_VALUE_SCALE parity). 익명 헬퍼는 Potential~ prefix(jumbo ODR).
+float PotentialExpectedOptionScale(EPotentialStat Stat)
+{
+	switch (Stat)
+	{
+	case EPotentialStat::AllStatPercent:
+		return 0.4f;
+	case EPotentialStat::GoldFindPercent:
+	case EPotentialStat::DropRatePercent:
+		return 1.5f;
+	default:
+		return 1.0f;
+	}
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialFormulaV2OptionRangesTest,
+	"IdleProject.Inventory.PotentialFormula.V2OptionRanges",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialFormulaV2OptionRangesTest::RunTest(const FString& Parameters)
+{
+	// 잠재 V2: Transcendent 기준 신규 옵션 3종 값 범위 = 등급 범위 × 배수(3자리 라운딩). 서버 getPotentialStatRollRange parity.
+	const EPotentialStat NewStats[] = {
+		EPotentialStat::AllStatPercent,
+		EPotentialStat::GoldFindPercent,
+		EPotentialStat::DropRatePercent
+	};
+	for (const EPotentialStat Stat : NewStats)
+	{
+		const float Scale = PotentialExpectedOptionScale(Stat);
+		float StatMin = 0.0f;
+		float StatMax = 0.0f;
+		FPotentialFormula::GetPotentialStatRollRange(EPotentialGrade::Transcendent, Stat, StatMin, StatMax);
+		const float ExpectedMin = FMath::RoundToFloat(0.13f * Scale * 1000.0f) / 1000.0f;
+		const float ExpectedMax = FMath::RoundToFloat(0.195f * Scale * 1000.0f) / 1000.0f;
+		TestEqual(FString::Printf(TEXT("New option stat %d Transcendent min"), static_cast<int32>(Stat)), StatMin, ExpectedMin);
+		TestEqual(FString::Printf(TEXT("New option stat %d Transcendent max"), static_cast<int32>(Stat)), StatMax, ExpectedMax);
+	}
+
+	// 전투 8종은 배수 1.0 — 등급 기본 범위와 동일.
+	float CombatMin = 0.0f;
+	float CombatMax = 0.0f;
+	FPotentialFormula::GetPotentialStatRollRange(EPotentialGrade::Transcendent, EPotentialStat::PhysAtkPercent, CombatMin, CombatMax);
+	TestEqual(TEXT("Combat stat keeps grade min"), CombatMin, 0.13f);
+	TestEqual(TEXT("Combat stat keeps grade max"), CombatMax, 0.195f);
+
+	// Transcendent 롤은 4줄이며 각 줄 값이 스탯별 범위 안에 들어간다.
+	FRandomStream Rng(990011);
+	const TArray<FPotentialLine> Lines = FPotentialFormula::RollPotentialLines(EPotentialGrade::Transcendent, Rng);
+	TestEqual(TEXT("Transcendent rolls four lines"), Lines.Num(), 4);
+	for (const FPotentialLine& Line : Lines)
+	{
+		float LineMin = 0.0f;
+		float LineMax = 0.0f;
+		FPotentialFormula::GetPotentialStatRollRange(EPotentialGrade::Transcendent, Line.Stat, LineMin, LineMax);
+		TestTrue(TEXT("Transcendent line value within stat range"), Line.Value >= LineMin - KINDA_SMALL_NUMBER && Line.Value <= LineMax + KINDA_SMALL_NUMBER);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialFormulaV2RankCubeTranscendentTest,
+	"IdleProject.Inventory.PotentialFormula.V2RankCubeTranscendent",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialFormulaV2RankCubeTranscendentTest::RunTest(const FString& Parameters)
+{
+	// 잠재 V2: Legendary→Transcendent 상승 확률 = 0.05 (서버 RANK_CUBE_TRANSCENDENT_CHANCE parity).
+	TestEqual(TEXT("Rank cube transcendent chance is 0.05"), FPotentialFormula::RankCubeTranscendentChance, 0.05f);
+	TestEqual(TEXT("Rank cube base chance is 0.08"), FPotentialFormula::RankCubeUpgradeChance, 0.08f);
+
+	// 결정적 경계: GetFraction 첫 값이 0.05 미만이면 상승, 이상이면 유지. 시드 탐색으로 1/0 경계 검증.
+	bool bFoundUpgrade = false;
+	bool bFoundHold = false;
+	for (int32 Seed = 1; Seed <= 4000 && !(bFoundUpgrade && bFoundHold); ++Seed)
+	{
+		FRandomStream ProbeRng(Seed);
+		const float FirstFraction = FRandomStream(Seed).GetFraction();
+		TArray<FPotentialLine> OutLines;
+		const EPotentialGrade Result = FPotentialFormula::ApplyRankCube(EPotentialGrade::Legendary, EPotentialGrade::Transcendent, ProbeRng, OutLines);
+		if (FirstFraction < FPotentialFormula::RankCubeTranscendentChance)
+		{
+			TestEqual(TEXT("Below transcendent chance upgrades to Transcendent"), Result, EPotentialGrade::Transcendent);
+			TestEqual(TEXT("Upgraded Transcendent rolls four lines"), OutLines.Num(), 4);
+			bFoundUpgrade = true;
+		}
+		else
+		{
+			TestEqual(TEXT("At/above transcendent chance holds Legendary"), Result, EPotentialGrade::Legendary);
+			TestEqual(TEXT("Held Legendary rolls three lines"), OutLines.Num(), 3);
+			bFoundHold = true;
+		}
+	}
+	TestTrue(TEXT("Found a transcendent upgrade outcome"), bFoundUpgrade);
+	TestTrue(TEXT("Found a hold outcome"), bFoundHold);
+
+	// 상한 도달(이미 Transcendent) → 상승 불가, 유지.
+	FRandomStream CapRng(42);
+	TArray<FPotentialLine> CapLines;
+	const EPotentialGrade Capped = FPotentialFormula::ApplyRankCube(EPotentialGrade::Transcendent, EPotentialGrade::Transcendent, CapRng, CapLines);
+	TestEqual(TEXT("Already-capped grade stays Transcendent"), Capped, EPotentialGrade::Transcendent);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialEconomyAggregationTest,
+	"IdleProject.Inventory.PotentialFormula.V2EconomyAggregation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialEconomyAggregationTest::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+
+	// 무장착 → 합산 0.
+	const FEquippedPotentialEconomyBonus Empty = Inventory->ComputeEquippedPotentialEconomyBonus();
+	TestEqual(TEXT("Empty AllStat sum"), Empty.AllStatPercent, 0.0f);
+	TestEqual(TEXT("Empty Gold sum"), Empty.GoldFindPercent, 0.0f);
+	TestEqual(TEXT("Empty Drop sum"), Empty.DropRatePercent, 0.0f);
+
+	// 무기: AllStat 0.05 + Gold 0.1 (2줄).
+	FItemInstance Weapon = MakeTestItem(TEXT("trans_weapon"), EItemSlot::Weapon, EItemRarity::Legendary, 10.0f, 0.0f, 0.0f);
+	Weapon.PotentialGrade = EPotentialGrade::Transcendent;
+	Weapon.PotentialLine1.Stat = EPotentialStat::AllStatPercent;
+	Weapon.PotentialLine1.Value = 0.05f;
+	Weapon.PotentialLine2.Stat = EPotentialStat::GoldFindPercent;
+	Weapon.PotentialLine2.Value = 0.10f;
+	// 4번째 줄: DropRate 0.2 (Transcendent 줄4 수용 검증).
+	Weapon.PotentialLine4.Stat = EPotentialStat::DropRatePercent;
+	Weapon.PotentialLine4.Value = 0.20f;
+	Inventory->AddItem(Weapon);
+
+	// 헬멧: AllStat 0.03 + Drop 0.05 (두 슬롯 합산 누적 검증).
+	FItemInstance Helmet = MakeTestItem(TEXT("trans_helmet"), EItemSlot::Helmet, EItemRarity::Legendary, 0.0f, 5.0f, 0.0f);
+	Helmet.PotentialGrade = EPotentialGrade::Transcendent;
+	Helmet.PotentialLine1.Stat = EPotentialStat::AllStatPercent;
+	Helmet.PotentialLine1.Value = 0.03f;
+	Helmet.PotentialLine2.Stat = EPotentialStat::DropRatePercent;
+	Helmet.PotentialLine2.Value = 0.05f;
+	Inventory->AddItem(Helmet);
+
+	const FEquippedPotentialEconomyBonus Bonus = Inventory->ComputeEquippedPotentialEconomyBonus();
+	TestEqual(TEXT("AllStat sums across slots and lines"), Bonus.AllStatPercent, 0.08f);
+	TestEqual(TEXT("Gold sums equipped potential"), Bonus.GoldFindPercent, 0.10f);
+	TestEqual(TEXT("Drop sums across line1+line4"), Bonus.DropRatePercent, 0.25f);
+
+	// 신규 옵션은 전투 스탯 보너스(ComputeEquipmentBonus)에 합류하지 않는다(이중 적용 가드 #72).
+	const FDerivedStats Combat = Inventory->ComputeEquipmentBonus();
+	TestEqual(TEXT("New options do not inflate PhysAtk multiplier"), Combat.PhysAtk, 10.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FPotentialSaveRoundTripV22Test,
+	"IdleProject.Inventory.PotentialFormula.V2SaveRoundTripV22",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FPotentialSaveRoundTripV22Test::RunTest(const FString& Parameters)
+{
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+
+	FItemInstance Weapon = MakeTestItem(TEXT("trans_weapon"), EItemSlot::Weapon, EItemRarity::Legendary, 10.0f, 0.0f, 0.0f);
+	Weapon.PotentialGrade = EPotentialGrade::Transcendent;
+	const TArray<FPotentialLine> Lines = {
+		FPotentialLine{ EPotentialStat::PhysAtkPercent, 0.18f },
+		FPotentialLine{ EPotentialStat::AllStatPercent, 0.07f },
+		FPotentialLine{ EPotentialStat::GoldFindPercent, 0.25f },
+		FPotentialLine{ EPotentialStat::DropRatePercent, 0.28f }
+	};
+	Inventory->AddItem(Weapon);
+	TestTrue(TEXT("SetEquippedPotential accepts four Transcendent lines"), Inventory->SetEquippedPotential(EItemSlot::Weapon, EPotentialGrade::Transcendent, Lines));
+
+	// Capture → Restore 라운드트립(SaveVer 22 무변경, UE 태그드 직렬화). 4줄/신규 옵션 보존 확인.
+	TArray<FItemInstance> CapturedItems;
+	TMap<EItemSlot, int32> CapturedEquipped;
+	Inventory->CaptureState(CapturedItems, CapturedEquipped);
+
+	UInventoryComponent* Restored = NewObject<UInventoryComponent>();
+	Restored->RestoreState(CapturedItems, CapturedEquipped);
+
+	const FItemInstance* RestoredWeapon = Restored->GetEquippedItem(EItemSlot::Weapon);
+	TestNotNull(TEXT("Restored weapon present"), RestoredWeapon);
+	if (RestoredWeapon)
+	{
+		TestEqual(TEXT("Restored grade is Transcendent"), RestoredWeapon->PotentialGrade, EPotentialGrade::Transcendent);
+		TestEqual(TEXT("Line1 stat preserved"), RestoredWeapon->PotentialLine1.Stat, EPotentialStat::PhysAtkPercent);
+		TestEqual(TEXT("Line1 value preserved"), RestoredWeapon->PotentialLine1.Value, 0.18f);
+		TestEqual(TEXT("Line2 new option preserved"), RestoredWeapon->PotentialLine2.Stat, EPotentialStat::AllStatPercent);
+		TestEqual(TEXT("Line2 value preserved"), RestoredWeapon->PotentialLine2.Value, 0.07f);
+		TestEqual(TEXT("Line3 gold preserved"), RestoredWeapon->PotentialLine3.Stat, EPotentialStat::GoldFindPercent);
+		TestEqual(TEXT("Line4 drop preserved"), RestoredWeapon->PotentialLine4.Stat, EPotentialStat::DropRatePercent);
+		TestEqual(TEXT("Line4 value preserved"), RestoredWeapon->PotentialLine4.Value, 0.28f);
+	}
+
+	// 기존 v22(3줄, 신규 옵션 없음) 세이브 전방호환: 4번째 줄 기본값(None) 로드.
+	FItemInstance LegacyWeapon = MakeTestItem(TEXT("legacy_weapon"), EItemSlot::Weapon, EItemRarity::Unique, 8.0f, 0.0f, 0.0f);
+	LegacyWeapon.PotentialGrade = EPotentialGrade::Legendary;
+	LegacyWeapon.PotentialLine1.Stat = EPotentialStat::PhysAtkPercent;
+	LegacyWeapon.PotentialLine1.Value = 0.12f;
+	// PotentialLine4 의도적으로 기본값(None/0) 유지.
+	UInventoryComponent* LegacyInv = NewObject<UInventoryComponent>();
+	LegacyInv->AddItem(LegacyWeapon);
+	TArray<FItemInstance> LegacyItems;
+	TMap<EItemSlot, int32> LegacyEquipped;
+	LegacyInv->CaptureState(LegacyItems, LegacyEquipped);
+	UInventoryComponent* LegacyRestored = NewObject<UInventoryComponent>();
+	LegacyRestored->RestoreState(LegacyItems, LegacyEquipped);
+	const FItemInstance* RestoredLegacy = LegacyRestored->GetEquippedItem(EItemSlot::Weapon);
+	TestNotNull(TEXT("Legacy weapon present"), RestoredLegacy);
+	if (RestoredLegacy)
+	{
+		TestEqual(TEXT("Legacy line4 defaults to None (forward compat)"), RestoredLegacy->PotentialLine4.Stat, EPotentialStat::None);
+		TestEqual(TEXT("Legacy line1 preserved"), RestoredLegacy->PotentialLine1.Value, 0.12f);
 	}
 	return true;
 }

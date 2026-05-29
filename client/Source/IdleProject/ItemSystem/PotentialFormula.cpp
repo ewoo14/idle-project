@@ -19,10 +19,35 @@ EPotentialGrade GradeFromIndex(int32 Index)
 		return EPotentialGrade::Unique;
 	case 4:
 		return EPotentialGrade::Legendary;
+	// 잠재 V2: Transcendent(인덱스 5).
+	case 5:
+		return EPotentialGrade::Transcendent;
 	case 0:
 	default:
 		return EPotentialGrade::None;
 	}
+}
+
+// 잠재 V2 신규 옵션 값 배수(전투 8종 = 1.0). 서버 NEW_OPTION_VALUE_SCALE parity
+// (AllStatPercent 0.4 / GoldFindPercent 1.5 / DropRatePercent 1.5).
+float PotentialOptionValueScale(EPotentialStat Stat)
+{
+	switch (Stat)
+	{
+	case EPotentialStat::AllStatPercent:
+		return 0.4f;
+	case EPotentialStat::GoldFindPercent:
+	case EPotentialStat::DropRatePercent:
+		return 1.5f;
+	default:
+		return 1.0f;
+	}
+}
+
+// 서버 Math.round(x*1000)/1000 (3자리, fround 아님) parity.
+float PotentialRound3(float Value)
+{
+	return FMath::RoundToFloat(Value * 1000.0f) / 1000.0f;
 }
 }
 
@@ -35,10 +60,12 @@ EPotentialGrade FPotentialFormula::GetMaxPotentialGrade(EItemRarity Rarity)
 	case EItemRarity::Epic:
 		return EPotentialGrade::Unique;
 	case EItemRarity::Unique:
+		return EPotentialGrade::Legendary;
+	// 잠재 V2: 고레어도(Legendary/Transcendent/Mythic) 아이템은 Transcendent 잠재 허용(무한 chase). 서버 getMaxPotentialGrade parity.
 	case EItemRarity::Legendary:
 	case EItemRarity::Transcendent:
 	case EItemRarity::Mythic:
-		return EPotentialGrade::Legendary;
+		return EPotentialGrade::Transcendent;
 	case EItemRarity::None:
 	case EItemRarity::Common:
 	default:
@@ -57,6 +84,9 @@ int32 FPotentialFormula::GetPotentialLineCount(EPotentialGrade Grade)
 	case EPotentialGrade::Unique:
 	case EPotentialGrade::Legendary:
 		return 3;
+	// 잠재 V2: Transcendent 4줄. 서버 getPotentialLineCount parity.
+	case EPotentialGrade::Transcendent:
+		return 4;
 	case EPotentialGrade::None:
 	default:
 		return 0;
@@ -83,12 +113,28 @@ void FPotentialFormula::GetPotentialRollRange(EPotentialGrade Grade, float& OutM
 		OutMin = 0.10f;
 		OutMax = 0.15f;
 		break;
+	// 잠재 V2: Transcendent = Legendary × 1.3 상향(0.13 ~ 0.195). 서버 getPotentialRollRange parity.
+	case EPotentialGrade::Transcendent:
+		OutMin = 0.13f;
+		OutMax = 0.195f;
+		break;
 	case EPotentialGrade::None:
 	default:
 		OutMin = 0.0f;
 		OutMax = 0.0f;
 		break;
 	}
+}
+
+void FPotentialFormula::GetPotentialStatRollRange(EPotentialGrade Grade, EPotentialStat Stat, float& OutMin, float& OutMax)
+{
+	float BaseMin = 0.0f;
+	float BaseMax = 0.0f;
+	GetPotentialRollRange(Grade, BaseMin, BaseMax);
+	const float Scale = PotentialOptionValueScale(Stat);
+	// 서버와 동일하게 범위 경계도 3자리 라운딩(Math.round(min*scale*1000)/1000).
+	OutMin = PotentialRound3(BaseMin * Scale);
+	OutMax = PotentialRound3(BaseMax * Scale);
 }
 
 TArray<FPotentialLine> FPotentialFormula::RollPotentialLines(EPotentialGrade Grade, FRandomStream& Rng)
@@ -100,6 +146,7 @@ TArray<FPotentialLine> FPotentialFormula::RollPotentialLines(EPotentialGrade Gra
 		return Lines;
 	}
 
+	// 잠재 V2: 추첨 풀 8→11(신규 옵션 3종 포함). 서버 POTENTIAL_STATS 순서/Fisher-Yates parity.
 	TArray<EPotentialStat> Stats{
 		EPotentialStat::PhysAtkPercent,
 		EPotentialStat::MagicAtkPercent,
@@ -108,7 +155,10 @@ TArray<FPotentialLine> FPotentialFormula::RollPotentialLines(EPotentialGrade Gra
 		EPotentialStat::MagicDefPercent,
 		EPotentialStat::CritRatePercent,
 		EPotentialStat::AtkSpeedPercent,
-		EPotentialStat::CritDmgPercent
+		EPotentialStat::CritDmgPercent,
+		EPotentialStat::AllStatPercent,
+		EPotentialStat::GoldFindPercent,
+		EPotentialStat::DropRatePercent
 	};
 	for (int32 Index = Stats.Num() - 1; Index > 0; --Index)
 	{
@@ -116,14 +166,15 @@ TArray<FPotentialLine> FPotentialFormula::RollPotentialLines(EPotentialGrade Gra
 		Stats.Swap(Index, SwapIndex);
 	}
 
-	float MinValue = 0.0f;
-	float MaxValue = 0.0f;
-	GetPotentialRollRange(Grade, MinValue, MaxValue);
 	for (int32 Index = 0; Index < LineCount; ++Index)
 	{
 		FPotentialLine Line;
 		Line.Stat = Stats[Index];
-		Line.Value = FMath::RoundToFloat(Rng.FRandRange(MinValue, MaxValue) * 1000.0f) / 1000.0f;
+		// 잠재 V2: 신규 옵션은 스탯별 배수로 값 범위 조정(전투 8종은 1.0 그대로). 3자리 라운딩.
+		float MinValue = 0.0f;
+		float MaxValue = 0.0f;
+		GetPotentialStatRollRange(Grade, Line.Stat, MinValue, MaxValue);
+		Line.Value = PotentialRound3(Rng.FRandRange(MinValue, MaxValue));
 		Lines.Add(Line);
 	}
 	return Lines;
@@ -132,9 +183,12 @@ TArray<FPotentialLine> FPotentialFormula::RollPotentialLines(EPotentialGrade Gra
 EPotentialGrade FPotentialFormula::ApplyRankCube(EPotentialGrade CurrentGrade, EPotentialGrade MaxGrade, FRandomStream& Rng, TArray<FPotentialLine>& OutLines)
 {
 	EPotentialGrade NewGrade = CurrentGrade;
-	if (GetGradeIndex(CurrentGrade) > 0 && GetGradeIndex(CurrentGrade) < GetGradeIndex(MaxGrade) && Rng.GetFraction() < RankCubeUpgradeChance)
+	const EPotentialGrade NextGrade = GradeFromIndex(GetGradeIndex(CurrentGrade) + 1);
+	// 잠재 V2: Legendary→Transcendent 상승만 낮은 확률(0.05), 나머지는 기존 0.08. 서버 upgradeChanceTo parity.
+	const float UpgradeChance = NextGrade == EPotentialGrade::Transcendent ? RankCubeTranscendentChance : RankCubeUpgradeChance;
+	if (GetGradeIndex(CurrentGrade) > 0 && GetGradeIndex(CurrentGrade) < GetGradeIndex(MaxGrade) && Rng.GetFraction() < UpgradeChance)
 	{
-		NewGrade = GradeFromIndex(GetGradeIndex(CurrentGrade) + 1);
+		NewGrade = NextGrade;
 	}
 	OutLines = RollPotentialLines(NewGrade, Rng);
 	return NewGrade;

@@ -568,7 +568,9 @@ void UIdleGameInstance::AddGold(int64 Amount)
 		// 칭호 GoldPct 도 같은 단일 골드획득 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
 		const FTitleBonus TitleBonus = TitleService ? TitleService->GetEquippedTitleBonus() : FTitleBonus();
 		const double TitleGoldPct = TitleBonus.Type == ETitleBonus::GoldPct ? static_cast<double>(TitleBonus.Value) : 0.0;
-		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct + TitleGoldPct;
+		// 잠재 V2: 장착 잠재 GoldFindPercent 도 같은 단일 골드획득 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+		const double PotentialGoldPct = static_cast<double>(GetEquippedPotentialGoldFindPercent());
+		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct + TitleGoldPct + PotentialGoldPct;
 		// (double)MAX_int64 * 배수는 int64 범위를 넘겨 RoundToInt64에서 오버플로(UB)하므로
 		// 범위 초과 시 EffectiveAmount를 MAX_int64로 포화시킨다(아래 합산 포화 로직과 정합).
 		const double ScaledAmount = static_cast<double>(Amount) * GoldMultiplier;
@@ -3150,6 +3152,27 @@ float UIdleGameInstance::GetTitleCritDamageBonus() const
 	return Bonus.Type == ETitleBonus::CritDmgPct ? Bonus.Value : 0.0f;
 }
 
+float UIdleGameInstance::GetEquippedPotentialAllStatMultiplier() const
+{
+	// 잠재 V2: 장착 잠재 AllStatPercent 합 → 1.0 + 합. RefreshDerivedStats 전역 배수 단일 지점에서만 곱한다(이중 적용 금지 #72).
+	const UInventoryComponent* Inventory = FindPlayerInventory();
+	return Inventory ? 1.0f + Inventory->ComputeEquippedPotentialEconomyBonus().AllStatPercent : 1.0f;
+}
+
+float UIdleGameInstance::GetEquippedPotentialGoldFindPercent() const
+{
+	// 잠재 V2: 장착 잠재 GoldFindPercent 합(비율). AddGold 골드 배수 단일 지점에서만 더한다(이중 적용 금지 #72).
+	const UInventoryComponent* Inventory = FindPlayerInventory();
+	return Inventory ? Inventory->ComputeEquippedPotentialEconomyBonus().GoldFindPercent : 0.0f;
+}
+
+float UIdleGameInstance::GetEquippedPotentialDropRatePercent() const
+{
+	// 잠재 V2: 장착 잠재 DropRatePercent 합(비율). 펫 Drop 집계 단일 지점에서만 더한다(이중 적용 금지 #72).
+	const UInventoryComponent* Inventory = FindPlayerInventory();
+	return Inventory ? Inventory->ComputeEquippedPotentialEconomyBonus().DropRatePercent : 0.0f;
+}
+
 bool UIdleGameInstance::EquipTitle(const FString& TitleId)
 {
 	EnsureTitleService();
@@ -3724,7 +3747,9 @@ float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 	const float PetAdjusted = FMath::Clamp(BaseChance * PetMultiplier, 0.0f, 1.0f);
 	const float ConsumableBonus = BuffService ? BuffService->GetDropBuffAdd(GetCurrentUnixSeconds()) : 0.0f;
 	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
-	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus, 0.0f, 1.0f);
+	// 잠재 V2: 장착 잠재 DropRatePercent 도 펫 Drop 집계와 동일한 단일 가산 지점(여기)에만 합류한다(이중 적용 금지, #72).
+	const float PotentialDropBonus = GetEquippedPotentialDropRatePercent();
+	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus + PotentialDropBonus, 0.0f, 1.0f);
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const

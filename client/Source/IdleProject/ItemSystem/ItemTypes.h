@@ -65,7 +65,9 @@ enum class EPotentialGrade : uint8
 	Rare = 1 UMETA(DisplayName = "Rare"),
 	Epic = 2 UMETA(DisplayName = "Epic"),
 	Unique = 3 UMETA(DisplayName = "Unique"),
-	Legendary = 4 UMETA(DisplayName = "Legendary")
+	Legendary = 4 UMETA(DisplayName = "Legendary"),
+	// 잠재 V2: Transcendent 등급(4줄). 고레어도 아이템만 도달(무한 chase). 서버 potential.ts parity.
+	Transcendent = 5 UMETA(DisplayName = "Transcendent")
 };
 
 UENUM(BlueprintType)
@@ -79,7 +81,11 @@ enum class EPotentialStat : uint8
 	MagicDefPercent = 5 UMETA(DisplayName = "MagicDefPercent"),
 	CritRatePercent = 6 UMETA(DisplayName = "CritRatePercent"),
 	AtkSpeedPercent = 7 UMETA(DisplayName = "AtkSpeedPercent"),
-	CritDmgPercent = 8 UMETA(DisplayName = "CritDmgPercent")
+	CritDmgPercent = 8 UMETA(DisplayName = "CritDmgPercent"),
+	// 잠재 V2 신규 옵션 3종(서버 potential.ts 9/10/11 parity). 전투 8종 외 경제/전역 옵션.
+	AllStatPercent = 9 UMETA(DisplayName = "AllStatPercent"),
+	GoldFindPercent = 10 UMETA(DisplayName = "GoldFindPercent"),
+	DropRatePercent = 11 UMETA(DisplayName = "DropRatePercent")
 };
 
 UENUM(BlueprintType)
@@ -175,6 +181,11 @@ struct IDLEPROJECT_API FItemInstance
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	FPotentialLine PotentialLine3;
 
+	// 잠재 V2: Transcendent(4줄) 수용용 4번째 줄. SaveVer 22 유지 — UE 태그드 직렬화로 기존 세이브는
+	// 이 필드를 기본값(None/0)으로 로드(전방호환). 1~3등급은 미사용(기본값).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
+	FPotentialLine PotentialLine4;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Item")
 	int32 EnhanceFailStreak = 0;
 
@@ -217,6 +228,10 @@ struct IDLEPROJECT_API FItemPowerScore
 				return Line.Value * 100.0f;
 			case EPotentialStat::CritDmgPercent:
 				return Line.Value * 100.0f;
+			// 잠재 V2 신규 옵션은 경제/전역 보너스라 아이템 전투 파워 점수에 가산하지 않는다(0).
+			case EPotentialStat::AllStatPercent:
+			case EPotentialStat::GoldFindPercent:
+			case EPotentialStat::DropRatePercent:
 			case EPotentialStat::None:
 			default:
 				return 0.0f;
@@ -225,7 +240,8 @@ struct IDLEPROJECT_API FItemPowerScore
 		const float RawScore = BaseScore * EnhanceMultiplier
 			+ PotentialBonus(Item.PotentialLine1)
 			+ PotentialBonus(Item.PotentialLine2)
-			+ PotentialBonus(Item.PotentialLine3);
+			+ PotentialBonus(Item.PotentialLine3)
+			+ PotentialBonus(Item.PotentialLine4);
 		return FMath::RoundToInt(RawScore);
 	}
 };

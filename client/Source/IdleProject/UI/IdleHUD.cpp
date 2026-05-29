@@ -637,6 +637,8 @@ const TCHAR* PotentialGradeToLocalizationKey(EPotentialGrade Grade)
 		return TEXT("RARITY_UNIQUE");
 	case EPotentialGrade::Legendary:
 		return TEXT("RARITY_LEGENDARY");
+	case EPotentialGrade::Transcendent:
+		return TEXT("RARITY_TRANSCENDENT");
 	case EPotentialGrade::None:
 	default:
 		return TEXT("RARITY_NONE");
@@ -662,6 +664,8 @@ FLinearColor PotentialGradeToColor(EPotentialGrade Grade)
 		return RarityUnique;
 	case EPotentialGrade::Legendary:
 		return RarityLegendary;
+	case EPotentialGrade::Transcendent:
+		return RarityTranscendent;
 	case EPotentialGrade::None:
 	default:
 		return TextMuted;
@@ -688,6 +692,12 @@ const TCHAR* PotentialStatToLocalizationKey(EPotentialStat Stat)
 		return TEXT("POTENTIAL_STAT_ATK_SPEED");
 	case EPotentialStat::CritDmgPercent:
 		return TEXT("POTENTIAL_STAT_CRIT_DMG");
+	case EPotentialStat::AllStatPercent:
+		return TEXT("POTENTIAL_STAT_ALL_STAT");
+	case EPotentialStat::GoldFindPercent:
+		return TEXT("POTENTIAL_STAT_GOLD_FIND");
+	case EPotentialStat::DropRatePercent:
+		return TEXT("POTENTIAL_STAT_DROP_RATE");
 	case EPotentialStat::None:
 	default:
 		return TEXT("NONE_DASH");
@@ -711,7 +721,7 @@ FText FormatPotentialLineLabel(const FPotentialLine& Line)
 FText BuildPotentialLineSummary(const FItemInstance& Item)
 {
 	TArray<FString> Parts;
-	for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3 })
+	for (const FPotentialLine& Line : { Item.PotentialLine1, Item.PotentialLine2, Item.PotentialLine3, Item.PotentialLine4 })
 	{
 		const FText Label = FormatPotentialLineLabel(Line);
 		if (!Label.IsEmpty())
