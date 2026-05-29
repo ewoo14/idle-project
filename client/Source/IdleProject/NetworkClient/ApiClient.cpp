@@ -33,6 +33,11 @@ FString SerializeJsonObject(const TSharedRef<FJsonObject>& JsonObject)
 	FJsonSerializer::Serialize(JsonObject, Writer);
 	return JsonBody;
 }
+
+const TCHAR* GetLeaderboardPathSegment(ELeaderboardKind Kind)
+{
+	return Kind == ELeaderboardKind::Power ? TEXT("power") : TEXT("rebirth");
+}
 }
 
 void UApiClient::Initialize(const FString& InBaseUrl)
@@ -249,6 +254,34 @@ void UApiClient::DownloadSave(const FString& CharacterId, TFunction<void(bool, F
 			Callback(true, SerializeJsonObject((*PayloadObject).ToSharedRef()));
 		}
 	});
+}
+
+void UApiClient::FetchLeaderboard(ELeaderboardKind Kind, int32 Season, TFunction<void(bool, FString)> Callback)
+{
+	const FString Path = FString::Printf(
+		TEXT("/v1/leaderboard/%s?season=%d&limit=100"),
+		GetLeaderboardPathSegment(Kind),
+		Season);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::FetchMyRank(ELeaderboardKind Kind, int32 Season, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid character id"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(
+		TEXT("/v1/leaderboard/%s/me?season=%d&characterId=%s"),
+		GetLeaderboardPathSegment(Kind),
+		Season,
+		*CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
 }
 
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)

@@ -8,6 +8,7 @@
 #include "GameCore/CloudSavePayloadMapper.h"
 #include "GameCore/ConsumableFormula.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/LeaderboardService.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
@@ -114,6 +115,7 @@ void UIdleGameInstance::Init()
 	EnsureRuneService();
 	EnsureAchievementService();
 	EnsureMasteryService();
+	EnsureLeaderboardService();
 	EnsureBuffService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
@@ -145,6 +147,7 @@ void UIdleGameInstance::Shutdown()
 	RuneService = nullptr;
 	AchievementService = nullptr;
 	MasteryService = nullptr;
+	LeaderboardService = nullptr;
 	BuffService = nullptr;
 	Super::Shutdown();
 }
@@ -366,6 +369,74 @@ void UIdleGameInstance::UploadToCloud()
 			if (UIdleGameInstance* StrongThis = WeakThis.Get())
 			{
 				StrongThis->SetCloudSyncState(bUploadOk ? ECloudSyncState::Synced : ECloudSyncState::Offline);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::RefreshLeaderboard(ELeaderboardKind Kind)
+{
+	if (!ApiClient)
+	{
+		EnsureLeaderboardService();
+		if (LeaderboardService)
+		{
+			LeaderboardService->ParseListJson(FString(), Kind);
+			LeaderboardService->ParseMyRankJson(FString(), Kind);
+		}
+		return;
+	}
+
+	EnsureLeaderboardService();
+	EnsureSeasonService();
+	if (!LeaderboardService || !SeasonService)
+	{
+		return;
+	}
+
+	const int32 SeasonId = SeasonService->GetSeasonId();
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->FetchLeaderboard(Kind, SeasonId, [WeakThis, Kind](bool bSuccess, FString Body) mutable
+	{
+		if (UIdleGameInstance* StrongThis = WeakThis.Get())
+		{
+			StrongThis->EnsureLeaderboardService();
+			if (StrongThis->LeaderboardService)
+			{
+				StrongThis->LeaderboardService->ParseListJson(bSuccess ? Body : FString(), Kind);
+			}
+		}
+	});
+
+	ApiClient->EnsureCharacter([WeakThis, Kind, SeasonId](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis)
+		{
+			return;
+		}
+
+		StrongThis->EnsureLeaderboardService();
+		if (!StrongThis->ApiClient || !StrongThis->LeaderboardService)
+		{
+			return;
+		}
+
+		if (!bCharacterOk)
+		{
+			StrongThis->LeaderboardService->ParseMyRankJson(FString(), Kind);
+			return;
+		}
+
+		StrongThis->ApiClient->FetchMyRank(Kind, SeasonId, CharacterId, [WeakThis, Kind](bool bSuccess, FString Body) mutable
+		{
+			if (UIdleGameInstance* StrongThis = WeakThis.Get())
+			{
+				StrongThis->EnsureLeaderboardService();
+				if (StrongThis->LeaderboardService)
+				{
+					StrongThis->LeaderboardService->ParseMyRankJson(bSuccess ? Body : FString(), Kind);
+				}
 			}
 		});
 	});
@@ -2051,6 +2122,14 @@ void UIdleGameInstance::EnsureMasteryService()
 	{
 		MasteryService = NewObject<UMasteryService>(this);
 		MasteryService->Initialize();
+	}
+}
+
+void UIdleGameInstance::EnsureLeaderboardService()
+{
+	if (!LeaderboardService)
+	{
+		LeaderboardService = NewObject<ULeaderboardService>(this);
 	}
 }
 

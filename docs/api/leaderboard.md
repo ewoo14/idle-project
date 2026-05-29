@@ -2,6 +2,10 @@
 
 Base path: `/v1/leaderboard`
 
+Client contract: `score` is serialized as a JSON string to preserve bigint
+precision. UE parses it into `int64` in `ULeaderboardService`; non-ok or
+offline responses fall back to an empty top-N list and rank `0` for `/me`.
+
 리더보드는 Redis ZSET을 우선 조회하고, 캐시가 비어 있으면 PostgreSQL에서 조회한다. 시즌은 양의 정수 `season`으로 지정하며, 시즌 생성/마감 운영 정책은 1.0 운영자 기능에서 확장한다.
 
 ## GET `/power`
