@@ -42,7 +42,9 @@ public:
 
 private:
 	int64 TrackXp[FMasteryFormula::TrackCount] = {0, 0, 0, 0, 0, 0};
+	int32 CachedLevel[FMasteryFormula::TrackCount] = {0, 0, 0, 0, 0, 0};
 
 	static int32 ToIndex(EMasteryTrack Track);
+	void RefreshCachedLevel(int32 Index);
 	int32 LevelOf(EMasteryTrack Track) const;
 };

@@ -1367,7 +1367,9 @@ float UIdleGameInstance::GetRuneGoldFindBonus() const
 
 float UIdleGameInstance::GetRuneExpBoostBonus() const
 {
-	return RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
+	const float RuneBonus = RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f;
+	return RuneBonus + MasteryBonus;
 }
 
 float UIdleGameInstance::GetRuneOfflineEffBonus() const
@@ -1953,11 +1955,17 @@ void UIdleGameInstance::RefreshPlayerCharacterStats()
 
 void UIdleGameInstance::HandleChapterBossDefeated(int32 ClearedChapter)
 {
+	EnsureMasteryService();
 	if (ClearedChapter == 1)
 	{
 		MarkChapter1BossDefeated();
 	}
 	RecordQuestProgress(EQuestObjective::DefeatBoss, 1);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Combat, 20);
+		RefreshPlayerCharacterStats();
+	}
 }
 
 void UIdleGameInstance::LoadLastSeenUnixSec()

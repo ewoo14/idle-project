@@ -69,6 +69,10 @@ bool FMasteryFormulaTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Core multiplier is monotonic"), FMasteryFormula::CoreStatMultiplier(10, 10, 10) > FMasteryFormula::CoreStatMultiplier(1, 1, 1));
 	TestEqual(TEXT("Crit starts at zero"), FMasteryFormula::CritRateAdd(0), 0.0f);
 	TestTrue(TEXT("Gold find is monotonic"), FMasteryFormula::GoldFindPct(50) > FMasteryFormula::GoldFindPct(5));
+	TestEqual(TEXT("Core multiplier level 1 parity anchor"), FMasteryFormula::CoreStatMultiplier(1, 1, 1), 1.0277259349822998f);
+	TestEqual(TEXT("Core multiplier level 30 parity anchor"), FMasteryFormula::CoreStatMultiplier(30, 30, 30), 1.0902172327041626f);
+	TestEqual(TEXT("Crit level 30 parity anchor"), FMasteryFormula::CritRateAdd(30), 0.034339871257543564f);
+	TestEqual(TEXT("Gold find level 100 parity anchor"), FMasteryFormula::GoldFindPct(100), 0.09230241179466248f);
 	return true;
 }
 
@@ -102,6 +106,15 @@ bool FMasteryServiceTest::RunTest(const FString& Parameters)
 	Restored->ImportSave(Saved);
 	TestEqual(TEXT("Combat xp round trips"), Restored->GetTrackTotalXp(EMasteryTrack::Combat), static_cast<int64>(250));
 	TestEqual(TEXT("Beast level round trips"), Restored->GetTrackLevel(EMasteryTrack::Beast), Service->GetTrackLevel(EMasteryTrack::Beast));
+
+	const FMasteryLevelInfo RestoredCombatInfo = Restored->GetTrackLevelInfo(EMasteryTrack::Combat);
+	int32 ExpectedLevel = 0;
+	int64 ExpectedInto = 0;
+	int64 ExpectedNeed = 0;
+	FMasteryFormula::LevelFromTotalXp(Restored->GetTrackTotalXp(EMasteryTrack::Combat), ExpectedLevel, ExpectedInto, ExpectedNeed);
+	TestEqual(TEXT("Imported combat cached level mirrors formula"), RestoredCombatInfo.Level, ExpectedLevel);
+	TestEqual(TEXT("Imported combat cached xp into level mirrors formula"), RestoredCombatInfo.XpIntoLevel, ExpectedInto);
+	TestEqual(TEXT("Imported combat cached xp to next mirrors formula"), RestoredCombatInfo.XpToNext, ExpectedNeed);
 	return true;
 }
 
@@ -156,6 +169,14 @@ bool FMasteryGameInstanceHooksTest::RunTest(const FString& Parameters)
 	GameInstance->RecordMonsterKilled();
 	TestEqual(TEXT("Monster kill grants combat mastery xp"), Mastery ? Mastery->GetTrackTotalXp(EMasteryTrack::Combat) : -1, static_cast<int64>(1));
 
+	GameInstance->InitializeStageServiceForTests();
+	if (UStageService* StageService = GameInstance->GetStageService())
+	{
+		StageService->RestoreState(1, UStageService::StagesPerChapter, 0, false, 0);
+		StageService->RecordKill(true);
+	}
+	TestEqual(TEXT("Chapter boss clear grants combat mastery xp"), Mastery ? Mastery->GetTrackTotalXp(EMasteryTrack::Combat) : -1, static_cast<int64>(21));
+
 	FRuneInstance Rune;
 	Rune.RuneId = TEXT("test_rune");
 	Rune.RuneType = ERuneType::PhysAtk;
@@ -173,7 +194,29 @@ bool FMasteryGameInstanceHooksTest::RunTest(const FString& Parameters)
 	TestEqual(
 		TEXT("Combat mastery survives save round trip"),
 		RestoredGameInstance->GetMasteryService() ? RestoredGameInstance->GetMasteryService()->GetTrackTotalXp(EMasteryTrack::Combat) : -1,
-		static_cast<int64>(1));
+		static_cast<int64>(21));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryUtilityBonusExposureTest,
+	"IdleProject.Mastery.UtilityBonusExposure",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FMasteryUtilityBonusExposureTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* Save = NewObject<UIdleSaveGame>();
+	Save->bHasSave = true;
+	Save->SaveVersion = 13;
+
+	FMasterySaveEntry Beast;
+	Beast.Track = static_cast<uint8>(EMasteryTrack::Beast);
+	Beast.TotalXp = FMasteryFormula::XpToNext(0);
+	Save->Mastery.Add(Beast);
+
+	TestTrue(TEXT("Seeded beast mastery save applies"), GameInstance->ApplyFromSave(Save));
+	TestEqual(TEXT("Rune exp boost getter includes beast mastery bonus"), GameInstance->GetRuneExpBoostBonus(), FMasteryFormula::ExpBoostPct(1));
 	return true;
 }
 

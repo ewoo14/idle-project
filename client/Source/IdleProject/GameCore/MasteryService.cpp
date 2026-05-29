@@ -5,6 +5,7 @@ void UMasteryService::Initialize()
 	for (int32 Index = 0; Index < FMasteryFormula::TrackCount; ++Index)
 	{
 		TrackXp[Index] = 0;
+		CachedLevel[Index] = 0;
 	}
 }
 
@@ -21,9 +22,10 @@ void UMasteryService::AddXp(EMasteryTrack Track, int64 Amount)
 		return;
 	}
 
-	const int32 PreviousLevel = LevelOf(Track);
+	const int32 PreviousLevel = CachedLevel[Index];
 	TrackXp[Index] = TrackXp[Index] > MAX_int64 - Amount ? MAX_int64 : TrackXp[Index] + Amount;
-	const int32 NewLevel = LevelOf(Track);
+	RefreshCachedLevel(Index);
+	const int32 NewLevel = CachedLevel[Index];
 	if (NewLevel > PreviousLevel)
 	{
 		OnTrackLevelUp.Broadcast(Track, NewLevel);
@@ -107,6 +109,7 @@ void UMasteryService::ImportSave(const TArray<FMasterySaveEntry>& Entries)
 		if (Entry.Track < FMasteryFormula::TrackCount)
 		{
 			TrackXp[Entry.Track] = FMath::Max<int64>(0, Entry.TotalXp);
+			RefreshCachedLevel(Entry.Track);
 		}
 	}
 }
@@ -117,17 +120,22 @@ int32 UMasteryService::ToIndex(EMasteryTrack Track)
 	return Index >= 0 && Index < FMasteryFormula::TrackCount ? Index : INDEX_NONE;
 }
 
-int32 UMasteryService::LevelOf(EMasteryTrack Track) const
+void UMasteryService::RefreshCachedLevel(int32 Index)
 {
-	const int32 Index = ToIndex(Track);
-	if (Index == INDEX_NONE)
+	if (Index < 0 || Index >= FMasteryFormula::TrackCount)
 	{
-		return 0;
+		return;
 	}
 
 	int32 Level = 0;
 	int64 Into = 0;
 	int64 Need = 0;
 	FMasteryFormula::LevelFromTotalXp(TrackXp[Index], Level, Into, Need);
-	return Level;
+	CachedLevel[Index] = Level;
+}
+
+int32 UMasteryService::LevelOf(EMasteryTrack Track) const
+{
+	const int32 Index = ToIndex(Track);
+	return Index == INDEX_NONE ? 0 : CachedLevel[Index];
 }
