@@ -157,6 +157,7 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 		*Service,
 		ELeaderboardKind::Power,
 		7,
+		TEXT("2026-W22"),
 		false,
 		false);
 
@@ -164,6 +165,8 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Leaderboard season label formats"), ViewModel.SeasonLabel.ToString(), FString(TEXT("Season 7")));
 	TestEqual(TEXT("Power tab label localizes"), ViewModel.PowerTabLabel.ToString(), FString(TEXT("Power")));
 	TestEqual(TEXT("Rebirth tab label localizes"), ViewModel.RebirthTabLabel.ToString(), FString(TEXT("Rebirth")));
+	TestEqual(TEXT("Weekly tab label localizes"), ViewModel.WeeklyTabLabel.ToString(), FString(TEXT("Weekly Boss")));
+	TestEqual(TEXT("Weekly week label formats"), ViewModel.WeekLabel.ToString(), FString(TEXT("This Week 2026-W22")));
 	TestEqual(TEXT("Top entries become rows"), ViewModel.Rows.Num(), 2);
 	TestEqual(TEXT("Top row rank formats"), ViewModel.Rows[0].RankLabel.ToString(), FString(TEXT("#1")));
 	TestEqual(TEXT("Top row score formats"), ViewModel.Rows[0].ScoreLabel.ToString(), FString(TEXT("Score 1,500")));
@@ -177,12 +180,30 @@ bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
 		*Service,
 		ELeaderboardKind::Rebirth,
 		7,
+		TEXT("2026-W22"),
 		true,
 		true);
 	TestTrue(TEXT("Offline state is exposed"), OfflineViewModel.bOffline);
 	TestTrue(TEXT("Loading state is exposed"), OfflineViewModel.bLoading);
 	TestEqual(TEXT("Offline label localizes"), OfflineViewModel.OfflineLabel.ToString(), FString(TEXT("Offline")));
 	TestEqual(TEXT("Loading label localizes"), OfflineViewModel.LoadingLabel.ToString(), FString(TEXT("Loading...")));
+
+	// 주간 보스 종류: 주간 데미지 엔트리를 점수=데미지(천단위 콤마)로 노출하는지 검증
+	Service->ParseListJson(TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"boss-a\",\"score\":1234567,\"rank\":1},{\"characterId\":\"self\",\"score\":99000,\"rank\":4}]}"), ELeaderboardKind::WeeklyDamage);
+	Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":{\"characterId\":\"self\",\"score\":99000,\"rank\":4}}"), ELeaderboardKind::WeeklyDamage);
+	const FIdleHUDLeaderboardPanelViewModel WeeklyViewModel = IdleProject::UI::BuildLeaderboardPanelViewModel(
+		*Service,
+		ELeaderboardKind::WeeklyDamage,
+		7,
+		TEXT("2026-W22"),
+		false,
+		false);
+	TestEqual(TEXT("Weekly active kind is exposed"), static_cast<int32>(WeeklyViewModel.ActiveKind), static_cast<int32>(ELeaderboardKind::WeeklyDamage));
+	TestEqual(TEXT("Weekly week label formats on active tab"), WeeklyViewModel.WeekLabel.ToString(), FString(TEXT("This Week 2026-W22")));
+	TestEqual(TEXT("Weekly damage rows become entries"), WeeklyViewModel.Rows.Num(), 2);
+	TestEqual(TEXT("Weekly top damage formats with commas"), WeeklyViewModel.Rows[0].ScoreLabel.ToString(), FString(TEXT("Score 1,234,567")));
+	TestTrue(TEXT("My weekly row is highlighted"), WeeklyViewModel.Rows[1].bSelf);
+	TestEqual(TEXT("My weekly rank row formats"), WeeklyViewModel.MyEntry.RankLabel.ToString(), FString(TEXT("#4")));
 
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;

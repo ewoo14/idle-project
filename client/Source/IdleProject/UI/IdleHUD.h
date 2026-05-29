@@ -378,6 +378,8 @@ struct IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel
 	FText SeasonLabel;
 	FText PowerTabLabel;
 	FText RebirthTabLabel;
+	FText WeeklyTabLabel;
+	FText WeekLabel;
 	FText MyRankTitle;
 	FText EmptyLabel;
 	FText OfflineLabel;
@@ -738,7 +740,7 @@ IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const U
 IDLEPROJECT_API FIdleHUDPotentialPanelViewModel BuildPotentialPanelViewModel(const UInventoryComponent& Inventory, int64 ResetCubes, int64 RankCubes);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
-IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, bool bLoading, bool bOffline);
+IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
