@@ -6,6 +6,7 @@
 #include "GameCore/CloudSaveMergePolicy.h"
 #include "GameCore/CloudSavePayloadMapper.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/RebirthFormula.h"
 #include "GameCore/RewardFormula.h"
@@ -110,6 +111,7 @@ void UIdleGameInstance::Init()
 	EnsureDungeonService();
 	EnsureRuneService();
 	EnsureAchievementService();
+	EnsureMasteryService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
@@ -139,6 +141,7 @@ void UIdleGameInstance::Shutdown()
 	DungeonService = nullptr;
 	RuneService = nullptr;
 	AchievementService = nullptr;
+	MasteryService = nullptr;
 	Super::Shutdown();
 }
 
@@ -371,8 +374,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureQuestService();
 	EnsureSeasonService();
 	EnsureAchievementService();
+	EnsureMasteryService();
 
-	SaveGame->SaveVersion = 12;
+	SaveGame->SaveVersion = 13;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -463,6 +467,11 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (AchievementService)
 	{
 		AchievementService->CaptureState(SaveGame->AchievementMetrics, SaveGame->Achievements, &SaveGame->AchievementUniqueItemIds);
+	}
+
+	if (MasteryService)
+	{
+		SaveGame->Mastery = MasteryService->ExportSave();
 	}
 
 	return true;
@@ -565,6 +574,12 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (PetService)
 	{
 		PetService->RestoreState(SaveGame->EquippedPetId, SaveGame->OwnedPetIds, SaveGame->PetLevels);
+	}
+
+	EnsureMasteryService();
+	if (MasteryService)
+	{
+		MasteryService->ImportSave(SaveGame->SaveVersion >= 13 ? SaveGame->Mastery : TArray<FMasterySaveEntry>());
 	}
 
 	if (SaveGame->SaveVersion >= 2)
@@ -683,6 +698,7 @@ bool UIdleGameInstance::ApplyCharacterSaveState(
 int64 UIdleGameInstance::ClimbTower()
 {
 	EnsureTowerService();
+	EnsureMasteryService();
 	AIdleCharacter* Character = FindPlayerCharacter();
 	if (!TowerService || !Character)
 	{
@@ -695,6 +711,11 @@ int64 UIdleGameInstance::ClimbTower()
 	{
 		RecordAchievementMetric(EAchievementMetric::TowerHighestFloor, TowerService->GetHighestFloor());
 		RecordQuestProgress(EQuestObjective::ClimbTower, FMath::Max(1, TowerService->GetHighestFloor() - PreviousHighestFloor));
+		if (MasteryService)
+		{
+			MasteryService->AddXp(EMasteryTrack::Abyss, 10);
+			RefreshPlayerCharacterStats();
+		}
 		AddGold(Reward);
 		RequestAutosave();
 	}
@@ -704,6 +725,7 @@ int64 UIdleGameInstance::ClimbTower()
 FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
 {
 	EnsureDungeonService();
+	EnsureMasteryService();
 	FDungeonRunResult Result;
 	Result.Type = Type;
 
@@ -721,6 +743,11 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
 
 	AddGold(Result.GoldReward);
 	AddExp(Result.ExpReward);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Abyss, 30);
+		RefreshPlayerCharacterStats();
+	}
 	if (Result.EssenceReward > 0)
 	{
 		if (RuneEssence > MAX_int64 - Result.EssenceReward)
@@ -945,6 +972,7 @@ bool UIdleGameInstance::TryBuyShopResource(int64 Cost, int64& ResourceCount)
 void UIdleGameInstance::AddRune(const FRuneInstance& Rune)
 {
 	EnsureRuneService();
+	EnsureMasteryService();
 	if (!RuneService)
 	{
 		return;
@@ -954,6 +982,11 @@ void UIdleGameInstance::AddRune(const FRuneInstance& Rune)
 	RuneService->AddRune(Rune);
 	if (RuneService->GetOwnedRunes().Num() != PreviousCount)
 	{
+		if (MasteryService)
+		{
+			MasteryService->AddXp(EMasteryTrack::Rune, 5);
+			RefreshPlayerCharacterStats();
+		}
 		RequestAutosave();
 	}
 }
@@ -961,6 +994,7 @@ void UIdleGameInstance::AddRune(const FRuneInstance& Rune)
 bool UIdleGameInstance::TryEnhanceRune(int32 OwnedIndex)
 {
 	EnsureRuneService();
+	EnsureMasteryService();
 	if (!RuneService || !RuneService->GetOwnedRunes().IsValidIndex(OwnedIndex))
 	{
 		return false;
@@ -984,6 +1018,11 @@ bool UIdleGameInstance::TryEnhanceRune(int32 OwnedIndex)
 	}
 
 	RefreshPlayerCharacterStats();
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Rune, 5);
+		RefreshPlayerCharacterStats();
+	}
 	RequestAutosave();
 	return true;
 }
@@ -1107,7 +1146,8 @@ void UIdleGameInstance::AddExp(int64 Amount)
 		return;
 	}
 
-	CurrentExp += Amount;
+	const double ExpMultiplier = 1.0 + static_cast<double>(GetMasteryService() ? GetMasteryService()->GetGlobalBonus().ExpBoostPct : 0.0f);
+	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
 	while (NextExp > 0 && CurrentExp >= NextExp && CharacterLevel < FLevelFormulas::LEVEL_CAP)
@@ -1303,6 +1343,11 @@ float UIdleGameInstance::GetAchievementStatMultiplier() const
 	return AchievementService ? AchievementService->GetStatMultiplier() : 1.0f;
 }
 
+float UIdleGameInstance::GetMasteryCoreStatMultiplier() const
+{
+	return MasteryService ? MasteryService->GetGlobalBonus().CoreStatMultiplier : 1.0f;
+}
+
 int32 UIdleGameInstance::GetAchievementTotalPoints() const
 {
 	return AchievementService ? AchievementService->GetTotalPoints() : 0;
@@ -1315,11 +1360,15 @@ int64 UIdleGameInstance::GetAchievementMetricValue(EAchievementMetric Metric) co
 
 float UIdleGameInstance::GetRuneGoldFindBonus() const
 {
-	return RuneService ? RuneService->GetEquippedUtilValues().GoldFind : 0.0f;
+	const float RuneBonus = RuneService ? RuneService->GetEquippedUtilValues().GoldFind : 0.0f;
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().GoldFindPct : 0.0f;
+	return RuneBonus + MasteryBonus;
 }
 
 float UIdleGameInstance::GetRuneExpBoostBonus() const
 {
+	// EXP 마스터리 보너스는 AddExp 보편 경로에서 단일 적용된다. 이 getter는
+	// 처치 EXP 계산(IdleMonster)에 쓰이므로 마스터리를 더하면 이중 적용된다.
 	return RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
 }
 
@@ -1408,14 +1457,26 @@ void UIdleGameInstance::RecordQuestProgress(EQuestObjective Objective, int32 Amo
 
 void UIdleGameInstance::RecordMonsterKilled()
 {
+	EnsureMasteryService();
 	RecordQuestProgress(EQuestObjective::KillMonster, 1);
 	RecordAchievementMetric(EAchievementMetric::MonstersKilled, 1);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Combat, 1);
+		RefreshPlayerCharacterStats();
+	}
 }
 
 void UIdleGameInstance::RecordGearEnhanced()
 {
+	EnsureMasteryService();
 	RecordQuestProgress(EQuestObjective::Enhance, 1);
 	RecordAchievementMetric(EAchievementMetric::GearEnhanced, 1);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Equipment, 5);
+		RefreshPlayerCharacterStats();
+	}
 }
 
 void UIdleGameInstance::RecordAchievementMetric(EAchievementMetric Metric, int64 AmountOrValue)
@@ -1439,6 +1500,7 @@ void UIdleGameInstance::RecordAchievementItemCollected(const FItemInstance& Item
 FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 {
 	EnsureQuestService();
+	EnsureMasteryService();
 	FQuestClaimResult Result;
 	if (!QuestService)
 	{
@@ -1457,6 +1519,11 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 	AddGold(Result.RewardGold);
 	AddExp(Result.RewardExp);
 	RecordAchievementMetric(EAchievementMetric::QuestsCompleted, 1);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Explore, 20);
+		RefreshPlayerCharacterStats();
+	}
 	EnsureSeasonService();
 	if (SeasonService)
 	{
@@ -1574,6 +1641,7 @@ bool UIdleGameInstance::TryUnlockPet(const FString& PetId)
 FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 {
 	EnsurePetService();
+	EnsureMasteryService();
 	FPetFeedResult Result;
 	if (!PetService)
 	{
@@ -1624,6 +1692,11 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 	RecordQuestProgress(EQuestObjective::FeedPet, 1);
 	RecordAchievementMetric(EAchievementMetric::PetsFed, 1);
 	RecordAchievementMetric(EAchievementMetric::HighestPetLevel, Result.NewLevel);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Beast, 5);
+		RefreshPlayerCharacterStats();
+	}
 	OnPetFed.Broadcast(Result);
 	RequestAutosave();
 	return Result;
@@ -1656,7 +1729,9 @@ int64 UIdleGameInstance::ApplyEquippedPetGoldBonus(int64 BaseAmount) const
 
 float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 {
-	return PetService ? PetService->ApplyDropBonusChance(BaseChance) : BaseChance;
+	const float PetAdjusted = PetService ? PetService->ApplyDropBonusChance(BaseChance) : BaseChance;
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
+	return PetAdjusted + MasteryBonus;
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const
@@ -1861,6 +1936,15 @@ void UIdleGameInstance::EnsureAchievementService()
 	}
 }
 
+void UIdleGameInstance::EnsureMasteryService()
+{
+	if (!MasteryService)
+	{
+		MasteryService = NewObject<UMasteryService>(this);
+		MasteryService->Initialize();
+	}
+}
+
 void UIdleGameInstance::RefreshPlayerCharacterStats()
 {
 	if (AIdleCharacter* Character = FindPlayerCharacter())
@@ -1871,11 +1955,17 @@ void UIdleGameInstance::RefreshPlayerCharacterStats()
 
 void UIdleGameInstance::HandleChapterBossDefeated(int32 ClearedChapter)
 {
+	EnsureMasteryService();
 	if (ClearedChapter == 1)
 	{
 		MarkChapter1BossDefeated();
 	}
 	RecordQuestProgress(EQuestObjective::DefeatBoss, 1);
+	if (MasteryService)
+	{
+		MasteryService->AddXp(EMasteryTrack::Combat, 20);
+		RefreshPlayerCharacterStats();
+	}
 }
 
 void UIdleGameInstance::LoadLastSeenUnixSec()

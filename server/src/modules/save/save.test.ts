@@ -180,6 +180,8 @@ describe("SaveService", () => {
         transcendCount: 3,
         towerHighestFloor: 25,
         skillPoints: 12,
+        worldPower: 21,
+        masteryLevels: [1, 2, 3, 4, 5, 6],
         customClientField: "kept",
       },
     });
@@ -223,6 +225,16 @@ describe("SaveService", () => {
     expect(payloadSchema.properties.skillPoints).toEqual({
       type: "integer",
       minimum: 0,
+    });
+    expect(payloadSchema.properties.worldPower).toEqual({
+      type: "integer",
+      minimum: 0,
+    });
+    expect(payloadSchema.properties.masteryLevels).toEqual({
+      type: "array",
+      items: { type: "integer", minimum: 0 },
+      minItems: 0,
+      maxItems: 6,
     });
     expect(payloadSchema.additionalProperties).toBe(true);
   });

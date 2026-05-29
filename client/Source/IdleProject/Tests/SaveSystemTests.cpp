@@ -2,6 +2,8 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/MasteryFormula.h"
+#include "GameCore/MasteryService.h"
 #include "GameCore/CloudSaveMergePolicy.h"
 #include "GameCore/CloudSavePayloadMapper.h"
 #include "GameCore/PetLevelFormula.h"
@@ -67,7 +69,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V12"), SaveGame->SaveVersion, static_cast<int32>(12));
+	TestEqual(TEXT("SaveVersion starts at V13"), SaveGame->SaveVersion, static_cast<int32>(13));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -76,6 +78,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fresh save has no skill points"), SaveGame->SkillPoints, 0);
 	TestEqual(TEXT("Fresh save defaults to current season"), SaveGame->SeasonId, USeasonService::CurrentSeasonId);
 	TestEqual(TEXT("Fresh save has no season tokens"), SaveGame->SeasonTokens, 0);
+	TestEqual(TEXT("Fresh save has no mastery payload until capture"), SaveGame->Mastery.Num(), 0);
 
 	return true;
 }
@@ -137,7 +140,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V12"), CapturedSave->SaveVersion, static_cast<int32>(12));
+	TestEqual(TEXT("Captured save writes V13"), CapturedSave->SaveVersion, static_cast<int32>(13));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -222,15 +225,41 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V12"), CapturedSave->SaveVersion, static_cast<int32>(12));
+	TestEqual(TEXT("Capture after legacy migration writes V13"), CapturedSave->SaveVersion, static_cast<int32>(13));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
-	TestTrue(TEXT("Reapplying captured v11 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	TestTrue(TEXT("Reapplying captured v13 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V12 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V12 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V13 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V13 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemMasteryV12MigrationTest,
+	"IdleProject.GameCore.SaveSystem.MasteryV12Migration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemMasteryV12MigrationTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->SaveVersion = 12;
+	LegacySave->bHasSave = true;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave accepts v12 save without mastery"), GameInstance->ApplyFromSave(LegacySave));
+	const UMasteryService* Mastery = GameInstance->GetMasteryService();
+	TestNotNull(TEXT("Mastery service is created for migrated saves"), Mastery);
+	TestEqual(TEXT("Migrated combat mastery starts at zero"), Mastery ? Mastery->GetTrackTotalXp(EMasteryTrack::Combat) : -1, static_cast<int64>(0));
+	TestEqual(TEXT("Migrated world power starts at zero"), Mastery ? Mastery->GetWorldPower() : -1, static_cast<int64>(0));
+
+	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Capture after v12 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
+	TestEqual(TEXT("Migrated capture writes v13"), CapturedSave->SaveVersion, static_cast<int32>(13));
+	TestEqual(TEXT("Migrated capture writes all mastery tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	return true;
 }
@@ -724,6 +753,10 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->LastSeenUnixSec = 1234567890;
 	SourceSave->TowerHighestFloor = 42;
 	SourceSave->SkillPoints = 9;
+	FMasterySaveEntry MasteryEntry;
+	MasteryEntry.Track = static_cast<uint8>(EMasteryTrack::Combat);
+	MasteryEntry.TotalXp = 250;
+	SourceSave->Mastery.Add(MasteryEntry);
 	SourceSave->InventoryItems.Add(MakeSaveTestItem(TEXT("mythic_sword"), EItemSlot::Weapon, EItemRarity::Mythic, 100.0f, 0.0f, 0.0f));
 	SourceSave->EquippedSlotIndex.Add(EItemSlot::Weapon, 0);
 	SourceSave->SkillRanks.Add(TEXT("heavy_strike"), 4);
@@ -749,6 +782,8 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Payload includes transcend extension field"), PayloadJson.Contains(TEXT("\"transcendCount\":2")));
 	TestTrue(TEXT("Payload includes tower extension field"), PayloadJson.Contains(TEXT("\"towerHighestFloor\":42")));
 	TestTrue(TEXT("Payload includes skill point extension field"), PayloadJson.Contains(TEXT("\"skillPoints\":9")));
+	TestTrue(TEXT("Payload includes mastery world power"), PayloadJson.Contains(TEXT("\"worldPower\":2")));
+	TestTrue(TEXT("Payload includes mastery levels"), PayloadJson.Contains(TEXT("\"masteryLevels\":[2,0,0,0,0,0]")));
 
 	UIdleSaveGame* RestoredSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Cloud payload deserializes into local save"), FCloudSavePayloadMapper::PayloadJsonToSave(PayloadJson, *RestoredSave));
@@ -759,6 +794,9 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Transcend count round trips through cloud payload"), RestoredSave->TranscendCount, SourceSave->TranscendCount);
 	TestEqual(TEXT("Tower floor round trips through cloud payload"), RestoredSave->TowerHighestFloor, SourceSave->TowerHighestFloor);
 	TestEqual(TEXT("Skill points round trips through cloud payload"), RestoredSave->SkillPoints, SourceSave->SkillPoints);
+	TestEqual(TEXT("Mastery payload round trips through cloud payload"), RestoredSave->Mastery.Num(), 1);
+	TestEqual(TEXT("Mastery track round trips through cloud payload"), RestoredSave->Mastery.IsValidIndex(0) ? RestoredSave->Mastery[0].Track : 255, static_cast<uint8>(EMasteryTrack::Combat));
+	TestEqual(TEXT("Mastery xp round trips through cloud payload"), RestoredSave->Mastery.IsValidIndex(0) ? RestoredSave->Mastery[0].TotalXp : -1, static_cast<int64>(250));
 	TestEqual(TEXT("Inventory item round trips through cloud payload"), RestoredSave->InventoryItems.Num(), 1);
 	TestEqual(TEXT("Inventory item id survives cloud payload"), RestoredSave->InventoryItems[0].ItemId, FName(TEXT("mythic_sword")));
 	TestEqual(TEXT("Inventory display name survives cloud payload"), RestoredSave->InventoryItems[0].DisplayName.ToString(), FString(TEXT("mythic_sword")));

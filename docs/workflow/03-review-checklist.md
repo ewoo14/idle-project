@@ -461,3 +461,33 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   stage multipliers, weak-element mappings, or reward bonus constants.
 - [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
   band and keeps median inside the 5-10h target.
+
+## PR #72 Designer Checklist Addendum (Section 1)
+
+- [ ] Mastery HUD renders six localized rows in Combat, Equipment, Abyss, Rune,
+  Beast, Explore order with level, XP bar, `xpIntoLevel / xpToNext`, and current
+  bonus summary.
+- [ ] Header shows localized `MASTERY_PANEL_TITLE` and
+  `MASTERY_WORLD_POWER_FORMAT` beside the CP hierarchy without replacing CP.
+- [ ] HUD ViewModel uses `UMasteryService::GetTrackLevelInfo` for XP bar state
+  and existing BlueprintPure getters for World Power and global bonus summaries.
+- [ ] Panel uses only existing `docs/planning/ui-tokens.json` colors and remains
+  readable at 1080p, 1440p, and 4K with no hard-coded color additions.
+- [ ] ko/en `UI.csv` includes paired Mastery title, track, level, XP, bonus, and
+  tooltip keys covered by `IdleProject.Localization.CsvIntegrity`.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
+## PR #72 Balance Checklist Addendum (Section 5)
+
+- [ ] `docs/planning/mastery-v1-balance-note.md` documents the mastery XP curve,
+  cumulative XP anchors, and level 5/30/100 bonus anchors.
+- [ ] The level-100 all-track review point shows
+  `1 + 0.02 * ln(1 + 300) = 1.114...` core pressure and explains why this is
+  bounded long-tail growth rather than a replacement prestige multiplier.
+- [ ] The note states that mastery is not injected into the sampled
+  first-rebirth run until acquisition timing is modeled in `tools/balance-sim`.
+- [ ] The current 1000-run rebirth distribution remains documented as p10
+  4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h.
+- [ ] Inflation guardrails cover separate stacking from transcend, tower, and
+  achievement, plus the V1.5 deferral of per-track local bonuses.

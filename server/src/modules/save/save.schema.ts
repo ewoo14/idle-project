@@ -37,6 +37,13 @@ export const putSaveSchema = {
           transcendCount: { type: "integer", minimum: 0 },
           towerHighestFloor: { type: "integer", minimum: 0 },
           skillPoints: { type: "integer", minimum: 0 },
+          worldPower: { type: "integer", minimum: 0 },
+          masteryLevels: {
+            type: "array",
+            items: { type: "integer", minimum: 0 },
+            minItems: 0,
+            maxItems: 6,
+          },
         },
       },
     },

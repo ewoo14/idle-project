@@ -16,6 +16,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/MasteryService.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputAction.h"
@@ -180,7 +181,8 @@ void AIdleCharacter::RefreshDerivedStats()
 	const float TranscendMultiplier = IdleGameInstance ? IdleGameInstance->GetTranscendStatMultiplier() : 1.0f;
 	const float TowerMultiplier = IdleGameInstance ? IdleGameInstance->GetTowerMilestoneMultiplier() : 1.0f;
 	const float AchievementMultiplier = IdleGameInstance ? IdleGameInstance->GetAchievementStatMultiplier() : 1.0f;
-	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier;
+	const float MasteryCoreMultiplier = IdleGameInstance ? IdleGameInstance->GetMasteryCoreStatMultiplier() : 1.0f;
+	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier;
 	Derived.Hp *= StatMultiplier;
 	Derived.PhysAtk *= StatMultiplier;
 	Derived.MagicAtk *= StatMultiplier;
@@ -198,6 +200,10 @@ void AIdleCharacter::RefreshDerivedStats()
 			Derived.MagicDef *= RuneMultipliers.MagicDef + CodexCore;
 			Derived.Hp *= RuneMultipliers.Hp + CodexCore;
 			Derived.CritDmg += RuneService->GetEquippedUtilValues().CritDamage;
+		}
+		if (const UMasteryService* MasteryService = IdleGameInstance->GetMasteryService())
+		{
+			Derived.CritRate += MasteryService->GetGlobalBonus().CritRateAdd;
 		}
 
 		const FPetStatBonus PetStatBonus = IdleGameInstance->GetEquippedPetStatBonus();

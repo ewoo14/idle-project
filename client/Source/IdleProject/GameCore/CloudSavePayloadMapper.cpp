@@ -2,6 +2,7 @@
 
 #include "CharacterSystem/LevelFormulas.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/MasteryFormula.h"
 #include "ItemSystem/ItemTypes.h"
 #include "JsonObjectConverter.h"
 #include "Serialization/JsonReader.h"
@@ -27,6 +28,26 @@ int64 ComputeTotalExp(const UIdleSaveGame& SaveGame)
 	return FMath::Max<int64>(LevelFloor, LevelFloor + FMath::Max<int64>(0, SaveGame.CurrentExp));
 }
 
+TArray<int32> ComputeMasteryLevels(const UIdleSaveGame& SaveGame)
+{
+	TArray<int32> Levels;
+	Levels.Init(0, FMasteryFormula::TrackCount);
+	for (const FMasterySaveEntry& Entry : SaveGame.Mastery)
+	{
+		if (Entry.Track >= FMasteryFormula::TrackCount)
+		{
+			continue;
+		}
+
+		int32 Level = 0;
+		int64 Into = 0;
+		int64 Need = 0;
+		FMasteryFormula::LevelFromTotalXp(Entry.TotalXp, Level, Into, Need);
+		Levels[Entry.Track] = Level;
+	}
+	return Levels;
+}
+
 bool DeserializePayload(const FString& PayloadJson, TSharedPtr<FJsonObject>& OutPayload)
 {
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(PayloadJson);
@@ -46,6 +67,18 @@ bool FCloudSavePayloadMapper::SaveToPayloadJson(const UIdleSaveGame& SaveGame, F
 	Payload->SetNumberField(TEXT("transcendCount"), FMath::Max(0, SaveGame.TranscendCount));
 	Payload->SetNumberField(TEXT("towerHighestFloor"), FMath::Max(0, SaveGame.TowerHighestFloor));
 	Payload->SetNumberField(TEXT("skillPoints"), FMath::Max(0, SaveGame.SkillPoints));
+	const TArray<int32> MasteryLevels = ComputeMasteryLevels(SaveGame);
+	int64 WorldPower = 0;
+	TArray<TSharedPtr<FJsonValue>> MasteryLevelValues;
+	MasteryLevelValues.Reserve(MasteryLevels.Num());
+	for (const int32 Level : MasteryLevels)
+	{
+		const int32 SafeLevel = FMath::Max(0, Level);
+		WorldPower += SafeLevel;
+		MasteryLevelValues.Add(MakeShared<FJsonValueNumber>(SafeLevel));
+	}
+	Payload->SetNumberField(TEXT("worldPower"), static_cast<double>(WorldPower));
+	Payload->SetArrayField(TEXT("masteryLevels"), MasteryLevelValues);
 
 	TSharedRef<FJsonObject> FullSave = MakeShared<FJsonObject>();
 	if (!FJsonObjectConverter::UStructToJsonObject(UIdleSaveGame::StaticClass(), &SaveGame, FullSave))
