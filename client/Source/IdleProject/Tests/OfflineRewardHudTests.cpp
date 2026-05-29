@@ -2,6 +2,8 @@
 
 #include "GameCore/QuestService.h"
 #include "GameCore/DungeonService.h"
+#include "GameCore/MasteryFormula.h"
+#include "GameCore/MasteryService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
@@ -27,6 +29,38 @@ FItemInstance MakeHudTestItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity, 
 	Item.EnhanceLevel = EnhanceLevel;
 	return Item;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryHudLocalBonusViewModelTest,
+	"IdleProject.UI.HUD.MasteryPanelLocalBonusViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMasteryHudLocalBonusViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UMasteryService* MasteryService = NewObject<UMasteryService>();
+	MasteryService->Initialize();
+	MasteryService->AddXp(EMasteryTrack::Combat, FMasteryFormula::XpToNext(0));
+	MasteryService->AddXp(EMasteryTrack::Equipment, FMasteryFormula::XpToNext(0));
+	MasteryService->AddXp(EMasteryTrack::Abyss, FMasteryFormula::XpToNext(0));
+	MasteryService->AddXp(EMasteryTrack::Rune, FMasteryFormula::XpToNext(0));
+	MasteryService->AddXp(EMasteryTrack::Beast, FMasteryFormula::XpToNext(0));
+	MasteryService->AddXp(EMasteryTrack::Explore, FMasteryFormula::XpToNext(0));
+
+	const FIdleHUDMasteryPanelViewModel ViewModel = IdleProject::UI::BuildMasteryPanelViewModel(*MasteryService);
+	TestEqual(TEXT("Mastery panel title uses approved English copy"), ViewModel.Title.ToString(), FString(TEXT("Mastery")));
+	TestEqual(TEXT("Mastery panel exposes six track rows"), ViewModel.Rows.Num(), FMasteryFormula::TrackCount);
+	TestEqual(TEXT("Combat local bonus label names kill rewards"), ViewModel.Rows[0].LocalBonusLabel.ToString(), FString(TEXT("Local Bonus: Kill Reward +1%")));
+	TestEqual(TEXT("Equipment local bonus label names cost reduction"), ViewModel.Rows[1].LocalBonusLabel.ToString(), FString(TEXT("Local Bonus: Enhance Cost -1%")));
+	TestEqual(TEXT("Rune local bonus label names rune core"), ViewModel.Rows[3].LocalBonusLabel.ToString(), FString(TEXT("Local Bonus: Rune Core +1%")));
+	TestEqual(TEXT("Combat tooltip explains local effect"), ViewModel.Rows[0].TooltipLabel.ToString(), FString(TEXT("Increases gold and EXP from kills.")));
+	TestEqual(TEXT("Equipment tooltip explains local effect"), ViewModel.Rows[1].TooltipLabel.ToString(), FString(TEXT("Reduces enhancement gold cost.")));
+	TestEqual(TEXT("Combat local bonus comes from service getter"), ViewModel.Rows[0].LocalBonusPercent, FMath::RoundToInt(MasteryService->GetLocalBonus(EMasteryTrack::Combat) * 100.0f));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

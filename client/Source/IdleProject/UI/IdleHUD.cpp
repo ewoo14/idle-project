@@ -15,6 +15,7 @@
 #include "GameCore/ConsumableFormula.h"
 #include "GameCore/DungeonFormula.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
@@ -249,6 +250,82 @@ const TCHAR* ConsumableEffectKey(EConsumableType Type)
 		return TEXT("CONSUMABLE_WISDOM_BOOSTER_EFFECT");
 	default:
 		return TEXT("NONE_DASH");
+	}
+}
+
+const EMasteryTrack* GetMasteryTrackDisplayOrder()
+{
+	static const EMasteryTrack Order[] = {
+		EMasteryTrack::Combat,
+		EMasteryTrack::Equipment,
+		EMasteryTrack::Abyss,
+		EMasteryTrack::Rune,
+		EMasteryTrack::Beast,
+		EMasteryTrack::Explore,
+	};
+	return Order;
+}
+
+const TCHAR* MasteryTrackToLocalizationKey(EMasteryTrack Track)
+{
+	switch (Track)
+	{
+	case EMasteryTrack::Combat:
+		return TEXT("MASTERY_TRACK_COMBAT");
+	case EMasteryTrack::Equipment:
+		return TEXT("MASTERY_TRACK_EQUIPMENT");
+	case EMasteryTrack::Abyss:
+		return TEXT("MASTERY_TRACK_ABYSS");
+	case EMasteryTrack::Rune:
+		return TEXT("MASTERY_TRACK_RUNE");
+	case EMasteryTrack::Beast:
+		return TEXT("MASTERY_TRACK_BEAST");
+	case EMasteryTrack::Explore:
+		return TEXT("MASTERY_TRACK_EXPLORE");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+const TCHAR* MasteryLocalBonusFormatKey(EMasteryTrack Track)
+{
+	switch (Track)
+	{
+	case EMasteryTrack::Combat:
+		return TEXT("MASTERY_LOCAL_BONUS_COMBAT_FORMAT");
+	case EMasteryTrack::Equipment:
+		return TEXT("MASTERY_LOCAL_BONUS_EQUIPMENT_FORMAT");
+	case EMasteryTrack::Abyss:
+		return TEXT("MASTERY_LOCAL_BONUS_ABYSS_FORMAT");
+	case EMasteryTrack::Rune:
+		return TEXT("MASTERY_LOCAL_BONUS_RUNE_FORMAT");
+	case EMasteryTrack::Beast:
+		return TEXT("MASTERY_LOCAL_BONUS_BEAST_FORMAT");
+	case EMasteryTrack::Explore:
+		return TEXT("MASTERY_LOCAL_BONUS_EXPLORE_FORMAT");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
+const TCHAR* MasteryLocalBonusTooltipKey(EMasteryTrack Track)
+{
+	switch (Track)
+	{
+	case EMasteryTrack::Combat:
+		return TEXT("MASTERY_LOCAL_BONUS_COMBAT_TOOLTIP");
+	case EMasteryTrack::Equipment:
+		return TEXT("MASTERY_LOCAL_BONUS_EQUIPMENT_TOOLTIP");
+	case EMasteryTrack::Abyss:
+		return TEXT("MASTERY_LOCAL_BONUS_ABYSS_TOOLTIP");
+	case EMasteryTrack::Rune:
+		return TEXT("MASTERY_LOCAL_BONUS_RUNE_TOOLTIP");
+	case EMasteryTrack::Beast:
+		return TEXT("MASTERY_LOCAL_BONUS_BEAST_TOOLTIP");
+	case EMasteryTrack::Explore:
+		return TEXT("MASTERY_LOCAL_BONUS_EXPLORE_TOOLTIP");
+	default:
+		return TEXT("MASTERY_TOOLTIP_LOCKED");
 	}
 }
 
@@ -2446,6 +2523,53 @@ FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UA
 	return ViewModel;
 }
 
+FIdleHUDMasteryPanelViewModel IdleProject::UI::BuildMasteryPanelViewModel(const UMasteryService& MasteryService)
+{
+	FIdleHUDMasteryPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("MASTERY_PANEL_TITLE"));
+	ViewModel.WorldPowerLabel = FormatLocalizedUIWithInt64(TEXT("MASTERY_WORLD_POWER_FORMAT"), TEXT("Amount"), MasteryService.GetWorldPower());
+	ViewModel.Rows.Reserve(FMasteryFormula::TrackCount);
+
+	const EMasteryTrack* Tracks = GetMasteryTrackDisplayOrder();
+	for (int32 Index = 0; Index < FMasteryFormula::TrackCount; ++Index)
+	{
+		const EMasteryTrack Track = Tracks[Index];
+		const FMasteryLevelInfo Info = MasteryService.GetTrackLevelInfo(Track);
+		const float LocalBonus = MasteryService.GetLocalBonus(Track);
+		const int32 LocalBonusPercent = FMath::RoundToInt(FMath::Max(0.0f, LocalBonus) * 100.0f);
+		const float ProgressRatio = Info.XpToNext > 0
+			? FMath::Clamp(static_cast<float>(Info.XpIntoLevel) / static_cast<float>(Info.XpToNext), 0.0f, 1.0f)
+			: 0.0f;
+
+		FIdleHUDMasteryTrackRowViewModel Row;
+		Row.Track = Track;
+		Row.TrackLabel = IdleProject::Localization::UI(MasteryTrackToLocalizationKey(Track));
+		Row.LevelLabel = FormatLocalizedUI(TEXT("MASTERY_TRACK_LEVEL_FORMAT"), [&Info](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(Info.Level));
+		});
+		Row.XpLabel = FormatLocalizedUI(TEXT("MASTERY_TRACK_XP_FORMAT"), [&Info](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Current"), FText::FromString(FormatIntegerWithCommas(Info.XpIntoLevel)));
+			Args.Add(TEXT("Next"), FText::FromString(FormatIntegerWithCommas(Info.XpToNext)));
+		});
+		Row.ProgressLabel = FormatLocalizedUI(TEXT("MASTERY_TRACK_PROGRESS_FORMAT"), [ProgressRatio](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::AsNumber(FMath::RoundToInt(ProgressRatio * 100.0f)));
+		});
+		Row.LocalBonusLabel = FormatLocalizedUI(MasteryLocalBonusFormatKey(Track), [LocalBonusPercent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Percent"), FText::AsNumber(LocalBonusPercent));
+		});
+		Row.TooltipLabel = IdleProject::Localization::UI(MasteryLocalBonusTooltipKey(Track));
+		Row.ProgressRatio = ProgressRatio;
+		Row.LocalBonusPercent = LocalBonusPercent;
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FText IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier)
 {
 	const FAchievementDefinition* Definition = FindAchievementDefinitionById(AchievementId);
@@ -2975,6 +3099,7 @@ void AIdleHUD::DrawHUD()
 	DrawTowerPanel();
 	DrawDungeonPanel();
 	DrawAchievementPanel();
+	DrawMasteryPanel();
 	DrawStatAllocationPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
@@ -5904,6 +6029,61 @@ void AIdleHUD::DrawAchievementPanel()
 	if (bShowFeedback)
 	{
 		DrawText(AchievementFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, RowY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	}
+}
+
+void AIdleHUD::DrawMasteryPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UMasteryService* MasteryService = IdleGameInstance ? IdleGameInstance->GetMasteryService() : nullptr;
+	if (!MasteryService)
+	{
+		return;
+	}
+
+	const FIdleHUDMasteryPanelViewModel ViewModel = BuildMasteryPanelViewModel(*MasteryService);
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	const float RowHeight = 42.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const float PanelHeight = 72.0f * Scale + ViewModel.Rows.Num() * RowHeight + Padding;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 454.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.WorldPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 44.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+
+	float RowY = Y + 70.0f * Scale;
+	for (const FIdleHUDMasteryTrackRowViewModel& Row : ViewModel.Rows)
+	{
+		const float RowX = X + Padding;
+		const float RowWidth = PanelWidth - Padding * 2.0f;
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), RowX, RowY, RowWidth, RowHeight - 5.0f * Scale);
+		DrawRect(Theme::AccentBlue.CopyWithNewOpacity(0.52f), RowX, RowY + RowHeight - 10.0f * Scale, RowWidth, 4.0f * Scale);
+		DrawRect(Theme::AccentGold, RowX, RowY + RowHeight - 10.0f * Scale, RowWidth * Row.ProgressRatio, 4.0f * Scale);
+
+		DrawText(Row.TrackLabel.ToString(), Theme::TextPrimary, RowX + 8.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+		DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, RowX + 78.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+		DrawText(Row.LocalBonusLabel.ToString(), Theme::AccentGold, RowX + 132.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+		DrawText(Row.XpLabel.ToString(), Theme::TextMuted, RowX + 8.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+		DrawText(Row.TooltipLabel.ToString(), Theme::TextMuted, RowX + 132.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		RowY += RowHeight;
 	}
 }
 

@@ -6,6 +6,7 @@
 #include "GameFramework/HUD.h"
 #include "GameCore/DungeonTypes.h"
 #include "GameCore/IdleGameInstance.h"
+#include "GameCore/MasteryTypes.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -22,6 +23,7 @@ class AIdleCharacter;
 class AIdleMonster;
 class UBattleAIComponent;
 class UInventoryComponent;
+class UMasteryService;
 class URuneService;
 class USkillComponent;
 class SIdleHUDWidget;
@@ -618,6 +620,26 @@ struct IDLEPROJECT_API FIdleHUDAchievementViewModel
 	TArray<FIdleHUDAchievementRowViewModel> Rows;
 };
 
+struct IDLEPROJECT_API FIdleHUDMasteryTrackRowViewModel
+{
+	EMasteryTrack Track = EMasteryTrack::Combat;
+	FText TrackLabel;
+	FText LevelLabel;
+	FText XpLabel;
+	FText ProgressLabel;
+	FText LocalBonusLabel;
+	FText TooltipLabel;
+	float ProgressRatio = 0.0f;
+	int32 LocalBonusPercent = 0;
+};
+
+struct IDLEPROJECT_API FIdleHUDMasteryPanelViewModel
+{
+	FText Title;
+	FText WorldPowerLabel;
+	TArray<FIdleHUDMasteryTrackRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -653,6 +675,7 @@ IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, i
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
 IDLEPROJECT_API FIdleHUDDungeonPanelViewModel BuildDungeonPanelViewModel(const UDungeonService& DungeonService, int64 CombatPower, const FString& TodayUtc);
 IDLEPROJECT_API FIdleHUDAchievementViewModel BuildAchievementViewModel(const UAchievementService& AchievementService);
+IDLEPROJECT_API FIdleHUDMasteryPanelViewModel BuildMasteryPanelViewModel(const UMasteryService& MasteryService);
 IDLEPROJECT_API FText BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
 IDLEPROJECT_API FIdleHUDCloudSyncViewModel BuildCloudSyncViewModel(ECloudSyncState State);
@@ -804,6 +827,7 @@ private:
 	void DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, float Y, float Width, float Height);
 	void TryRunDungeonFromHitBox(FName BoxName);
 	void DrawAchievementPanel();
+	void DrawMasteryPanel();
 	void DrawPetPanel();
 	void DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipPetFromHitBox(FName BoxName);
