@@ -18,6 +18,15 @@ type MasteryParityAnchor = {
   localBonus: number;
 };
 
+const masteryTracks = [
+  { id: 0, name: "Combat" },
+  { id: 1, name: "Equipment" },
+  { id: 2, name: "Abyss" },
+  { id: 3, name: "Rune" },
+  { id: 4, name: "Beast" },
+  { id: 5, name: "Explore" },
+];
+
 const anchors: MasteryParityAnchor[] = [
   {
     level: 0,
@@ -81,8 +90,30 @@ describe("mastery formula parity with FMasteryFormula", () => {
     expect(dropRateAdd(level)).toBe(expectedDrop);
     expect(goldFindPct(level)).toBe(expectedGold);
     expect(expBoostPct(level)).toBe(expectedExp);
-    for (const track of [0, 1, 2, 3, 4, 5]) {
+    for (const { id: track } of masteryTracks) {
       expect(localBonus(track, level)).toBe(expectedLocal);
     }
+  });
+
+  it.each(
+    masteryTracks,
+  )("keeps $name local bonus aligned with FMasteryFormula at level 0/1/30/100", ({
+    id: track,
+  }) => {
+    for (const { level, localBonus: expectedLocal } of anchors.filter(
+      (anchor) => [0, 1, 30, 100].includes(anchor.level),
+    )) {
+      expect(localBonus(track, level)).toBe(expectedLocal);
+      expect(localBonus(track, level)).toBe(
+        Math.fround(0.01 * Math.log(1 + Math.max(0, level))),
+      );
+    }
+  });
+
+  it("caps Equipment local cost reduction at 0.50 with fround raw input", () => {
+    expect(localBonus(1, 1e30)).toBe(0.5);
+    expect(localBonus(1, 1e30)).toBe(
+      Math.min(0.5, Math.fround(0.01 * Math.log(1 + 1e30))),
+    );
   });
 });
