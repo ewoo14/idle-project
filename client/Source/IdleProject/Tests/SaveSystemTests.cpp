@@ -2,6 +2,8 @@
 
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
+#include "GameCore/BuffService.h"
+#include "GameCore/ConsumableTypes.h"
 #include "GameCore/MasteryFormula.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/CloudSaveMergePolicy.h"
@@ -69,7 +71,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V13"), SaveGame->SaveVersion, static_cast<int32>(13));
+	TestEqual(TEXT("SaveVersion starts at V14"), SaveGame->SaveVersion, static_cast<int32>(14));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -79,6 +81,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fresh save defaults to current season"), SaveGame->SeasonId, USeasonService::CurrentSeasonId);
 	TestEqual(TEXT("Fresh save has no season tokens"), SaveGame->SeasonTokens, 0);
 	TestEqual(TEXT("Fresh save has no mastery payload until capture"), SaveGame->Mastery.Num(), 0);
+	TestEqual(TEXT("Fresh save has no consumable payload until capture"), SaveGame->Consumables.Num(), 0);
 
 	return true;
 }
@@ -126,6 +129,11 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->SeasonId = USeasonService::CurrentSeasonId;
 	SourceSave->SeasonTokens = 50;
 	SourceSave->SeasonClaimedTiers.Add(1);
+	FConsumableSaveEntry ConsumableEntry;
+	ConsumableEntry.Type = static_cast<uint8>(EConsumableType::GoldFeast);
+	ConsumableEntry.Count = 3;
+	ConsumableEntry.BuffEndUnixSec = 1234569000;
+	SourceSave->Consumables.Add(ConsumableEntry);
 
 	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
 	TestNotNull(TEXT("Game instance is created"), GameInstance);
@@ -140,7 +148,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V13"), CapturedSave->SaveVersion, static_cast<int32>(13));
+	TestEqual(TEXT("Captured save writes V14"), CapturedSave->SaveVersion, static_cast<int32>(14));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -176,6 +184,10 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Captured quest claimed flag round trips"), CapturedQuest ? CapturedQuest->bClaimed : false);
 	TestEqual(TEXT("Season tokens round trip through game instance"), CapturedSave->SeasonTokens, SourceSave->SeasonTokens);
 	TestTrue(TEXT("Season claimed tier round trips through game instance"), CapturedSave->SeasonClaimedTiers.Contains(1));
+	TestEqual(TEXT("Consumable payload round trips"), CapturedSave->Consumables.Num(), 1);
+	TestEqual(TEXT("Consumable type round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Type : 255, static_cast<uint8>(EConsumableType::GoldFeast));
+	TestEqual(TEXT("Consumable count round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Count : -1, 3);
+	TestEqual(TEXT("Consumable buff end round trips"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].BuffEndUnixSec : -1, static_cast<int64>(1234569000));
 
 	const UStageService* StageService = GameInstance->GetStageService();
 	TestNotNull(TEXT("ApplyFromSave ensures stage service"), StageService);
@@ -225,15 +237,15 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V13"), CapturedSave->SaveVersion, static_cast<int32>(13));
+	TestEqual(TEXT("Capture after legacy migration writes V14"), CapturedSave->SaveVersion, static_cast<int32>(14));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
 	UIdleGameInstance* ReappliedGameInstance = NewObject<UIdleGameInstance>();
-	TestTrue(TEXT("Reapplying captured v13 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
+	TestTrue(TEXT("Reapplying captured v14 save succeeds"), ReappliedGameInstance->ApplyFromSave(CapturedSave));
 	const UStageService* ReappliedStageService = ReappliedGameInstance->GetStageService();
-	TestEqual(TEXT("V13 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
-	TestEqual(TEXT("V13 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
+	TestEqual(TEXT("V14 reapply does not migrate stage twice"), ReappliedStageService ? ReappliedStageService->GetCurrentStage() : INDEX_NONE, 5);
+	TestEqual(TEXT("V14 reapply keeps highest cleared chapter"), ReappliedStageService ? ReappliedStageService->GetHighestClearedChapter() : INDEX_NONE, 1);
 
 	return true;
 }
@@ -258,8 +270,32 @@ bool FIdleSaveSystemMasteryV12MigrationTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v12 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated capture writes v13"), CapturedSave->SaveVersion, static_cast<int32>(13));
+	TestEqual(TEXT("Migrated capture writes v14"), CapturedSave->SaveVersion, static_cast<int32>(14));
 	TestEqual(TEXT("Migrated capture writes all mastery tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FIdleSaveSystemConsumableV13MigrationTest,
+	"IdleProject.GameCore.SaveSystem.ConsumableV13Migration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FIdleSaveSystemConsumableV13MigrationTest::RunTest(const FString& Parameters)
+{
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->SaveVersion = 13;
+	LegacySave->bHasSave = true;
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("ApplyFromSave accepts v13 save without consumables"), GameInstance->ApplyFromSave(LegacySave));
+	TestNotNull(TEXT("Buff service is created for migrated saves"), GameInstance->GetBuffService());
+	TestEqual(TEXT("Migrated attack tonic stock starts at zero"), GameInstance->GetBuffService() ? GameInstance->GetBuffService()->GetCount(EConsumableType::AttackTonic) : -1, 0);
+
+	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
+	TestTrue(TEXT("Capture after v13 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
+	TestEqual(TEXT("Migrated consumable capture writes v14"), CapturedSave->SaveVersion, static_cast<int32>(14));
+	TestEqual(TEXT("Migrated capture has no consumable stock"), CapturedSave->Consumables.Num(), 0);
 
 	return true;
 }
@@ -774,6 +810,11 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->SeasonId = USeasonService::CurrentSeasonId;
 	SourceSave->SeasonTokens = 25;
 	SourceSave->SeasonClaimedTiers.Add(1);
+	FConsumableSaveEntry ConsumableEntry;
+	ConsumableEntry.Type = static_cast<uint8>(EConsumableType::WisdomBooster);
+	ConsumableEntry.Count = 4;
+	ConsumableEntry.BuffEndUnixSec = 1234569999;
+	SourceSave->Consumables.Add(ConsumableEntry);
 
 	FString PayloadJson;
 	TestTrue(TEXT("Cloud payload serializes populated local save"), FCloudSavePayloadMapper::SaveToPayloadJson(*SourceSave, PayloadJson));
@@ -784,6 +825,7 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Payload includes skill point extension field"), PayloadJson.Contains(TEXT("\"skillPoints\":9")));
 	TestTrue(TEXT("Payload includes mastery world power"), PayloadJson.Contains(TEXT("\"worldPower\":2")));
 	TestTrue(TEXT("Payload includes mastery levels"), PayloadJson.Contains(TEXT("\"masteryLevels\":[2,0,0,0,0,0]")));
+	TestTrue(TEXT("Payload includes consumables in full save"), PayloadJson.Contains(TEXT("\"Consumables\"")));
 
 	UIdleSaveGame* RestoredSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Cloud payload deserializes into local save"), FCloudSavePayloadMapper::PayloadJsonToSave(PayloadJson, *RestoredSave));
@@ -809,6 +851,9 @@ bool FIdleCloudSavePayloadMapperRoundTripTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("Quest id survives cloud payload"), RestoredSave->Quests[0].QuestId, FString(TEXT("main_ch1_001")));
 	TestEqual(TEXT("Quest reset date survives cloud payload"), RestoredSave->QuestDailyResetDate, FString(TEXT("2026-05-27")));
 	TestEqual(TEXT("Season tokens survive cloud payload"), RestoredSave->SeasonTokens, static_cast<int32>(25));
+	TestEqual(TEXT("Consumable payload survives cloud payload"), RestoredSave->Consumables.Num(), 1);
+	TestEqual(TEXT("Consumable type survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Type : 255, static_cast<uint8>(EConsumableType::WisdomBooster));
+	TestEqual(TEXT("Consumable count survives cloud payload"), RestoredSave->Consumables.IsValidIndex(0) ? RestoredSave->Consumables[0].Count : -1, 4);
 	TestTrue(TEXT("Season claimed tiers survive cloud payload"), RestoredSave->SeasonClaimedTiers.Contains(1));
 
 	FCloudSaveProgressSnapshot Snapshot;

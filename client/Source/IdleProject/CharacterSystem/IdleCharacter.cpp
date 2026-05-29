@@ -15,6 +15,7 @@
 #include "CombatSystem/SkillComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "GameCore/BuffService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/MasteryService.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -190,6 +191,18 @@ void AIdleCharacter::RefreshDerivedStats()
 	Derived.MagicDef *= StatMultiplier;
 	if (IdleGameInstance)
 	{
+		if (const UBuffService* BuffService = IdleGameInstance->GetBuffService())
+		{
+			const int64 NowUnixSec = UIdleGameInstance::GetCurrentUnixSeconds();
+			const float AttackMultiplier = BuffService->GetBuffStatMultiplier(EConsumableType::AttackTonic, NowUnixSec);
+			const float GuardMultiplier = BuffService->GetBuffStatMultiplier(EConsumableType::GuardTonic, NowUnixSec);
+			const float AllStatMultiplier = BuffService->GetBuffStatMultiplier(EConsumableType::AllStatElixir, NowUnixSec);
+			Derived.PhysAtk *= AttackMultiplier * AllStatMultiplier;
+			Derived.MagicAtk *= AttackMultiplier * AllStatMultiplier;
+			Derived.Hp *= GuardMultiplier * AllStatMultiplier;
+			Derived.PhysDef *= GuardMultiplier * AllStatMultiplier;
+			Derived.MagicDef *= GuardMultiplier * AllStatMultiplier;
+		}
 		if (const URuneService* RuneService = IdleGameInstance->GetRuneService())
 		{
 			const FRuneCoreMultipliers RuneMultipliers = RuneService->GetEquippedCoreMultipliers();

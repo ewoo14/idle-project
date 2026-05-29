@@ -275,6 +275,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   equipment affix/set bonuses, enhancement, rebirth bonus points, and
   transcend multiplier.
 
+## PR #73 Character Checklist Addendum (Section 4)
+
+- [ ] Consumable type ids stay fixed: AttackTonic=0, GuardTonic=1,
+  AllStatElixir=2, FortuneScroll=3, GoldFeast=4, WisdomBooster=5.
+- [ ] Buff percentages and 1800s duration match C++ `FConsumableFormula` and
+  server `consumable.ts` (`Math.fround` anchors).
+- [ ] Stat buffs are applied only inside `RefreshDerivedStats`; gold, EXP, and
+  drop buffs each have one economy application point.
+- [ ] `SaveVersion=14` preserves counts and buff end timestamps, while v13
+  saves migrate to empty consumable state.
+- [ ] Rebirth and transcend do not reset consumable inventory or active buff
+  timestamps in V1.
+
 ## PR #57 Character Checklist Addendum (Section 4)
 
 - [ ] `EClassId` preserves existing numeric values for None and the first five
@@ -475,6 +488,23 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   readable at 1080p, 1440p, and 4K with no hard-coded color additions.
 - [ ] ko/en `UI.csv` includes paired Mastery title, track, level, XP, bonus, and
   tooltip keys covered by `IdleProject.Localization.CsvIntegrity`.
+- [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
+  this PR adds no binary art assets.
+
+## PR #73 Designer Checklist Addendum (Section 1)
+
+- [ ] Consumables HUD renders six localized rows in AttackTonic, GuardTonic,
+  AllStatElixir, FortuneScroll, GoldFeast, WisdomBooster order with name,
+  effect, owned count, use action, and active countdown.
+- [ ] Active buff bar shows localized buff name and `GetBuffRemainingSec`
+  countdown without replacing stat/economy getter ownership.
+- [ ] HUD ViewModel uses `UBuffService::GetCount`, `IsBuffActive`, and
+  `GetBuffRemainingSec`; use hitboxes call `UIdleGameInstance::TryUseConsumable`.
+- [ ] Panel uses only existing `docs/planning/ui-tokens.json` colors and remains
+  readable at 1080p, 1440p, and 4K with no new color token.
+- [ ] ko/en `UI.csv` includes paired consumable names, effect labels, active
+  buff labels, count format, and use action covered by
+  `IdleProject.Localization.CsvIntegrity`.
 - [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
   this PR adds no binary art assets.
 

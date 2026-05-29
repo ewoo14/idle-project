@@ -1936,3 +1936,48 @@ Guardrails:
 - Re-run `cd server; npm run test -- mastery` after changing mastery constants,
   and re-run `cd server; npm run balance:sim` if mastery enters the sampled
   first-rebirth model.
+
+---
+
+## PR #73 Consumables V1 Balance Review
+
+PR #73 adds six consumable items with 30-minute timed buffs. The detailed review
+artifact is `docs/planning/consumables-v1-balance-note.md`.
+
+Formula anchors:
+
+- AttackTonic: PhysAtk and MagicAtk +30% for 1800s.
+- GuardTonic: HP, PhysDef, and MagicDef +30% for 1800s.
+- AllStatElixir: core stats +20% for 1800s.
+- FortuneScroll: DropRateAdd +30 percentage points for 1800s.
+- GoldFeast: gold gain +50% for 1800s.
+- WisdomBooster: EXP gain +50% for 1800s.
+
+Consumables are temporary pressure, not permanent growth. Stat buffs enter once
+after the existing permanent progression multipliers, while economy buffs each
+own one application lane: gold, EXP, or drop. Same-type reuse refreshes duration
+instead of stacking another multiplier.
+
+Shop acquisition uses the PR #38 gear-roll cost curve through
+`GetGearRollCost(GlobalStageIndex)`, currently
+`round(300 * computeRewardMultiplier(GlobalStageIndex))`. This keeps the V1
+shop price tied to existing stage progression instead of introducing a separate
+consumable economy curve.
+
+The current 1000-run first-rebirth simulator output is unchanged because
+consumable acquisition and usage cadence are not injected into the sampled run
+yet: p10 4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h. Median
+remains inside the 5-10h target and every sampled run remains inside the 3-20h
+review band.
+
+Guardrails:
+
+- Do not tune first-rebirth pacing from consumables until stock acquisition,
+  price pressure, and expected uptime are modeled in `tools/balance-sim`.
+- Keep AllStatElixir below the single-lane stat tonics because it touches more
+  derived lanes.
+- Keep GoldFeast, WisdomBooster, and FortuneScroll on one economy application
+  path each to avoid double counting with mastery, runes, pets, and
+  achievements.
+- Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
+  after changing consumable values, duration, acquisition, or shop pricing.

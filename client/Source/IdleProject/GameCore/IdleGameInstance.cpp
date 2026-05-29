@@ -3,8 +3,10 @@
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/LevelFormulas.h"
 #include "CombatSystem/SkillComponent.h"
+#include "GameCore/BuffService.h"
 #include "GameCore/CloudSaveMergePolicy.h"
 #include "GameCore/CloudSavePayloadMapper.h"
+#include "GameCore/ConsumableFormula.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
@@ -112,6 +114,7 @@ void UIdleGameInstance::Init()
 	EnsureRuneService();
 	EnsureAchievementService();
 	EnsureMasteryService();
+	EnsureBuffService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
@@ -142,6 +145,7 @@ void UIdleGameInstance::Shutdown()
 	RuneService = nullptr;
 	AchievementService = nullptr;
 	MasteryService = nullptr;
+	BuffService = nullptr;
 	Super::Shutdown();
 }
 
@@ -159,14 +163,6 @@ void UIdleGameInstance::AddGold(int64 Amount)
 		return;
 	}
 
-	if (Amount > 0 && Gold > MAX_int64 - Amount)
-	{
-		Gold = MAX_int64;
-		RecordAchievementMetric(EAchievementMetric::GoldEarned, Amount);
-		OnGoldChanged.Broadcast(Gold);
-		RequestAutosave();
-		return;
-	}
 	if (Amount < 0 && (Amount == MIN_int64 || Gold < -Amount))
 	{
 		RecordAchievementMetric(EAchievementMetric::GoldSpent, Gold);
@@ -177,10 +173,26 @@ void UIdleGameInstance::AddGold(int64 Amount)
 		return;
 	}
 
-	Gold = Gold + Amount;
+	int64 EffectiveAmount = Amount;
 	if (Amount > 0)
 	{
-		RecordAchievementMetric(EAchievementMetric::GoldEarned, Amount);
+		EnsureBuffService();
+		const double GoldMultiplier = 1.0 + static_cast<double>(BuffService ? BuffService->GetGoldBuffPct(GetCurrentUnixSeconds()) : 0.0f);
+		EffectiveAmount = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * GoldMultiplier));
+		if (Gold > MAX_int64 - EffectiveAmount)
+		{
+			Gold = MAX_int64;
+			RecordAchievementMetric(EAchievementMetric::GoldEarned, EffectiveAmount);
+			OnGoldChanged.Broadcast(Gold);
+			RequestAutosave();
+			return;
+		}
+	}
+
+	Gold = Gold + EffectiveAmount;
+	if (Amount > 0)
+	{
+		RecordAchievementMetric(EAchievementMetric::GoldEarned, EffectiveAmount);
 	}
 	else if (Amount < 0)
 	{
@@ -375,8 +387,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 	EnsureMasteryService();
+	EnsureBuffService();
 
-	SaveGame->SaveVersion = 13;
+	SaveGame->SaveVersion = 14;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -472,6 +485,11 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (MasteryService)
 	{
 		SaveGame->Mastery = MasteryService->ExportSave();
+	}
+
+	if (BuffService)
+	{
+		SaveGame->Consumables = BuffService->ExportSave();
 	}
 
 	return true;
@@ -580,6 +598,12 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	if (MasteryService)
 	{
 		MasteryService->ImportSave(SaveGame->SaveVersion >= 13 ? SaveGame->Mastery : TArray<FMasterySaveEntry>());
+	}
+
+	EnsureBuffService();
+	if (BuffService)
+	{
+		BuffService->ImportSave(SaveGame->SaveVersion >= 14 ? SaveGame->Consumables : TArray<FConsumableSaveEntry>());
 	}
 
 	if (SaveGame->SaveVersion >= 2)
@@ -956,6 +980,52 @@ bool UIdleGameInstance::TryBuyRankCube()
 	return TryBuyShopResource(FShopFormula::GetRankCubeCost(GlobalStageIndex), RankCubes);
 }
 
+void UIdleGameInstance::AddConsumable(EConsumableType Type, int32 Amount)
+{
+	EnsureBuffService();
+	if (!BuffService)
+	{
+		return;
+	}
+
+	BuffService->AddConsumable(Type, Amount);
+	RequestAutosave();
+}
+
+bool UIdleGameInstance::TryUseConsumable(EConsumableType Type)
+{
+	EnsureBuffService();
+	if (!BuffService || !BuffService->UseConsumable(Type, GetCurrentUnixSeconds()))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryBuyConsumable(EConsumableType Type)
+{
+	EnsureBuffService();
+	if (!BuffService || !FConsumableFormula::IsValidType(Type))
+	{
+		return false;
+	}
+
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const int64 Cost = FShopFormula::GetGearRollCost(GlobalStageIndex);
+	if (Cost <= 0 || Gold < Cost)
+	{
+		return false;
+	}
+
+	AddGold(-Cost);
+	BuffService->AddConsumable(Type, 1);
+	RequestAutosave();
+	return true;
+}
+
 bool UIdleGameInstance::TryBuyShopResource(int64 Cost, int64& ResourceCount)
 {
 	if (Cost <= 0 || Gold < Cost || ResourceCount >= MAX_int64)
@@ -1146,7 +1216,11 @@ void UIdleGameInstance::AddExp(int64 Amount)
 		return;
 	}
 
-	const double ExpMultiplier = 1.0 + static_cast<double>(GetMasteryService() ? GetMasteryService()->GetGlobalBonus().ExpBoostPct : 0.0f);
+	EnsureBuffService();
+	const double ExpMultiplier =
+		1.0
+		+ static_cast<double>(GetMasteryService() ? GetMasteryService()->GetGlobalBonus().ExpBoostPct : 0.0f)
+		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f);
 	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
@@ -1731,7 +1805,8 @@ float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 {
 	const float PetAdjusted = PetService ? PetService->ApplyDropBonusChance(BaseChance) : BaseChance;
 	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
-	return PetAdjusted + MasteryBonus;
+	const float ConsumableBonus = BuffService ? BuffService->GetDropBuffAdd(GetCurrentUnixSeconds()) : 0.0f;
+	return PetAdjusted + MasteryBonus + ConsumableBonus;
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const
@@ -1942,6 +2017,15 @@ void UIdleGameInstance::EnsureMasteryService()
 	{
 		MasteryService = NewObject<UMasteryService>(this);
 		MasteryService->Initialize();
+	}
+}
+
+void UIdleGameInstance::EnsureBuffService()
+{
+	if (!BuffService)
+	{
+		BuffService = NewObject<UBuffService>(this);
+		BuffService->Initialize();
 	}
 }
 

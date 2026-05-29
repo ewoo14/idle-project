@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "GameCore/AchievementFormula.h"
+#include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonTypes.h"
 #include "GameCore/MasteryTypes.h"
 #include "GameFramework/SaveGame.h"
@@ -19,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 13;
+	int32 SaveVersion = 14;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -131,6 +132,9 @@ public:
 
 	UPROPERTY()
 	TArray<FMasterySaveEntry> Mastery;
+
+	UPROPERTY()
+	TArray<FConsumableSaveEntry> Consumables;
 
 	UPROPERTY()
 	TArray<FRuneSaveEntry> Runes;

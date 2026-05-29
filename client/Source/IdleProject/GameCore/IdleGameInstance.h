@@ -5,6 +5,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/AchievementService.h"
+#include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonService.h"
 #include "GameCore/MasteryService.h"
 #include "GameCore/OfflineRewardFormula.h"
@@ -19,6 +20,7 @@
 #include "IdleGameInstance.generated.h"
 
 class UApiClient;
+class UBuffService;
 class UInventoryComponent;
 class AIdleCharacter;
 class UIdleSaveGame;
@@ -165,8 +167,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UMasteryService* GetMasteryService() const { return MasteryService; }
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UBuffService* GetBuffService() const { return BuffService; }
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Time")
+	static int64 GetCurrentUnixSeconds();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Settings")
 	void SetLanguage(const FString& Language);
@@ -229,6 +237,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
 	bool TryBuyRankCube();
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Consumable")
+	void AddConsumable(EConsumableType Type, int32 Amount = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Consumable")
+	bool TryUseConsumable(EConsumableType Type);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
+	bool TryBuyConsumable(EConsumableType Type);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	void AddRune(const FRuneInstance& Rune);
@@ -514,6 +531,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMasteryService> MasteryService;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UBuffService> BuffService;
+
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
 	UPROPERTY()
 	FString ApiBaseUrl = TEXT("http://localhost:3000");
@@ -584,7 +604,6 @@ private:
 	static const TCHAR* SaveSlotName;
 	static constexpr float AutosaveDebounceSeconds = 1.0f;
 	static constexpr int32 CloudSaveApiVersion = 4;
-	static int64 GetCurrentUnixSeconds();
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
 	EClassId GetCurrentClassIdForRunes() const;
@@ -606,6 +625,7 @@ private:
 	void EnsureRuneService();
 	void EnsureAchievementService();
 	void EnsureMasteryService();
+	void EnsureBuffService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);
 	UFUNCTION()

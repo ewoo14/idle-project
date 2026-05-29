@@ -3,6 +3,7 @@ export * from "./bossPhase.js";
 export * from "./classRune.js";
 export * from "./combat.js";
 export * from "./combatPower.js";
+export * from "./consumable.js";
 export {
   computeItemBonus,
   getRarityStatMultiplier,
