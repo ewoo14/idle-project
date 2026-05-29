@@ -32,9 +32,101 @@
 #include "RuneSystem/ClassRuneFormula.h"
 #include "RuneSystem/RuneFormula.h"
 #include "RuneSystem/RuneService.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 namespace
 {
+// jumbo(unity) 빌드 ODR 회피용 고유 prefix(GuildInstance~) 헬퍼.
+const TCHAR* GuildInstanceRankToServerString(EGuildRank Rank)
+{
+	switch (Rank)
+	{
+	case EGuildRank::Master:
+		return TEXT("master");
+	case EGuildRank::Vice:
+		return TEXT("vice");
+	case EGuildRank::Officer:
+		return TEXT("officer");
+	default:
+		return TEXT("member");
+	}
+}
+
+EGuildJoinMode GuildInstanceParseJoinMode(const FString& JoinModeString)
+{
+	return JoinModeString == TEXT("approval") ? EGuildJoinMode::Approval : EGuildJoinMode::Open;
+}
+
+// 서버 `GET /v1/guilds` 목록 응답(`{ok,data:{guilds:[...]}}` 또는 `{ok,data:[...]}`)을 요약 배열로 파싱.
+void GuildInstanceParseListResponse(const FString& JsonBody, TArray<FGuildSummary>& OutSummaries)
+{
+	OutSummaries.Reset();
+	if (JsonBody.IsEmpty())
+	{
+		return;
+	}
+
+	TSharedPtr<FJsonObject> ResponseJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonBody);
+	if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !ResponseJson.IsValid())
+	{
+		return;
+	}
+
+	bool bOk = false;
+	if (!ResponseJson->TryGetBoolField(TEXT("ok"), bOk) || !bOk)
+	{
+		return;
+	}
+
+	// data 가 배열이거나 {guilds:[...]} 형태 모두 허용.
+	const TArray<TSharedPtr<FJsonValue>>* GuildArray = nullptr;
+	if (!ResponseJson->TryGetArrayField(TEXT("data"), GuildArray) || !GuildArray)
+	{
+		const TSharedPtr<FJsonObject>* DataObjectPtr = nullptr;
+		if (ResponseJson->TryGetObjectField(TEXT("data"), DataObjectPtr) && DataObjectPtr && DataObjectPtr->IsValid())
+		{
+			(*DataObjectPtr)->TryGetArrayField(TEXT("guilds"), GuildArray);
+		}
+	}
+
+	if (!GuildArray)
+	{
+		return;
+	}
+
+	OutSummaries.Reserve(GuildArray->Num());
+	for (const TSharedPtr<FJsonValue>& Value : *GuildArray)
+	{
+		const TSharedPtr<FJsonObject> GuildObject = Value.IsValid() ? Value->AsObject() : nullptr;
+		if (!GuildObject.IsValid())
+		{
+			continue;
+		}
+
+		FGuildSummary Summary;
+		GuildObject->TryGetStringField(TEXT("id"), Summary.Id);
+		GuildObject->TryGetStringField(TEXT("name"), Summary.Name);
+
+		int32 Level = 1;
+		if (GuildObject->TryGetNumberField(TEXT("level"), Level))
+		{
+			Summary.Level = FMath::Max(1, Level);
+		}
+		int32 MemberCount = 0;
+		if (GuildObject->TryGetNumberField(TEXT("memberCount"), MemberCount))
+		{
+			Summary.MemberCount = FMath::Max(0, MemberCount);
+		}
+		FString JoinModeString;
+		if (GuildObject->TryGetStringField(TEXT("joinMode"), JoinModeString))
+		{
+			Summary.JoinMode = GuildInstanceParseJoinMode(JoinModeString);
+		}
+		OutSummaries.Add(MoveTemp(Summary));
+	}
+}
 FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
 {
 	return FPrimaryStats(
@@ -548,6 +640,328 @@ void UIdleGameInstance::RefreshGuildSnapshot()
 			{
 				// 서버 권위 — 성공 시 스냅샷 캐시 갱신(무소속이면 false 로 캐시 비움).
 				StrongInner->GuildService->ParseSnapshotJson(bSuccess ? Body : FString());
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelRefreshList(const FString& Query, TFunction<void(bool, const TArray<FGuildSummary>&)> OnComplete)
+{
+	if (!ApiClient)
+	{
+		if (OnComplete)
+		{
+			OnComplete(false, TArray<FGuildSummary>());
+		}
+		return;
+	}
+
+	ApiClient->ListGuilds(Query, 20, 0, [OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString Body)
+	{
+		TArray<FGuildSummary> Summaries;
+		if (bSuccess)
+		{
+			GuildInstanceParseListResponse(Body, Summaries);
+		}
+		if (OnComplete)
+		{
+			OnComplete(bSuccess, Summaries);
+		}
+	});
+}
+
+void UIdleGameInstance::GuildPanelCreate(const FString& Name, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient)
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, Name, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->CreateGuild(CharacterId, Name, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelJoin(const FString& GuildId, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->JoinGuild(GuildId, CharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelLeave(const FString& GuildId, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->LeaveGuild(GuildId, CharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelApprove(const FString& GuildId, const FString& TargetCharacterId, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, TargetCharacterId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString ActorCharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || ActorCharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->ApproveRequest(GuildId, TargetCharacterId, ActorCharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelReject(const FString& GuildId, const FString& TargetCharacterId, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, TargetCharacterId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString ActorCharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || ActorCharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->RejectRequest(GuildId, TargetCharacterId, ActorCharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelSetRank(const FString& GuildId, const FString& TargetCharacterId, EGuildRank NewRank, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty() || TargetCharacterId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	const FString RankString = GuildInstanceRankToServerString(NewRank);
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, TargetCharacterId, RankString, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString ActorCharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || ActorCharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->SetMemberRank(GuildId, TargetCharacterId, ActorCharacterId, RankString, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelUpdateJoinMode(const FString& GuildId, EGuildJoinMode NewJoinMode, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	const FString JoinModeString = NewJoinMode == EGuildJoinMode::Approval ? TEXT("approval") : TEXT("open");
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, JoinModeString, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString ActorCharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || ActorCharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		// name/notice 는 본 PR UI 범위 밖 — 빈 문자열은 서버에서 미변경으로 처리(설정 PATCH).
+		StrongThis->ApiClient->UpdateGuildSettings(GuildId, ActorCharacterId, FString(), FString(), JoinModeString, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
 			}
 		});
 	});

@@ -28,6 +28,7 @@ class UMasteryService;
 class URuneService;
 class USkillComponent;
 class UWeeklyBossService;
+class UGuildService;
 class SIdleHUDWidget;
 
 struct IDLEPROJECT_API FIdleHUDSkillSlotViewModel
@@ -431,6 +432,87 @@ struct IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel
 	TArray<FIdleHUDWeeklyBossMilestoneRowViewModel> Rows;
 };
 
+// ── 길드 패널 뷰모델(PR-G1) ──────────────────────────────────────────────────
+/** 무소속 화면의 길드 목록 1행. */
+struct IDLEPROJECT_API FIdleHUDGuildListRowViewModel
+{
+	FString GuildId;
+	FText NameLabel;
+	FText InfoLabel;     // Lv n · m/30
+	FText JoinLabel;     // 가입/신청(가입 모드별)
+	FName JoinHitBoxName;
+	bool bApproval = false;
+};
+
+/** 내 길드 멤버 1행(닉네임 + 계급 배지 + 승급/강등 액션). */
+struct IDLEPROJECT_API FIdleHUDGuildMemberRowViewModel
+{
+	FString CharacterId;
+	FText NicknameLabel;
+	FText RankBadgeLabel;
+	EGuildRank Rank = EGuildRank::Member;
+	bool bSelf = false;
+	// 길드장 관리(승급/강등) — 미해금/정원 초과 시 비활성.
+	bool bShowPromote = false;
+	bool bCanPromote = false;
+	FText PromoteLabel;        // 승급 / 인원 부족 / 정원 초과
+	EGuildRank PromoteTargetRank = EGuildRank::Member;
+	FName PromoteHitBoxName;
+	bool bShowDemote = false;
+	FName DemoteHitBoxName;
+};
+
+/** 길드 가입 신청 1행(길드장/부 승인 큐). */
+struct IDLEPROJECT_API FIdleHUDGuildRequestRowViewModel
+{
+	FString CharacterId;
+	FText CharacterLabel;
+	FName ApproveHitBoxName;
+	FName RejectHitBoxName;
+};
+
+/** 길드 패널 전체 뷰모델 — bHasGuild 로 무소속/내 길드 화면 분기. */
+struct IDLEPROJECT_API FIdleHUDGuildPanelViewModel
+{
+	// 공통
+	FText Title;
+	FText RefreshLabel;
+	FText StateLabel;        // 로딩/오프라인(비면 표시 안 함)
+	bool bOffline = false;
+	bool bLoading = false;
+	bool bHasGuild = false;
+
+	// 무소속 화면
+	FText NoneTitle;
+	FText ListEmptyLabel;
+	TArray<FIdleHUDGuildListRowViewModel> ListRows;
+	FText CreateTitle;
+	FText CreateNameLabel;     // 이름: {Name}
+	FText CreateNameCycleLabel;
+	FText CreateLabel;
+	FName CreateNameCycleHitBoxName;
+	FName CreateHitBoxName;
+
+	// 내 길드 화면
+	FText MyTitle;
+	FText GuildNameLabel;
+	FText SummaryLabel;        // Lv n · m/30 · 가입모드
+	FText MyRankBadgeLabel;
+	FText LeaveLabel;
+	FName LeaveHitBoxName;
+	FText MemberListTitle;
+	TArray<FIdleHUDGuildMemberRowViewModel> MemberRows;
+
+	// 길드장 관리(내 rank=Master 일 때만 노출)
+	bool bShowManage = false;
+	FText ManageTitle;
+	FText ToggleJoinModeLabel;
+	FName ToggleJoinModeHitBoxName;
+	FText RequestsTitle;
+	FText RequestsEmptyLabel;
+	TArray<FIdleHUDGuildRequestRowViewModel> RequestRows;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneSlotViewModel
 {
 	int32 SlotIndex = INDEX_NONE;
@@ -748,6 +830,7 @@ IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRol
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
+IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -872,6 +955,20 @@ private:
 	void DrawWeeklyBossMilestoneRow(const FIdleHUDWeeklyBossMilestoneRowViewModel& Row, float X, float Y, float Width, float Height);
 	void TryChallengeWeeklyBoss();
 	void ClaimWeeklyBossFromHitBox(FName BoxName);
+	void DrawGuildPanel();
+	void DrawGuildListRow(const FIdleHUDGuildListRowViewModel& Row, float X, float Y, float Width, float Height);
+	void DrawGuildMemberRow(const FIdleHUDGuildMemberRowViewModel& Row, float X, float Y, float Width, float Height);
+	void DrawGuildRequestRow(const FIdleHUDGuildRequestRowViewModel& Row, float X, float Y, float Width, float Height);
+	void RefreshGuildBrowseList();
+	void CycleGuildCreateName();
+	void TryCreateGuild();
+	void JoinGuildFromHitBox(FName BoxName);
+	void TryLeaveGuild();
+	void ToggleGuildJoinMode();
+	void ApproveGuildRequestFromHitBox(FName BoxName);
+	void RejectGuildRequestFromHitBox(FName BoxName);
+	void SetGuildMemberRankFromHitBox(FName BoxName, bool bPromote);
+	void SetGuildFeedback(const TCHAR* Key, bool bSuccess);
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
@@ -979,4 +1076,13 @@ private:
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 	bool bStatInfoVisible = false;
+
+	// ── 길드 패널 UI 상태(PR-G1, 서버 권위 — 캐시/표시 전용) ──────────────────
+	TArray<FGuildSummary> GuildBrowseList;     // 무소속 화면 목록 캐시(서버 ListGuilds)
+	bool bGuildBrowseLoading = false;          // 목록 비동기 로딩 표시
+	bool bGuildActionPending = false;          // 생성/가입/탈퇴/관리 액션 in-flight
+	int32 GuildCreateNamePresetIndex = 0;      // 생성 이름 프리셋 인덱스(이름 변경 버튼 순환)
+	FText GuildFeedbackLabel;
+	bool bGuildFeedbackSuccess = false;
+	float GuildFeedbackStartTime = -1000.0f;
 };
