@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  WEEKLY_CHALLENGE_LIMIT,
   getChallengeDamage,
-  milestoneThreshold,
   getReachedMilestones,
-  milestoneGoldReward,
   milestoneEssenceReward,
+  milestoneGoldReward,
+  milestoneThreshold,
+  WEEKLY_CHALLENGE_LIMIT,
 } from "./weeklyBoss.js";
 
 // 클라 FWeeklyBossFormula(Tests/WeeklyBossTests.cpp FormulaParity)와 동일 앵커를
