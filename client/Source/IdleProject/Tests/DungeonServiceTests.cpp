@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 
+#include "IdleGameInstanceTestHelpers.h"
 #include "GameCore/DungeonFormula.h"
 #include "GameCore/DungeonService.h"
 #include "GameCore/IdleGameInstance.h"
@@ -17,14 +18,6 @@
 
 namespace
 {
-struct FIdleGameInstanceWorldContextAccessor : UIdleGameInstance
-{
-	static void Attach(UIdleGameInstance* Instance, FWorldContext* Context)
-	{
-		static_cast<FIdleGameInstanceWorldContextAccessor*>(Instance)->WorldContext = Context;
-	}
-};
-
 FWorldContext* AttachGameInstanceToDungeonTestWorld(UIdleGameInstance* GameInstance, UWorld* World)
 {
 	if (!GEngine || !GameInstance || !World)
