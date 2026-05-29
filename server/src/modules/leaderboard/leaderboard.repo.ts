@@ -115,6 +115,65 @@ export class LeaderboardRepoPg {
         }
       : null;
   }
+
+  async upsertWeeklyDamage(
+    weekId: string,
+    characterId: string,
+    damage: bigint,
+  ) {
+    await this.pool.query(
+      `insert into leaderboard_weekly_damage (week_id, character_id, damage, updated_at)
+       values ($1, $2, $3, now())
+       on conflict (week_id, character_id)
+       do update set damage = excluded.damage, updated_at = now()`,
+      [weekId, characterId, damage.toString()],
+    );
+  }
+
+  async listWeeklyDamage(
+    weekId: string,
+    limit: number,
+  ): Promise<LeaderboardRow[]> {
+    const result = await this.pool.query(
+      `select character_id as "characterId", damage as score,
+              row_number() over (order by damage desc) as rank
+       from leaderboard_weekly_damage
+       where week_id = $1
+       order by damage desc
+       limit $2`,
+      [weekId, limit],
+    );
+    return result.rows.map((row) => ({
+      characterId: row.characterId,
+      score: BigInt(row.score),
+      rank: Number(row.rank),
+    }));
+  }
+
+  async getWeeklyDamageRank(
+    weekId: string,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null> {
+    const result = await this.pool.query(
+      `select rank, score
+       from (
+         select character_id,
+                rank() over (order by damage desc) as rank,
+                damage as score
+         from leaderboard_weekly_damage
+         where week_id = $1
+       ) ranked
+       where character_id = $2`,
+      [weekId, characterId],
+    );
+    const row = result.rows[0];
+    return row
+      ? {
+          rank: Number(row.rank),
+          score: BigInt(row.score),
+        }
+      : null;
+  }
 }
 
 export class LeaderboardCacheRedis {

@@ -25,6 +25,16 @@ export type LeaderboardRepo = {
     seasonId: number,
     characterId: string,
   ): Promise<Omit<LeaderboardRow, "characterId"> | null>;
+  upsertWeeklyDamage(
+    weekId: string,
+    characterId: string,
+    damage: bigint,
+  ): Promise<void>;
+  listWeeklyDamage(weekId: string, limit: number): Promise<LeaderboardRow[]>;
+  getWeeklyDamageRank(
+    weekId: string,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null>;
 };
 
 export type LeaderboardCache = {
@@ -103,6 +113,28 @@ export class LeaderboardService {
       kind === "power"
         ? await this.repo.getPowerRank(seasonId, characterId)
         : await this.repo.getRebirthRank(seasonId, characterId);
+    return row ?? { rank: 0, score: 0n };
+  }
+
+  async updateWeeklyDamage(input: {
+    characterId: string;
+    weekId: string;
+    damage: bigint;
+  }) {
+    await this.repo.upsertWeeklyDamage(
+      input.weekId,
+      input.characterId,
+      input.damage,
+    );
+  }
+
+  async getWeekly(weekId: string, limit = 100) {
+    const normalizedLimit = Math.min(Math.max(limit, 1), 100);
+    return this.repo.listWeeklyDamage(weekId, normalizedLimit);
+  }
+
+  async getMyWeeklyRank(weekId: string, characterId: string) {
+    const row = await this.repo.getWeeklyDamageRank(weekId, characterId);
     return row ?? { rank: 0, score: 0n };
   }
 }

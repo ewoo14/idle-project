@@ -33,6 +33,8 @@ export type SavePayload = {
     count: number;
     buffEndUnixSec: number;
   }>;
+  weeklyBossDamage?: number;
+  weeklyBossWeekId?: string;
   [key: string]: unknown;
 };
 
@@ -59,7 +61,7 @@ export class SaveService {
     private readonly repo: SaveRepo,
     private readonly leaderboard: Pick<
       LeaderboardService,
-      "updatePower" | "updateRebirth"
+      "updatePower" | "updateRebirth" | "updateWeeklyDamage"
     >,
     private readonly logger: SaveLogger = { warn: () => undefined },
   ) {}
@@ -98,6 +100,20 @@ export class SaveService {
       seasonId: 1,
       rebirthCount: input.payload.rebirthCount,
     });
+    const weekId = input.payload.weeklyBossWeekId;
+    const weeklyDamage = input.payload.weeklyBossDamage;
+    if (
+      typeof weekId === "string" &&
+      weekId.length > 0 &&
+      typeof weeklyDamage === "number" &&
+      weeklyDamage >= 0
+    ) {
+      await this.leaderboard.updateWeeklyDamage({
+        characterId: input.characterId,
+        weekId,
+        damage: BigInt(weeklyDamage),
+      });
+    }
     return save;
   }
 

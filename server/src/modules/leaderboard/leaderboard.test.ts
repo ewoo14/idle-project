@@ -118,6 +118,59 @@ describe("LeaderboardService", () => {
     expect(repo.getRebirthRank).toHaveBeenCalledWith(2, uuid(2));
     expect(row).toEqual({ rank: 1, score: 3n });
   });
+
+  it("upserts weekly boss damage keyed by the ISO week", async () => {
+    const repo = createRepo();
+    const service = new LeaderboardService(repo, createCache());
+
+    await service.updateWeeklyDamage({
+      characterId: "c1",
+      weekId: "2026-W22",
+      damage: 4500n,
+    });
+
+    expect(repo.upsertWeeklyDamage).toHaveBeenCalledWith(
+      "2026-W22",
+      "c1",
+      4500n,
+    );
+  });
+
+  it("lists weekly boss damage ordered by the repo and clamps the limit", async () => {
+    const repo = createRepo();
+    repo.listWeeklyDamage.mockResolvedValue([
+      { characterId: "c1", score: 4500n, rank: 1 },
+      { characterId: "c2", score: 1200n, rank: 2 },
+    ]);
+    const service = new LeaderboardService(repo, createCache());
+
+    const rows = await service.getWeekly("2026-W22", 999);
+
+    expect(repo.listWeeklyDamage).toHaveBeenCalledWith("2026-W22", 100);
+    expect(rows[0]?.characterId).toBe("c1");
+    expect(rows[1]?.rank).toBe(2);
+  });
+
+  it("returns the current character weekly damage rank", async () => {
+    const repo = createRepo();
+    repo.getWeeklyDamageRank.mockResolvedValue({ rank: 2, score: 1200n });
+    const service = new LeaderboardService(repo, createCache());
+
+    const row = await service.getMyWeeklyRank("2026-W22", uuid(1));
+
+    expect(repo.getWeeklyDamageRank).toHaveBeenCalledWith("2026-W22", uuid(1));
+    expect(row).toEqual({ rank: 2, score: 1200n });
+  });
+
+  it("returns rank zero when the current character has no weekly damage row", async () => {
+    const repo = createRepo();
+    repo.getWeeklyDamageRank.mockResolvedValue(null);
+    const service = new LeaderboardService(repo, createCache());
+
+    const row = await service.getMyWeeklyRank("2026-W23", uuid(1));
+
+    expect(row).toEqual({ rank: 0, score: 0n });
+  });
 });
 
 describe("LeaderboardRepoPg", () => {
@@ -181,6 +234,61 @@ describe("LeaderboardRepoPg", () => {
     );
     expect(query.mock.calls[0]?.[0]).toContain("where season_id = $1");
     expect(query.mock.calls[0]?.[0]).toContain("where character_id = $2");
+  });
+
+  it("queries weekly damage rank inside the requested week only", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ rank: "1", score: "4500" }],
+    });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    const row = await repo.getWeeklyDamageRank("2026-W22", uuid(3));
+
+    expect(row).toEqual({ rank: 1, score: 4500n });
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("rank() over (order by damage desc)"),
+      ["2026-W22", uuid(3)],
+    );
+    expect(query.mock.calls[0]?.[0]).toContain("where week_id = $1");
+    expect(query.mock.calls[0]?.[0]).toContain("where character_id = $2");
+  });
+
+  it("returns null when the weekly damage rank is missing", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    const row = await repo.getWeeklyDamageRank("2026-W23", uuid(4));
+
+    expect(row).toBeNull();
+  });
+
+  it("upserts weekly damage as a bigint string keyed by week and character", async () => {
+    const query = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    await repo.upsertWeeklyDamage("2026-W22", uuid(5), 922337203685477000n);
+
+    expect(query.mock.calls[0]?.[0]).toContain(
+      "on conflict (week_id, character_id)",
+    );
+    expect(query).toHaveBeenCalledWith(expect.any(String), [
+      "2026-W22",
+      uuid(5),
+      "922337203685477000",
+    ]);
+  });
+
+  it("lists weekly damage rows preserving bigint scores", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ characterId: uuid(1), score: "4500", rank: "1" }],
+    });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    const rows = await repo.listWeeklyDamage("2026-W22", 10);
+
+    expect(rows[0]).toEqual({ characterId: uuid(1), score: 4500n, rank: 1 });
+    expect(query.mock.calls[0]?.[0]).toContain("where week_id = $1");
+    expect(query.mock.calls[0]?.[0]).toContain("order by damage desc");
   });
 });
 
@@ -256,6 +364,112 @@ describe("leaderboardRoutes", () => {
 
     await app.close();
   });
+
+  it("returns the weekly boss damage top-N for the requested week", async () => {
+    const app = Fastify({ logger: false });
+    vi.mocked(pool.query).mockResolvedValue({
+      rows: [
+        { characterId: uuid(1), score: "4500", rank: "1" },
+        { characterId: uuid(2), score: "1200", rank: "2" },
+      ],
+    } as never);
+    await app.register(errorHandlerPlugin);
+    await app.register(leaderboardRoutes, {
+      prefix: "/v1/leaderboard",
+      redis: createCache() as never,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/leaderboard/weekly?week=2026-W22&limit=10",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      data: [
+        { characterId: uuid(1), score: "4500", rank: 1 },
+        { characterId: uuid(2), score: "1200", rank: 2 },
+      ],
+    });
+    expect(pool.query).toHaveBeenCalledWith(expect.any(String), [
+      "2026-W22",
+      10,
+    ]);
+
+    await app.close();
+  });
+
+  it("returns an empty board for a week with no submissions", async () => {
+    const app = Fastify({ logger: false });
+    vi.mocked(pool.query).mockResolvedValue({ rows: [] } as never);
+    await app.register(errorHandlerPlugin);
+    await app.register(leaderboardRoutes, {
+      prefix: "/v1/leaderboard",
+      redis: createCache() as never,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/leaderboard/weekly?week=2026-W99",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ok: true, data: [] });
+
+    await app.close();
+  });
+
+  it("returns the current character weekly rank", async () => {
+    const app = Fastify({ logger: false });
+    vi.mocked(pool.query).mockResolvedValue({
+      rows: [{ rank: "2", score: "1200" }],
+    } as never);
+    await app.register(errorHandlerPlugin);
+    await app.register(leaderboardRoutes, {
+      prefix: "/v1/leaderboard",
+      redis: createCache() as never,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/leaderboard/weekly/me?week=2026-W22&characterId=${uuid(1)}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      data: { rank: 2, score: "1200" },
+    });
+    expect(pool.query).toHaveBeenCalledWith(expect.any(String), [
+      "2026-W22",
+      uuid(1),
+    ]);
+
+    await app.close();
+  });
+
+  it("rejects weekly queries missing the week", async () => {
+    const app = Fastify({ logger: false });
+    await app.register(errorHandlerPlugin);
+    await app.register(leaderboardRoutes, {
+      prefix: "/v1/leaderboard",
+      redis: createCache() as never,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/leaderboard/weekly",
+    });
+
+    expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
 });
 
 function createRepo() {
@@ -266,6 +480,9 @@ function createRepo() {
     listRebirth: vi.fn().mockResolvedValue([]),
     getPowerRank: vi.fn().mockResolvedValue(null),
     getRebirthRank: vi.fn().mockResolvedValue(null),
+    upsertWeeklyDamage: vi.fn(),
+    listWeeklyDamage: vi.fn().mockResolvedValue([]),
+    getWeeklyDamageRank: vi.fn().mockResolvedValue(null),
   };
 }
 
