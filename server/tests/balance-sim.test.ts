@@ -1014,6 +1014,76 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports mastery local bonus pressure without changing first-rebirth timing", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+
+    expect(report.json.model.masteryLocalBonusPressure.rows).toEqual([
+      {
+        track: "Combat",
+        effect: "Kill reward",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: null,
+        firstRebirthInjected: false,
+      },
+      {
+        track: "Equipment",
+        effect: "Enhancement gold discount",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: 50,
+        firstRebirthInjected: false,
+      },
+      {
+        track: "Abyss",
+        effect: "Dungeon reward",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: null,
+        firstRebirthInjected: false,
+      },
+      {
+        track: "Rune",
+        effect: "Rune codex additive value",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: null,
+        firstRebirthInjected: false,
+      },
+      {
+        track: "Beast",
+        effect: "Pet bonus",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: null,
+        firstRebirthInjected: false,
+      },
+      {
+        track: "Explore",
+        effect: "Quest reward",
+        lv5Percent: 1.792,
+        lv30Percent: 3.434,
+        lv100Percent: 4.615,
+        capPercent: null,
+        firstRebirthInjected: false,
+      },
+    ]);
+    expect(
+      report.json.model.masteryLocalBonusPressure.injectedIntoSampledRun,
+    ).toBe(false);
+    expect(report.json.distribution.summary.medianHours).toBe(5.328);
+    expect(report.markdown).toContain("## Mastery Local Bonus Pressure");
+    expect(report.markdown).toContain(
+      "| Equipment | Enhancement gold discount | 1.792% | 3.434% | 4.615% | 50% | no |",
+    );
+  });
+
   it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);

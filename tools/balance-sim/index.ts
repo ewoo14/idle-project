@@ -51,6 +51,7 @@ import {
   cumulativeExp,
   expToNext,
 } from "../../server/src/core/formulas/level.js";
+import { localBonus } from "../../server/src/core/formulas/mastery.js";
 import {
   computeOfflineRewards,
   OFFLINE_EFFICIENCY,
@@ -196,6 +197,7 @@ export type BalanceReport = {
       uniqueTraitPressure: UniqueTraitPressure;
       dungeonPressure: DungeonPressure;
       consumablePressure: ConsumablePressure;
+      masteryLocalBonusPressure: MasteryLocalBonusPressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -574,6 +576,22 @@ export type ConsumablePressure = {
   rows: ConsumablePressureRow[];
 };
 
+export type MasteryLocalBonusRow = {
+  track: string;
+  effect: string;
+  lv5Percent: number;
+  lv30Percent: number;
+  lv100Percent: number;
+  capPercent: number | null;
+  firstRebirthInjected: boolean;
+};
+
+export type MasteryLocalBonusPressure = {
+  formula: string;
+  injectedIntoSampledRun: boolean;
+  rows: MasteryLocalBonusRow[];
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -764,6 +782,7 @@ export function buildBalanceReport(
       bossIncluded: true,
       formulas: [
         "server/src/core/formulas/level.ts",
+        "server/src/core/formulas/mastery.ts",
         "server/src/core/formulas/combat.ts",
         "server/src/core/formulas/consumable.ts",
         "server/src/core/formulas/stats.ts",
@@ -796,6 +815,7 @@ export function buildBalanceReport(
       uniqueTraitPressure: buildUniqueTraitPressure(),
       dungeonPressure: buildDungeonPressure(distribution.samples),
       consumablePressure: buildConsumablePressure(),
+      masteryLocalBonusPressure: buildMasteryLocalBonusPressure(),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -1946,6 +1966,61 @@ function buildConsumablePressure(): ConsumablePressure {
   };
 }
 
+function buildMasteryLocalBonusPressure(): MasteryLocalBonusPressure {
+  const tracks = [
+    {
+      track: "Combat",
+      effect: "Kill reward",
+      index: 0,
+      capPercent: null,
+    },
+    {
+      track: "Equipment",
+      effect: "Enhancement gold discount",
+      index: 1,
+      capPercent: 50,
+    },
+    {
+      track: "Abyss",
+      effect: "Dungeon reward",
+      index: 2,
+      capPercent: null,
+    },
+    {
+      track: "Rune",
+      effect: "Rune codex additive value",
+      index: 3,
+      capPercent: null,
+    },
+    {
+      track: "Beast",
+      effect: "Pet bonus",
+      index: 4,
+      capPercent: null,
+    },
+    {
+      track: "Explore",
+      effect: "Quest reward",
+      index: 5,
+      capPercent: null,
+    },
+  ] as const;
+
+  return {
+    formula: "0.01 * ln(1 + level); Equipment capped at 50%",
+    injectedIntoSampledRun: false,
+    rows: tracks.map((track) => ({
+      track: track.track,
+      effect: track.effect,
+      lv5Percent: percent(localBonus(track.index, 5)),
+      lv30Percent: percent(localBonus(track.index, 30)),
+      lv100Percent: percent(localBonus(track.index, 100)),
+      capPercent: track.capPercent,
+      firstRebirthInjected: false,
+    })),
+  };
+}
+
 function buildDungeonPressureRow(
   dungeon: DungeonName,
   type: number,
@@ -2748,6 +2823,28 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "<!-- markdownlint-enable MD013 -->",
     "",
+    "## Mastery Local Bonus Pressure",
+    "",
+    `- Formula: \`${report.model.masteryLocalBonusPressure.formula}\`.`,
+    "- Source: `server/src/core/formulas/mastery.ts`.",
+    "- Local mastery bonuses are not injected into the sampled first-rebirth",
+    "  timing model until acquisition timing and expected per-track levels are",
+    "  modeled explicitly.",
+    "- Equipment returns a discount value and is capped at 50%; the other tracks",
+    "  use the same uncapped logarithmic coefficient as an additive or",
+    "  multiplicative lane at one application point.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Track | Effect | Lv5 | Lv30 | Lv100 | Cap | First rebirth injected |",
+    "| --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ...report.model.masteryLocalBonusPressure.rows.map(
+      (row) =>
+        `| ${row.track} | ${row.effect} | ${row.lv5Percent}% | ${row.lv30Percent}% | ${row.lv100Percent}% | ${row.capPercent === null ? "n/a" : `${row.capPercent}%`} | ${row.firstRebirthInjected ? "yes" : "no"} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
     "## Rune Codex Collection Pressure",
     "",
     `- Total cells: ${report.model.runeCodexPressure.totalCells}`,
@@ -2816,6 +2913,10 @@ function randomRange(random: () => number, min: number, max: number): number {
 function round(value: number, digits: number): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function percent(value: number): number {
+  return round(value * 100, 3);
 }
 
 function mulberry32(seed: number): () => number {
