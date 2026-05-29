@@ -146,15 +146,15 @@ bool FGuildServiceParseSnapshotJsonTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-// ── ③ 세이브 v17 라운드트립(CachedGuildId/Rank) ────────────────────────────────
+// ── ③ 세이브 v18 라운드트립(길드 id/rank/레벨·버프·포인트·pending·출석일) ────────
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGuildSaveRoundTripTest,
-	"IdleProject.Guild.SaveRoundTripV17",
+	"IdleProject.Guild.SaveRoundTripV18",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 {
-	// 캡처: GuildService 캐시 → 세이브(v17).
+	// 캡처: GuildService 캐시 → 세이브(v18). 레벨/버프 파생 검증을 위해 exp 가 큰 스냅샷 적용.
 	UIdleGameInstance* SourceInstance = NewObject<UIdleGameInstance>();
 	SourceInstance->InitializeGuildServiceForTests();
 
@@ -162,15 +162,27 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 	Snapshot.bHasGuild = true;
 	Snapshot.MyRank = EGuildRank::Officer;
 	Snapshot.Guild.Id = TEXT("guild-roundtrip");
-	SourceInstance->GetGuildService()->ApplySnapshot(Snapshot);
+	Snapshot.GuildExp = 30000; // L1(10000)+L2(16000)=26000 누적 → L3 도달.
+	Snapshot.ContributionPoints = 777;
+	UGuildService* SourceService = SourceInstance->GetGuildService();
+	SourceService->ApplySnapshot(Snapshot);
+	SourceService->AddPendingAutoContribution(42);
+
+	const int32 ExpectedLevel = FGuildFormula::GetGuildLevel(30000);
+	const FGuildBuff ExpectedBuff = FGuildFormula::GetGuildBuff(ExpectedLevel);
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture to save succeeds"), SourceInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Captured save writes V17"), SaveGame->SaveVersion, static_cast<int32>(17));
+	TestEqual(TEXT("Captured save writes V18"), SaveGame->SaveVersion, static_cast<int32>(18));
 	TestEqual(TEXT("Captured guild id"), SaveGame->CachedGuildId, FString(TEXT("guild-roundtrip")));
 	TestEqual(TEXT("Captured guild rank officer"), static_cast<int32>(SaveGame->CachedGuildRank), static_cast<int32>(EGuildRank::Officer));
+	TestEqual(TEXT("Captured guild level"), SaveGame->CachedGuildLevel, ExpectedLevel);
+	TestEqual(TEXT("Captured attack pct"), SaveGame->CachedGuildAttackPct, ExpectedBuff.AttackPct);
+	TestEqual(TEXT("Captured gold pct"), SaveGame->CachedGuildGoldPct, ExpectedBuff.GoldPct);
+	TestEqual(TEXT("Captured contribution points"), SaveGame->CachedContributionPoints, static_cast<int64>(777));
+	TestEqual(TEXT("Captured pending auto contribution"), SaveGame->PendingAutoContribution, static_cast<int64>(42));
 
-	// 복원: 세이브(v17) → 새 인스턴스 GuildService 캐시.
+	// 복원: 세이브(v18) → 새 인스턴스 GuildService 캐시(오프라인 버프 캐시 적용).
 	SaveGame->bHasSave = true;
 	UIdleGameInstance* TargetInstance = NewObject<UIdleGameInstance>();
 	TestTrue(TEXT("Apply from save succeeds"), TargetInstance->ApplyFromSave(SaveGame));
@@ -182,6 +194,27 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("Restored service has guild"), RestoredService->HasGuild());
 		TestEqual(TEXT("Restored guild id matches"), RestoredService->GetCachedGuildId(), FString(TEXT("guild-roundtrip")));
 		TestEqual(TEXT("Restored rank matches"), RestoredService->GetMyRank(), EGuildRank::Officer);
+		TestEqual(TEXT("Restored level matches"), RestoredService->GetGuildLevel(), ExpectedLevel);
+		TestEqual(TEXT("Restored attack buff (offline cache)"), RestoredService->GetGuildBuff().AttackPct, ExpectedBuff.AttackPct);
+		TestEqual(TEXT("Restored gold buff (offline cache)"), RestoredService->GetGuildBuff().GoldPct, ExpectedBuff.GoldPct);
+		TestEqual(TEXT("Restored contribution points"), RestoredService->GetContributionPoints(), static_cast<int64>(777));
+		TestEqual(TEXT("Restored pending auto contribution"), RestoredService->GetPendingAutoContribution(), static_cast<int64>(42));
+	}
+
+	// v17 입력 로드(가드 >=18 미충족) → 무길드버프(레벨1·0%)로 복원, 무소속 아님(id 존재).
+	UIdleSaveGame* LegacyV17 = NewObject<UIdleSaveGame>();
+	LegacyV17->SaveVersion = 17;
+	LegacyV17->bHasSave = true;
+	LegacyV17->CachedGuildId = TEXT("legacy-guild");
+	LegacyV17->CachedGuildRank = static_cast<uint8>(EGuildRank::Member);
+	UIdleGameInstance* LegacyInstance = NewObject<UIdleGameInstance>();
+	TestTrue(TEXT("Apply v17 legacy succeeds"), LegacyInstance->ApplyFromSave(LegacyV17));
+	if (UGuildService* LegacyService = LegacyInstance->GetGuildService())
+	{
+		TestTrue(TEXT("v17 restore still has guild id"), LegacyService->HasGuild());
+		TestEqual(TEXT("v17 restore level defaults to one"), LegacyService->GetGuildLevel(), 1);
+		TestEqual(TEXT("v17 restore no attack buff"), LegacyService->GetGuildBuff().AttackPct, 0.0f);
+		TestEqual(TEXT("v17 restore no gold buff"), LegacyService->GetGuildBuff().GoldPct, 0.0f);
 	}
 
 	// 무소속 라운드트립: 빈 id 면 복원 후에도 무소속.
@@ -198,6 +231,76 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 	{
 		TestFalse(TEXT("Empty restore stays guildless"), EmptyRestored->HasGuild());
 	}
+
+	return true;
+}
+
+// ── ④ 길드 레벨/버프 parity (서버 getGuildLevel/getGuildBuff 누적 임계·계수 1:1) ──
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildLevelBuffParityTest,
+	"IdleProject.Guild.LevelBuffParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildLevelBuffParityTest::RunTest(const FString& Parameters)
+{
+	// parity 상수.
+	TestEqual(TEXT("Guild level base 10000"), FGuildFormula::GUILD_LEVEL_BASE, static_cast<int64>(10000));
+	TestEqual(TEXT("Guild level growth 1.6"), FGuildFormula::GUILD_LEVEL_GROWTH, 1.6);
+	TestEqual(TEXT("Buff per level 0.004"), FGuildFormula::GUILD_BUFF_PER_LEVEL, 0.004f);
+	TestEqual(TEXT("Auto weekly cap 2000"), FGuildFormula::AUTO_WEEKLY_CAP, static_cast<int64>(2000));
+
+	// 누적 임계 경계값(서버 누적 합과 동일):
+	//  L1 step=10000(누적 0~9999=L1), L2 step=16000(누적 10000~25999=L2),
+	//  L3 step=25600(누적 26000~51599=L3).
+	TestEqual(TEXT("exp 0 -> L1"), FGuildFormula::GetGuildLevel(0), 1);
+	TestEqual(TEXT("exp negative -> L1"), FGuildFormula::GetGuildLevel(-5), 1);
+	TestEqual(TEXT("exp 9999 -> L1"), FGuildFormula::GetGuildLevel(9999), 1);
+	TestEqual(TEXT("exp 10000 -> L2"), FGuildFormula::GetGuildLevel(10000), 2);
+	TestEqual(TEXT("exp 25999 -> L2"), FGuildFormula::GetGuildLevel(25999), 2);
+	TestEqual(TEXT("exp 26000 -> L3"), FGuildFormula::GetGuildLevel(26000), 3);
+	TestEqual(TEXT("exp 51599 -> L3"), FGuildFormula::GetGuildLevel(51599), 3);
+	TestEqual(TEXT("exp 51600 -> L4"), FGuildFormula::GetGuildLevel(51600), 4);
+
+	// 버프 계수: level*0.004 양 채널.
+	const FGuildBuff Buff5 = FGuildFormula::GetGuildBuff(5);
+	TestEqual(TEXT("Level 5 attack buff 0.02"), Buff5.AttackPct, 0.02f);
+	TestEqual(TEXT("Level 5 gold buff 0.02"), Buff5.GoldPct, 0.02f);
+	const FGuildBuff Buff1 = FGuildFormula::GetGuildBuff(1);
+	TestEqual(TEXT("Level 1 attack buff 0.004"), Buff1.AttackPct, 0.004f);
+
+	return true;
+}
+
+// ── ⑤ 자동 기여 델타 누적 · 주간 상한 클램프 플러시 ────────────────────────────
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildPendingContributionTest,
+	"IdleProject.Guild.PendingContribution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildPendingContributionTest::RunTest(const FString& Parameters)
+{
+	UGuildService* Service = NewObject<UGuildService>();
+
+	// 음수/0 무시.
+	Service->AddPendingAutoContribution(0);
+	Service->AddPendingAutoContribution(-100);
+	TestEqual(TEXT("No accrual from zero/negative"), Service->GetPendingAutoContribution(), static_cast<int64>(0));
+
+	// 누적.
+	Service->AddPendingAutoContribution(50);
+	Service->AddPendingAutoContribution(30);
+	TestEqual(TEXT("Accrued 80"), Service->GetPendingAutoContribution(), static_cast<int64>(80));
+
+	// 상한 미만 → 전량 소비.
+	const int64 Flushed = Service->ConsumePendingAutoContribution();
+	TestEqual(TEXT("Flushed 80 below cap"), Flushed, static_cast<int64>(80));
+	TestEqual(TEXT("Pending drained"), Service->GetPendingAutoContribution(), static_cast<int64>(0));
+
+	// 주간 상한 초과 → 상한만큼만 소비, 잔여는 보관.
+	Service->AddPendingAutoContribution(FGuildFormula::AUTO_WEEKLY_CAP + 500);
+	const int64 Clamped = Service->ConsumePendingAutoContribution();
+	TestEqual(TEXT("Flushed clamped to weekly cap"), Clamped, FGuildFormula::AUTO_WEEKLY_CAP);
+	TestEqual(TEXT("Remainder retained"), Service->GetPendingAutoContribution(), static_cast<int64>(500));
 
 	return true;
 }

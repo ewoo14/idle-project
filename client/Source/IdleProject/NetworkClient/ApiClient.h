@@ -44,6 +44,13 @@ public:
 	void RejectRequest(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, TFunction<void(bool, FString)> Callback);
 	void SetMemberRank(const FString& GuildId, const FString& TargetCharacterId, const FString& ActorCharacterId, const FString& Rank, TFunction<void(bool, FString)> Callback);
 	void UpdateGuildSettings(const FString& GuildId, const FString& ActorCharacterId, const FString& Name, const FString& Notice, const FString& JoinMode, TFunction<void(bool, FString)> Callback);
+
+	// ── 길드 기여/상점 `/v1/guilds/:id/...` (PR-G2, {ok,data} 래퍼) ───────────────
+	void GuildAttendance(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void GuildDonate(const FString& GuildId, const FString& CharacterId, int64 Gold, TFunction<void(bool, FString)> Callback);
+	void GuildContribute(const FString& GuildId, const FString& CharacterId, int64 Amount, TFunction<void(bool, FString)> Callback);
+	void GetGuildShop(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void BuyGuildShopItem(const FString& GuildId, const FString& CharacterId, const FString& ItemId, TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool RequestQuestList(const FString& CharacterId);

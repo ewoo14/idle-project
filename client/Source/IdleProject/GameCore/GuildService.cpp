@@ -1,5 +1,6 @@
 #include "GameCore/GuildService.h"
 
+#include "GameCore/GuildFormula.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
@@ -69,11 +70,37 @@ int64 GuildParseInt64Field(const TSharedPtr<FJsonObject>& Object, const TCHAR* F
 void UGuildService::ApplySnapshot(const FGuildSnapshot& Snapshot)
 {
 	CachedSnapshot = Snapshot;
+
+	if (CachedSnapshot.bHasGuild)
+	{
+		// 레벨은 누적 exp 로 재계산해 서버 권위와 항상 일치(스냅샷 denorm 무시).
+		// exp 가 0(직접 ApplySnapshot 호출 등)이면 스냅샷이 전달한 레벨을 신뢰.
+		const int32 LevelFromExp = FGuildFormula::GetGuildLevel(CachedSnapshot.GuildExp);
+		CachedLevel = CachedSnapshot.GuildExp > 0
+			? LevelFromExp
+			: FMath::Max(1, CachedSnapshot.GuildLevel);
+		CachedSnapshot.GuildLevel = CachedLevel;
+		CachedSnapshot.Guild.Level = CachedLevel;
+		// 버프는 레벨에서 단일 공식으로 파생(서버 getGuildBuff parity).
+		CachedBuff = FGuildFormula::GetGuildBuff(CachedLevel);
+		CachedSnapshot.Buff = CachedBuff;
+		CachedContributionPoints = FMath::Max<int64>(0, CachedSnapshot.ContributionPoints);
+	}
+	else
+	{
+		CachedLevel = 1;
+		CachedBuff = FGuildBuff();
+		CachedContributionPoints = 0;
+	}
 }
 
 void UGuildService::ClearSnapshot()
 {
 	CachedSnapshot = FGuildSnapshot();
+	CachedBuff = FGuildBuff();
+	CachedLevel = 1;
+	CachedContributionPoints = 0;
+	// PendingAutoContribution/LastAttendanceDate 는 멤버십 캐시와 독립(세이브 영속)이라 유지.
 }
 
 bool UGuildService::ParseSnapshotJson(const FString& JsonBody)
@@ -134,16 +161,24 @@ bool UGuildService::ParseSnapshotJson(const FString& JsonBody)
 	{
 		Snapshot.Guild.JoinMode = GuildParseJoinMode(JoinModeString);
 	}
+	// 서버는 guild.exp 를 bigint 문자열로 직렬화 → 레벨·버프 파생 소스.
+	Snapshot.GuildExp = FMath::Max<int64>(0, GuildParseInt64Field(GuildObject, TEXT("exp")));
+	Snapshot.GuildLevel = Snapshot.Guild.Level;
 
-	// 내 멤버십(me) — rank.
+	// 내 멤버십(me) — rank / 기여 포인트 / 출석·헌납 가능 여부.
 	const TSharedPtr<FJsonObject>* MeObjectPtr = nullptr;
 	if (Data->TryGetObjectField(TEXT("me"), MeObjectPtr) && MeObjectPtr && MeObjectPtr->IsValid())
 	{
+		const TSharedPtr<FJsonObject>& MeObject = *MeObjectPtr;
 		FString MyRankString;
-		if ((*MeObjectPtr)->TryGetStringField(TEXT("rank"), MyRankString))
+		if (MeObject->TryGetStringField(TEXT("rank"), MyRankString))
 		{
 			Snapshot.MyRank = GuildParseRank(MyRankString);
 		}
+		Snapshot.ContributionPoints = FMath::Max<int64>(0, GuildParseInt64Field(MeObject, TEXT("contributionPoints")));
+		MeObject->TryGetBoolField(TEXT("canAttend"), Snapshot.bCanAttendToday);
+		// 서버는 donationRemaining(bigint 문자열)을 주므로 >0 이면 헌납 가능.
+		Snapshot.bCanDonateToday = GuildParseInt64Field(MeObject, TEXT("donationRemaining")) > 0;
 	}
 
 	// 멤버 목록.
@@ -193,19 +228,72 @@ bool UGuildService::ParseSnapshotJson(const FString& JsonBody)
 		}
 	}
 
-	CachedSnapshot = MoveTemp(Snapshot);
+	// ApplySnapshot 경유로 레벨/버프/포인트 캐시를 단일 공식(parity)으로 파생.
+	ApplySnapshot(Snapshot);
 	return true;
 }
 
-void UGuildService::ExportSave(FString& OutGuildId, uint8& OutRank) const
+void UGuildService::AddPendingAutoContribution(int64 Delta)
+{
+	if (Delta <= 0)
+	{
+		return;
+	}
+	// 포화 합산(int64 오버플로 방지).
+	PendingAutoContribution = PendingAutoContribution > MAX_int64 - Delta
+		? MAX_int64
+		: PendingAutoContribution + Delta;
+}
+
+int64 UGuildService::ConsumePendingAutoContribution()
+{
+	if (PendingAutoContribution <= 0)
+	{
+		return 0;
+	}
+	// 주간 자동 상한으로 클램프(서버 contribute 가 잔여 상한으로 한 번 더 캡하지만,
+	// 클라도 동일 상한으로 선클램프해 과대 보고를 막는다 — parity).
+	const int64 Flushed = FMath::Min<int64>(PendingAutoContribution, FGuildFormula::AUTO_WEEKLY_CAP);
+	PendingAutoContribution -= Flushed;
+	return Flushed;
+}
+
+void UGuildService::ExportSave(
+	FString& OutGuildId,
+	uint8& OutRank,
+	int32& OutLevel,
+	float& OutAttackPct,
+	float& OutGoldPct,
+	int64& OutContributionPoints,
+	int64& OutPendingAutoContribution,
+	FString& OutLastAttendanceDate) const
 {
 	OutGuildId = GetCachedGuildId();
 	OutRank = static_cast<uint8>(CachedSnapshot.MyRank);
+	OutLevel = CachedLevel;
+	OutAttackPct = CachedBuff.AttackPct;
+	OutGoldPct = CachedBuff.GoldPct;
+	OutContributionPoints = CachedContributionPoints;
+	OutPendingAutoContribution = PendingAutoContribution;
+	OutLastAttendanceDate = LastAttendanceDate;
 }
 
-void UGuildService::ImportSave(const FString& InGuildId, uint8 InRank)
+void UGuildService::ImportSave(
+	const FString& InGuildId,
+	uint8 InRank,
+	int32 InLevel,
+	float InAttackPct,
+	float InGoldPct,
+	int64 InContributionPoints,
+	int64 InPendingAutoContribution,
+	const FString& InLastAttendanceDate)
 {
 	ClearSnapshot();
+
+	// pending/출석일은 멤버십과 독립적으로 영속(무소속이어도 복원).
+	PendingAutoContribution = FMath::Max<int64>(0, InPendingAutoContribution);
+	LastAttendanceDate = InLastAttendanceDate;
+
 	if (InGuildId.IsEmpty())
 	{
 		return;
@@ -214,4 +302,15 @@ void UGuildService::ImportSave(const FString& InGuildId, uint8 InRank)
 	CachedSnapshot.bHasGuild = true;
 	CachedSnapshot.Guild.Id = InGuildId;
 	CachedSnapshot.MyRank = GuildRankFromByte(InRank);
+
+	// 오프라인 버프 적용: 세이브에서 복원한 레벨/버프 캐시를 그대로 사용(서버 재동기화 전까지).
+	CachedLevel = FMath::Max(1, InLevel);
+	CachedBuff.AttackPct = FMath::Max(0.0f, InAttackPct);
+	CachedBuff.GoldPct = FMath::Max(0.0f, InGoldPct);
+	CachedContributionPoints = FMath::Max<int64>(0, InContributionPoints);
+
+	CachedSnapshot.GuildLevel = CachedLevel;
+	CachedSnapshot.Guild.Level = CachedLevel;
+	CachedSnapshot.Buff = CachedBuff;
+	CachedSnapshot.ContributionPoints = CachedContributionPoints;
 }

@@ -189,6 +189,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
 	void RefreshGuildSnapshot();
 
+	/**
+	 * 누적된 자동 기여 델타(던전 클리어·보스 도전)를 서버로 플러시(POST contribute).
+	 * 소속 길드가 있고 pending>0 일 때만 호출되며, 성공 시 스냅샷을 재동기화한다.
+	 * 세이브/재접속 시점에 호출(주간 상한은 GuildService/서버가 클램프).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
+	void FlushPendingGuildContribution();
+
 	// ── 길드 패널 UI 액션 배선(서버 권위 — 완료 시 스냅샷 재동기화) ───────────────
 	/** 길드 목록 조회(무소속 화면). 파싱된 요약 배열을 콜백으로 전달(UI 캐시용). */
 	void GuildPanelRefreshList(const FString& Query, TFunction<void(bool, const TArray<FGuildSummary>&)> OnComplete);
@@ -667,6 +675,9 @@ private:
 	static const TCHAR* SaveSlotName;
 	static constexpr float AutosaveDebounceSeconds = 1.0f;
 	static constexpr int32 CloudSaveApiVersion = 4;
+	// 길드 자동 기여 누적량(소량, 주간 상한은 GuildService/서버가 클램프).
+	static constexpr int64 GuildAutoContributionPerDungeon = 5;
+	static constexpr int64 GuildAutoContributionPerBoss = 10;
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
 	EClassId GetCurrentClassIdForRunes() const;

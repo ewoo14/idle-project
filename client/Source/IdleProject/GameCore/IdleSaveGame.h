@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 17;
+	int32 SaveVersion = 18;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -175,4 +175,28 @@ public:
 
 	UPROPERTY()
 	uint8 CachedGuildRank = 0;
+
+	// ── 길드 레벨/버프/기여 캐시(SaveVer 18, PR-G2) — 오프라인 버프 적용/델타 플러시 ──
+	UPROPERTY()
+	int32 CachedGuildLevel = 1;
+
+	/** 길드 공격력 버프 비율(0.04 = +4%). 오프라인에도 캐시 적용. */
+	UPROPERTY()
+	float CachedGuildAttackPct = 0.0f;
+
+	/** 길드 골드획득 버프 비율(0.04 = +4%). */
+	UPROPERTY()
+	float CachedGuildGoldPct = 0.0f;
+
+	/** 내 개인 기여 포인트(상점 화폐). */
+	UPROPERTY()
+	int64 CachedContributionPoints = 0;
+
+	/** 미플러시 자동 기여 델타(재접속 시 서버로 플러시). */
+	UPROPERTY()
+	int64 PendingAutoContribution = 0;
+
+	/** 마지막 길드 출석 UTC 날짜(YYYY-MM-DD). */
+	UPROPERTY()
+	FString LastGuildAttendanceDate;
 };

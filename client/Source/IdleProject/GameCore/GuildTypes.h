@@ -24,6 +24,22 @@ enum class EGuildJoinMode : uint8
 	Approval
 };
 
+/**
+ * 길드 레벨 기반 영구 버프(전 멤버 로컬 적용). 서버 `getGuildBuff(level)` parity —
+ * 공격력 +0.4%*Lv, 골드획득 +0.4%*Lv. 비율(0.04 = +4%) 단위로 보관한다.
+ */
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FGuildBuff
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	float AttackPct = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	float GoldPct = 0.0f;
+};
+
 /** 길드 멤버 1인 요약(서버 스냅샷 members 항목). 서버 권위 — 로컬은 캐시만 보관. */
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FGuildMemberInfo
@@ -95,6 +111,31 @@ struct IDLEPROJECT_API FGuildSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	FGuildSummary Guild;
+
+	// ── 길드 레벨/버프/기여(PR-G2, 서버 스냅샷 응답 파싱) ───────────────────────
+	/** 길드 레벨(서버 권위 — guild.level). FGuildSummary.Level 과 동일 값. */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 GuildLevel = 1;
+
+	/** 길드 누적 EXP(서버 bigint 문자열, int64). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 GuildExp = 0;
+
+	/** 내 개인 기여 포인트(상점 화폐, 서버 me.contributionPoints). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 ContributionPoints = 0;
+
+	/** 길드 레벨 기반 영구 버프(전 멤버 로컬 적용). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	FGuildBuff Buff;
+
+	/** 오늘 출석 가능 여부(서버 me.canAttend). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	bool bCanAttendToday = false;
+
+	/** 오늘 헌납 가능 여부(서버 me.donationRemaining > 0 파생). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	bool bCanDonateToday = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	TArray<FGuildMemberInfo> Members;

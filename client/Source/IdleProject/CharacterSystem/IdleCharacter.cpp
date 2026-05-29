@@ -16,6 +16,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "GameCore/BuffService.h"
+#include "GameCore/GuildService.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/MasteryService.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -227,6 +228,14 @@ void AIdleCharacter::RefreshDerivedStats()
 		Derived.PhysDef *= 1.0f + PetStatBonus.PhysDefPct;
 		Derived.MagicDef *= 1.0f + PetStatBonus.MagicDefPct;
 		Derived.Hp *= 1.0f + PetStatBonus.HpPct;
+
+		// 길드 레벨 영구 버프: 공격력 +AttackPct 단일 지점(오프라인에도 캐시 버프 적용, 이중 적용 금지 #72).
+		if (const UGuildService* GuildService = IdleGameInstance->GetGuildService())
+		{
+			const float GuildAttackPct = GuildService->GetGuildBuff().AttackPct;
+			Derived.PhysAtk *= 1.0f + GuildAttackPct;
+			Derived.MagicAtk *= 1.0f + GuildAttackPct;
+		}
 	}
 
 	CachedPrimaryStats = Primary;
