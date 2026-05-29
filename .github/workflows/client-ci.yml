@@ -40,6 +40,22 @@ jobs:
 
       - name: 안내
         run: |
-          Write-Host "UE5 빌드는 자체 호스팅 러너 또는 Epic 권한이 필요합니다."
-          Write-Host "이 step 은 PR #1 단계에서는 placeholder 입니다."
-          Write-Host "M1 클라이언트 슬라이스 머지 이후 실제 RunUAT 호출로 교체합니다."
+          Write-Host "GitHub-hosted 러너엔 UE5 가 없어 실제 빌드/Automation 불가(placeholder)."
+          Write-Host "실 검증은 self-hosted 러너 job 'UE5 Automation (self-hosted)' 또는"
+          Write-Host "로컬 게이트 'tools/ci/ue-automation.ps1' 로 수행합니다(docs/ops/ue-automation-ci.md)."
+
+  # UE5 표준 jumbo 빌드 + Automation 실검증 (UE 설치된 self-hosted Windows 러너 필요).
+  # 러너 미등록 상태에서 PR 가 막히지 않도록 라벨 'ue/automation' 게이트.
+  # 러너 등록 후 docs/ops/ue-automation-ci.md 절차대로 활성화.
+  ue5-automation:
+    name: UE5 Automation (self-hosted)
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'ue/automation') }}
+    runs-on: [self-hosted, windows, ue5]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: UE Automation 게이트 (표준 jumbo 빌드 + 전체 IdleProject)
+        shell: pwsh
+        run: ./tools/ci/ue-automation.ps1
