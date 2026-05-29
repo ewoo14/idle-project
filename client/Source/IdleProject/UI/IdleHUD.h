@@ -462,6 +462,17 @@ struct IDLEPROJECT_API FIdleHUDGuildMemberRowViewModel
 	FName DemoteHitBoxName;
 };
 
+/** 길드 상점 1행(이름·가격·구매 버튼, PR-G2). 포인트 부족 시 비활성. */
+struct IDLEPROJECT_API FIdleHUDGuildShopRowViewModel
+{
+	FString ItemId;
+	FText NameLabel;
+	FText PriceLabel;        // {Price} P
+	bool bCanBuy = false;    // 포인트 충분 + 액션 가능
+	FText BuyLabel;          // 구매 / 포인트 부족
+	FName BuyHitBoxName;
+};
+
 /** 길드 가입 신청 1행(길드장/부 승인 큐). */
 struct IDLEPROJECT_API FIdleHUDGuildRequestRowViewModel
 {
@@ -500,6 +511,30 @@ struct IDLEPROJECT_API FIdleHUDGuildPanelViewModel
 	FText MyRankBadgeLabel;
 	FText LeaveLabel;
 	FName LeaveHitBoxName;
+
+	// 길드 레벨/EXP/버프/기여(PR-G2)
+	FText LevelLabel;          // 길드 Lv {Level}
+	FText ExpLabel;            // EXP {Into}/{Span} (다음 레벨까지)
+	float ExpProgressRatio = 0.0f;
+	FText BuffLabel;           // 공격 +X% · 골드 +Y%
+	FText ContributionLabel;   // 내 기여 {Points} P
+	FText WeeklyContributionLabel; // 주간 기여 {Weekly}
+
+	// 출석/헌납 액션(PR-G2)
+	FText AttendLabel;         // 출석 / 출석 완료
+	bool bCanAttend = false;
+	FName AttendHitBoxName;
+	FText DonateLabel;         // 헌납 {Amount}
+	bool bCanDonate = false;
+	FName DonateHitBoxName;
+	FText DonateCycleLabel;    // 금액 변경
+	FName DonateCycleHitBoxName;
+
+	// 길드 상점(PR-G2)
+	FText ShopTitle;
+	FText ShopEmptyLabel;
+	TArray<FIdleHUDGuildShopRowViewModel> ShopRows;
+
 	FText MemberListTitle;
 	TArray<FIdleHUDGuildMemberRowViewModel> MemberRows;
 
@@ -830,7 +865,7 @@ IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRol
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
-IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline);
+IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -959,7 +994,9 @@ private:
 	void DrawGuildListRow(const FIdleHUDGuildListRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawGuildMemberRow(const FIdleHUDGuildMemberRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawGuildRequestRow(const FIdleHUDGuildRequestRowViewModel& Row, float X, float Y, float Width, float Height);
+	void DrawGuildShopRow(const FIdleHUDGuildShopRowViewModel& Row, float X, float Y, float Width, float Height);
 	void RefreshGuildBrowseList();
+	void RefreshGuildShop();
 	void CycleGuildCreateName();
 	void TryCreateGuild();
 	void JoinGuildFromHitBox(FName BoxName);
@@ -968,6 +1005,10 @@ private:
 	void ApproveGuildRequestFromHitBox(FName BoxName);
 	void RejectGuildRequestFromHitBox(FName BoxName);
 	void SetGuildMemberRankFromHitBox(FName BoxName, bool bPromote);
+	void TryGuildAttendance();
+	void CycleGuildDonateAmount();
+	void TryGuildDonate();
+	void BuyGuildShopItemFromHitBox(FName BoxName);
 	void SetGuildFeedback(const TCHAR* Key, bool bSuccess);
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
@@ -1082,6 +1123,11 @@ private:
 	bool bGuildBrowseLoading = false;          // 목록 비동기 로딩 표시
 	bool bGuildActionPending = false;          // 생성/가입/탈퇴/관리 액션 in-flight
 	int32 GuildCreateNamePresetIndex = 0;      // 생성 이름 프리셋 인덱스(이름 변경 버튼 순환)
+	// ── 길드 기여/상점 UI 상태(PR-G2) ─────────────────────────────────────────
+	TArray<FGuildShopItemInfo> GuildShopItems; // 길드 상점 카탈로그 캐시(별도 fetch)
+	bool bGuildShopLoading = false;            // 상점 비동기 로딩 표시
+	FString GuildShopLoadedForId;              // 상점을 로드한 길드 id(전환/탈퇴 시 무효화)
+	int32 GuildDonatePresetIndex = 0;          // 헌납 금액 프리셋 인덱스(금액 변경 버튼 순환)
 	FText GuildFeedbackLabel;
 	bool bGuildFeedbackSuccess = false;
 	float GuildFeedbackStartTime = -1000.0f;

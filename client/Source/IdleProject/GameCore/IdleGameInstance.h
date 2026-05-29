@@ -214,6 +214,14 @@ public:
 	void GuildPanelSetRank(const FString& GuildId, const FString& TargetCharacterId, EGuildRank NewRank, TFunction<void(bool)> OnComplete);
 	/** 길드 설정(가입 모드 토글 등, 길드장/부) → 성공 시 스냅샷 갱신. */
 	void GuildPanelUpdateJoinMode(const FString& GuildId, EGuildJoinMode NewJoinMode, TFunction<void(bool)> OnComplete);
+	/** 일일 출석(+기여) → 성공 시 스냅샷 갱신. */
+	void GuildPanelAttendance(TFunction<void(bool)> OnComplete);
+	/** 골드 헌납(floor(gold/1000) 기여, 일일 상한 서버 검증) → 성공 시 스냅샷 갱신. */
+	void GuildPanelDonate(int64 DonateGold, TFunction<void(bool)> OnComplete);
+	/** 길드 상점 카탈로그 조회(별도 fetch). 파싱된 아이템 배열을 콜백으로 전달(UI 캐시용). */
+	void GuildPanelFetchShop(TFunction<void(bool, const TArray<FGuildShopItemInfo>&)> OnComplete);
+	/** 길드 상점 구매(포인트 차감, 서버 검증) → 성공 시 스냅샷 갱신. */
+	void GuildPanelBuyShopItem(const FString& ItemId, TFunction<void(bool)> OnComplete);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -391,6 +399,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Potential")
 	int64 GetRankCubes() const { return RankCubes; }
+
+	/**
+	 * 길드 상점 구매 보상(서버 `shopBuy` 응답 reward)을 캐릭터에 실제 지급한다.
+	 * RewardType 은 서버 카탈로그 type 문자열(gold/expPotion/essence/protectionScroll/resetCube/rankCube).
+	 * 알 수 없는 타입은 무시(로그)하며, Amount<=0 은 지급하지 않는다.
+	 */
+	void ApplyGuildShopReward(const FString& RewardType, int64 Amount);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int32 GetCharacterLevel() const { return CharacterLevel; }

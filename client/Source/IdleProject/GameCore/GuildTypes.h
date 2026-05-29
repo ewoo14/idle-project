@@ -81,6 +81,25 @@ struct IDLEPROJECT_API FGuildSummary
 	EGuildJoinMode JoinMode = EGuildJoinMode::Open;
 };
 
+/**
+ * 길드 상점 1행(서버 `GET /:id/shop` items 항목). 서버 GUILD_SHOP_CATALOG parity —
+ * 소비형 보상이며 가격은 개인 기여 포인트. 스냅샷이 아닌 별도 fetch 로 로드한다.
+ */
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FGuildShopItemInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	FString Id;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	FString Name;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 Price = 0;
+};
+
 /** 길드 가입 신청 1건(승인제, 권한자에게만 노출). */
 USTRUCT(BlueprintType)
 struct IDLEPROJECT_API FGuildJoinRequestInfo
@@ -136,6 +155,14 @@ struct IDLEPROJECT_API FGuildSnapshot
 	/** 오늘 헌납 가능 여부(서버 me.donationRemaining > 0 파생). */
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	bool bCanDonateToday = false;
+
+	/** 오늘 남은 헌납 가능 골드(서버 me.donationRemaining, 일일 상한 - 사용분). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 DonationRemaining = 0;
+
+	/** 내 주간 기여 누적(서버 me.weeklyContribution, 주간 리셋). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 WeeklyContribution = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	TArray<FGuildMemberInfo> Members;

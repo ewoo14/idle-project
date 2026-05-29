@@ -176,9 +176,11 @@ bool UGuildService::ParseSnapshotJson(const FString& JsonBody)
 			Snapshot.MyRank = GuildParseRank(MyRankString);
 		}
 		Snapshot.ContributionPoints = FMath::Max<int64>(0, GuildParseInt64Field(MeObject, TEXT("contributionPoints")));
+		Snapshot.WeeklyContribution = FMath::Max<int64>(0, GuildParseInt64Field(MeObject, TEXT("weeklyContribution")));
 		MeObject->TryGetBoolField(TEXT("canAttend"), Snapshot.bCanAttendToday);
 		// 서버는 donationRemaining(bigint 문자열)을 주므로 >0 이면 헌납 가능.
-		Snapshot.bCanDonateToday = GuildParseInt64Field(MeObject, TEXT("donationRemaining")) > 0;
+		Snapshot.DonationRemaining = FMath::Max<int64>(0, GuildParseInt64Field(MeObject, TEXT("donationRemaining")));
+		Snapshot.bCanDonateToday = Snapshot.DonationRemaining > 0;
 	}
 
 	// 멤버 목록.

@@ -90,6 +90,14 @@ const FString GuildApproveHitBoxPrefix(TEXT("GuildApprove_"));
 const FString GuildRejectHitBoxPrefix(TEXT("GuildReject_"));
 const FString GuildPromoteHitBoxPrefix(TEXT("GuildPromote_"));
 const FString GuildDemoteHitBoxPrefix(TEXT("GuildDemote_"));
+// 길드 기여/상점(PR-G2) — 동일 Guild~ prefix 로 jumbo ODR 회피.
+const FName GuildAttendHitBoxName(TEXT("GuildAttend"));
+const FName GuildDonateHitBoxName(TEXT("GuildDonate"));
+const FName GuildDonateCycleHitBoxName(TEXT("GuildDonateCycle"));
+const FString GuildShopBuyHitBoxPrefix(TEXT("GuildShopBuy_"));
+// 헌납 금액 프리셋(순환) — 보유 골드로 가능한 만큼만 활성.
+const int64 GuildDonatePresets[] = { 1000, 5000, 10000 };
+constexpr int32 GuildDonatePresetCount = 3;
 constexpr int32 GuildCreateNamePresetCount = 8;
 constexpr float GuildFeedbackDurationSeconds = 2.4f;
 constexpr int32 RebirthRequiredLevel = 100;
@@ -228,6 +236,69 @@ FText GuildShortCharacterLabel(const FString& CharacterId)
 		return FText::FromString(CharacterId);
 	}
 	return FText::FromString(FString::Printf(TEXT("%s...%s"), *CharacterId.Left(6), *CharacterId.Right(4)));
+}
+
+// ── 길드 기여/상점 헬퍼(PR-G2) ───────────────────────────────────────────────
+/** 상점 아이템 id → 로컬라이즈 표기명. 알 수 없는 id 는 서버 제공 name 폴백. */
+FText GuildShopItemNameLabel(const FGuildShopItemInfo& Item)
+{
+	static const TMap<FString, const TCHAR*> IdToKey = {
+		{ TEXT("protection_scroll"), TEXT("GUILD_SHOP_ITEM_PROTECTION_SCROLL") },
+		{ TEXT("reset_cube"), TEXT("GUILD_SHOP_ITEM_RESET_CUBE") },
+		{ TEXT("gold_pouch"), TEXT("GUILD_SHOP_ITEM_GOLD_POUCH") },
+		{ TEXT("exp_potion"), TEXT("GUILD_SHOP_ITEM_EXP_POTION") },
+		{ TEXT("rank_cube"), TEXT("GUILD_SHOP_ITEM_RANK_CUBE") },
+		{ TEXT("essence"), TEXT("GUILD_SHOP_ITEM_ESSENCE") },
+	};
+	if (const TCHAR* const* KeyPtr = IdToKey.Find(Item.Id))
+	{
+		return IdleProject::Localization::UI(*KeyPtr);
+	}
+	return Item.Name.IsEmpty() ? IdleProject::Localization::UI(TEXT("NONE_DASH")) : FText::FromString(Item.Name);
+}
+
+/**
+ * 현재 EXP 의 "현재 레벨 내 진행" 산출 — 다음 레벨까지 채운 양/필요 양·비율.
+ * 서버 parity 상수(FGuildFormula::GUILD_LEVEL_BASE/GROWTH)로 누적 임계를 재현한다.
+ * 진행 표시 전용(레벨 자체는 GetGuildLevel 권위).
+ */
+void GuildComputeExpProgress(int64 Exp, int32 Level, int64& OutInto, int64& OutSpan, float& OutRatio)
+{
+	OutInto = 0;
+	OutSpan = 0;
+	OutRatio = 0.0f;
+	if (Exp < 0 || Level < 1)
+	{
+		return;
+	}
+
+	// 레벨 L 도달 누적 임계 = Σ_{i=1}^{L-1} floor(BASE*GROWTH^(i-1)).
+	int64 Cumulative = 0;
+	for (int32 i = 1; i < Level; ++i)
+	{
+		const double StepDouble = FMath::Floor(static_cast<double>(FGuildFormula::GUILD_LEVEL_BASE) * FMath::Pow(FGuildFormula::GUILD_LEVEL_GROWTH, static_cast<double>(i - 1)));
+		if (StepDouble >= static_cast<double>(MAX_int64))
+		{
+			return;
+		}
+		Cumulative += static_cast<int64>(StepDouble);
+	}
+
+	const double NextStepDouble = FMath::Floor(static_cast<double>(FGuildFormula::GUILD_LEVEL_BASE) * FMath::Pow(FGuildFormula::GUILD_LEVEL_GROWTH, static_cast<double>(Level - 1)));
+	if (NextStepDouble >= static_cast<double>(MAX_int64))
+	{
+		return; // 캡 레벨 — 진행 표시 생략.
+	}
+	OutSpan = static_cast<int64>(NextStepDouble);
+	OutInto = FMath::Clamp<int64>(Exp - Cumulative, 0, OutSpan);
+	OutRatio = OutSpan > 0 ? FMath::Clamp(static_cast<float>(OutInto) / static_cast<float>(OutSpan), 0.0f, 1.0f) : 0.0f;
+}
+
+/** 헌납 프리셋 금액(순환) — 보유 골드 검증은 호출부. */
+int64 GuildDonatePresetAmount(int32 PresetIndex)
+{
+	const int32 Clamped = ((PresetIndex % GuildDonatePresetCount) + GuildDonatePresetCount) % GuildDonatePresetCount;
+	return GuildDonatePresets[Clamped];
 }
 
 FText FormatPercentLabel(const TCHAR* Key, float Rate)
@@ -2240,7 +2311,7 @@ FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewMode
 	return ViewModel;
 }
 
-FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline)
+FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems)
 {
 	FIdleHUDGuildPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("GUILD_PANEL_TITLE"));
@@ -2300,6 +2371,65 @@ FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGui
 	ViewModel.MyRankBadgeLabel = IdleProject::Localization::UI(GuildRankToLocalizationKey(MyRank));
 	ViewModel.LeaveLabel = IdleProject::Localization::UI(TEXT("GUILD_LEAVE"));
 	ViewModel.LeaveHitBoxName = GuildLeaveHitBoxName;
+
+	// ── 길드 레벨/EXP/버프/기여(PR-G2) ──
+	const FGuildSnapshot& Snapshot = GuildService.GetSnapshot();
+	const int32 GuildLevel = GuildService.GetGuildLevel();
+	const FGuildBuff Buff = GuildService.GetGuildBuff();
+	const int64 ContributionPoints = GuildService.GetContributionPoints();
+	ViewModel.LevelLabel = FormatLocalizedUI(TEXT("GUILD_LEVEL_FORMAT"), [GuildLevel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Level"), FText::AsNumber(GuildLevel));
+	});
+	int64 ExpInto = 0;
+	int64 ExpSpan = 0;
+	GuildComputeExpProgress(Snapshot.GuildExp, GuildLevel, ExpInto, ExpSpan, ViewModel.ExpProgressRatio);
+	ViewModel.ExpLabel = FormatLocalizedUI(TEXT("GUILD_EXP_FORMAT"), [ExpInto, ExpSpan](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Into"), FText::AsNumber(ExpInto));
+		Args.Add(TEXT("Span"), FText::AsNumber(ExpSpan));
+	});
+	// 버프는 비율(0.04=+4%) → %.1f%% 로 표기.
+	const float AttackPercent = Buff.AttackPct * 100.0f;
+	const float GoldPercent = Buff.GoldPct * 100.0f;
+	ViewModel.BuffLabel = FormatLocalizedUI(TEXT("GUILD_BUFF_FORMAT"), [AttackPercent, GoldPercent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Attack"), FText::FromString(FString::Printf(TEXT("%.1f"), AttackPercent)));
+		Args.Add(TEXT("Gold"), FText::FromString(FString::Printf(TEXT("%.1f"), GoldPercent)));
+	});
+	ViewModel.ContributionLabel = FormatLocalizedUIWithInt64(TEXT("GUILD_CONTRIBUTION_FORMAT"), TEXT("Points"), ContributionPoints);
+	ViewModel.WeeklyContributionLabel = FormatLocalizedUIWithInt64(TEXT("GUILD_WEEKLY_CONTRIBUTION_FORMAT"), TEXT("Weekly"), Snapshot.WeeklyContribution);
+
+	// 일일 출석 — 가능 시 활성(오프라인/액션 중 비활성은 Draw 단계 가드).
+	ViewModel.bCanAttend = Snapshot.bCanAttendToday;
+	ViewModel.AttendLabel = IdleProject::Localization::UI(Snapshot.bCanAttendToday ? TEXT("GUILD_ATTEND") : TEXT("GUILD_ATTEND_DONE"));
+	ViewModel.AttendHitBoxName = GuildAttendHitBoxName;
+
+	// 헌납 — 프리셋 금액 순환, 보유 골드+일일 상한 모두 충족 시 활성.
+	const int64 DonateClamped = FMath::Max<int64>(0, DonateAmount);
+	const bool bAffordDonate = PlayerGold >= DonateClamped && DonateClamped > 0;
+	ViewModel.bCanDonate = Snapshot.bCanDonateToday && bAffordDonate;
+	ViewModel.DonateLabel = FormatLocalizedUIWithInt64(TEXT("GUILD_DONATE_FORMAT"), TEXT("Amount"), DonateClamped);
+	ViewModel.DonateHitBoxName = GuildDonateHitBoxName;
+	ViewModel.DonateCycleLabel = IdleProject::Localization::UI(TEXT("GUILD_DONATE_CYCLE"));
+	ViewModel.DonateCycleHitBoxName = GuildDonateCycleHitBoxName;
+
+	// 길드 상점 — 별도 fetch 한 카탈로그(없으면 빈 안내). 포인트 부족 시 비활성.
+	ViewModel.ShopTitle = IdleProject::Localization::UI(TEXT("GUILD_SHOP_TITLE"));
+	ViewModel.ShopEmptyLabel = IdleProject::Localization::UI(TEXT("GUILD_SHOP_EMPTY"));
+	for (const FGuildShopItemInfo& Item : ShopItems)
+	{
+		FIdleHUDGuildShopRowViewModel Row;
+		Row.ItemId = Item.Id;
+		Row.NameLabel = GuildShopItemNameLabel(Item);
+		Row.PriceLabel = FormatLocalizedUIWithInt64(TEXT("GUILD_SHOP_PRICE_FORMAT"), TEXT("Price"), Item.Price);
+		const bool bAfford = ContributionPoints >= Item.Price;
+		Row.bCanBuy = bAfford;
+		Row.BuyLabel = IdleProject::Localization::UI(bAfford ? TEXT("GUILD_SHOP_BUY") : TEXT("GUILD_SHOP_INSUFFICIENT"));
+		Row.BuyHitBoxName = FName(*(GuildShopBuyHitBoxPrefix + Item.Id));
+		ViewModel.ShopRows.Add(MoveTemp(Row));
+	}
+
 	ViewModel.MemberListTitle = IdleProject::Localization::UI(TEXT("GUILD_MEMBER_LIST_TITLE"));
 
 	const TArray<FGuildMemberInfo>& Members = GuildService.GetMembers();
@@ -3854,6 +3984,26 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(GuildDemoteHitBoxPrefix))
 	{
 		SetGuildMemberRankFromHitBox(BoxName, false);
+		return;
+	}
+	if (BoxName == GuildAttendHitBoxName)
+	{
+		TryGuildAttendance();
+		return;
+	}
+	if (BoxName == GuildDonateCycleHitBoxName)
+	{
+		CycleGuildDonateAmount();
+		return;
+	}
+	if (BoxName == GuildDonateHitBoxName)
+	{
+		TryGuildDonate();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(GuildShopBuyHitBoxPrefix))
+	{
+		BuyGuildShopItemFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -6899,7 +7049,18 @@ void AIdleHUD::DrawGuildPanel()
 
 	const bool bOffline = IdleGameInstance->GetCloudSyncState() == ECloudSyncState::Offline;
 	const FString PendingCreateName = GuildPresetCreateName(GuildCreateNamePresetIndex).ToString();
-	const FIdleHUDGuildPanelViewModel ViewModel = BuildGuildPanelViewModel(*GuildService, GuildBrowseList, PendingCreateName, bGuildBrowseLoading || bGuildActionPending, bOffline);
+	const int64 PlayerGold = IdleGameInstance->GetGold();
+	const int64 DonateAmount = GuildDonatePresetAmount(GuildDonatePresetIndex);
+	// 내 길드 화면 진입 시 상점이 아직 현재 길드로 로드되지 않았으면 1회 fetch.
+	if (GuildService->HasGuild() && !bOffline)
+	{
+		const FString CurrentGuildId = GuildService->GetCachedGuildId();
+		if (!CurrentGuildId.IsEmpty() && GuildShopLoadedForId != CurrentGuildId && !bGuildShopLoading)
+		{
+			RefreshGuildShop();
+		}
+	}
+	const FIdleHUDGuildPanelViewModel ViewModel = BuildGuildPanelViewModel(*GuildService, GuildBrowseList, PendingCreateName, bGuildBrowseLoading || bGuildActionPending, bOffline, PlayerGold, DonateAmount, GuildShopItems);
 
 	const UWorld* World = GetWorld();
 	const float FeedbackElapsed = World ? World->GetTimeSeconds() - GuildFeedbackStartTime : 0.0f;
@@ -6928,6 +7089,10 @@ void AIdleHUD::DrawGuildPanel()
 	{
 		const int32 VisibleMembers = FMath::Min(ViewModel.MemberRows.Num(), 8);
 		PanelHeight = 110.0f * Scale + VisibleMembers * (RowHeight + RowGap);
+		// G2 기여/버프 정보 4줄 + 출석/헌납 버튼 행 + 상점(제목+행).
+		PanelHeight += 132.0f * Scale + ButtonHeight + RowGap;
+		const int32 VisibleShop = FMath::Min(ViewModel.ShopRows.Num(), 6);
+		PanelHeight += 24.0f * Scale + FMath::Max(1, VisibleShop) * (RowHeight + RowGap);
 		if (ViewModel.bShowManage)
 		{
 			const int32 VisibleReq = FMath::Min(ViewModel.RequestRows.Num(), 4);
@@ -7018,6 +7183,68 @@ void AIdleHUD::DrawGuildPanel()
 			AddHitBox(FVector2D(LeaveX, CursorY - 4.0f * Scale), FVector2D(LeaveWidth, ButtonHeight), GuildLeaveHitBoxName, true, 90);
 		}
 		CursorY += 26.0f * Scale;
+
+		// ── 길드 레벨/EXP/버프/기여(PR-G2) ──
+		DrawText(ViewModel.LevelLabel.ToString(), Theme::AccentBlue, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		DrawText(ViewModel.ContributionLabel.ToString(), Theme::AccentGold, X + PanelWidth - Padding - 140.0f * Scale, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+		CursorY += 18.0f * Scale;
+		// EXP 진행 바.
+		const float ExpBarWidth = PanelWidth - Padding * 2.0f;
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.9f), X + Padding, CursorY, ExpBarWidth, 6.0f * Scale);
+		DrawRect(Theme::AccentBlue, X + Padding, CursorY, ExpBarWidth * FMath::Clamp(ViewModel.ExpProgressRatio, 0.0f, 1.0f), 6.0f * Scale);
+		CursorY += 10.0f * Scale;
+		DrawText(ViewModel.ExpLabel.ToString(), Theme::TextMuted, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		CursorY += 18.0f * Scale;
+		DrawText(ViewModel.BuffLabel.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		CursorY += 18.0f * Scale;
+		DrawText(ViewModel.WeeklyContributionLabel.ToString(), Theme::TextMuted, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		CursorY += 22.0f * Scale;
+
+		// ── 출석 / 헌납 액션 행 ──
+		const bool bActionAllowed = !bGuildActionPending && !bOffline;
+		const float AttendWidth = 86.0f * Scale;
+		const bool bAttendEnabled = bActionAllowed && ViewModel.bCanAttend;
+		DrawRect(bAttendEnabled ? Theme::AccentGold : Theme::BgPrimary, X + Padding, CursorY, AttendWidth, ButtonHeight);
+		DrawText(ViewModel.AttendLabel.ToString(), bAttendEnabled ? Theme::BgPrimary : Theme::TextMuted, X + Padding + 8.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		if (bAttendEnabled)
+		{
+			AddHitBox(FVector2D(X + Padding, CursorY), FVector2D(AttendWidth, ButtonHeight), GuildAttendHitBoxName, true, 90);
+		}
+
+		const float DonateWidth = 104.0f * Scale;
+		const float DonateCycleWidth = 56.0f * Scale;
+		const float DonateCycleX = X + PanelWidth - Padding - DonateCycleWidth;
+		const float DonateX = DonateCycleX - 6.0f * Scale - DonateWidth;
+		const bool bDonateEnabled = bActionAllowed && ViewModel.bCanDonate;
+		DrawRect(bDonateEnabled ? Theme::AccentBlue : Theme::BgPrimary, DonateX, CursorY, DonateWidth, ButtonHeight);
+		DrawText(ViewModel.DonateLabel.ToString(), bDonateEnabled ? Theme::BgPrimary : Theme::TextMuted, DonateX + 6.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+		if (bDonateEnabled)
+		{
+			AddHitBox(FVector2D(DonateX, CursorY), FVector2D(DonateWidth, ButtonHeight), GuildDonateHitBoxName, true, 90);
+		}
+		DrawRect(bActionAllowed ? Theme::BgPrimary : Theme::BgPanel, DonateCycleX, CursorY, DonateCycleWidth, ButtonHeight);
+		DrawText(ViewModel.DonateCycleLabel.ToString(), Theme::TextMuted, DonateCycleX + 6.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.48f * Scale);
+		if (bActionAllowed)
+		{
+			AddHitBox(FVector2D(DonateCycleX, CursorY), FVector2D(DonateCycleWidth, ButtonHeight), GuildDonateCycleHitBoxName, true, 90);
+		}
+		CursorY += ButtonHeight + RowGap + 6.0f * Scale;
+
+		// ── 길드 상점 ──
+		DrawText(ViewModel.ShopTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		CursorY += 22.0f * Scale;
+		const int32 VisibleShop = FMath::Min(ViewModel.ShopRows.Num(), 6);
+		if (VisibleShop == 0)
+		{
+			DrawText(ViewModel.ShopEmptyLabel.ToString(), Theme::TextMuted, X + Padding, CursorY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+			CursorY += RowHeight + RowGap;
+		}
+		for (int32 Index = 0; Index < VisibleShop; ++Index)
+		{
+			DrawGuildShopRow(ViewModel.ShopRows[Index], X + Padding, CursorY, PanelWidth - Padding * 2.0f, RowHeight);
+			CursorY += RowHeight + RowGap;
+		}
+		CursorY += 6.0f * Scale;
 
 		DrawText(ViewModel.MemberListTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 		CursorY += 22.0f * Scale;
@@ -7162,6 +7389,29 @@ void AIdleHUD::DrawGuildRequestRow(const FIdleHUDGuildRequestRowViewModel& Row, 
 	}
 }
 
+void AIdleHUD::DrawGuildShopRow(const FIdleHUDGuildShopRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	DrawRect(Theme::AccentGold, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.NameLabel.ToString(), Theme::TextPrimary, X + 10.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.PriceLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+
+	const float BtnWidth = 64.0f * Scale;
+	const float BtnHeight = 24.0f * Scale;
+	const float BtnX = X + Width - BtnWidth - 6.0f * Scale;
+	const float BtnY = Y + (Height - BtnHeight) * 0.5f;
+	const bool bEnabled = Row.bCanBuy && !bGuildActionPending;
+	DrawRect(bEnabled ? Theme::AccentGold : Theme::BgPanel, BtnX, BtnY, BtnWidth, BtnHeight);
+	DrawText(Row.BuyLabel.ToString(), bEnabled ? Theme::BgPrimary : Theme::TextMuted, BtnX + 8.0f * Scale, BtnY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	if (bEnabled)
+	{
+		AddHitBox(FVector2D(BtnX, BtnY), FVector2D(BtnWidth, BtnHeight), Row.BuyHitBoxName, true, 91);
+	}
+}
+
 void AIdleHUD::SetGuildFeedback(const TCHAR* Key, bool bSuccess)
 {
 	GuildFeedbackLabel = IdleProject::Localization::UI(Key);
@@ -7203,6 +7453,37 @@ void AIdleHUD::RefreshGuildBrowseList()
 			if (bSuccess)
 			{
 				StrongThis->GuildBrowseList = Summaries;
+			}
+			StrongThis->RefreshMouseInteraction();
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::RefreshGuildShop()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || !GuildService->HasGuild() || bGuildShopLoading)
+	{
+		return;
+	}
+
+	const FString TargetGuildId = GuildService->GetCachedGuildId();
+	bGuildShopLoading = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelFetchShop([WeakThis, TargetGuildId](bool bSuccess, const TArray<FGuildShopItemInfo>& Items)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildShopLoading = false;
+			if (bSuccess)
+			{
+				StrongThis->GuildShopItems = Items;
+				StrongThis->GuildShopLoadedForId = TargetGuildId;
 			}
 			StrongThis->RefreshMouseInteraction();
 		}
@@ -7315,6 +7596,12 @@ void AIdleHUD::TryLeaveGuild()
 		if (AIdleHUD* StrongThis = WeakThis.Get())
 		{
 			StrongThis->bGuildActionPending = false;
+			if (bSuccess)
+			{
+				// 탈퇴 시 상점 캐시 무효화(재가입 시 재조회).
+				StrongThis->GuildShopItems.Reset();
+				StrongThis->GuildShopLoadedForId.Reset();
+			}
 			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_LEFT") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
 		}
 	});
@@ -7468,6 +7755,107 @@ void AIdleHUD::SetGuildMemberRankFromHitBox(FName BoxName, bool bPromote)
 		{
 			StrongThis->bGuildActionPending = false;
 			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_RANK_CHANGED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryGuildAttendance()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+	if (!GuildService->HasGuild() || !GuildService->GetSnapshot().bCanAttendToday)
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelAttendance([WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_ATTENDED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::CycleGuildDonateAmount()
+{
+	using namespace IdleProject::UI;
+	GuildDonatePresetIndex = (GuildDonatePresetIndex + 1) % GuildDonatePresetCount;
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryGuildDonate()
+{
+	using namespace IdleProject::UI;
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const int64 Amount = GuildDonatePresetAmount(GuildDonatePresetIndex);
+	// 보유 골드/일일 상한 가드(UI 표시와 일치).
+	if (!GuildService->HasGuild() || !GuildService->GetSnapshot().bCanDonateToday || Amount <= 0 || IdleGameInstance->GetGold() < Amount)
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelDonate(Amount, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_DONATED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::BuyGuildShopItemFromHitBox(FName BoxName)
+{
+	using namespace IdleProject::UI;
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+
+	const FString ItemId = BoxName.ToString().RightChop(GuildShopBuyHitBoxPrefix.Len());
+	if (!GuildService->HasGuild() || ItemId.IsEmpty())
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelBuyShopItem(ItemId, [WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_PURCHASED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
 		}
 	});
 	RefreshMouseInteraction();

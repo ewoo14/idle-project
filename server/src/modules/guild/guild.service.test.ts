@@ -834,7 +834,7 @@ describe("GuildService.shop / shopBuy", () => {
     const guild = await service.create(userId, charA, "구매길드");
     // 출석/헌납으로 포인트 적립.
     await service.donate(userId, charA, guild.id, 200_000); // +200 포인트
-    const item = GUILD_SHOP_CATALOG[0]; // price 100
+    const item = GUILD_SHOP_CATALOG[0]; // 카탈로그 첫 항목(가격은 카탈로그 상수에서 가져옴)
     const res = await service.shopBuy(userId, charA, guild.id, item.id);
     expect(res.itemId).toBe(item.id);
     expect(res.reward).toEqual(item.reward);

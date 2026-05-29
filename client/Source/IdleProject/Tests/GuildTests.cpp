@@ -1,5 +1,7 @@
 #include "Misc/AutomationTest.h"
 
+#include "GameCore/BuffService.h"
+#include "GameCore/ConsumableTypes.h"
 #include "GameCore/GuildFormula.h"
 #include "GameCore/GuildService.h"
 #include "GameCore/GuildTypes.h"
@@ -301,6 +303,66 @@ bool FGuildPendingContributionTest::RunTest(const FString& Parameters)
 	const int64 Clamped = Service->ConsumePendingAutoContribution();
 	TestEqual(TEXT("Flushed clamped to weekly cap"), Clamped, FGuildFormula::AUTO_WEEKLY_CAP);
 	TestEqual(TEXT("Remainder retained"), Service->GetPendingAutoContribution(), static_cast<int64>(500));
+
+	return true;
+}
+
+// ── ⑥ 길드 상점 보상 지급(ApplyGuildShopReward) — 타입별 정식 grant 라우팅 ───────
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildShopRewardGrantTest,
+	"IdleProject.Guild.ShopRewardGrant",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildShopRewardGrantTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+
+	// gold: AddGold 경로로 증가.
+	const int64 GoldBefore = GameInstance->GetGold();
+	GameInstance->ApplyGuildShopReward(TEXT("gold"), 100000);
+	TestEqual(TEXT("Gold reward adds to gold"), GameInstance->GetGold(), GoldBefore + 100000);
+
+	// essence: RuneEssence 누적(던전 보상과 동일 경로).
+	const int64 EssenceBefore = GameInstance->GetRuneEssence();
+	GameInstance->ApplyGuildShopReward(TEXT("essence"), 3);
+	TestEqual(TEXT("Essence reward adds to rune essence"), GameInstance->GetRuneEssence(), EssenceBefore + 3);
+
+	// expPotion: WisdomBooster(EXP 부스트) 소비 아이템 수량 증가.
+	GameInstance->ApplyGuildShopReward(TEXT("expPotion"), 5);
+	UBuffService* BuffService = GameInstance->GetBuffService();
+	TestNotNull(TEXT("Buff service exists after exp potion grant"), BuffService);
+	if (BuffService)
+	{
+		TestEqual(
+			TEXT("Exp potion grants WisdomBooster consumables (Standard)"),
+			BuffService->GetCount(EConsumableType::WisdomBooster, EConsumableGrade::Standard),
+			5);
+	}
+
+	// protectionScroll: 실존 강화 보호서 카운터 증가(#71 재화).
+	const int64 ScrollsBefore = GameInstance->GetProtectionScrolls();
+	GameInstance->ApplyGuildShopReward(TEXT("protectionScroll"), 5);
+	TestEqual(TEXT("Protection scroll reward adds to protection scrolls"), GameInstance->GetProtectionScrolls(), ScrollsBefore + 5);
+
+	// resetCube: 실존 잠재 재설정 큐브 카운터 증가(두 차례 누적 확인).
+	const int64 ResetBefore = GameInstance->GetResetCubes();
+	GameInstance->ApplyGuildShopReward(TEXT("resetCube"), 3);
+	GameInstance->ApplyGuildShopReward(TEXT("resetCube"), 2);
+	TestEqual(TEXT("Reset cube reward accumulates"), GameInstance->GetResetCubes(), ResetBefore + 5);
+
+	// rankCube: 실존 잠재 등급 큐브 카운터 증가.
+	const int64 RankBefore = GameInstance->GetRankCubes();
+	GameInstance->ApplyGuildShopReward(TEXT("rankCube"), 1);
+	TestEqual(TEXT("Rank cube reward adds to rank cubes"), GameInstance->GetRankCubes(), RankBefore + 1);
+
+	// 알 수 없는 타입/비양수 수량은 무시(상태 불변).
+	const int64 GoldAfter = GameInstance->GetGold();
+	const int64 ScrollsAfter = GameInstance->GetProtectionScrolls();
+	GameInstance->ApplyGuildShopReward(TEXT("unknownType"), 999);
+	GameInstance->ApplyGuildShopReward(TEXT("gold"), 0);
+	GameInstance->ApplyGuildShopReward(TEXT("protectionScroll"), -5);
+	TestEqual(TEXT("Unknown/zero reward leaves gold unchanged"), GameInstance->GetGold(), GoldAfter);
+	TestEqual(TEXT("Negative reward leaves protection scrolls unchanged"), GameInstance->GetProtectionScrolls(), ScrollsAfter);
 
 	return true;
 }
