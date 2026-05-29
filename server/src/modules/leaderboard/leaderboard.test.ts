@@ -97,6 +97,17 @@ describe("LeaderboardService", () => {
     expect(row).toEqual({ rank: 0, score: 0n });
   });
 
+  it("returns rank zero when the current character has no rebirth row", async () => {
+    const repo = createRepo();
+    repo.getRebirthRank.mockResolvedValue(null);
+    const service = new LeaderboardService(repo, createCache());
+
+    const row = await service.getMyRank("rebirth", 1, uuid(1));
+
+    expect(repo.getRebirthRank).toHaveBeenCalledWith(1, uuid(1));
+    expect(row).toEqual({ rank: 0, score: 0n });
+  });
+
   it("returns the current character rebirth rank with tied scores sharing rank", async () => {
     const repo = createRepo();
     repo.getRebirthRank.mockResolvedValue({ rank: 1, score: 3n });
@@ -124,6 +135,22 @@ describe("LeaderboardRepoPg", () => {
       [3, uuid(3)],
     );
     expect(query.mock.calls[0]?.[0]).toContain("where season_id = $1");
+    expect(query.mock.calls[0]?.[0]).toContain("where character_id = $2");
+  });
+
+  it("maps tied zero-score power ranks without losing bigint precision", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ rank: "1", score: "922337203685477000" }],
+    });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    const row = await repo.getPowerRank(5, uuid(5));
+
+    expect(row).toEqual({ rank: 1, score: 922337203685477000n });
+    expect(query.mock.calls[0]?.[0]).toContain(
+      "rank() over (order by power_score desc)",
+    );
+    expect(query.mock.calls[0]?.[0]).toContain("where season_id = $1");
   });
 
   it("returns null when rebirth rank is missing", async () => {
@@ -137,6 +164,23 @@ describe("LeaderboardRepoPg", () => {
       expect.stringContaining("rank() over (order by rebirth_count desc)"),
       [4, uuid(4)],
     );
+  });
+
+  it("maps rebirth zero-score ranks inside the requested season only", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{ rank: "7", score: "0" }],
+    });
+    const repo = new LeaderboardRepoPg({ query } as never);
+
+    const row = await repo.getRebirthRank(6, uuid(6));
+
+    expect(row).toEqual({ rank: 7, score: 0n });
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("rank() over (order by rebirth_count desc)"),
+      [6, uuid(6)],
+    );
+    expect(query.mock.calls[0]?.[0]).toContain("where season_id = $1");
+    expect(query.mock.calls[0]?.[0]).toContain("where character_id = $2");
   });
 });
 
@@ -184,6 +228,31 @@ describe("leaderboardRoutes", () => {
     });
 
     expect(response.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it("returns rank zero for missing rebirth my-rank rows", async () => {
+    const app = Fastify({ logger: false });
+    vi.mocked(pool.query).mockResolvedValue({ rows: [] } as never);
+    await app.register(errorHandlerPlugin);
+    await app.register(leaderboardRoutes, {
+      prefix: "/v1/leaderboard",
+      redis: createCache() as never,
+    });
+    await app.ready();
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/leaderboard/rebirth/me?season=2&characterId=${uuid(2)}`,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      data: { rank: 0, score: "0" },
+    });
+    expect(pool.query).toHaveBeenCalledWith(expect.any(String), [2, uuid(2)]);
 
     await app.close();
   });

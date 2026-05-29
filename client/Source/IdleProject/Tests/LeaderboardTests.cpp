@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 
+#include "IdleGameInstanceTestHelpers.h"
 #include "GameCore/LeaderboardService.h"
+#include "GameCore/IdleGameInstance.h"
 #include "Internationalization/IdleLocalization.h"
 #include "UI/IdleHUD.h"
 
@@ -63,14 +65,77 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FLeaderboardServiceGracefulJsonTest::RunTest(const FString& Parameters)
 {
 	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	Service->ParseListJson(TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"cached\",\"score\":50,\"rank\":1}]}"), ELeaderboardKind::Power);
+	Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":{\"characterId\":\"cached\",\"score\":50,\"rank\":1}}"), ELeaderboardKind::Power);
 
 	TestEqual(TEXT("Invalid list returns empty array"), Service->ParseListJson(TEXT("{bad json"), ELeaderboardKind::Power).Num(), 0);
+	TestEqual(TEXT("Invalid list clears cached rows gracefully"), Service->GetEntries(ELeaderboardKind::Power).Num(), 0);
 	TestEqual(TEXT("Non-ok list returns empty array"), Service->ParseListJson(TEXT("{\"ok\":false,\"data\":[]}"), ELeaderboardKind::Power).Num(), 0);
 
 	const FLeaderboardEntry Missing = Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":null}"), ELeaderboardKind::Power);
 	TestEqual(TEXT("Missing my rank uses rank zero"), Missing.Rank, 0);
 	TestEqual(TEXT("Missing my rank uses zero score"), Missing.Score, static_cast<int64>(0));
 	TestTrue(TEXT("Missing my rank has no character id"), Missing.CharacterId.IsEmpty());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardServiceRankBoundaryTest,
+	"IdleProject.Leaderboard.RankBoundaryJson",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardServiceRankBoundaryTest::RunTest(const FString& Parameters)
+{
+	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	const FString Json = TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"unranked\",\"score\":0,\"rank\":0},{\"characterId\":\"negative-rank\",\"score\":-1,\"rank\":-10},{\"characterId\":\"huge-rank\",\"score\":\"10\",\"rank\":\"2147483650\"}]}");
+
+	const TArray<FLeaderboardEntry> Entries = Service->ParseListJson(Json, ELeaderboardKind::Rebirth);
+
+	TestEqual(TEXT("Boundary entries parse"), Entries.Num(), 3);
+	if (Entries.Num() != 3)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("Rank zero remains the unranked sentinel"), Entries[0].Rank, 0);
+	TestEqual(TEXT("Zero score parses"), Entries[0].Score, static_cast<int64>(0));
+	TestEqual(TEXT("Negative score parses without overflow"), Entries[1].Score, static_cast<int64>(-1));
+	TestEqual(TEXT("Negative rank clamps to unranked sentinel"), Entries[1].Rank, 0);
+	TestEqual(TEXT("Rank above int32 clamps safely"), Entries[2].Rank, MAX_int32);
+	TestEqual(TEXT("Rebirth boundary entries are cached"), Service->GetEntries(ELeaderboardKind::Rebirth).Num(), 3);
+
+	const FLeaderboardEntry MyEntry = Service->ParseMyRankJson(
+		TEXT("{\"ok\":true,\"data\":{\"characterId\":\"self\",\"score\":0,\"rank\":0}}"),
+		ELeaderboardKind::Rebirth);
+	TestEqual(TEXT("My rank zero remains the unranked sentinel"), MyEntry.Rank, 0);
+	TestEqual(TEXT("My score zero parses"), MyEntry.Score, static_cast<int64>(0));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardRefreshNoApiClientGracefulTest,
+	"IdleProject.Leaderboard.RefreshNoApiClientGraceful",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardRefreshNoApiClientGracefulTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	FIdleGameInstanceWorldContextAccessor::Attach(GameInstance, nullptr);
+
+	GameInstance->RefreshLeaderboard(ELeaderboardKind::Power);
+
+	ULeaderboardService* Service = GameInstance->GetLeaderboardService();
+	TestNotNull(TEXT("RefreshLeaderboard creates service without ApiClient"), Service);
+	if (!Service)
+	{
+		return false;
+	}
+
+	TestEqual(TEXT("No ApiClient leaves top list empty"), Service->GetEntries(ELeaderboardKind::Power).Num(), 0);
+	TestEqual(TEXT("No ApiClient leaves my rank at zero"), Service->GetMyEntry(ELeaderboardKind::Power).Rank, 0);
+	TestEqual(TEXT("No ApiClient leaves my score at zero"), Service->GetMyEntry(ELeaderboardKind::Power).Score, static_cast<int64>(0));
 
 	return true;
 }
