@@ -60,21 +60,18 @@ const anchors: MasteryParityAnchor[] = [
 ];
 
 describe("mastery formula parity with FMasteryFormula", () => {
-  it.each(anchors)(
-    "matches C++ float anchors at level $level",
-    ({
-      level,
-      coreStatMultiplier: expectedCore,
-      critRateAdd: expectedCrit,
-      dropRateAdd: expectedDrop,
-      goldFindPct: expectedGold,
-      expBoostPct: expectedExp,
-    }) => {
-      expect(coreStatMultiplier(level, level, level)).toBe(expectedCore);
-      expect(critRateAdd(level)).toBe(expectedCrit);
-      expect(dropRateAdd(level)).toBe(expectedDrop);
-      expect(goldFindPct(level)).toBe(expectedGold);
-      expect(expBoostPct(level)).toBe(expectedExp);
-    },
-  );
+  it.each(anchors)("matches C++ float anchors at level $level", ({
+    level,
+    coreStatMultiplier: expectedCore,
+    critRateAdd: expectedCrit,
+    dropRateAdd: expectedDrop,
+    goldFindPct: expectedGold,
+    expBoostPct: expectedExp,
+  }) => {
+    expect(coreStatMultiplier(level, level, level)).toBe(expectedCore);
+    expect(critRateAdd(level)).toBe(expectedCrit);
+    expect(dropRateAdd(level)).toBe(expectedDrop);
+    expect(goldFindPct(level)).toBe(expectedGold);
+    expect(expBoostPct(level)).toBe(expectedExp);
+  });
 });

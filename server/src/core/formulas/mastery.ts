@@ -10,7 +10,7 @@ export interface MasteryLevelInfo {
 
 export function xpToNext(level: number): number {
   const safe = Math.max(0, Math.floor(level));
-  return Math.floor(MASTERY_XP_BASE * Math.pow(MASTERY_XP_GROWTH, safe));
+  return Math.floor(MASTERY_XP_BASE * MASTERY_XP_GROWTH ** safe);
 }
 
 export function levelFromTotalXp(totalXp: number): MasteryLevelInfo {

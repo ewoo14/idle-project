@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  MASTERY_TRACK_COUNT,
-  MASTERY_XP_BASE,
-  MASTERY_XP_GROWTH,
   coreStatMultiplier,
   critRateAdd,
   dropRateAdd,
   expBoostPct,
   goldFindPct,
   levelFromTotalXp,
+  MASTERY_TRACK_COUNT,
+  MASTERY_XP_BASE,
+  MASTERY_XP_GROWTH,
   worldPower,
   xpToNext,
 } from "./mastery.js";
@@ -20,9 +20,7 @@ describe("mastery formula", () => {
 
   it("uses the shared geometric xp curve", () => {
     expect(xpToNext(0)).toBe(MASTERY_XP_BASE);
-    expect(xpToNext(1)).toBe(
-      Math.floor(MASTERY_XP_BASE * MASTERY_XP_GROWTH),
-    );
+    expect(xpToNext(1)).toBe(Math.floor(MASTERY_XP_BASE * MASTERY_XP_GROWTH));
     expect(xpToNext(10)).toBeGreaterThan(xpToNext(9));
   });
 
