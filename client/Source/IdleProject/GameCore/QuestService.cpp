@@ -344,6 +344,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch4_004"), EQuestType::Main, TEXT("Raise the Tower Signal"), EQuestObjective::ClimbTower, 25, 27500, 20500, TEXT("main_ch4_003"), TEXT("4-5"));
 	AddDefinition(TEXT("main_ch4_005"), EQuestType::Main, TEXT("Break the Mirror Legion"), EQuestObjective::KillMonster, 80, 31500, 23600, TEXT("main_ch4_004"), TEXT("4-8"));
 	AddDefinition(TEXT("main_ch4_006"), EQuestType::Main, TEXT("Defeat the Rift Sovereign"), EQuestObjective::DefeatBoss, 1, 38000, 28500, TEXT("main_ch4_005"), TEXT("4-10"));
+	AddDefinition(TEXT("main_ch5_001"), EQuestType::Main, TEXT("Descend the Lightless Stair"), EQuestObjective::KillMonster, 95, 44000, 33000, TEXT("main_ch4_006"), TEXT("5-1"));
+	AddDefinition(TEXT("main_ch5_002"), EQuestType::Main, TEXT("Walk the Snuffed Necropolis"), EQuestObjective::ClearMap, 1, 50000, 37500, TEXT("main_ch5_001"), TEXT("5-2"));
+	AddDefinition(TEXT("main_ch5_003"), EQuestType::Main, TEXT("Strength for the Abyssal Throne"), EQuestObjective::ReachLevel, 60, 57000, 42500, TEXT("main_ch5_002"), TEXT("5-4"));
+	AddDefinition(TEXT("main_ch5_004"), EQuestType::Main, TEXT("Silence the Void Herald"), EQuestObjective::ClimbTower, 35, 64500, 48000, TEXT("main_ch5_003"), TEXT("5-5"));
+	AddDefinition(TEXT("main_ch5_005"), EQuestType::Main, TEXT("Breach the Thunder Barrier"), EQuestObjective::KillMonster, 110, 73000, 54500, TEXT("main_ch5_004"), TEXT("5-8"));
+	AddDefinition(TEXT("main_ch5_006"), EQuestType::Main, TEXT("Defeat Verkas the Dimension Lord"), EQuestObjective::DefeatBoss, 1, 88000, 66000, TEXT("main_ch5_005"), TEXT("5-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);

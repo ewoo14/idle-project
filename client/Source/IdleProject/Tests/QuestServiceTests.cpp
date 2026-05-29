@@ -277,7 +277,7 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
 	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
-	TestEqual(TEXT("Quest definition count matches chapter four client contract"), Definitions.Num(), 35);
+	TestEqual(TEXT("Quest definition count matches chapter five client contract"), Definitions.Num(), 41);
 
 	struct FExpectedQuestDefinition
 	{
@@ -316,6 +316,12 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("main_ch4_004"), EQuestType::Main, EQuestObjective::ClimbTower, 25, 27500, 20500, TEXT("main_ch4_003"), TEXT("4-5")},
 		{TEXT("main_ch4_005"), EQuestType::Main, EQuestObjective::KillMonster, 80, 31500, 23600, TEXT("main_ch4_004"), TEXT("4-8")},
 		{TEXT("main_ch4_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 38000, 28500, TEXT("main_ch4_005"), TEXT("4-10")},
+		{TEXT("main_ch5_001"), EQuestType::Main, EQuestObjective::KillMonster, 95, 44000, 33000, TEXT("main_ch4_006"), TEXT("5-1")},
+		{TEXT("main_ch5_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 50000, 37500, TEXT("main_ch5_001"), TEXT("5-2")},
+		{TEXT("main_ch5_003"), EQuestType::Main, EQuestObjective::ReachLevel, 60, 57000, 42500, TEXT("main_ch5_002"), TEXT("5-4")},
+		{TEXT("main_ch5_004"), EQuestType::Main, EQuestObjective::ClimbTower, 35, 64500, 48000, TEXT("main_ch5_003"), TEXT("5-5")},
+		{TEXT("main_ch5_005"), EQuestType::Main, EQuestObjective::KillMonster, 110, 73000, 54500, TEXT("main_ch5_004"), TEXT("5-8")},
+		{TEXT("main_ch5_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 88000, 66000, TEXT("main_ch5_005"), TEXT("5-10")},
 		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
 		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
 		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
@@ -425,6 +431,26 @@ bool FQuestServiceChapterFourPrerequisiteChainTest::RunTest(const FString& Param
 	TestTrue(TEXT("Chapter four legion quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_005")).bSuccess);
 	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
 	TestTrue(TEXT("Chapter four boss quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch4_006")).bSuccess);
+
+	FQuestState ChapterFiveStart;
+	TestTrue(TEXT("Claiming chapter four finale unlocks chapter five start"), Quests->GetQuestState(TEXT("main_ch5_001"), ChapterFiveStart));
+	TestEqual(TEXT("Chapter five quest starts on map 5-1"), ChapterFiveStart.ChapterMapId, FString(TEXT("5-1")));
+
+	Quests->RecordProgress(EQuestObjective::KillMonster, 95);
+	FQuestClaimResult ChapterFiveFirstClaim = Quests->ClaimQuest(TEXT("main_ch5_001"));
+	TestTrue(TEXT("Chapter five first quest can be claimed"), ChapterFiveFirstClaim.bSuccess);
+	TestTrue(TEXT("Chapter five first quest unlocks necropolis"), ChapterFiveFirstClaim.UnlockedQuestIds.Contains(TEXT("main_ch5_002")));
+
+	Quests->RecordProgress(EQuestObjective::ClearMap, 1);
+	TestTrue(TEXT("Chapter five necropolis can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_002")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 60);
+	TestTrue(TEXT("Chapter five level gate can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_003")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ClimbTower, 35);
+	TestTrue(TEXT("Chapter five herald quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_004")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::KillMonster, 110);
+	TestTrue(TEXT("Chapter five barrier quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_005")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
+	TestTrue(TEXT("Chapter five boss quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_006")).bSuccess);
 
 	return true;
 }
