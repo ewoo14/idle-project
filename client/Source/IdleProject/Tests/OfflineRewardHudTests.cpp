@@ -59,6 +59,14 @@ bool FMasteryHudLocalBonusViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Equipment tooltip explains local effect"), ViewModel.Rows[1].TooltipLabel.ToString(), FString(TEXT("Reduces enhancement gold cost.")));
 	TestEqual(TEXT("Combat local bonus comes from service getter"), ViewModel.Rows[0].LocalBonusPercent, FMath::RoundToInt(MasteryService->GetLocalBonus(EMasteryTrack::Combat) * 100.0f));
 
+	// 2종 보너스: 트랙별 의미가 드러나는 라벨(전투=처치골드 %, 심연=던전 입장 +N 정수, 룬=룬 에센스 %).
+	TestEqual(TEXT("Combat bonus II label names kill gold"), ViewModel.Rows[0].LocalBonus2Label.ToString(), FString(TEXT("Bonus II: Kill Gold +1%")));
+	TestEqual(TEXT("Equipment bonus II label names cube price"), ViewModel.Rows[1].LocalBonus2Label.ToString(), FString(TEXT("Bonus II: Cube Price -1%")));
+	TestEqual(TEXT("Abyss bonus II label names dungeon entries as integer"), ViewModel.Rows[2].LocalBonus2Label.ToString(), FString(TEXT("Bonus II: Dungeon Entries +0")));
+	TestEqual(TEXT("Rune bonus II label names rune essence"), ViewModel.Rows[3].LocalBonus2Label.ToString(), FString(TEXT("Bonus II: Rune Essence +1%")));
+	TestEqual(TEXT("Combat bonus II percent comes from service getter"), ViewModel.Rows[0].LocalBonus2Percent, FMath::RoundToInt(MasteryService->GetLocalBonus2(EMasteryTrack::Combat) * 100.0f));
+	TestEqual(TEXT("Abyss bonus II entries come from service getter"), ViewModel.Rows[2].LocalBonus2AbyssEntries, MasteryService->GetAbyssBonusEntries());
+
 	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }

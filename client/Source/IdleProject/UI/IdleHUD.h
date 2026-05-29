@@ -703,9 +703,13 @@ struct IDLEPROJECT_API FIdleHUDMasteryTrackRowViewModel
 	FText XpLabel;
 	FText ProgressLabel;
 	FText LocalBonusLabel;
+	FText LocalBonus2Label;
 	FText TooltipLabel;
 	float ProgressRatio = 0.0f;
 	int32 LocalBonusPercent = 0;
+	// 2종 보너스 표시값. 심연은 던전 입장 +N(정수), 그 외 트랙은 % 정수.
+	int32 LocalBonus2Percent = 0;
+	int32 LocalBonus2AbyssEntries = 0;
 };
 
 struct IDLEPROJECT_API FIdleHUDMasteryPanelViewModel
