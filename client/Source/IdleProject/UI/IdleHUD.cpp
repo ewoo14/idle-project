@@ -310,6 +310,21 @@ const TCHAR* ConsumableEffectKey(EConsumableType Type)
 	}
 }
 
+const TCHAR* ConsumableGradeLabelKey(EConsumableGrade Grade)
+{
+	switch (Grade)
+	{
+	case EConsumableGrade::Lesser:
+		return TEXT("CONSUMABLE_GRADE_LESSER");
+	case EConsumableGrade::Standard:
+		return TEXT("CONSUMABLE_GRADE_STANDARD");
+	case EConsumableGrade::Greater:
+		return TEXT("CONSUMABLE_GRADE_GREATER");
+	default:
+		return TEXT("NONE_DASH");
+	}
+}
+
 const EMasteryTrack* GetMasteryTrackDisplayOrder()
 {
 	static const EMasteryTrack Order[] = {
@@ -386,9 +401,37 @@ const TCHAR* MasteryLocalBonusTooltipKey(EMasteryTrack Track)
 	}
 }
 
-FName MakeConsumableUseHitBoxName(EConsumableType Type)
+FName MakeConsumableUseHitBoxName(EConsumableType Type, EConsumableGrade Grade)
 {
-	return FName(*FString::Printf(TEXT("%s%d"), *ConsumableUseHitBoxPrefix, static_cast<int32>(Type)));
+	return FName(*FString::Printf(TEXT("%s%d_%d"), *ConsumableUseHitBoxPrefix, static_cast<int32>(Type), static_cast<int32>(Grade)));
+}
+
+bool ParseConsumableUseHitBoxName(FName BoxName, EConsumableType& OutType, EConsumableGrade& OutGrade)
+{
+	const FString Raw = BoxName.ToString();
+	if (!Raw.StartsWith(ConsumableUseHitBoxPrefix))
+	{
+		return false;
+	}
+
+	const FString Payload = Raw.RightChop(ConsumableUseHitBoxPrefix.Len());
+	FString TypeText;
+	FString GradeText;
+	if (!Payload.Split(TEXT("_"), &TypeText, &GradeText))
+	{
+		return false;
+	}
+
+	int32 ParsedType = INDEX_NONE;
+	int32 ParsedGrade = INDEX_NONE;
+	if (!LexTryParseString(ParsedType, *TypeText) || !LexTryParseString(ParsedGrade, *GradeText))
+	{
+		return false;
+	}
+
+	OutType = static_cast<EConsumableType>(ParsedType);
+	OutGrade = static_cast<EConsumableGrade>(ParsedGrade);
+	return true;
 }
 
 const TCHAR* RarityToLocalizationKey(EItemRarity Rarity)
@@ -2016,26 +2059,65 @@ FIdleHUDConsumablePanelViewModel IdleProject::UI::BuildConsumablePanelViewModel(
 	ViewModel.ActiveBuffTitle = IdleProject::Localization::UI(TEXT("CONSUMABLE_ACTIVE_BUFF_TITLE"));
 	ViewModel.EmptyActiveBuffLabel = IdleProject::Localization::UI(TEXT("CONSUMABLE_ACTIVE_BUFF_EMPTY"));
 
+	// 등급은 소(Lesser)→중(Standard)→대(Greater) 순으로 표시합니다.
+	static const EConsumableGrade GradeOrder[] = {
+		EConsumableGrade::Lesser,
+		EConsumableGrade::Standard,
+		EConsumableGrade::Greater,
+	};
+
 	const EConsumableType* Order = GetConsumableDisplayOrder();
 	for (int32 Index = 0; Index < GetConsumableDisplayCount(); ++Index)
 	{
 		const EConsumableType Type = Order[Index];
-		FIdleHUDConsumableRowViewModel Row;
-		Row.Type = Type;
-		Row.NameLabel = IdleProject::Localization::UI(ConsumableNameKey(Type));
-		Row.EffectLabel = IdleProject::Localization::UI(ConsumableEffectKey(Type));
-		Row.Count = BuffService.GetCount(Type);
-		Row.CountLabel = FormatLocalizedUIWithNumber(TEXT("CONSUMABLE_COUNT_FORMAT"), TEXT("Count"), Row.Count);
-		Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_USE"));
-		Row.UseHitBoxName = MakeConsumableUseHitBoxName(Type);
-		Row.RemainingSec = BuffService.GetBuffRemainingSec(Type, NowUnixSec);
-		Row.RemainingLabel = FText::FromString(FormatMinutesSeconds(Row.RemainingSec));
-		Row.bCanUse = Row.Count > 0;
-		Row.bActive = BuffService.IsBuffActive(Type, NowUnixSec);
-		ViewModel.Rows.Add(Row);
-		if (Row.bActive)
+		const FText TypeName = IdleProject::Localization::UI(ConsumableNameKey(Type));
+		const FText EffectLabel = IdleProject::Localization::UI(ConsumableEffectKey(Type));
+		const bool bTypeActive = BuffService.IsBuffActive(Type, NowUnixSec);
+		const EConsumableGrade ActiveGrade = BuffService.GetActiveGrade(Type, NowUnixSec);
+		const int64 RemainingSec = BuffService.GetBuffRemainingSec(Type, NowUnixSec);
+
+		// 등급별 보유 행을 생성합니다. 보유 등급이 하나도 없으면 Standard 행만 비활성으로 노출해
+		// 6종 타입이 항상 패널에 보이도록 유지합니다(#73 회귀 방지).
+		const int32 TotalCount = BuffService.GetTotalCount(Type);
+		// 재고가 모두 소진됐지만 현재 활성 등급이 있으면 그 등급 행을 유지해 활성 표시가 사라지지 않게 합니다.
+		const bool bShowActivePlaceholder = TotalCount == 0 && bTypeActive;
+		for (const EConsumableGrade Grade : GradeOrder)
 		{
-			ViewModel.ActiveBuffRows.Add(Row);
+			const int32 GradeCount = BuffService.GetCount(Type, Grade);
+			const bool bIsActiveGrade = bTypeActive && Grade == ActiveGrade;
+			// 보유 등급은 항상 노출하고, 무재고 타입은 (활성 등급 / 없으면 Standard) 1행만 노출합니다.
+			const bool bPlaceholderRow = TotalCount == 0
+				&& (bShowActivePlaceholder ? bIsActiveGrade : Grade == EConsumableGrade::Standard);
+			if (GradeCount <= 0 && !bPlaceholderRow)
+			{
+				continue;
+			}
+
+			FIdleHUDConsumableRowViewModel Row;
+			Row.Type = Type;
+			Row.Grade = Grade;
+			Row.GradeLabel = IdleProject::Localization::UI(ConsumableGradeLabelKey(Grade));
+			// 이름에 등급을 함께 표기합니다(예: "공격 토닉 (대)").
+			Row.NameLabel = FormatLocalizedUI(TEXT("CONSUMABLE_NAME_WITH_GRADE_FORMAT"), [&TypeName, &Row](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Name"), TypeName);
+				Args.Add(TEXT("Grade"), Row.GradeLabel);
+			});
+			Row.EffectLabel = EffectLabel;
+			Row.Count = GradeCount;
+			Row.CountLabel = FormatLocalizedUIWithNumber(TEXT("CONSUMABLE_COUNT_FORMAT"), TEXT("Count"), Row.Count);
+			Row.ActionLabel = IdleProject::Localization::UI(TEXT("ACTION_USE"));
+			Row.UseHitBoxName = MakeConsumableUseHitBoxName(Type, Grade);
+			Row.RemainingSec = RemainingSec;
+			Row.RemainingLabel = FText::FromString(FormatMinutesSeconds(RemainingSec));
+			Row.bCanUse = GradeCount > 0;
+			// 활성 표시는 현재 활성 등급 행에만 부여합니다.
+			Row.bActive = bTypeActive && Grade == ActiveGrade;
+			ViewModel.Rows.Add(Row);
+			if (Row.bActive)
+			{
+				ViewModel.ActiveBuffRows.Add(Row);
+			}
 		}
 	}
 
@@ -4547,16 +4629,14 @@ void AIdleHUD::TryUseConsumableFromHitBox(FName BoxName)
 		return;
 	}
 
-	const FString Raw = BoxName.ToString();
-	const FString TypeValue = Raw.RightChop(ConsumableUseHitBoxPrefix.Len());
-	int32 ParsedType = INDEX_NONE;
-	if (!LexTryParseString(ParsedType, *TypeValue))
+	EConsumableType Type = EConsumableType::AttackTonic;
+	EConsumableGrade Grade = EConsumableGrade::Standard;
+	if (!ParseConsumableUseHitBoxName(BoxName, Type, Grade))
 	{
 		return;
 	}
 
-	const EConsumableType Type = static_cast<EConsumableType>(ParsedType);
-	if (IdleGameInstance->TryUseConsumable(Type))
+	if (IdleGameInstance->TryUseConsumable(Type, Grade))
 	{
 		RefreshMouseInteraction();
 	}
