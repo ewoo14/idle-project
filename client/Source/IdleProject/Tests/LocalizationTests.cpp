@@ -407,6 +407,10 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("MISSION_REWARD_GOLD_FORMAT"),
 				TEXT("MISSION_REWARD_ESSENCE_FORMAT"),
 				TEXT("MISSION_REWARD_CONSUMABLE_FORMAT"),
+				TEXT("POTENTIAL_STAT_ALL_STAT"),
+				TEXT("POTENTIAL_STAT_GOLD_FIND"),
+				TEXT("POTENTIAL_STAT_DROP_RATE"),
+				TEXT("RARITY_TRANSCENDENT"),
 			};
 
 			for (const FString& RequiredKey : RequiredCloudSyncKeys)
