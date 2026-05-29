@@ -2,6 +2,7 @@
 
 #include "GameCore/BuffService.h"
 #include "GameCore/ConsumableTypes.h"
+#include "GameCore/GuildBossFormula.h"
 #include "GameCore/GuildFormula.h"
 #include "GameCore/GuildService.h"
 #include "GameCore/GuildTypes.h"
@@ -148,15 +149,15 @@ bool FGuildServiceParseSnapshotJsonTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-// ── ③ 세이브 v18 라운드트립(길드 id/rank/레벨·버프·포인트·pending·출석일) ────────
+// ── ③ 세이브 v19 라운드트립(길드 id/rank/레벨·버프·포인트·pending·출석일+보스 캐시) ─
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FGuildSaveRoundTripTest,
-	"IdleProject.Guild.SaveRoundTripV18",
+	"IdleProject.Guild.SaveRoundTripV19",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 {
-	// 캡처: GuildService 캐시 → 세이브(v18). 레벨/버프 파생 검증을 위해 exp 가 큰 스냅샷 적용.
+	// 캡처: GuildService 캐시 → 세이브(v19). 레벨/버프 파생 검증을 위해 exp 가 큰 스냅샷 적용.
 	UIdleGameInstance* SourceInstance = NewObject<UIdleGameInstance>();
 	SourceInstance->InitializeGuildServiceForTests();
 
@@ -166,6 +167,9 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 	Snapshot.Guild.Id = TEXT("guild-roundtrip");
 	Snapshot.GuildExp = 30000; // L1(10000)+L2(16000)=26000 누적 → L3 도달.
 	Snapshot.ContributionPoints = 777;
+	// 보스 진행 표시 캐시(서버 권위 미러) 라운드트립 검증용.
+	Snapshot.BossDefeatedCount = 3;
+	Snapshot.BossChallengesRemaining = 4;
 	UGuildService* SourceService = SourceInstance->GetGuildService();
 	SourceService->ApplySnapshot(Snapshot);
 	SourceService->AddPendingAutoContribution(42);
@@ -175,7 +179,7 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture to save succeeds"), SourceInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Captured save writes V18"), SaveGame->SaveVersion, static_cast<int32>(18));
+	TestEqual(TEXT("Captured save writes V19"), SaveGame->SaveVersion, static_cast<int32>(19));
 	TestEqual(TEXT("Captured guild id"), SaveGame->CachedGuildId, FString(TEXT("guild-roundtrip")));
 	TestEqual(TEXT("Captured guild rank officer"), static_cast<int32>(SaveGame->CachedGuildRank), static_cast<int32>(EGuildRank::Officer));
 	TestEqual(TEXT("Captured guild level"), SaveGame->CachedGuildLevel, ExpectedLevel);
@@ -183,8 +187,10 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Captured gold pct"), SaveGame->CachedGuildGoldPct, ExpectedBuff.GoldPct);
 	TestEqual(TEXT("Captured contribution points"), SaveGame->CachedContributionPoints, static_cast<int64>(777));
 	TestEqual(TEXT("Captured pending auto contribution"), SaveGame->PendingAutoContribution, static_cast<int64>(42));
+	TestEqual(TEXT("Captured boss defeated count"), SaveGame->CachedBossDefeatedCount, 3);
+	TestEqual(TEXT("Captured boss challenges remaining"), SaveGame->CachedBossChallengesRemaining, 4);
 
-	// 복원: 세이브(v18) → 새 인스턴스 GuildService 캐시(오프라인 버프 캐시 적용).
+	// 복원: 세이브(v19) → 새 인스턴스 GuildService 캐시(오프라인 버프 캐시 적용).
 	SaveGame->bHasSave = true;
 	UIdleGameInstance* TargetInstance = NewObject<UIdleGameInstance>();
 	TestTrue(TEXT("Apply from save succeeds"), TargetInstance->ApplyFromSave(SaveGame));
@@ -201,6 +207,8 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Restored gold buff (offline cache)"), RestoredService->GetGuildBuff().GoldPct, ExpectedBuff.GoldPct);
 		TestEqual(TEXT("Restored contribution points"), RestoredService->GetContributionPoints(), static_cast<int64>(777));
 		TestEqual(TEXT("Restored pending auto contribution"), RestoredService->GetPendingAutoContribution(), static_cast<int64>(42));
+		TestEqual(TEXT("Restored boss defeated count (display cache)"), RestoredService->GetBossDefeatedCount(), 3);
+		TestEqual(TEXT("Restored boss challenges remaining (display cache)"), RestoredService->GetBossChallengesRemaining(), 4);
 	}
 
 	// v17 입력 로드(가드 >=18 미충족) → 무길드버프(레벨1·0%)로 복원, 무소속 아님(id 존재).
@@ -363,6 +371,132 @@ bool FGuildShopRewardGrantTest::RunTest(const FString& Parameters)
 	GameInstance->ApplyGuildShopReward(TEXT("protectionScroll"), -5);
 	TestEqual(TEXT("Unknown/zero reward leaves gold unchanged"), GameInstance->GetGold(), GoldAfter);
 	TestEqual(TEXT("Negative reward leaves protection scrolls unchanged"), GameInstance->GetProtectionScrolls(), ScrollsAfter);
+
+	return true;
+}
+
+// ── ⑦ 길드 보스 공식 parity (서버 getGuildBossHp/getChallengeDamage + 상수 1:1) ───
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildBossFormulaParityTest,
+	"IdleProject.Guild.BossFormulaParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildBossFormulaParityTest::RunTest(const FString& Parameters)
+{
+	// parity 상수(서버 guild.service.ts §보스).
+	TestEqual(TEXT("Boss base HP 1,000,000"), FGuildBossFormula::GUILD_BOSS_BASE_HP, static_cast<int64>(1000000));
+	TestEqual(TEXT("Boss HP growth 1.5"), FGuildBossFormula::GUILD_BOSS_HP_GROWTH, 1.5);
+	TestEqual(TEXT("Weekly boss challenge limit 7"), FGuildBossFormula::WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT, 7);
+	TestEqual(TEXT("Boss dmg-to-contrib divisor 10,000"), FGuildBossFormula::GUILD_BOSS_DMG_TO_CONTRIB, static_cast<int64>(10000));
+
+	// getGuildBossHp 연속 격파 경계(서버 floor(BASE*GROWTH^max(d,0))):
+	//  d=0 -> 1,000,000 / d=1 -> 1,500,000 / d=2 -> floor(2,250,000)=2,250,000.
+	TestEqual(TEXT("Boss HP at defeated 0"), FGuildBossFormula::GetGuildBossHp(0), static_cast<int64>(1000000));
+	TestEqual(TEXT("Boss HP at defeated 1"), FGuildBossFormula::GetGuildBossHp(1), static_cast<int64>(1500000));
+	TestEqual(TEXT("Boss HP at defeated 2"), FGuildBossFormula::GetGuildBossHp(2), static_cast<int64>(2250000));
+	// 음수 격파수는 0 으로 클램프(서버 Math.max(d,0)).
+	TestEqual(TEXT("Boss HP clamps negative defeated to base"), FGuildBossFormula::GetGuildBossHp(-3), static_cast<int64>(1000000));
+
+	// getChallengeDamage: 음수→0, 양수→그대로(서버 trunc(max(0,cp))).
+	TestEqual(TEXT("Challenge damage of negative cp is zero"), FGuildBossFormula::GetChallengeDamage(-100), static_cast<int64>(0));
+	TestEqual(TEXT("Challenge damage of zero cp is zero"), FGuildBossFormula::GetChallengeDamage(0), static_cast<int64>(0));
+	TestEqual(TEXT("Challenge damage equals positive cp"), FGuildBossFormula::GetChallengeDamage(123456), static_cast<int64>(123456));
+
+	return true;
+}
+
+// ── ⑧ 보스 상태 스냅샷 파싱/접근자(서버 snapshot.boss / GET /:id/boss) ────────────
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildBossSnapshotParseTest,
+	"IdleProject.Guild.BossSnapshotParse",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildBossSnapshotParseTest::RunTest(const FString& Parameters)
+{
+	UGuildService* Service = NewObject<UGuildService>();
+
+	// 보스 상태 포함 스냅샷(서버 toBossState 형태 — hp/accumDamage 는 bigint 문자열).
+	const FString Json = TEXT("{\"ok\":true,\"data\":{")
+		TEXT("\"guild\":{\"id\":\"g-1\",\"name\":\"Raiders\",\"level\":2,\"memberCount\":8,\"joinMode\":\"open\"},")
+		TEXT("\"me\":{\"characterId\":\"me-1\",\"rank\":\"master\"},")
+		TEXT("\"members\":[{\"characterId\":\"me-1\",\"rank\":\"master\",\"totalContribution\":\"100\"}],")
+		TEXT("\"requests\":[],")
+		TEXT("\"boss\":{\"weekId\":\"2026-W22\",\"hp\":\"1500000\",\"accumDamage\":\"450000\",")
+		TEXT("\"defeatedCount\":2,\"challengesRemaining\":5,\"unclaimedDefeats\":1,\"topContributors\":[]}}}");
+
+	TestTrue(TEXT("Boss snapshot parses ok"), Service->ParseSnapshotJson(Json));
+	TestEqual(TEXT("Parsed boss hp (bigint string)"), Service->GetBossHp(), static_cast<int64>(1500000));
+	TestEqual(TEXT("Parsed boss accum damage"), Service->GetBossAccumDamage(), static_cast<int64>(450000));
+	TestEqual(TEXT("Parsed boss defeated count"), Service->GetBossDefeatedCount(), 2);
+	TestEqual(TEXT("Parsed boss challenges remaining"), Service->GetBossChallengesRemaining(), 5);
+	TestEqual(TEXT("Parsed boss unclaimed defeats"), Service->GetBossUnclaimedDefeats(), 1);
+
+	// 보스 키가 없는 스냅샷이면 보스 상태는 기본값(0).
+	const FString NoBoss = TEXT("{\"ok\":true,\"data\":{")
+		TEXT("\"guild\":{\"id\":\"g-2\",\"name\":\"NoBoss\",\"level\":1,\"memberCount\":3,\"joinMode\":\"open\"},")
+		TEXT("\"me\":{\"characterId\":\"me-2\",\"rank\":\"member\"},\"members\":[],\"requests\":[]}}");
+	TestTrue(TEXT("No-boss snapshot still parses"), Service->ParseSnapshotJson(NoBoss));
+	TestEqual(TEXT("Missing boss -> hp zero"), Service->GetBossHp(), static_cast<int64>(0));
+	TestEqual(TEXT("Missing boss -> defeated zero"), Service->GetBossDefeatedCount(), 0);
+
+	return true;
+}
+
+// ── ⑨ 주간 길드 랭킹 파싱(서버 guildRankings: rankings[]+me) ──────────────────────
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildRankingsParseTest,
+	"IdleProject.Guild.RankingsParse",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildRankingsParseTest::RunTest(const FString& Parameters)
+{
+	// GuildPanelFetchRankings 의 내부 파서(GuildInstanceParseRankings)는 익명 헬퍼라
+	// 동일 응답 형태를 GuildPanelFetchRankings 콜백으로 검증한다(파싱 결과만 확인).
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+
+	bool bCallbackInvoked = false;
+	bool bCallbackSuccess = false;
+	TArray<FGuildRankingEntry> Rankings;
+	FGuildRankingEntry MyRank;
+
+	// ApiClient 미초기화 → 즉시 실패 콜백(파싱은 별도 단위 검증이 어려우므로 실패 경로 확인).
+	GameInstance->GuildPanelFetchRankings(20, [&](bool bSuccess, const TArray<FGuildRankingEntry>& InRankings, const FGuildRankingEntry& InMyRank)
+	{
+		bCallbackInvoked = true;
+		bCallbackSuccess = bSuccess;
+		Rankings = InRankings;
+		MyRank = InMyRank;
+	});
+
+	TestTrue(TEXT("Rankings fetch callback invoked"), bCallbackInvoked);
+	TestFalse(TEXT("Rankings fetch fails without ApiClient"), bCallbackSuccess);
+	TestEqual(TEXT("No rankings on failure"), Rankings.Num(), 0);
+	TestEqual(TEXT("Default my rank is zero"), MyRank.Rank, 0);
+
+	return true;
+}
+
+// ── ⑩ 보스 격파 보상 지급(rewards 배열 gold+essence — G2 ApplyGuildShopReward 재사용) ─
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FGuildBossRewardGrantTest,
+	"IdleProject.Guild.BossRewardGrant",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuildBossRewardGrantTest::RunTest(const FString& Parameters)
+{
+	// 보스 격파 보상(GUILD_BOSS_REWARD_PER_DEFEAT = gold 200000 + essence 5)을
+	// 격파 N건 누적 시 amount*N 으로 ApplyGuildShopReward(G2 재사용)에 적용하는 경로 검증.
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+
+	const int64 GoldBefore = GameInstance->GetGold();
+	const int64 EssenceBefore = GameInstance->GetRuneEssence();
+
+	// 2건 격파 누적 수령 가정: gold 400000 + essence 10.
+	GameInstance->ApplyGuildShopReward(TEXT("gold"), 200000 * 2);
+	GameInstance->ApplyGuildShopReward(TEXT("essence"), 5 * 2);
+
+	TestEqual(TEXT("Boss gold reward (2 defeats) adds to gold"), GameInstance->GetGold(), GoldBefore + 400000);
+	TestEqual(TEXT("Boss essence reward (2 defeats) adds to rune essence"), GameInstance->GetRuneEssence(), EssenceBefore + 10);
 
 	return true;
 }

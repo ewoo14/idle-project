@@ -114,6 +114,32 @@ struct IDLEPROJECT_API FGuildJoinRequestInfo
 };
 
 /**
+ * 주간 길드 랭킹 1행(서버 `GET /v1/guilds/rankings` rankings 항목).
+ * 서버 `toRankingResponse` parity — 길드별 Σ weekly_contribution 상위 N.
+ */
+USTRUCT(BlueprintType)
+struct IDLEPROJECT_API FGuildRankingEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 Rank = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	FString GuildId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	FString Name;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 Level = 1;
+
+	/** 길드 주간 기여 합(서버 bigint 문자열, int64). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 WeeklyContribution = 0;
+};
+
+/**
  * 내 길드 스냅샷(서버 `GET /v1/guilds/me` 응답의 클라 캐시 표현).
  * bHasGuild=false 면 무소속이며 나머지 필드는 무의미하다.
  */
@@ -163,6 +189,27 @@ struct IDLEPROJECT_API FGuildSnapshot
 	/** 내 주간 기여 누적(서버 me.weeklyContribution, 주간 리셋). */
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	int64 WeeklyContribution = 0;
+
+	// ── 길드 보스 상태(PR-G3, 서버 snapshot.boss / GET /:id/boss 파싱) ───────────
+	/** 현재 공유 보스 HP(서버 boss.hp = getGuildBossHp(defeated), bigint 문자열). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 BossHp = 0;
+
+	/** 현재 보스 누적 데미지(서버 boss.accumDamage, 격파 이월분, bigint 문자열). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int64 BossAccumDamage = 0;
+
+	/** 이번 주 누적 격파 횟수(서버 boss.defeatedCount). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 BossDefeatedCount = 0;
+
+	/** 내 이번 주 남은 보스 도전 횟수(서버 boss.challengesRemaining). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 BossChallengesRemaining = 0;
+
+	/** 내 미수령 격파 보상 건수(서버 boss.unclaimedDefeats = defeated - 내 수령분). */
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
+	int32 BossUnclaimedDefeats = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Guild")
 	TArray<FGuildMemberInfo> Members;

@@ -51,6 +51,12 @@ public:
 	void GuildContribute(const FString& GuildId, const FString& CharacterId, int64 Amount, TFunction<void(bool, FString)> Callback);
 	void GetGuildShop(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	void BuyGuildShopItem(const FString& GuildId, const FString& CharacterId, const FString& ItemId, TFunction<void(bool, FString)> Callback);
+
+	// ── 길드 보스/주간 랭킹 `/v1/guilds/...` (PR-G3, {ok,data} 래퍼) ───────────────
+	void ChallengeGuildBoss(const FString& GuildId, const FString& CharacterId, int64 Cp, TFunction<void(bool, FString)> Callback);
+	void ClaimGuildBossReward(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void GetGuildBoss(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
+	void GetGuildRankings(int32 Limit, const FString& CharacterId, TFunction<void(bool, FString)> Callback);
 	bool RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool ClaimOfflineRewards(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount);
 	bool RequestQuestList(const FString& CharacterId);

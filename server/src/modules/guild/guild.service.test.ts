@@ -8,20 +8,27 @@ import {
   ATTENDANCE_REWARD,
   AUTO_WEEKLY_CAP,
   DONATION_DAILY_CAP,
+  GUILD_BOSS_BASE_HP,
+  GUILD_BOSS_DMG_TO_CONTRIB,
   GUILD_CAPACITY,
   GUILD_LEVEL_BASE,
   GUILD_SHOP_CATALOG,
+  type GuildBossRecord,
   type GuildJoinMode,
   type GuildJoinRequestRecord,
   type GuildMemberRecord,
   type GuildRank,
+  type GuildRankingRow,
   type GuildRecord,
   type GuildRepo,
   GuildService,
+  getChallengeDamage,
+  getGuildBossHp,
   getGuildBuff,
   getGuildLevel,
   getRankSlotCap,
   isRankUnlocked,
+  WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT,
 } from "./guild.service.js";
 
 const userId = "00000000-0000-0000-0000-000000000001";
@@ -34,6 +41,9 @@ class FakeGuildRepo implements GuildRepo {
   guilds = new Map<string, GuildRecord>();
   members = new Map<string, GuildMemberRecord>(); // characterId → member
   requests: GuildJoinRequestRecord[] = [];
+  bosses = new Map<string, GuildBossRecord>(); // guildId → boss
+  // (guildId|weekId|characterId) → damage
+  bossContrib = new Map<string, bigint>();
   // userId → characterId 들. 기본은 모든 charA/B/C 가 userId 소유로 간주.
   ownedCharacters = new Set<string>([charA, charB, charC]);
 
@@ -116,6 +126,9 @@ class FakeGuildRepo implements GuildRepo {
       lastDonationDate: null,
       dailyDonation: 0n,
       weeklyResetId: null,
+      weeklyBossChallenges: 0,
+      bossClaimedCount: 0,
+      bossClaimWeekId: null,
     });
     return guild;
   }
@@ -147,6 +160,9 @@ class FakeGuildRepo implements GuildRepo {
       lastDonationDate: null,
       dailyDonation: 0n,
       weeklyResetId: null,
+      weeklyBossChallenges: 0,
+      bossClaimedCount: 0,
+      bossClaimWeekId: null,
     };
     this.members.set(input.characterId, member);
     return member;
@@ -310,6 +326,117 @@ class FakeGuildRepo implements GuildRepo {
     return member;
   }
 
+  async getBoss(guildId: string) {
+    return this.bosses.get(guildId) ?? null;
+  }
+
+  async challengeBoss(input: {
+    guildId: string;
+    characterId: string;
+    weekId: string;
+    weeklyReset: boolean;
+    dmg: bigint;
+    newAccumDamage: bigint;
+    newDefeatedCount: number;
+    newChallengeCount: number;
+  }) {
+    const member = this.members.get(input.characterId);
+    if (!member || member.guildId !== input.guildId) {
+      return null;
+    }
+    const boss: GuildBossRecord = {
+      guildId: input.guildId,
+      weekId: input.weekId,
+      accumDamage: input.newAccumDamage,
+      defeatedCount: input.newDefeatedCount,
+    };
+    this.bosses.set(input.guildId, boss);
+    const key = `${input.guildId}|${input.weekId}|${input.characterId}`;
+    this.bossContrib.set(key, (this.bossContrib.get(key) ?? 0n) + input.dmg);
+    // 멤버 주간 마커 전진 + weeklyReset 면 weekly 컬럼 0 부터(repo 와 동일).
+    if (input.weeklyReset) {
+      member.weeklyContribution = 0n;
+      member.weeklyAutoContribution = 0n;
+    }
+    member.weeklyResetId = input.weekId;
+    member.weeklyBossChallenges = input.newChallengeCount;
+    return { boss, member };
+  }
+
+  async claimBossReward(input: {
+    characterId: string;
+    weekId: string;
+    fromClaimedCount: number;
+    toDefeatedCount: number;
+  }) {
+    const member = this.members.get(input.characterId);
+    if (!member) {
+      return null;
+    }
+    const current =
+      member.bossClaimWeekId === input.weekId ? member.bossClaimedCount : 0;
+    if (current !== input.fromClaimedCount) {
+      return null;
+    }
+    member.bossClaimedCount = input.toDefeatedCount;
+    member.bossClaimWeekId = input.weekId;
+    return member;
+  }
+
+  async listBossContrib(input: {
+    guildId: string;
+    weekId: string;
+    limit: number;
+  }) {
+    const rows: { characterId: string; damage: bigint }[] = [];
+    for (const [key, damage] of this.bossContrib) {
+      const [guildId, weekId, characterId] = key.split("|");
+      if (guildId === input.guildId && weekId === input.weekId) {
+        rows.push({ characterId: characterId ?? "", damage });
+      }
+    }
+    rows.sort((a, b) =>
+      b.damage > a.damage ? 1 : b.damage < a.damage ? -1 : 0,
+    );
+    return rows.slice(0, input.limit);
+  }
+
+  async listGuildRankings(limit: number) {
+    return this.computeRankings().slice(0, limit);
+  }
+
+  async getGuildRanking(guildId: string) {
+    return this.computeRankings().find((r) => r.guildId === guildId) ?? null;
+  }
+
+  // 길드별 Σ weekly_contribution 집계 + 순위(동점은 createdAt 오름차순).
+  private computeRankings(): GuildRankingRow[] {
+    const sums = new Map<string, bigint>();
+    for (const m of this.members.values()) {
+      sums.set(m.guildId, (sums.get(m.guildId) ?? 0n) + m.weeklyContribution);
+    }
+    const rows = [...this.guilds.values()].map((g) => ({
+      guildId: g.id,
+      name: g.name,
+      level: getGuildLevel(g.exp),
+      weeklyContribution: sums.get(g.id) ?? 0n,
+      createdAt: g.createdAt,
+    }));
+    rows.sort((a, b) => {
+      if (b.weeklyContribution !== a.weeklyContribution) {
+        return b.weeklyContribution > a.weeklyContribution ? 1 : -1;
+      }
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+    return rows.map((r, i) => ({
+      guildId: r.guildId,
+      name: r.name,
+      level: r.level,
+      weeklyContribution: r.weeklyContribution,
+      rank: i + 1,
+    }));
+  }
+
   // 테스트 헬퍼: 임의 멤버 직접 주입(정원/계급 시나리오).
   seedMembers(
     guildId: string,
@@ -335,6 +462,9 @@ class FakeGuildRepo implements GuildRepo {
         lastDonationDate: null,
         dailyDonation: 0n,
         weeklyResetId: null,
+        weeklyBossChallenges: 0,
+        bossClaimedCount: 0,
+        bossClaimWeekId: null,
         ...(overrides[i - 1] ?? {}),
       });
     }
@@ -859,5 +989,266 @@ describe("GuildService.shop / shopBuy", () => {
     await expect(
       service.shopBuy(userId, charA, guild.id, "no_such_item"),
     ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("GuildBossFormula (순수 함수, 클라 parity)", () => {
+  it("HP = floor(BASE * 1.5^defeated) (격파마다 상향)", () => {
+    expect(getGuildBossHp(0)).toBe(GUILD_BOSS_BASE_HP);
+    expect(getGuildBossHp(1)).toBe(Math.floor(GUILD_BOSS_BASE_HP * 1.5));
+    expect(getGuildBossHp(2)).toBe(Math.floor(GUILD_BOSS_BASE_HP * 1.5 ** 2));
+    // 음수 방어(0 으로 클램프).
+    expect(getGuildBossHp(-3)).toBe(GUILD_BOSS_BASE_HP);
+  });
+
+  it("getChallengeDamage = trunc(cp), 음수/비정상 0", () => {
+    expect(getChallengeDamage(12345)).toBe(12345);
+    expect(getChallengeDamage(99.9)).toBe(99);
+    expect(getChallengeDamage(0)).toBe(0);
+    expect(getChallengeDamage(-50)).toBe(0);
+    expect(getChallengeDamage(Number.NaN)).toBe(0);
+  });
+});
+
+describe("GuildService.challengeBoss", () => {
+  it("도전 시 누적·내 기여 데미지 적립, 잔여 횟수 감소", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "보스길드");
+    const res = await service.challengeBoss(userId, charA, guild.id, 5000);
+    expect(res.damage).toBe("5000");
+    expect(res.accumDamage).toBe("5000");
+    expect(res.defeatedCount).toBe(0);
+    expect(res.challengesRemaining).toBe(WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT - 1);
+    const boss = await repo.getBoss(guild.id);
+    expect(boss?.accumDamage).toBe(5000n);
+  });
+
+  it("누적이 여러 명에 걸쳐 쌓임(비동기 협력)", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "협력길드");
+    await service.join(userId, charB, guild.id);
+    await service.challengeBoss(userId, charA, guild.id, 100_000);
+    const res = await service.challengeBoss(userId, charB, guild.id, 50_000);
+    expect(res.accumDamage).toBe("150000");
+    expect(res.defeatedCount).toBe(0);
+  });
+
+  it("주간 도전 한도(7) 초과 거부", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "한도길드");
+    for (let i = 0; i < WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT; i++) {
+      await service.challengeBoss(userId, charA, guild.id, 10);
+    }
+    await expect(
+      service.challengeBoss(userId, charA, guild.id, 10),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("단일 격파: 누적이 HP 도달 시 defeated++·이월 차감", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "격파길드");
+    // BASE_HP(1,000,000) + 1 데미지 → 1격파, 이월 1.
+    const res = await service.challengeBoss(
+      userId,
+      charA,
+      guild.id,
+      GUILD_BOSS_BASE_HP + 1,
+    );
+    expect(res.defeatedCount).toBe(1);
+    expect(res.newDefeats).toBe(1);
+    expect(res.accumDamage).toBe("1"); // 이월
+    expect(res.bossHp).toBe(String(getGuildBossHp(1)));
+  });
+
+  it("연속 격파: 한 번의 도전이 여러 HP 임계를 넘으면 defeated 다중 증가", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "연속격파");
+    // HP0=1,000,000, HP1=1,500,000, HP2=2,250,000. 합 4,750,000.
+    // 5,000,000 데미지 → 3격파, 이월 250,000.
+    const hp0 = getGuildBossHp(0);
+    const hp1 = getGuildBossHp(1);
+    const hp2 = getGuildBossHp(2);
+    const total = hp0 + hp1 + hp2; // 4,750,000
+    const res = await service.challengeBoss(
+      userId,
+      charA,
+      guild.id,
+      total + 250_000,
+    );
+    expect(res.defeatedCount).toBe(3);
+    expect(res.newDefeats).toBe(3);
+    expect(res.accumDamage).toBe("250000");
+  });
+
+  it("보스 데미지 → 기여(floor(dmg/D)) 1회만 적립(이중적립 금지)", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "기여보스");
+    // dmg=25,000, D=10,000 → +2 기여.
+    const res = await service.challengeBoss(userId, charA, guild.id, 25_000);
+    const expected = Math.floor(25_000 / GUILD_BOSS_DMG_TO_CONTRIB);
+    expect(res.contributionGain).toBe(String(expected));
+    const member = await repo.getMembership(charA);
+    expect(member?.contributionPoints).toBe(BigInt(expected));
+    expect(member?.weeklyContribution).toBe(BigInt(expected));
+    // EXP 도 1회만 반영.
+    expect((await repo.getGuild(guild.id))?.exp).toBe(BigInt(expected));
+  });
+
+  it("데미지가 D 미만이면 기여 0(누적 데미지는 적립)", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "소액보스");
+    const res = await service.challengeBoss(userId, charA, guild.id, 5000);
+    expect(res.contributionGain).toBe("0");
+    expect(res.accumDamage).toBe("5000");
+    expect((await repo.getMembership(charA))?.contributionPoints).toBe(0n);
+  });
+
+  it("주간 리셋: 새 주 진입 시 보스 누적·도전 횟수 0 부터", async () => {
+    const clock = mutableClock(new Date("2026-06-01T00:00:00Z")); // 2026-W23
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo, clock);
+    const guild = await service.create(userId, charA, "보스리셋");
+    await service.challengeBoss(userId, charA, guild.id, 300_000);
+    expect((await repo.getBoss(guild.id))?.accumDamage).toBe(300_000n);
+
+    clock.set(new Date("2026-06-09T00:00:00Z")); // 다음 주
+    const res = await service.challengeBoss(userId, charA, guild.id, 100_000);
+    expect(res.accumDamage).toBe("100000"); // 보스 누적 리셋
+    expect(res.challengesRemaining).toBe(WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT - 1); // 도전 횟수 리셋
+  });
+
+  it("비멤버는 도전 거부", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "비멤버보스");
+    await expect(
+      service.challengeBoss(userId, charB, guild.id, 100),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});
+
+describe("GuildService.claimBossReward", () => {
+  it("격파분 미수령 보상 전원 지급(격파 N건 × 보상)", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "보상길드");
+    await service.join(userId, charB, guild.id);
+    // 2격파 발생.
+    const hp0 = getGuildBossHp(0);
+    const hp1 = getGuildBossHp(1);
+    await service.challengeBoss(userId, charA, guild.id, hp0 + hp1);
+    // charB(미도전 멤버)도 전원 보상 수령 가능.
+    const res = await service.claimBossReward(userId, charB, guild.id);
+    expect(res.status).toBe("claimed");
+    expect(res.defeats).toBe(2);
+    expect(res.claimedCount).toBe(2);
+    // 재수령 시 미수령 없음.
+    await expect(
+      service.claimBossReward(userId, charB, guild.id),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("격파 0건이면 수령할 보상 없음", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "무보상");
+    await service.challengeBoss(userId, charA, guild.id, 100); // 격파 X
+    await expect(
+      service.claimBossReward(userId, charA, guild.id),
+    ).rejects.toBeInstanceOf(ConflictError);
+  });
+
+  it("추가 격파 후 차분만 수령(마일스톤 추적)", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "차분보상");
+    await service.challengeBoss(userId, charA, guild.id, getGuildBossHp(0));
+    const first = await service.claimBossReward(userId, charA, guild.id);
+    expect(first.defeats).toBe(1);
+    // 추가 격파 1건.
+    await service.challengeBoss(userId, charA, guild.id, getGuildBossHp(1));
+    const second = await service.claimBossReward(userId, charA, guild.id);
+    expect(second.defeats).toBe(1); // 차분만
+    expect(second.claimedCount).toBe(2);
+  });
+});
+
+describe("GuildService.guildRankings", () => {
+  it("길드별 Σ weekly_contribution 내림차순 정렬", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const g1 = await service.create(userId, charA, "랭킹1");
+    const g2 = await service.create(userId, charB, "랭킹2");
+    // g2 가 더 많은 주간 기여.
+    await service.contribute(userId, charA, g1.id, 100);
+    await service.contribute(userId, charB, g2.id, 500);
+    const res = await service.guildRankings({ limit: 10 });
+    expect(res.rankings[0].guildId).toBe(g2.id);
+    expect(res.rankings[0].rank).toBe(1);
+    expect(res.rankings[1].guildId).toBe(g1.id);
+  });
+
+  it("동점은 생성 순(createdAt 오름차순)으로 안정 정렬", async () => {
+    const clock = mutableClock(new Date("2026-06-01T00:00:00Z"));
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo, clock);
+    const g1 = await service.create(userId, charA, "동점A");
+    clock.set(new Date("2026-06-01T01:00:00Z"));
+    const g2 = await service.create(userId, charB, "동점B");
+    // 둘 다 기여 0(동점).
+    const res = await service.guildRankings({ limit: 10 });
+    expect(res.rankings[0].guildId).toBe(g1.id); // 먼저 생성
+    expect(res.rankings[1].guildId).toBe(g2.id);
+  });
+
+  it("characterId 지정 시 내 길드 순위 동봉", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const g1 = await service.create(userId, charA, "내랭킹1");
+    const g2 = await service.create(userId, charB, "내랭킹2");
+    await service.contribute(userId, charB, g2.id, 500);
+    const res = await service.guildRankings({
+      limit: 10,
+      userId,
+      characterId: charA,
+    });
+    expect(res.me?.guildId).toBe(g1.id);
+    expect(res.me?.rank).toBe(2);
+  });
+
+  it("무소속이면 me=null", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    await service.create(userId, charB, "타길드");
+    const res = await service.guildRankings({
+      limit: 10,
+      userId,
+      characterId: charA, // 무소속
+    });
+    expect(res.me).toBeNull();
+  });
+});
+
+describe("GuildService.snapshot (보스 상태)", () => {
+  it("스냅샷에 보스 상태(HP/누적/도전 잔여/미수령) 포함", async () => {
+    const repo = new FakeGuildRepo();
+    const { service } = makeService(repo);
+    const guild = await service.create(userId, charA, "보스스냅");
+    await service.challengeBoss(userId, charA, guild.id, getGuildBossHp(0) + 7);
+    const snap = await service.snapshot(userId, charA);
+    expect(snap.boss?.defeatedCount).toBe(1);
+    expect(snap.boss?.unclaimedDefeats).toBe(1);
+    expect(snap.boss?.accumDamage).toBe("7");
+    expect(snap.boss?.challengesRemaining).toBe(
+      WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT - 1,
+    );
+    expect(snap.boss?.hp).toBe(String(getGuildBossHp(1)));
   });
 });

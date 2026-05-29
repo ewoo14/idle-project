@@ -1,9 +1,11 @@
 import type { Pool, PoolClient } from "pg";
 import type {
+  GuildBossRecord,
   GuildJoinMode,
   GuildJoinRequestRecord,
   GuildMemberRecord,
   GuildRank,
+  GuildRankingRow,
   GuildRecord,
   GuildRepo,
 } from "./guild.service.js";
@@ -30,7 +32,10 @@ const MEMBER_COLUMNS = `guild_id as "guildId",
   weekly_auto_contribution as "weeklyAutoContribution",
   last_donation_date as "lastDonationDate",
   daily_donation as "dailyDonation",
-  weekly_reset_id as "weeklyResetId"`;
+  weekly_reset_id as "weeklyResetId",
+  weekly_boss_challenges as "weeklyBossChallenges",
+  boss_claimed_count as "bossClaimedCount",
+  boss_claim_week_id as "bossClaimWeekId"`;
 
 function mapGuild(row: Record<string, unknown>): GuildRecord {
   return {
@@ -61,6 +66,28 @@ function mapMember(row: Record<string, unknown>): GuildMemberRecord {
     lastDonationDate: (row.lastDonationDate as string | null) ?? null,
     dailyDonation: BigInt(row.dailyDonation as string),
     weeklyResetId: (row.weeklyResetId as string | null) ?? null,
+    weeklyBossChallenges: Number(row.weeklyBossChallenges),
+    bossClaimedCount: Number(row.bossClaimedCount),
+    bossClaimWeekId: (row.bossClaimWeekId as string | null) ?? null,
+  };
+}
+
+function mapBoss(row: Record<string, unknown>): GuildBossRecord {
+  return {
+    guildId: row.guildId as string,
+    weekId: row.weekId as string,
+    accumDamage: BigInt(row.accumDamage as string),
+    defeatedCount: Number(row.defeatedCount),
+  };
+}
+
+function mapRanking(row: Record<string, unknown>): GuildRankingRow {
+  return {
+    guildId: row.guildId as string,
+    name: row.name as string,
+    level: Number(row.level),
+    weeklyContribution: BigInt(row.weeklyContribution as string),
+    rank: Number(row.rank),
   };
 }
 
@@ -460,6 +487,176 @@ export class GuildRepoPg implements GuildRepo {
       [input.characterId, input.cost.toString()],
     );
     return result.rows[0] ? mapMember(result.rows[0]) : null;
+  }
+
+  async getBoss(guildId: string): Promise<GuildBossRecord | null> {
+    const result = await this.pool.query(
+      `select guild_id as "guildId",
+              week_id as "weekId",
+              accum_damage as "accumDamage",
+              defeated_count as "defeatedCount"
+       from guild_boss
+       where guild_id = $1`,
+      [guildId],
+    );
+    return result.rows[0] ? mapBoss(result.rows[0]) : null;
+  }
+
+  async challengeBoss(input: {
+    guildId: string;
+    characterId: string;
+    weekId: string;
+    weeklyReset: boolean;
+    dmg: bigint;
+    newAccumDamage: bigint;
+    newDefeatedCount: number;
+    newChallengeCount: number;
+  }): Promise<{ boss: GuildBossRecord; member: GuildMemberRecord } | null> {
+    return this.withTransaction(async (client) => {
+      // 1) 보스 행 upsert. 서비스가 계산한 누적/격파를 권위 값으로 기록.
+      //    week_id 가 바뀌면(주간 리셋) 새 주 값으로 덮어쓴다.
+      const bossResult = await client.query(
+        `insert into guild_boss (guild_id, week_id, accum_damage, defeated_count, updated_at)
+         values ($1, $2, $3, $4, now())
+         on conflict (guild_id)
+         do update set week_id = excluded.week_id,
+                       accum_damage = excluded.accum_damage,
+                       defeated_count = excluded.defeated_count,
+                       updated_at = now()
+         returning guild_id as "guildId",
+                   week_id as "weekId",
+                   accum_damage as "accumDamage",
+                   defeated_count as "defeatedCount"`,
+        [
+          input.guildId,
+          input.weekId,
+          input.newAccumDamage.toString(),
+          input.newDefeatedCount,
+        ],
+      );
+
+      // 2) 멤버 보스 기여(주간 내부 랭킹). weeklyReset 면 0 부터(이전 주 행은 week_id 가 달라 무관).
+      await client.query(
+        `insert into guild_boss_contrib (guild_id, week_id, character_id, damage)
+         values ($1, $2, $3, $4)
+         on conflict (guild_id, week_id, character_id)
+         do update set damage = guild_boss_contrib.damage + excluded.damage`,
+        [input.guildId, input.weekId, input.characterId, input.dmg.toString()],
+      );
+
+      // 3) 멤버 주간 도전 카운트 + 주간 리셋 마커 갱신.
+      //    weeklyReset(멤버 마커 stale) 면 weekly_contribution/auto 도 0 으로 리셋하고
+      //    weekly_reset_id 를 현재 주로 전진(이후 applyContribution 은 weeklyReset=false 로 호출).
+      const weeklyContribCol = input.weeklyReset ? "0" : "weekly_contribution";
+      const weeklyAutoCol = input.weeklyReset
+        ? "0"
+        : "weekly_auto_contribution";
+      const memberResult = await client.query(
+        `update guild_members
+         set weekly_boss_challenges = $3,
+             weekly_reset_id = $4,
+             weekly_contribution = ${weeklyContribCol},
+             weekly_auto_contribution = ${weeklyAutoCol}
+         where character_id = $1 and guild_id = $2
+         returning ${MEMBER_COLUMNS}`,
+        [
+          input.characterId,
+          input.guildId,
+          input.newChallengeCount,
+          input.weekId,
+        ],
+      );
+      if (!memberResult.rows[0]) {
+        return null;
+      }
+      return {
+        boss: mapBoss(bossResult.rows[0]),
+        member: mapMember(memberResult.rows[0]),
+      };
+    });
+  }
+
+  async claimBossReward(input: {
+    characterId: string;
+    weekId: string;
+    fromClaimedCount: number;
+    toDefeatedCount: number;
+  }): Promise<GuildMemberRecord | null> {
+    // 조건부 update — 기대 마일스톤(fromClaimedCount)과 다르면 0행(동시성 가드).
+    // boss_claim_week_id 가 이전 주면 fromClaimedCount=0 으로 호출되므로
+    // (week_id 불일치 or claimed_count 일치) 둘 다 매칭하도록 처리.
+    const result = await this.pool.query(
+      `update guild_members
+       set boss_claimed_count = $3,
+           boss_claim_week_id = $2
+       where character_id = $1
+         and ( (boss_claim_week_id = $2 and boss_claimed_count = $4)
+            or (boss_claim_week_id is distinct from $2 and $4 = 0) )
+       returning ${MEMBER_COLUMNS}`,
+      [
+        input.characterId,
+        input.weekId,
+        input.toDefeatedCount,
+        input.fromClaimedCount,
+      ],
+    );
+    return result.rows[0] ? mapMember(result.rows[0]) : null;
+  }
+
+  async listBossContrib(input: {
+    guildId: string;
+    weekId: string;
+    limit: number;
+  }): Promise<{ characterId: string; damage: bigint }[]> {
+    const result = await this.pool.query(
+      `select character_id as "characterId", damage
+       from guild_boss_contrib
+       where guild_id = $1 and week_id = $2
+       order by damage desc
+       limit $3`,
+      [input.guildId, input.weekId, input.limit],
+    );
+    return result.rows.map((row) => ({
+      characterId: row.characterId as string,
+      damage: BigInt(row.damage as string),
+    }));
+  }
+
+  async listGuildRankings(limit: number): Promise<GuildRankingRow[]> {
+    // 길드별 Σ weekly_contribution(멤버 합) 상위 N. #76 row_number 패턴.
+    const result = await this.pool.query(
+      `select g.id as "guildId", g.name, g.level,
+              coalesce(sum(m.weekly_contribution), 0) as "weeklyContribution",
+              row_number() over (
+                order by coalesce(sum(m.weekly_contribution), 0) desc, g.created_at asc
+              ) as rank
+       from guilds g
+       left join guild_members m on m.guild_id = g.id
+       group by g.id, g.name, g.level, g.created_at
+       order by "weeklyContribution" desc, g.created_at asc
+       limit $1`,
+      [limit],
+    );
+    return result.rows.map(mapRanking);
+  }
+
+  async getGuildRanking(guildId: string): Promise<GuildRankingRow | null> {
+    const result = await this.pool.query(
+      `select "guildId", name, level, "weeklyContribution", rank
+       from (
+         select g.id as "guildId", g.name, g.level,
+                coalesce(sum(m.weekly_contribution), 0) as "weeklyContribution",
+                rank() over (
+                  order by coalesce(sum(m.weekly_contribution), 0) desc
+                ) as rank
+         from guilds g
+         left join guild_members m on m.guild_id = g.id
+         group by g.id, g.name, g.level, g.created_at
+       ) ranked
+       where "guildId" = $1`,
+      [guildId],
+    );
+    return result.rows[0] ? mapRanking(result.rows[0]) : null;
   }
 
   private async withTransaction<T>(

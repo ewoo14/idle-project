@@ -243,6 +243,165 @@ bool GuildInstanceParseBuyReward(const FString& JsonBody, FString& OutType, int6
 	}
 	return true;
 }
+
+/** 서버 bigint(문자열) 또는 number 필드를 int64 로 파싱(랭킹 weeklyContribution 등). */
+int64 GuildInstanceParseInt64Field(const TSharedPtr<FJsonObject>& Object, const TCHAR* FieldName)
+{
+	if (!Object.IsValid())
+	{
+		return 0;
+	}
+	FString StringValue;
+	if (Object->TryGetStringField(FieldName, StringValue))
+	{
+		return FCString::Atoi64(*StringValue);
+	}
+	double NumberValue = 0.0;
+	if (Object->TryGetNumberField(FieldName, NumberValue))
+	{
+		return static_cast<int64>(NumberValue);
+	}
+	return 0;
+}
+
+/**
+ * 보스 격파 보상 수령 응답(`data.rewards` 배열)을 (type, amount) 쌍 배열로 파싱한다.
+ * 서버 claimBossReward 응답: { defeats, claimedCount, rewards: [{type, amount}, ...] }.
+ * 격파 N건 누적이므로 각 reward.amount 는 이미 N 배가 적용된 값(서버 권위).
+ */
+bool GuildInstanceParseBossRewards(const FString& JsonBody, TArray<TPair<FString, int64>>& OutRewards)
+{
+	OutRewards.Reset();
+	if (JsonBody.IsEmpty())
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> ResponseJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonBody);
+	if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !ResponseJson.IsValid())
+	{
+		return false;
+	}
+
+	bool bOk = false;
+	if (!ResponseJson->TryGetBoolField(TEXT("ok"), bOk) || !bOk)
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObjectPtr = nullptr;
+	if (!ResponseJson->TryGetObjectField(TEXT("data"), DataObjectPtr) || !DataObjectPtr || !DataObjectPtr->IsValid())
+	{
+		return false;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* RewardArray = nullptr;
+	if (!(*DataObjectPtr)->TryGetArrayField(TEXT("rewards"), RewardArray) || !RewardArray)
+	{
+		return false;
+	}
+
+	OutRewards.Reserve(RewardArray->Num());
+	for (const TSharedPtr<FJsonValue>& Value : *RewardArray)
+	{
+		const TSharedPtr<FJsonObject> RewardObject = Value.IsValid() ? Value->AsObject() : nullptr;
+		if (!RewardObject.IsValid())
+		{
+			continue;
+		}
+		FString Type;
+		if (!RewardObject->TryGetStringField(TEXT("type"), Type) || Type.IsEmpty())
+		{
+			continue;
+		}
+		const int64 Amount = GuildInstanceParseInt64Field(RewardObject, TEXT("amount"));
+		OutRewards.Add(TPair<FString, int64>(Type, Amount));
+	}
+	return true;
+}
+
+/** 단일 랭킹 행 JSON → FGuildRankingEntry(서버 toRankingResponse parity). */
+FGuildRankingEntry GuildInstanceParseRankingEntry(const TSharedPtr<FJsonObject>& RowObject)
+{
+	FGuildRankingEntry Entry;
+	if (!RowObject.IsValid())
+	{
+		return Entry;
+	}
+	int32 RankValue = 0;
+	if (RowObject->TryGetNumberField(TEXT("rank"), RankValue))
+	{
+		Entry.Rank = FMath::Max(0, RankValue);
+	}
+	RowObject->TryGetStringField(TEXT("guildId"), Entry.GuildId);
+	RowObject->TryGetStringField(TEXT("name"), Entry.Name);
+	int32 LevelValue = 1;
+	if (RowObject->TryGetNumberField(TEXT("level"), LevelValue))
+	{
+		Entry.Level = FMath::Max(1, LevelValue);
+	}
+	Entry.WeeklyContribution = FMath::Max<int64>(0, GuildInstanceParseInt64Field(RowObject, TEXT("weeklyContribution")));
+	return Entry;
+}
+
+/**
+ * 주간 길드 랭킹 응답(`data.rankings[]` + `data.me`)을 파싱한다.
+ * 서버 guildRankings: { rankings: [...], me: <행 or null> }.
+ */
+bool GuildInstanceParseRankings(const FString& JsonBody, TArray<FGuildRankingEntry>& OutRankings, FGuildRankingEntry& OutMyRank)
+{
+	OutRankings.Reset();
+	OutMyRank = FGuildRankingEntry();
+	if (JsonBody.IsEmpty())
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> ResponseJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonBody);
+	if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !ResponseJson.IsValid())
+	{
+		return false;
+	}
+
+	bool bOk = false;
+	if (!ResponseJson->TryGetBoolField(TEXT("ok"), bOk) || !bOk)
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObjectPtr = nullptr;
+	if (!ResponseJson->TryGetObjectField(TEXT("data"), DataObjectPtr) || !DataObjectPtr || !DataObjectPtr->IsValid())
+	{
+		return false;
+	}
+	const TSharedPtr<FJsonObject>& Data = *DataObjectPtr;
+
+	const TArray<TSharedPtr<FJsonValue>>* RankingArray = nullptr;
+	if (Data->TryGetArrayField(TEXT("rankings"), RankingArray) && RankingArray)
+	{
+		OutRankings.Reserve(RankingArray->Num());
+		for (const TSharedPtr<FJsonValue>& Value : *RankingArray)
+		{
+			const TSharedPtr<FJsonObject> RowObject = Value.IsValid() ? Value->AsObject() : nullptr;
+			if (!RowObject.IsValid())
+			{
+				continue;
+			}
+			OutRankings.Add(GuildInstanceParseRankingEntry(RowObject));
+		}
+	}
+
+	// me 는 무소속이면 null — 그 경우 OutMyRank 는 기본값(rank 0) 유지.
+	const TSharedPtr<FJsonObject>* MeObjectPtr = nullptr;
+	if (Data->TryGetObjectField(TEXT("me"), MeObjectPtr) && MeObjectPtr && MeObjectPtr->IsValid())
+	{
+		OutMyRank = GuildInstanceParseRankingEntry(*MeObjectPtr);
+	}
+	return true;
+}
+
 FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
 {
 	return FPrimaryStats(
@@ -1393,6 +1552,150 @@ void UIdleGameInstance::GuildPanelBuyShopItem(const FString& ItemId, TFunction<v
 	});
 }
 
+void UIdleGameInstance::GuildPanelChallengeBoss(TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	const AIdleCharacter* Character = FindPlayerCharacter();
+	if (!ApiClient || GuildId.IsEmpty() || !Character)
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	// 현재 캐릭터 CP 를 도전 데미지로 전달(서버 getChallengeDamage 가 trunc·클램프).
+	// 데미지→기여 적립은 서버 applyContribution 권위 — 클라는 별도 기여 적립하지 않는다.
+	const int64 Cp = Character->GetCombatPower();
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, Cp, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->ChallengeGuildBoss(GuildId, CharacterId, Cp, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					// 보스/기여/격파는 서버 권위 — 스냅샷 재동기화로 최신 상태 반영.
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelClaimBossReward(TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->ClaimGuildBossReward(GuildId, CharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString Body)
+		{
+			// 성공 시 rewards 배열(격파 N건 누적)을 각각 ApplyGuildShopReward(G2 재사용)로 지급한다.
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					TArray<TPair<FString, int64>> Rewards;
+					if (GuildInstanceParseBossRewards(Body, Rewards))
+					{
+						for (const TPair<FString, int64>& Reward : Rewards)
+						{
+							StrongInner->ApplyGuildShopReward(Reward.Key, Reward.Value);
+						}
+					}
+					StrongInner->RequestAutosave();
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelFetchRankings(int32 Limit, TFunction<void(bool, const TArray<FGuildRankingEntry>&, const FGuildRankingEntry&)> OnComplete)
+{
+	if (!ApiClient)
+	{
+		if (OnComplete)
+		{
+			OnComplete(false, TArray<FGuildRankingEntry>(), FGuildRankingEntry());
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, Limit, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient)
+		{
+			if (OnComplete)
+			{
+				OnComplete(false, TArray<FGuildRankingEntry>(), FGuildRankingEntry());
+			}
+			return;
+		}
+
+		// characterId 가 있으면 내 길드 순위(me)도 함께 요청. 실패해도 랭킹은 누구나 조회 가능.
+		const FString MyCharacterId = (bCharacterOk && !CharacterId.IsEmpty()) ? CharacterId : FString();
+		StrongThis->ApiClient->GetGuildRankings(Limit, MyCharacterId, [OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString Body)
+		{
+			TArray<FGuildRankingEntry> Rankings;
+			FGuildRankingEntry MyRank;
+			if (bSuccess)
+			{
+				GuildInstanceParseRankings(Body, Rankings, MyRank);
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess, Rankings, MyRank);
+			}
+		});
+	});
+}
+
 bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 {
 	if (!SaveGame)
@@ -1413,7 +1716,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureWeeklyBossService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 18;
+	SaveGame->SaveVersion = 19;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1535,6 +1838,8 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		int64 ContributionPoints = 0;
 		int64 PendingAutoContribution = 0;
 		FString LastAttendanceDate;
+		int32 BossDefeatedCount = 0;
+		int32 BossChallengesRemaining = 0;
 		GuildService->ExportSave(
 			GuildId,
 			GuildRank,
@@ -1543,7 +1848,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 			GuildGoldPct,
 			ContributionPoints,
 			PendingAutoContribution,
-			LastAttendanceDate);
+			LastAttendanceDate,
+			BossDefeatedCount,
+			BossChallengesRemaining);
 		SaveGame->CachedGuildId = GuildId;
 		SaveGame->CachedGuildRank = GuildRank;
 		SaveGame->CachedGuildLevel = GuildLevel;
@@ -1552,6 +1859,8 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->CachedContributionPoints = ContributionPoints;
 		SaveGame->PendingAutoContribution = PendingAutoContribution;
 		SaveGame->LastGuildAttendanceDate = LastAttendanceDate;
+		SaveGame->CachedBossDefeatedCount = BossDefeatedCount;
+		SaveGame->CachedBossChallengesRemaining = BossChallengesRemaining;
 	}
 
 	return true;
@@ -1688,9 +1997,9 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsureGuildService();
 	if (GuildService)
 	{
-		if (SaveGame->SaveVersion >= 18)
+		if (SaveGame->SaveVersion >= 19)
 		{
-			// v18+: 레벨/버프/포인트/pending/출석일 전체 복원(오프라인 버프 캐시 적용).
+			// v19+(PR-G3): v18 캐시 + 보스 진행 표시 캐시(격파·도전잔여) 전체 복원.
 			GuildService->ImportSave(
 				SaveGame->CachedGuildId,
 				SaveGame->CachedGuildRank,
@@ -1699,16 +2008,33 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 				SaveGame->CachedGuildGoldPct,
 				SaveGame->CachedContributionPoints,
 				SaveGame->PendingAutoContribution,
-				SaveGame->LastGuildAttendanceDate);
+				SaveGame->LastGuildAttendanceDate,
+				SaveGame->CachedBossDefeatedCount,
+				SaveGame->CachedBossChallengesRemaining);
+		}
+		else if (SaveGame->SaveVersion >= 18)
+		{
+			// v18(PR-G2): 보스 캐시 이전 — 레벨/버프/포인트/pending/출석일만 복원(보스 0).
+			GuildService->ImportSave(
+				SaveGame->CachedGuildId,
+				SaveGame->CachedGuildRank,
+				SaveGame->CachedGuildLevel,
+				SaveGame->CachedGuildAttackPct,
+				SaveGame->CachedGuildGoldPct,
+				SaveGame->CachedContributionPoints,
+				SaveGame->PendingAutoContribution,
+				SaveGame->LastGuildAttendanceDate,
+				0,
+				0);
 		}
 		else if (SaveGame->SaveVersion >= 17)
 		{
 			// v17(PR-G1): 길드 id/rank 만 존재 → 무길드버프(레벨1·0%)로 복원. 서버 재동기화 시 갱신.
-			GuildService->ImportSave(SaveGame->CachedGuildId, SaveGame->CachedGuildRank, 1, 0.0f, 0.0f, 0, 0, FString());
+			GuildService->ImportSave(SaveGame->CachedGuildId, SaveGame->CachedGuildRank, 1, 0.0f, 0.0f, 0, 0, FString(), 0, 0);
 		}
 		else
 		{
-			GuildService->ImportSave(FString(), 0, 1, 0.0f, 0.0f, 0, 0, FString());
+			GuildService->ImportSave(FString(), 0, 1, 0.0f, 0.0f, 0, 0, FString(), 0, 0);
 		}
 	}
 

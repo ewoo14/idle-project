@@ -4,6 +4,9 @@ import { rateLimitPolicies } from "../../plugins/rate-limit.js";
 import { GuildRepoPg } from "./guild.repo.js";
 import {
   guildAttendanceSchema,
+  guildBossChallengeSchema,
+  guildBossClaimSchema,
+  guildBossSchema,
   guildContributeSchema,
   guildCreateSchema,
   guildDonateSchema,
@@ -11,6 +14,7 @@ import {
   guildJoinSchema,
   guildLeaveSchema,
   guildListSchema,
+  guildRankingsSchema,
   guildRankSchema,
   guildRequestActionSchema,
   guildShopBuySchema,
@@ -318,6 +322,88 @@ export async function guildRoutes(app: FastifyInstance) {
         body.characterId,
         params.id,
         params.itemId,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // ── PR-G3: 길드 보스 / 주간 랭킹 ───────────────────────────────────────────
+
+  // 주간 길드 랭킹 (누구나, /:id 보다 먼저 매칭되도록 정적 경로)
+  app.get(
+    "/rankings",
+    {
+      preHandler: app.authenticate,
+      schema: guildRankingsSchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const query = request.query as { characterId?: string; limit?: number };
+      const data = await service.guildRankings({
+        limit: query.limit,
+        userId: query.characterId ? request.user.sub : undefined,
+        characterId: query.characterId,
+      });
+      return { ok: true, data };
+    },
+  );
+
+  // 공유 보스 도전 (멤버, 주간 횟수 제한 + 격파 루프 + 데미지→기여)
+  app.post(
+    "/:id/boss/challenge",
+    {
+      preHandler: app.authenticate,
+      schema: guildBossChallengeSchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const body = request.body as { characterId: string; cp: number };
+      const data = await service.challengeBoss(
+        request.user.sub,
+        body.characterId,
+        params.id,
+        body.cp,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 격파 보상 수령 (멤버, 미수령 격파분 전원 지급)
+  app.post(
+    "/:id/boss/claim",
+    {
+      preHandler: app.authenticate,
+      schema: guildBossClaimSchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const body = request.body as { characterId: string };
+      const data = await service.claimBossReward(
+        request.user.sub,
+        body.characterId,
+        params.id,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 보스 상태 조회 (멤버)
+  app.get(
+    "/:id/boss",
+    {
+      preHandler: app.authenticate,
+      schema: guildBossSchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const query = request.query as { characterId: string };
+      const data = await service.getBoss(
+        request.user.sub,
+        query.characterId,
+        params.id,
       );
       return { ok: true, data };
     },

@@ -57,6 +57,33 @@ export function getGuildBuff(level: number): GuildBuff {
   return { attackPct: pct, goldPct: pct };
 }
 
+// ── 길드 보스 공식 상수 (클라 UE GuildBossFormula 와 parity 필수, 스펙 §4) ──────
+export const GUILD_BOSS_BASE_HP = 1_000_000; // 첫 격파(defeated=0) 보스 HP
+export const GUILD_BOSS_HP_GROWTH = 1.5; // 격파마다 HP 성장률(무한 곡선)
+export const WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT = 7; // 멤버당 주간 도전 횟수
+export const GUILD_BOSS_DMG_TO_CONTRIB = 10_000; // 보스 데미지 → 기여 환산 제수
+
+/**
+ * 격파 횟수 → 다음 보스의 공유 HP(무한 기하). HP = floor(BASE * GROWTH^defeated).
+ * 클라(UE) `GetGuildBossHp` 와 동일 결과를 보장한다.
+ */
+export function getGuildBossHp(defeatedCount: number): number {
+  return Math.floor(
+    GUILD_BOSS_BASE_HP * GUILD_BOSS_HP_GROWTH ** Math.max(defeatedCount, 0),
+  );
+}
+
+/**
+ * CP → 1회 도전 누적 데미지(#77 GetChallengeDamage 재사용). 음수/소수 방어.
+ * 클라(UE) `GetChallengeDamage` parity.
+ */
+export function getChallengeDamage(cp: number): number {
+  if (!Number.isFinite(cp) || cp <= 0) {
+    return 0;
+  }
+  return Math.trunc(cp);
+}
+
 // ── 길드 상점 카탈로그 (서버 상수, 소비형 보상) ──────────────────────────────
 export type GuildShopItem = {
   id: string;
@@ -102,6 +129,15 @@ export const GUILD_SHOP_CATALOG: readonly GuildShopItem[] = [
     price: 300,
     reward: { type: "essence", amount: 3 },
   },
+] as const;
+
+// ── 길드 보스 격파 보상 (서버 상수, 소비형 — 클라가 세이브 반영) ───────────────
+export type GuildBossReward = { type: string; amount: number };
+
+/** 보스 1격파당 전원 지급 보상(소비형). 격파 N건 미수령 시 amount * N 누적 지급. */
+export const GUILD_BOSS_REWARD_PER_DEFEAT: readonly GuildBossReward[] = [
+  { type: "gold", amount: 200_000 },
+  { type: "essence", amount: 5 },
 ] as const;
 
 export type GuildRank = "master" | "vice" | "officer" | "member";
@@ -165,6 +201,26 @@ export type GuildMemberRecord = {
   lastDonationDate: string | null;
   dailyDonation: bigint;
   weeklyResetId: string | null;
+  weeklyBossChallenges: number;
+  bossClaimedCount: number;
+  bossClaimWeekId: string | null;
+};
+
+/** 공유 보스 상태(길드당 1행, 주간). */
+export type GuildBossRecord = {
+  guildId: string;
+  weekId: string;
+  accumDamage: bigint;
+  defeatedCount: number;
+};
+
+/** 주간 길드 랭킹 1행(길드별 Σ weekly_contribution). */
+export type GuildRankingRow = {
+  guildId: string;
+  name: string;
+  level: number;
+  weeklyContribution: bigint;
+  rank: number;
 };
 
 export type GuildJoinRequestRecord = {
@@ -268,6 +324,46 @@ export type GuildRepo = {
     characterId: string;
     cost: bigint;
   }): Promise<GuildMemberRecord | null>;
+  /** 보스 상태 조회(없으면 null). 주간 리셋/생성은 서비스가 판단해 challengeBoss 가 원자적으로 처리. */
+  getBoss(guildId: string): Promise<GuildBossRecord | null>;
+  /**
+   * 보스 도전 누적(한 트랜잭션, 원자적). 한 호출에서:
+   *  - guild_boss upsert: 새 주(weeklyReset)면 week_id/accum/defeated 리셋 후 누적,
+   *    아니면 accum_damage 를 newAccumDamage 로, defeated_count 를 newDefeatedCount 로 갱신.
+   *  - guild_boss_contrib upsert: 멤버 주간 누적 데미지 += dmg(weeklyReset 면 0 부터).
+   *  - guild_members: weekly_boss_challenges 갱신(weeklyReset 면 1, 아니면 +1).
+   * 도전 후 보스/멤버 상태를 반환. weeklyReset 인자는 멤버 주간 마커 기준(needsWeeklyReset).
+   */
+  challengeBoss(input: {
+    guildId: string;
+    characterId: string;
+    weekId: string;
+    weeklyReset: boolean;
+    dmg: bigint;
+    newAccumDamage: bigint;
+    newDefeatedCount: number;
+    newChallengeCount: number;
+  }): Promise<{ boss: GuildBossRecord; member: GuildMemberRecord } | null>;
+  /**
+   * 보스 격파 보상 수령(원자적). boss_claimed_count 를 toDefeatedCount 로 올리고
+   * boss_claim_week_id 를 weekId 로 갱신. fromClaimedCount(기대 현재값)와 다르면(동시성) null.
+   */
+  claimBossReward(input: {
+    characterId: string;
+    weekId: string;
+    fromClaimedCount: number;
+    toDefeatedCount: number;
+  }): Promise<GuildMemberRecord | null>;
+  /** 보스 내부 기여 랭킹(멤버별 누적 데미지 상위 N, 주간). */
+  listBossContrib(input: {
+    guildId: string;
+    weekId: string;
+    limit: number;
+  }): Promise<{ characterId: string; damage: bigint }[]>;
+  /** 주간 길드 랭킹: 길드별 Σ weekly_contribution 상위 N(#76 패턴). */
+  listGuildRankings(limit: number): Promise<GuildRankingRow[]>;
+  /** 특정 길드의 주간 랭킹 순위(내 길드 표시용). 없으면 null. */
+  getGuildRanking(guildId: string): Promise<GuildRankingRow | null>;
 };
 
 export class GuildService {
@@ -621,6 +717,7 @@ export class GuildService {
     const now = this.now();
     const today = toUtcDate(now);
     const guildResponse = this.toGuildResponse(guild);
+    const boss = await this.toBossState(membership, membership.guildId);
     return {
       guild: guildResponse,
       me: {
@@ -634,6 +731,7 @@ export class GuildService {
         characterId: r.characterId,
         requestedAt: r.requestedAt.toISOString(),
       })),
+      boss,
     };
   }
 
@@ -862,7 +960,250 @@ export class GuildService {
     };
   }
 
+  /**
+   * 공유 HP 풀 길드 보스 도전(#77 길드화, 4번째 기여 발생원).
+   * 멤버 검증 → 주간 진입 시 보스/도전 카운트 리셋 → 주간 도전 한도(7) 검증 →
+   * dmg = getChallengeDamage(cp) 를 accum_damage 와 멤버 보스 기여에 누적 →
+   * **격파 루프**: accum_damage >= getGuildBossHp(defeated) 인 동안 HP 만큼 이월 차감하고
+   * defeated_count++ (누적이 여러 HP 임계를 한 번에 넘으면 다중 격파) →
+   * 보스 데미지 기여: applyContribution(floor(dmg / DMG_TO_CONTRIB)) 1회만(이중적립 금지).
+   */
+  async challengeBoss(
+    userId: string,
+    characterId: string,
+    guildId: string,
+    cp: number,
+  ) {
+    const { membership, guild } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    const now = this.now();
+    const weekId = toUtcWeek(now);
+    const weeklyReset = this.needsWeeklyReset(membership, weekId);
+
+    // 주간 도전 한도(멤버당 7). 새 주면 0 부터 다시 카운트.
+    const usedChallenges = weeklyReset ? 0 : membership.weeklyBossChallenges;
+    if (usedChallenges >= WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT) {
+      throw new ConflictError("이번 주 보스 도전 횟수를 모두 사용했습니다.", {
+        code: "GUILD_BOSS_CHALLENGE_LIMIT",
+      });
+    }
+
+    // 보스 누적 상태(새 주면 0 부터 — 보스도 주간 리셋).
+    const existingBoss = await this.repo.getBoss(guildId);
+    const bossIsCurrentWeek = existingBoss?.weekId === weekId;
+    const baseAccum = bossIsCurrentWeek
+      ? (existingBoss?.accumDamage ?? 0n)
+      : 0n;
+    const baseDefeated = bossIsCurrentWeek
+      ? (existingBoss?.defeatedCount ?? 0)
+      : 0;
+
+    const dmg = BigInt(getChallengeDamage(cp));
+    let accum = baseAccum + dmg;
+    let defeated = baseDefeated;
+    // 격파 루프: 누적이 현재 HP 임계 이상이면 이월 차감 후 격파(다중 격파 가능).
+    let hp = BigInt(getGuildBossHp(defeated));
+    while (accum >= hp) {
+      accum -= hp;
+      defeated += 1;
+      hp = BigInt(getGuildBossHp(defeated));
+    }
+
+    const challenged = await this.repo.challengeBoss({
+      guildId,
+      characterId,
+      weekId,
+      // 보스 행 누적/격파는 이미 bossIsCurrentWeek 기준으로 계산된 값을 그대로 권위 기록.
+      // weeklyReset 은 멤버 주간 마커 기준(도전 카운트·weekly 컬럼 리셋). 마커도 전진시킨다.
+      weeklyReset,
+      dmg,
+      newAccumDamage: accum,
+      newDefeatedCount: defeated,
+      newChallengeCount: usedChallenges + 1,
+    });
+    if (!challenged) {
+      throw new NotFoundError("길드에 소속되어 있지 않습니다.", {
+        code: "GUILD_NOT_MEMBER",
+      });
+    }
+
+    // 보스 데미지 → 기여(4번째 발생원). contrib 1회만 적립(이중적립 금지).
+    const contribGain = dmg / BigInt(GUILD_BOSS_DMG_TO_CONTRIB);
+    let contributionPoints = challenged.member.contributionPoints;
+    if (contribGain > 0n) {
+      // challengeBoss 가 이미 멤버 주간 마커를 전진·weekly 컬럼을 리셋했으므로
+      // 여기선 weeklyReset=false 로 EXP/기여만 누적(이중 리셋 방지).
+      const updated = await this.repo.applyContribution({
+        guildId,
+        characterId,
+        amount: contribGain,
+        newLevel: getGuildLevel(guild.exp + contribGain),
+        weekId,
+        weeklyReset: false,
+        patch: {},
+      });
+      if (updated) {
+        contributionPoints = updated.contributionPoints;
+      }
+    }
+
+    const newDefeats = defeated - baseDefeated;
+    return {
+      status: "challenged" as const,
+      damage: dmg.toString(),
+      contributionGain: contribGain.toString(),
+      contributionPoints: contributionPoints.toString(),
+      accumDamage: accum.toString(),
+      defeatedCount: defeated,
+      newDefeats,
+      bossHp: getGuildBossHp(defeated).toString(),
+      challengesRemaining:
+        WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT - (usedChallenges + 1),
+    };
+  }
+
+  /**
+   * 보스 격파 보상 수령. 현 주 격파분(defeated_count) 중 멤버 미수령분을 전원 지급.
+   * 멤버별 수령 마일스톤(boss_claimed_count)을 추적, 주간 리셋(boss_claim_week_id).
+   * 보상은 소비형(클라가 세이브 반영). 미수령 0 이면 ConflictError.
+   */
+  async claimBossReward(userId: string, characterId: string, guildId: string) {
+    const { membership } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    const now = this.now();
+    const weekId = toUtcWeek(now);
+
+    const boss = await this.repo.getBoss(guildId);
+    const defeatedCount =
+      boss && boss.weekId === weekId ? boss.defeatedCount : 0;
+
+    // 보스 수령 마일스톤은 보스 주(week_id)와 동기화. 다른 주면 0 부터.
+    const claimedCount =
+      membership.bossClaimWeekId === weekId ? membership.bossClaimedCount : 0;
+    const unclaimed = defeatedCount - claimedCount;
+    if (unclaimed <= 0) {
+      throw new ConflictError("수령할 격파 보상이 없습니다.", {
+        code: "GUILD_BOSS_NO_REWARD",
+      });
+    }
+
+    const updated = await this.repo.claimBossReward({
+      characterId,
+      weekId,
+      fromClaimedCount: claimedCount,
+      toDefeatedCount: defeatedCount,
+    });
+    if (!updated) {
+      // 동시성: 그새 다른 요청이 수령. 멱등하게 보상 없음으로 처리.
+      throw new ConflictError("수령할 격파 보상이 없습니다.", {
+        code: "GUILD_BOSS_NO_REWARD",
+      });
+    }
+
+    // 격파 N건 × 1격파당 보상.
+    const rewards = GUILD_BOSS_REWARD_PER_DEFEAT.map((r) => ({
+      type: r.type,
+      amount: r.amount * unclaimed,
+    }));
+    return {
+      status: "claimed" as const,
+      defeats: unclaimed,
+      claimedCount: defeatedCount,
+      rewards,
+    };
+  }
+
+  /** 보스 상태 조회(멤버) — 공유 HP/누적/격파/내 도전 잔여/미수령/내부 기여 랭킹. */
+  async getBoss(userId: string, characterId: string, guildId: string) {
+    const { membership } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    return this.toBossState(membership, guildId);
+  }
+
+  /**
+   * 주간 길드 랭킹(Σ weekly_contribution 길드별 상위 N, #76 확장).
+   * characterId 지정 시 내 길드 순위도 함께 반환(인증 라우트 — 누구나).
+   */
+  async guildRankings(input: {
+    limit?: number;
+    userId?: string;
+    characterId?: string;
+  }) {
+    const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
+    const rows = await this.repo.listGuildRankings(limit);
+    const top = rows.map((r) => this.toRankingResponse(r));
+
+    let me: ReturnType<typeof this.toRankingResponse> | null = null;
+    if (input.userId && input.characterId) {
+      await this.assertCharacter(input.userId, input.characterId);
+      const membership = await this.repo.getMembership(input.characterId);
+      if (membership) {
+        const myRank = await this.repo.getGuildRanking(membership.guildId);
+        if (myRank) {
+          me = this.toRankingResponse(myRank);
+        }
+      }
+    }
+    return { rankings: top, me };
+  }
+
   // ── 내부 헬퍼 ───────────────────────────────────────────────────────────────
+
+  /** 멤버십+guildId 로 보스 상태 응답 구성(snapshot/getBoss 공통). */
+  private async toBossState(membership: GuildMemberRecord, guildId: string) {
+    const now = this.now();
+    const weekId = toUtcWeek(now);
+    const boss = await this.repo.getBoss(guildId);
+    const bossIsCurrentWeek = boss?.weekId === weekId;
+    const accumDamage = bossIsCurrentWeek ? (boss?.accumDamage ?? 0n) : 0n;
+    const defeatedCount = bossIsCurrentWeek ? (boss?.defeatedCount ?? 0) : 0;
+
+    const usedChallenges =
+      membership.weeklyResetId === weekId ? membership.weeklyBossChallenges : 0;
+    const claimedCount =
+      membership.bossClaimWeekId === weekId ? membership.bossClaimedCount : 0;
+
+    const topContrib = await this.repo.listBossContrib({
+      guildId,
+      weekId,
+      limit: 10,
+    });
+
+    return {
+      weekId,
+      hp: getGuildBossHp(defeatedCount).toString(),
+      accumDamage: accumDamage.toString(),
+      defeatedCount,
+      challengesRemaining: Math.max(
+        WEEKLY_GUILD_BOSS_CHALLENGE_LIMIT - usedChallenges,
+        0,
+      ),
+      unclaimedDefeats: Math.max(defeatedCount - claimedCount, 0),
+      topContributors: topContrib.map((c) => ({
+        characterId: c.characterId,
+        damage: c.damage.toString(),
+      })),
+    };
+  }
+
+  private toRankingResponse(row: GuildRankingRow) {
+    return {
+      guildId: row.guildId,
+      name: row.name,
+      level: row.level,
+      weeklyContribution: row.weeklyContribution.toString(),
+      rank: row.rank,
+    };
+  }
 
   /**
    * 멤버의 주간 마커가 현재 주와 다르면 주간 리셋이 필요(멤버별 lazy 리셋).
