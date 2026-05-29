@@ -19,6 +19,7 @@
 class UIdleGameInstance;
 class UBuffService;
 class UDungeonService;
+class ULeaderboardService;
 class AIdleCharacter;
 class AIdleMonster;
 class UBattleAIComponent;
@@ -361,6 +362,33 @@ struct IDLEPROJECT_API FIdleHUDConsumablePanelViewModel
 	TArray<FIdleHUDConsumableRowViewModel> ActiveBuffRows;
 };
 
+struct IDLEPROJECT_API FIdleHUDLeaderboardRowViewModel
+{
+	FString CharacterId;
+	FText CharacterLabel;
+	FText RankLabel;
+	FText ScoreLabel;
+	bool bSelf = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel
+{
+	FText Title;
+	FText SeasonLabel;
+	FText PowerTabLabel;
+	FText RebirthTabLabel;
+	FText MyRankTitle;
+	FText EmptyLabel;
+	FText OfflineLabel;
+	FText LoadingLabel;
+	FText RefreshLabel;
+	FIdleHUDLeaderboardRowViewModel MyEntry;
+	TArray<FIdleHUDLeaderboardRowViewModel> Rows;
+	ELeaderboardKind ActiveKind = ELeaderboardKind::Power;
+	bool bLoading = false;
+	bool bOffline = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneSlotViewModel
 {
 	int32 SlotIndex = INDEX_NONE;
@@ -672,6 +700,7 @@ IDLEPROJECT_API FIdleHUDEnhancePanelViewModel BuildEnhancePanelViewModel(const U
 IDLEPROJECT_API FIdleHUDPotentialPanelViewModel BuildPotentialPanelViewModel(const UInventoryComponent& Inventory, int64 ResetCubes, int64 RankCubes);
 IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRollCost, int64 ProtectionScrollCost, int64 ResetCubeCost, int64 RankCubeCost, int64 Gold, const FShopPurchaseResult& LastResult);
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
+IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -788,6 +817,10 @@ private:
 	void DrawConsumablePanel();
 	void DrawConsumableRow(const FIdleHUDConsumableRowViewModel& Row, float X, float Y, float Width, float Height);
 	void TryUseConsumableFromHitBox(FName BoxName);
+	void DrawLeaderboardPanel();
+	void DrawLeaderboardRow(const FIdleHUDLeaderboardRowViewModel& Row, float X, float Y, float Width, float Height);
+	void SelectLeaderboardKind(ELeaderboardKind Kind);
+	void RefreshSelectedLeaderboard();
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
 	void DrawRuneCodexCell(const FIdleHUDRuneCodexCellViewModel& Cell, float X, float Y, float Size);
@@ -881,6 +914,8 @@ private:
 	FText AchievementFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
+	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
+	bool bLeaderboardLoading = false;
 	int32 SelectedRuneOwnedIndex = INDEX_NONE;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;

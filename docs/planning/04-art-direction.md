@@ -278,3 +278,21 @@ uses `GetBuffRemainingSec` formatted as `MM:SS`, while row state comes from
 The panel keeps the Canvas-height 1.0-2.0 scale clamp for 1080p, 1440p, and 4K.
 No binary art assets were added; existing `.gitattributes` LFS patterns continue
 to cover future exported `.uasset` and `.png` UI assets.
+
+## PR #76 Leaderboard HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Leaderboard HUD V1 adds a
+right-side utility panel for seasonal Power and Rebirth rankings. The panel uses
+only existing tokens: `--bg-panel`, `--bg-primary`, `--text-primary`,
+`--text-muted`, `--accent-gold`, `--accent-blue`, and `--accent-red`.
+
+The header shows localized title and season copy, followed by Power/Rebirth tabs
+and a refresh action. The body renders up to eight top-N rows with rank,
+character id, and score, plus a separate `My Rank` row that highlights the
+current character when it appears in the top-N cache. Loading and offline states
+use localized status labels, with offline using the existing warning/red accent.
+
+The panel keeps the Canvas-height 1.0-2.0 scale clamp for 1080p, 1440p, and 4K
+and is sized as a compact right-side panel so it does not change save data or
+introduce new binary UI assets. Existing `.gitattributes` LFS patterns continue
+to cover future exported `.uasset` and `.png` UI assets.

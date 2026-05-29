@@ -1,6 +1,8 @@
 #include "Misc/AutomationTest.h"
 
 #include "GameCore/LeaderboardService.h"
+#include "Internationalization/IdleLocalization.h"
+#include "UI/IdleHUD.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -70,6 +72,54 @@ bool FLeaderboardServiceGracefulJsonTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Missing my rank uses zero score"), Missing.Score, static_cast<int64>(0));
 	TestTrue(TEXT("Missing my rank has no character id"), Missing.CharacterId.IsEmpty());
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FLeaderboardPanelViewModelTest,
+	"IdleProject.UI.HUD.LeaderboardPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FLeaderboardPanelViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	ULeaderboardService* Service = NewObject<ULeaderboardService>();
+	Service->ParseListJson(TEXT("{\"ok\":true,\"data\":[{\"characterId\":\"char-a\",\"score\":1500,\"rank\":1},{\"characterId\":\"self\",\"score\":1200,\"rank\":2}]}"), ELeaderboardKind::Power);
+	Service->ParseMyRankJson(TEXT("{\"ok\":true,\"data\":{\"characterId\":\"self\",\"score\":1200,\"rank\":2}}"), ELeaderboardKind::Power);
+
+	const FIdleHUDLeaderboardPanelViewModel ViewModel = IdleProject::UI::BuildLeaderboardPanelViewModel(
+		*Service,
+		ELeaderboardKind::Power,
+		7,
+		false,
+		false);
+
+	TestEqual(TEXT("Leaderboard panel title localizes"), ViewModel.Title.ToString(), FString(TEXT("Leaderboard")));
+	TestEqual(TEXT("Leaderboard season label formats"), ViewModel.SeasonLabel.ToString(), FString(TEXT("Season 7")));
+	TestEqual(TEXT("Power tab label localizes"), ViewModel.PowerTabLabel.ToString(), FString(TEXT("Power")));
+	TestEqual(TEXT("Rebirth tab label localizes"), ViewModel.RebirthTabLabel.ToString(), FString(TEXT("Rebirth")));
+	TestEqual(TEXT("Top entries become rows"), ViewModel.Rows.Num(), 2);
+	TestEqual(TEXT("Top row rank formats"), ViewModel.Rows[0].RankLabel.ToString(), FString(TEXT("#1")));
+	TestEqual(TEXT("Top row score formats"), ViewModel.Rows[0].ScoreLabel.ToString(), FString(TEXT("Score 1,500")));
+	TestFalse(TEXT("Non-self row is not highlighted"), ViewModel.Rows[0].bSelf);
+	TestTrue(TEXT("My top-N row is highlighted"), ViewModel.Rows[1].bSelf);
+	TestEqual(TEXT("My rank title localizes"), ViewModel.MyRankTitle.ToString(), FString(TEXT("My Rank")));
+	TestEqual(TEXT("My rank row formats"), ViewModel.MyEntry.RankLabel.ToString(), FString(TEXT("#2")));
+	TestEqual(TEXT("Refresh action localizes"), ViewModel.RefreshLabel.ToString(), FString(TEXT("Refresh")));
+
+	const FIdleHUDLeaderboardPanelViewModel OfflineViewModel = IdleProject::UI::BuildLeaderboardPanelViewModel(
+		*Service,
+		ELeaderboardKind::Rebirth,
+		7,
+		true,
+		true);
+	TestTrue(TEXT("Offline state is exposed"), OfflineViewModel.bOffline);
+	TestTrue(TEXT("Loading state is exposed"), OfflineViewModel.bLoading);
+	TestEqual(TEXT("Offline label localizes"), OfflineViewModel.OfflineLabel.ToString(), FString(TEXT("Offline")));
+	TestEqual(TEXT("Loading label localizes"), OfflineViewModel.LoadingLabel.ToString(), FString(TEXT("Loading...")));
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
