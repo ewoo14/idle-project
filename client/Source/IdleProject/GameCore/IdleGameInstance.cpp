@@ -522,7 +522,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 
-	SaveGame->SaveVersion = 15;
+	SaveGame->SaveVersion = 16;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1196,7 +1196,7 @@ bool UIdleGameInstance::TryBuyRankCube()
 	return TryBuyShopResource(FShopFormula::GetRankCubeCost(GlobalStageIndex), RankCubes);
 }
 
-void UIdleGameInstance::AddConsumable(EConsumableType Type, int32 Amount)
+void UIdleGameInstance::AddConsumable(EConsumableType Type, EConsumableGrade Grade, int32 Amount)
 {
 	EnsureBuffService();
 	if (!BuffService)
@@ -1204,14 +1204,14 @@ void UIdleGameInstance::AddConsumable(EConsumableType Type, int32 Amount)
 		return;
 	}
 
-	BuffService->AddConsumable(Type, Amount);
+	BuffService->AddConsumable(Type, Grade, Amount);
 	RequestAutosave();
 }
 
-bool UIdleGameInstance::TryUseConsumable(EConsumableType Type)
+bool UIdleGameInstance::TryUseConsumable(EConsumableType Type, EConsumableGrade Grade)
 {
 	EnsureBuffService();
-	if (!BuffService || !BuffService->UseConsumable(Type, GetCurrentUnixSeconds()))
+	if (!BuffService || !BuffService->UseConsumable(Type, Grade, GetCurrentUnixSeconds()))
 	{
 		return false;
 	}
@@ -1221,23 +1221,51 @@ bool UIdleGameInstance::TryUseConsumable(EConsumableType Type)
 	return true;
 }
 
-bool UIdleGameInstance::TryBuyConsumable(EConsumableType Type)
+int64 UIdleGameInstance::GetConsumableShopCost(EConsumableGrade Grade) const
+{
+	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
+	const int64 BaseCost = FShopFormula::GetGearRollCost(GlobalStageIndex);
+	if (BaseCost <= 0 || !FConsumableFormula::IsValidGrade(Grade))
+	{
+		return 0;
+	}
+
+	double Multiplier = 1.0;
+	switch (Grade)
+	{
+	case EConsumableGrade::Lesser:
+		Multiplier = 0.6;
+		break;
+	case EConsumableGrade::Standard:
+		Multiplier = 1.0;
+		break;
+	case EConsumableGrade::Greater:
+		Multiplier = 2.5;
+		break;
+	default:
+		Multiplier = 1.0;
+		break;
+	}
+
+	return FMath::Max<int64>(1, FMath::RoundToInt64(static_cast<double>(BaseCost) * Multiplier));
+}
+
+bool UIdleGameInstance::TryBuyConsumable(EConsumableType Type, EConsumableGrade Grade)
 {
 	EnsureBuffService();
-	if (!BuffService || !FConsumableFormula::IsValidType(Type))
+	if (!BuffService || !FConsumableFormula::IsValidType(Type) || !FConsumableFormula::IsValidGrade(Grade))
 	{
 		return false;
 	}
 
-	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
-	const int64 Cost = FShopFormula::GetGearRollCost(GlobalStageIndex);
+	const int64 Cost = GetConsumableShopCost(Grade);
 	if (Cost <= 0 || Gold < Cost)
 	{
 		return false;
 	}
 
 	AddGold(-Cost);
-	BuffService->AddConsumable(Type, 1);
+	BuffService->AddConsumable(Type, Grade, 1);
 	RequestAutosave();
 	return true;
 }

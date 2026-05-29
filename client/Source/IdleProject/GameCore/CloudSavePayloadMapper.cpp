@@ -84,6 +84,19 @@ bool FCloudSavePayloadMapper::SaveToPayloadJson(const UIdleSaveGame& SaveGame, F
 	Payload->SetNumberField(TEXT("worldPower"), static_cast<double>(WorldPower));
 	Payload->SetArrayField(TEXT("masteryLevels"), MasteryLevelValues);
 
+	TArray<TSharedPtr<FJsonValue>> ConsumableValues;
+	ConsumableValues.Reserve(SaveGame.Consumables.Num());
+	for (const FConsumableSaveEntry& Entry : SaveGame.Consumables)
+	{
+		TSharedRef<FJsonObject> ConsumableObject = MakeShared<FJsonObject>();
+		ConsumableObject->SetNumberField(TEXT("type"), FMath::Clamp<int32>(Entry.Type, 0, 5));
+		ConsumableObject->SetNumberField(TEXT("grade"), FMath::Clamp<int32>(Entry.Grade, 0, 2));
+		ConsumableObject->SetNumberField(TEXT("count"), FMath::Max(0, Entry.Count));
+		ConsumableObject->SetNumberField(TEXT("buffEndUnixSec"), static_cast<double>(FMath::Max<int64>(0, Entry.BuffEndUnixSec)));
+		ConsumableValues.Add(MakeShared<FJsonValueObject>(ConsumableObject));
+	}
+	Payload->SetArrayField(TEXT("consumables"), ConsumableValues);
+
 	TSharedRef<FJsonObject> FullSave = MakeShared<FJsonObject>();
 	if (!FJsonObjectConverter::UStructToJsonObject(UIdleSaveGame::StaticClass(), &SaveGame, FullSave))
 	{

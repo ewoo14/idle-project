@@ -258,13 +258,17 @@ public:
 	bool TryBuyRankCube();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Consumable")
-	void AddConsumable(EConsumableType Type, int32 Amount = 1);
+	void AddConsumable(EConsumableType Type, EConsumableGrade Grade = EConsumableGrade::Standard, int32 Amount = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Consumable")
-	bool TryUseConsumable(EConsumableType Type);
+	bool TryUseConsumable(EConsumableType Type, EConsumableGrade Grade = EConsumableGrade::Standard);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Shop")
-	bool TryBuyConsumable(EConsumableType Type);
+	bool TryBuyConsumable(EConsumableType Type, EConsumableGrade Grade = EConsumableGrade::Standard);
+
+	/** 등급별 소비 상점 가격: Lesser=기어롤×0.6, Standard=×1.0, Greater=×2.5 (#38 곡선 기반). */
+	UFUNCTION(BlueprintPure, Category = "Idle|Shop")
+	int64 GetConsumableShopCost(EConsumableGrade Grade) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	void AddRune(const FRuneInstance& Rune);

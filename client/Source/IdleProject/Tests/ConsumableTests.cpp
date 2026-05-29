@@ -70,6 +70,71 @@ bool FConsumableFormulaAnchorsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("All V1 consumables last 30 minutes"), FConsumableFormula::GetBuffDurationSec(EConsumableType::AttackTonic), static_cast<int64>(1800));
 	TestEqual(TEXT("Unknown consumable percent is zero"), FConsumableFormula::GetBuffPercent(static_cast<EConsumableType>(99)), 0.0f);
 	TestEqual(TEXT("Unknown consumable duration is zero"), FConsumableFormula::GetBuffDurationSec(static_cast<EConsumableType>(99)), static_cast<int64>(0));
+
+	// 2-인자 시그니처는 Standard 등급과 동일해야 합니다(회귀).
+	TestEqual(TEXT("Two-arg attack tonic equals standard grade"), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic, EConsumableGrade::Standard));
+
+	// 등급별 차등: Lesser = 0.5x, Greater = 2.0x.
+	TestEqual(TEXT("Lesser attack tonic is half of standard"), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic, EConsumableGrade::Lesser), 0.15f);
+	TestEqual(TEXT("Standard attack tonic keeps base percent"), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic, EConsumableGrade::Standard), 0.30f);
+	TestEqual(TEXT("Greater attack tonic doubles standard"), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic, EConsumableGrade::Greater), 0.60f);
+	TestEqual(TEXT("Lesser gold feast is half of standard"), FConsumableFormula::GetBuffPercent(EConsumableType::GoldFeast, EConsumableGrade::Lesser), 0.25f);
+	TestEqual(TEXT("Greater gold feast doubles standard"), FConsumableFormula::GetBuffPercent(EConsumableType::GoldFeast, EConsumableGrade::Greater), 1.00f);
+
+	// 지속시간은 등급과 무관하게 고정입니다.
+	TestEqual(TEXT("Lesser duration matches standard"), FConsumableFormula::GetBuffDurationSec(EConsumableType::AttackTonic, EConsumableGrade::Lesser), static_cast<int64>(1800));
+	TestEqual(TEXT("Greater duration matches standard"), FConsumableFormula::GetBuffDurationSec(EConsumableType::AttackTonic, EConsumableGrade::Greater), static_cast<int64>(1800));
+
+	// 잘못된 등급은 효과/지속 0.
+	TestEqual(TEXT("Invalid grade percent is zero"), FConsumableFormula::GetBuffPercent(EConsumableType::AttackTonic, static_cast<EConsumableGrade>(99)), 0.0f);
+	TestEqual(TEXT("Invalid grade duration is zero"), FConsumableFormula::GetBuffDurationSec(EConsumableType::AttackTonic, static_cast<EConsumableGrade>(99)), static_cast<int64>(0));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FConsumableGradeBuffServiceTest,
+	"IdleProject.Consumable.GradeBuffService",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FConsumableGradeBuffServiceTest::RunTest(const FString& Parameters)
+{
+	UBuffService* Service = NewObject<UBuffService>();
+	Service->Initialize();
+
+	// 등급별 수량은 독립적으로 관리됩니다.
+	Service->AddConsumable(EConsumableType::AttackTonic, EConsumableGrade::Lesser, 2);
+	Service->AddConsumable(EConsumableType::AttackTonic, EConsumableGrade::Greater, 1);
+	TestEqual(TEXT("Lesser stock is tracked"), Service->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Lesser), 2);
+	TestEqual(TEXT("Greater stock is tracked"), Service->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Greater), 1);
+	TestEqual(TEXT("Standard stock stays empty"), Service->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Standard), 0);
+	TestEqual(TEXT("Total count aggregates grades"), Service->GetTotalCount(EConsumableType::AttackTonic), 3);
+
+	// Lesser 사용 시 활성 등급 % (0.5x).
+	TestTrue(TEXT("Lesser use succeeds"), Service->UseConsumable(EConsumableType::AttackTonic, EConsumableGrade::Lesser, 1000));
+	TestEqual(TEXT("Lesser use decrements lesser stock"), Service->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Lesser), 1);
+	TestEqual(TEXT("Active grade is Lesser"), static_cast<int32>(Service->GetActiveGrade(EConsumableType::AttackTonic, 1000)), static_cast<int32>(EConsumableGrade::Lesser));
+	TestEqual(TEXT("Lesser multiplier reflects 0.5x percent"), Service->GetBuffStatMultiplier(EConsumableType::AttackTonic, 1000), 1.15f);
+
+	// 같은 타입을 Greater 로 재사용 시 최신 등급으로 갱신됩니다(스택=최신).
+	TestTrue(TEXT("Greater reuse succeeds"), Service->UseConsumable(EConsumableType::AttackTonic, EConsumableGrade::Greater, 1500));
+	TestEqual(TEXT("Active grade updates to Greater"), static_cast<int32>(Service->GetActiveGrade(EConsumableType::AttackTonic, 1500)), static_cast<int32>(EConsumableGrade::Greater));
+	TestEqual(TEXT("Greater multiplier reflects 2x percent"), Service->GetBuffStatMultiplier(EConsumableType::AttackTonic, 1500), 1.60f);
+	TestEqual(TEXT("Reused buff end resets from latest use"), Service->GetBuffRemainingSec(EConsumableType::AttackTonic, 1500), static_cast<int64>(1800));
+
+	// 경제 getter 도 활성 등급 % 를 사용합니다.
+	Service->AddConsumable(EConsumableType::GoldFeast, EConsumableGrade::Greater, 1);
+	TestTrue(TEXT("Greater gold feast use succeeds"), Service->UseConsumable(EConsumableType::GoldFeast, EConsumableGrade::Greater, 2000));
+	TestEqual(TEXT("Greater gold buff exposes doubled percent"), Service->GetGoldBuffPct(2000), 1.00f);
+
+	// 등급별 수량 + 활성 등급이 세이브를 통해 라운드트립됩니다.
+	TArray<FConsumableSaveEntry> Saved = Service->ExportSave();
+	UBuffService* Restored = NewObject<UBuffService>();
+	Restored->Initialize();
+	Restored->ImportSave(Saved);
+	TestEqual(TEXT("Lesser stock round trips"), Restored->GetCount(EConsumableType::AttackTonic, EConsumableGrade::Lesser), 1);
+	TestEqual(TEXT("Active Greater grade round trips"), static_cast<int32>(Restored->GetActiveGrade(EConsumableType::AttackTonic, 1500)), static_cast<int32>(EConsumableGrade::Greater));
+	TestEqual(TEXT("Restored Greater multiplier round trips"), Restored->GetBuffStatMultiplier(EConsumableType::AttackTonic, 1500), 1.60f);
+	TestEqual(TEXT("Restored gold buff round trips"), Restored->GetGoldBuffPct(2000), 1.00f);
 	return true;
 }
 
@@ -179,7 +244,7 @@ bool FConsumableGameInstanceHooksTest::RunTest(const FString& Parameters)
 	const FDerivedStats BaseStats = Character->GetCurrentDerivedStats();
 	const int64 BasePower = Character->GetCombatPower();
 
-	GameInstance->AddConsumable(EConsumableType::AttackTonic, 1);
+	GameInstance->AddConsumable(EConsumableType::AttackTonic, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("TryUseConsumable consumes stock"), GameInstance->TryUseConsumable(EConsumableType::AttackTonic));
 	const FDerivedStats AttackBuffedStats = Character->GetCurrentDerivedStats();
 	TestTrue(TEXT("Attack tonic increases physical attack"), AttackBuffedStats.PhysAtk > BaseStats.PhysAtk);
@@ -187,32 +252,32 @@ bool FConsumableGameInstanceHooksTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Attack tonic does not buff HP"), AttackBuffedStats.Hp, BaseStats.Hp);
 	TestTrue(TEXT("Combat power increases while attack tonic is active"), Character->GetCombatPower() > BasePower);
 
-	GameInstance->AddConsumable(EConsumableType::GuardTonic, 1);
+	GameInstance->AddConsumable(EConsumableType::GuardTonic, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("Guard tonic activates with attack tonic"), GameInstance->TryUseConsumable(EConsumableType::GuardTonic));
 	const FDerivedStats GuardBuffedStats = Character->GetCurrentDerivedStats();
 	TestTrue(TEXT("Guard tonic increases HP"), GuardBuffedStats.Hp > AttackBuffedStats.Hp);
 	TestTrue(TEXT("Guard tonic increases physical defense"), GuardBuffedStats.PhysDef > AttackBuffedStats.PhysDef);
 	TestEqual(TEXT("Guard tonic does not double-apply attack"), GuardBuffedStats.PhysAtk, AttackBuffedStats.PhysAtk);
 
-	GameInstance->AddConsumable(EConsumableType::AllStatElixir, 1);
+	GameInstance->AddConsumable(EConsumableType::AllStatElixir, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("All stat elixir activates with existing stat buffs"), GameInstance->TryUseConsumable(EConsumableType::AllStatElixir));
 	const FDerivedStats AllStatBuffedStats = Character->GetCurrentDerivedStats();
 	TestTrue(TEXT("All stat elixir increases attack on top of attack tonic"), AllStatBuffedStats.PhysAtk > GuardBuffedStats.PhysAtk);
 	TestTrue(TEXT("All stat elixir increases HP on top of guard tonic"), AllStatBuffedStats.Hp > GuardBuffedStats.Hp);
 
-	GameInstance->AddConsumable(EConsumableType::GoldFeast, 1);
+	GameInstance->AddConsumable(EConsumableType::GoldFeast, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("Gold feast activates"), GameInstance->TryUseConsumable(EConsumableType::GoldFeast));
 	GameInstance->AddGold(100);
 	TestEqual(TEXT("Gold feast applies once in AddGold"), GameInstance->GetGold(), static_cast<int64>(150));
 
-	GameInstance->AddConsumable(EConsumableType::WisdomBooster, 1);
+	GameInstance->AddConsumable(EConsumableType::WisdomBooster, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("Wisdom booster activates"), GameInstance->TryUseConsumable(EConsumableType::WisdomBooster));
 	GameInstance->AddExp(99);
 	TestEqual(TEXT("Wisdom booster applies once in AddExp"), GameInstance->GetCurrentExp(), static_cast<int64>(149));
 
 	const float BaseDropChance = 0.05f;
 	TestEqual(TEXT("Drop chance has no consumable bonus before fortune scroll"), GameInstance->ApplyEquippedPetDropBonusChance(BaseDropChance), BaseDropChance);
-	GameInstance->AddConsumable(EConsumableType::FortuneScroll, 1);
+	GameInstance->AddConsumable(EConsumableType::FortuneScroll, EConsumableGrade::Standard, 1);
 	TestTrue(TEXT("Fortune scroll activates"), GameInstance->TryUseConsumable(EConsumableType::FortuneScroll));
 	TestEqual(TEXT("Fortune scroll applies once in drop chance path"), GameInstance->ApplyEquippedPetDropBonusChance(BaseDropChance), BaseDropChance + 0.30f);
 
@@ -282,8 +347,8 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("v13 active buff timestamp migrates to inactive"), LegacyGameInstance->GetBuffService()->IsBuffActive(EConsumableType::GuardTonic, 1000));
 
 	UIdleSaveGame* RoundTripSave = NewObject<UIdleSaveGame>();
-	TestTrue(TEXT("v15 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
-	TestEqual(TEXT("Captured save version is v15"), RoundTripSave->SaveVersion, 15);
+	TestTrue(TEXT("v16 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
+	TestEqual(TEXT("Captured save version is v16"), RoundTripSave->SaveVersion, 16);
 	TestEqual(TEXT("Captured consumable payload has guard entry"), RoundTripSave->Consumables.Num(), 1);
 	TestEqual(TEXT("Captured consumable count persists"), RoundTripSave->Consumables[0].Count, 2);
 	TestEqual(TEXT("Captured active end timestamp persists"), RoundTripSave->Consumables[0].BuffEndUnixSec, static_cast<int64>(12345));
