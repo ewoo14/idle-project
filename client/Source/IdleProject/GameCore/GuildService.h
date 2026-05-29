@@ -64,6 +64,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
 	int64 GetContributionPoints() const { return CachedContributionPoints; }
 
+	// ── 길드 보스 상태 접근자(PR-G3, 서버 권위 — 스냅샷 캐시 표시용) ──────────────
+	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
+	int64 GetBossHp() const { return CachedSnapshot.BossHp; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
+	int64 GetBossAccumDamage() const { return CachedSnapshot.BossAccumDamage; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
+	int32 GetBossDefeatedCount() const { return CachedSnapshot.BossDefeatedCount; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
+	int32 GetBossChallengesRemaining() const { return CachedSnapshot.BossChallengesRemaining; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
+	int32 GetBossUnclaimedDefeats() const { return CachedSnapshot.BossUnclaimedDefeats; }
+
 	/**
 	 * 던전 클리어·보스 도전 등 자동 기여 델타를 로컬에 누적. 다음 플러시(Contribute)
 	 * 까지 보관한다. 음수/0 은 무시. 주간 상한 클램프는 플러시 시 적용.
@@ -80,8 +96,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Guild")
 	int64 GetPendingAutoContribution() const { return PendingAutoContribution; }
 
-	// ── 세이브 캐시(SaveVer 18) 라운드트립 ──────────────────────────────────────
-	/** 세이브에 저장할 캐시(길드 id / 내 rank / 레벨·버프·포인트·pending·출석일). */
+	// ── 세이브 캐시(SaveVer 19) 라운드트립 ──────────────────────────────────────
+	/**
+	 * 세이브에 저장할 캐시(길드 id / 내 rank / 레벨·버프·포인트·pending·출석일
+	 * + 보스 진행 표시 캐시[격파 횟수·내 도전 잔여], SaveVer 19).
+	 * 보스 진행은 서버 권위이며 여기 캐시는 재접속 직후 UI 표시 목적의 표시용이다.
+	 */
 	void ExportSave(
 		FString& OutGuildId,
 		uint8& OutRank,
@@ -90,7 +110,9 @@ public:
 		float& OutGoldPct,
 		int64& OutContributionPoints,
 		int64& OutPendingAutoContribution,
-		FString& OutLastAttendanceDate) const;
+		FString& OutLastAttendanceDate,
+		int32& OutBossDefeatedCount,
+		int32& OutBossChallengesRemaining) const;
 	/** 세이브에서 캐시를 복원(버프는 오프라인에도 적용되도록 캐시 직접 복원). */
 	void ImportSave(
 		const FString& InGuildId,
@@ -100,7 +122,9 @@ public:
 		float InGoldPct,
 		int64 InContributionPoints,
 		int64 InPendingAutoContribution,
-		const FString& InLastAttendanceDate);
+		const FString& InLastAttendanceDate,
+		int32 InBossDefeatedCount,
+		int32 InBossChallengesRemaining);
 
 private:
 	UPROPERTY()

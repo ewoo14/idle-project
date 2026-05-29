@@ -210,6 +210,30 @@ bool UGuildService::ParseSnapshotJson(const FString& JsonBody)
 		}
 	}
 
+	// 길드 보스 상태(서버 snapshot.boss — 무소속/미생성 시 누락 가능).
+	const TSharedPtr<FJsonObject>* BossObjectPtr = nullptr;
+	if (Data->TryGetObjectField(TEXT("boss"), BossObjectPtr) && BossObjectPtr && BossObjectPtr->IsValid())
+	{
+		const TSharedPtr<FJsonObject>& BossObject = *BossObjectPtr;
+		Snapshot.BossHp = FMath::Max<int64>(0, GuildParseInt64Field(BossObject, TEXT("hp")));
+		Snapshot.BossAccumDamage = FMath::Max<int64>(0, GuildParseInt64Field(BossObject, TEXT("accumDamage")));
+		int32 BossDefeated = 0;
+		if (BossObject->TryGetNumberField(TEXT("defeatedCount"), BossDefeated))
+		{
+			Snapshot.BossDefeatedCount = FMath::Max(0, BossDefeated);
+		}
+		int32 BossChallenges = 0;
+		if (BossObject->TryGetNumberField(TEXT("challengesRemaining"), BossChallenges))
+		{
+			Snapshot.BossChallengesRemaining = FMath::Max(0, BossChallenges);
+		}
+		int32 BossUnclaimed = 0;
+		if (BossObject->TryGetNumberField(TEXT("unclaimedDefeats"), BossUnclaimed))
+		{
+			Snapshot.BossUnclaimedDefeats = FMath::Max(0, BossUnclaimed);
+		}
+	}
+
 	// 가입 신청(권한자에게만 채워짐).
 	const TArray<TSharedPtr<FJsonValue>>* RequestArray = nullptr;
 	if (Data->TryGetArrayField(TEXT("requests"), RequestArray) && RequestArray)
@@ -268,7 +292,9 @@ void UGuildService::ExportSave(
 	float& OutGoldPct,
 	int64& OutContributionPoints,
 	int64& OutPendingAutoContribution,
-	FString& OutLastAttendanceDate) const
+	FString& OutLastAttendanceDate,
+	int32& OutBossDefeatedCount,
+	int32& OutBossChallengesRemaining) const
 {
 	OutGuildId = GetCachedGuildId();
 	OutRank = static_cast<uint8>(CachedSnapshot.MyRank);
@@ -278,6 +304,9 @@ void UGuildService::ExportSave(
 	OutContributionPoints = CachedContributionPoints;
 	OutPendingAutoContribution = PendingAutoContribution;
 	OutLastAttendanceDate = LastAttendanceDate;
+	// 보스 진행 표시 캐시(서버 권위 — 재접속 직후 UI 표시용).
+	OutBossDefeatedCount = CachedSnapshot.BossDefeatedCount;
+	OutBossChallengesRemaining = CachedSnapshot.BossChallengesRemaining;
 }
 
 void UGuildService::ImportSave(
@@ -288,7 +317,9 @@ void UGuildService::ImportSave(
 	float InGoldPct,
 	int64 InContributionPoints,
 	int64 InPendingAutoContribution,
-	const FString& InLastAttendanceDate)
+	const FString& InLastAttendanceDate,
+	int32 InBossDefeatedCount,
+	int32 InBossChallengesRemaining)
 {
 	ClearSnapshot();
 
@@ -315,4 +346,8 @@ void UGuildService::ImportSave(
 	CachedSnapshot.Guild.Level = CachedLevel;
 	CachedSnapshot.Buff = CachedBuff;
 	CachedSnapshot.ContributionPoints = CachedContributionPoints;
+
+	// 보스 진행 표시 캐시 복원(HP 는 서버 재동기화로 갱신, 격파/도전잔여만 표시 복원).
+	CachedSnapshot.BossDefeatedCount = FMath::Max(0, InBossDefeatedCount);
+	CachedSnapshot.BossChallengesRemaining = FMath::Max(0, InBossChallengesRemaining);
 }

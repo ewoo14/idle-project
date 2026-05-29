@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 18;
+	int32 SaveVersion = 19;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -199,4 +199,13 @@ public:
 	/** 마지막 길드 출석 UTC 날짜(YYYY-MM-DD). */
 	UPROPERTY()
 	FString LastGuildAttendanceDate;
+
+	// ── 길드 보스 진행 표시 캐시(SaveVer 19, PR-G3) — 서버 권위, 재접속 직후 표시용 ──
+	/** 이번 주 누적 격파 횟수(서버 boss.defeatedCount 미러). 새 재화 아님. */
+	UPROPERTY()
+	int32 CachedBossDefeatedCount = 0;
+
+	/** 내 이번 주 남은 보스 도전 횟수(서버 boss.challengesRemaining 미러). */
+	UPROPERTY()
+	int32 CachedBossChallengesRemaining = 0;
 };

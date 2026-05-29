@@ -567,6 +567,68 @@ void UApiClient::BuyGuildShopItem(const FString& GuildId, const FString& Charact
 	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/shop/%s/buy"), *GuildId, *ItemId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
 }
 
+void UApiClient::ChallengeGuildBoss(const FString& GuildId, const FString& CharacterId, int64 Cp, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild boss challenge input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	// CP 는 음수 방어(서버 getChallengeDamage 가 trunc(max(0,cp)) 로 한 번 더 클램프).
+	JsonObject->SetNumberField(TEXT("cp"), static_cast<double>(FMath::Max<int64>(0, Cp)));
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/boss/challenge"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::ClaimGuildBossReward(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild boss claim input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/boss/claim"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::GetGuildBoss(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild boss input"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(TEXT("/v1/guilds/%s/boss?characterId=%s"), *GuildId, *CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::GetGuildRankings(int32 Limit, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	// limit 은 서버가 1~100 으로 클램프하지만 클라도 양수로 보정.
+	const int32 SafeLimit = FMath::Clamp(Limit, 1, 100);
+	FString Path = FString::Printf(TEXT("/v1/guilds/rankings?limit=%d"), SafeLimit);
+	if (!CharacterId.IsEmpty())
+	{
+		// characterId 지정 시 내 길드 순위(me)도 함께 반환(서버 guildRankings).
+		Path += FString::Printf(TEXT("&characterId=%s"), *CharacterId);
+	}
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
 {
 	const FString Path = FString::Printf(

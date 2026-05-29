@@ -222,6 +222,19 @@ public:
 	void GuildPanelFetchShop(TFunction<void(bool, const TArray<FGuildShopItemInfo>&)> OnComplete);
 	/** 길드 상점 구매(포인트 차감, 서버 검증) → 성공 시 스냅샷 갱신. */
 	void GuildPanelBuyShopItem(const FString& ItemId, TFunction<void(bool)> OnComplete);
+	/**
+	 * 공유 HP 풀 길드 보스 도전(PR-G3). 현재 캐릭터 CP(GetCombatPower)를 서버로 전달 →
+	 * 서버가 누적·격파 루프·데미지→기여(applyContribution)를 권위 처리 → 스냅샷 재동기화.
+	 * 데미지→기여 적립은 서버만 수행한다(클라 이중 적립 금지).
+	 */
+	void GuildPanelChallengeBoss(TFunction<void(bool)> OnComplete);
+	/**
+	 * 보스 격파 보상 수령(PR-G3). 응답 rewards 배열(격파 N건 누적)을 각각
+	 * ApplyGuildShopReward(type, amount)(G2 재사용)로 지급 → 세이브 → 스냅샷 갱신.
+	 */
+	void GuildPanelClaimBossReward(TFunction<void(bool)> OnComplete);
+	/** 주간 길드 랭킹 조회(상위 N + 내 길드 순위). 파싱된 랭킹/내 순위를 콜백으로 전달. */
+	void GuildPanelFetchRankings(int32 Limit, TFunction<void(bool, const TArray<FGuildRankingEntry>&, const FGuildRankingEntry&)> OnComplete);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
