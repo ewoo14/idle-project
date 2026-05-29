@@ -476,6 +476,30 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Consumable Timed Buff Pressure
+
+- Duration: 1800s (30 minutes).
+- Source: `server/src/core/formulas/consumable.ts`.
+- Consumables are modeled as limited-duration pressure only and are not
+  injected into the sampled first-rebirth run until acquisition timing,
+  stock limits, and expected player usage are modeled explicitly.
+- Economy buffs each have one application lane: gold, EXP, or drop.
+- Stat buffs enter after the existing permanent progression multipliers
+  and must remain single-application by buff type.
+
+<!-- markdownlint-disable MD013 -->
+
+| Consumable | Effect | Value | Duration sec | Pressure | First rebirth injected |
+| --- | --- | ---: | ---: | --- | --- |
+| AttackTonic | PhysAtk/MagicAtk | 30% | 1800 | combat | no |
+| GuardTonic | Hp/PhysDef/MagicDef | 30% | 1800 | survival | no |
+| AllStatElixir | Core stats | 20% | 1800 | combat | no |
+| FortuneScroll | DropRateAdd | 30% | 1800 | economy | no |
+| GoldFeast | Gold | 50% | 1800 | economy | no |
+| WisdomBooster | Exp | 50% | 1800 | economy | no |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Rune Codex Collection Pressure
 
 - Total cells: 63
@@ -538,6 +562,7 @@
 
 - server/src/core/formulas/level.ts
 - server/src/core/formulas/combat.ts
+- server/src/core/formulas/consumable.ts
 - server/src/core/formulas/stats.ts
 - server/src/core/formulas/offline.ts
 - server/src/core/formulas/reward.ts

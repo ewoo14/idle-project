@@ -17,6 +17,12 @@ import {
 } from "../../server/src/core/formulas/combat.js";
 import { computeCombatPower } from "../../server/src/core/formulas/combatPower.js";
 import {
+  CONSUMABLE_TYPE,
+  type ConsumableType,
+  getConsumableBuffDurationSec,
+  getConsumableBuffPercent,
+} from "../../server/src/core/formulas/consumable.js";
+import {
   getAffixCount,
   getRarityDropChances,
   getRarityStatMultiplier,
@@ -189,6 +195,7 @@ export type BalanceReport = {
       runeCodexPressure: RuneCodexPressure;
       uniqueTraitPressure: UniqueTraitPressure;
       dungeonPressure: DungeonPressure;
+      consumablePressure: ConsumablePressure;
       classBalance: ClassBalanceSnapshot;
     };
     distribution: SimulationDistribution;
@@ -549,6 +556,24 @@ export type DungeonPressure = {
   rows: DungeonPressureRow[];
 };
 
+export type ConsumablePressureKind = "combat" | "survival" | "economy";
+
+export type ConsumablePressureRow = {
+  consumable: string;
+  effect: string;
+  valuePercent: number;
+  durationSeconds: number;
+  pressureKind: ConsumablePressureKind;
+  firstRebirthInjected: boolean;
+};
+
+export type ConsumablePressure = {
+  durationSeconds: number;
+  durationMinutes: number;
+  injectedIntoSampledRun: boolean;
+  rows: ConsumablePressureRow[];
+};
+
 const DEFAULT_RUNS = 1000;
 const DEFAULT_SEED = 23;
 const TARGET_LEVEL = 100;
@@ -638,6 +663,49 @@ const UNIQUE_TRAIT_REVIEW_RARITIES: Array<{
   { rarity: 4, name: "Unique" },
   { rarity: 6, name: "Transcendent" },
 ];
+const CONSUMABLE_REVIEW_DEFINITIONS: Array<{
+  type: ConsumableType;
+  name: string;
+  effect: string;
+  pressureKind: ConsumablePressureKind;
+}> = [
+  {
+    type: CONSUMABLE_TYPE.AttackTonic,
+    name: "AttackTonic",
+    effect: "PhysAtk/MagicAtk",
+    pressureKind: "combat",
+  },
+  {
+    type: CONSUMABLE_TYPE.GuardTonic,
+    name: "GuardTonic",
+    effect: "Hp/PhysDef/MagicDef",
+    pressureKind: "survival",
+  },
+  {
+    type: CONSUMABLE_TYPE.AllStatElixir,
+    name: "AllStatElixir",
+    effect: "Core stats",
+    pressureKind: "combat",
+  },
+  {
+    type: CONSUMABLE_TYPE.FortuneScroll,
+    name: "FortuneScroll",
+    effect: "DropRateAdd",
+    pressureKind: "economy",
+  },
+  {
+    type: CONSUMABLE_TYPE.GoldFeast,
+    name: "GoldFeast",
+    effect: "Gold",
+    pressureKind: "economy",
+  },
+  {
+    type: CONSUMABLE_TYPE.WisdomBooster,
+    name: "WisdomBooster",
+    effect: "Exp",
+    pressureKind: "economy",
+  },
+];
 
 export function simulateRebirthDistribution(
   options: SimulationOptions = {},
@@ -697,6 +765,7 @@ export function buildBalanceReport(
       formulas: [
         "server/src/core/formulas/level.ts",
         "server/src/core/formulas/combat.ts",
+        "server/src/core/formulas/consumable.ts",
         "server/src/core/formulas/stats.ts",
         "server/src/core/formulas/offline.ts",
         "server/src/core/formulas/reward.ts",
@@ -726,6 +795,7 @@ export function buildBalanceReport(
       ),
       uniqueTraitPressure: buildUniqueTraitPressure(),
       dungeonPressure: buildDungeonPressure(distribution.samples),
+      consumablePressure: buildConsumablePressure(),
       classBalance: buildClassBalanceSnapshot([50, 100]),
     },
     distribution,
@@ -1856,6 +1926,26 @@ function buildDungeonPressure(samples: SimulationSample[]): DungeonPressure {
   };
 }
 
+function buildConsumablePressure(): ConsumablePressure {
+  const durationSeconds = getConsumableBuffDurationSec(
+    CONSUMABLE_TYPE.AttackTonic,
+  );
+
+  return {
+    durationSeconds,
+    durationMinutes: durationSeconds / 60,
+    injectedIntoSampledRun: false,
+    rows: CONSUMABLE_REVIEW_DEFINITIONS.map((definition) => ({
+      consumable: definition.name,
+      effect: definition.effect,
+      valuePercent: round(getConsumableBuffPercent(definition.type) * 100, 3),
+      durationSeconds: getConsumableBuffDurationSec(definition.type),
+      pressureKind: definition.pressureKind,
+      firstRebirthInjected: false,
+    })),
+  };
+}
+
 function buildDungeonPressureRow(
   dungeon: DungeonName,
   type: number,
@@ -2632,6 +2722,28 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     ...report.model.dungeonPressure.rows.map(
       (row) =>
         `| ${row.dungeon} | ${row.combatPower} | ${row.minimumCp} | ${row.reward} | ${row.dailyReward} | ${row.dailyRewardHoursAtMedianLevel50Income ?? "n/a"} |`,
+    ),
+    "",
+    "<!-- markdownlint-enable MD013 -->",
+    "",
+    "## Consumable Timed Buff Pressure",
+    "",
+    `- Duration: ${report.model.consumablePressure.durationSeconds}s (${report.model.consumablePressure.durationMinutes} minutes).`,
+    "- Source: `server/src/core/formulas/consumable.ts`.",
+    "- Consumables are modeled as limited-duration pressure only and are not",
+    "  injected into the sampled first-rebirth run until acquisition timing,",
+    "  stock limits, and expected player usage are modeled explicitly.",
+    "- Economy buffs each have one application lane: gold, EXP, or drop.",
+    "- Stat buffs enter after the existing permanent progression multipliers",
+    "  and must remain single-application by buff type.",
+    "",
+    "<!-- markdownlint-disable MD013 -->",
+    "",
+    "| Consumable | Effect | Value | Duration sec | Pressure | First rebirth injected |",
+    "| --- | --- | ---: | ---: | --- | --- |",
+    ...report.model.consumablePressure.rows.map(
+      (row) =>
+        `| ${row.consumable} | ${row.effect} | ${row.valuePercent}% | ${row.durationSeconds} | ${row.pressureKind} | ${row.firstRebirthInjected ? "yes" : "no"} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

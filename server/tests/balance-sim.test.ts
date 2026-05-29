@@ -943,6 +943,77 @@ describe("balance simulator", () => {
     );
   });
 
+  it("reports consumable timed-buff pressure without injecting it into the sampled rebirth run", () => {
+    const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
+    const report = buildBalanceReport(distribution);
+    const consumablePressure = report.json.model.consumablePressure;
+
+    expect(report.json.model.formulas).toContain(
+      "server/src/core/formulas/consumable.ts",
+    );
+    expect(consumablePressure.durationSeconds).toBe(1800);
+    expect(consumablePressure.durationMinutes).toBe(30);
+    expect(consumablePressure.injectedIntoSampledRun).toBe(false);
+    expect(consumablePressure.rows).toEqual([
+      {
+        consumable: "AttackTonic",
+        effect: "PhysAtk/MagicAtk",
+        valuePercent: 30,
+        durationSeconds: 1800,
+        pressureKind: "combat",
+        firstRebirthInjected: false,
+      },
+      {
+        consumable: "GuardTonic",
+        effect: "Hp/PhysDef/MagicDef",
+        valuePercent: 30,
+        durationSeconds: 1800,
+        pressureKind: "survival",
+        firstRebirthInjected: false,
+      },
+      {
+        consumable: "AllStatElixir",
+        effect: "Core stats",
+        valuePercent: 20,
+        durationSeconds: 1800,
+        pressureKind: "combat",
+        firstRebirthInjected: false,
+      },
+      {
+        consumable: "FortuneScroll",
+        effect: "DropRateAdd",
+        valuePercent: 30,
+        durationSeconds: 1800,
+        pressureKind: "economy",
+        firstRebirthInjected: false,
+      },
+      {
+        consumable: "GoldFeast",
+        effect: "Gold",
+        valuePercent: 50,
+        durationSeconds: 1800,
+        pressureKind: "economy",
+        firstRebirthInjected: false,
+      },
+      {
+        consumable: "WisdomBooster",
+        effect: "Exp",
+        valuePercent: 50,
+        durationSeconds: 1800,
+        pressureKind: "economy",
+        firstRebirthInjected: false,
+      },
+    ]);
+    expect(report.json.distribution.summary.medianHours).toBe(5.328);
+    expect(report.markdown).toContain("## Consumable Timed Buff Pressure");
+    expect(report.markdown).toContain(
+      "| AttackTonic | PhysAtk/MagicAtk | 30% | 1800 | combat | no |",
+    );
+    expect(report.markdown).toContain(
+      "not injected into the sampled first-rebirth run",
+    );
+  });
+
   it("keeps class mastery DPS rows inside the PR #60 damage-role band", () => {
     const distribution = simulateRebirthDistribution({ runs: 1000, seed: 23 });
     const report = buildBalanceReport(distribution);
