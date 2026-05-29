@@ -296,3 +296,21 @@ The panel keeps the Canvas-height 1.0-2.0 scale clamp for 1080p, 1440p, and 4K
 and is sized as a compact right-side panel so it does not change save data or
 introduce new binary UI assets. Existing `.gitattributes` LFS patterns continue
 to cover future exported `.uasset` and `.png` UI assets.
+
+## PR #77 Weekly Boss HUD Addendum
+
+This addendum belongs to UI/UX style section 3.2. Weekly Boss HUD V1 adds a
+center-lane weekly panel below the dungeon panel. It uses existing tokens only:
+`--bg-panel`, `--bg-primary`, `--text-primary`, `--text-muted`,
+`--accent-gold`, `--accent-blue`, and `--accent-red`.
+
+The header shows the localized title, ISO week id, accumulated damage against
+the next `MilestoneThreshold(reached + 1)`, remaining weekly challenges out of
+7, reached/claimed milestone counts, and a Challenge CTA wired to
+`TryChallengeWeeklyBoss()`. The body shows the next four unclaimed milestone
+rows with threshold, gold/essence reward preview, state, and a Claim CTA wired
+to `ClaimWeeklyBossMilestone(n)`.
+
+The panel keeps the Canvas-height 1.0-2.0 scale clamp for 1080p, 1440p, and 4K.
+It does not introduce binary UI or art assets; future `.uasset` and `.png`
+exports remain covered by the existing `.gitattributes` LFS patterns.

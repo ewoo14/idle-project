@@ -1,5 +1,7 @@
 #include "Misc/AutomationTest.h"
 
+#include "Internationalization/IdleLocalization.h"
+#include "UI/IdleHUD.h"
 #include "GameCore/WeeklyBossFormula.h"
 #include "GameCore/WeeklyBossService.h"
 
@@ -79,6 +81,41 @@ bool FWeeklyBossServiceChallengeClaimResetTest::RunTest(const FString& Parameter
 	TestEqual(TEXT("New week resets challenge count"), Restored->GetRemainingChallenges(), FWeeklyBossFormula::WeeklyChallengeLimit);
 	TestEqual(TEXT("New week resets claimed milestones"), Restored->GetClaimedMilestones(), 0);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FWeeklyBossHudPanelViewModelTest,
+	"IdleProject.UI.HUD.WeeklyBossPanelViewModel",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FWeeklyBossHudPanelViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("en"));
+
+	UWeeklyBossService* Service = NewObject<UWeeklyBossService>();
+	Service->ImportSave(TEXT("2026-W22"), 2250, 2, 1);
+
+	const FIdleHUDWeeklyBossPanelViewModel ViewModel = IdleProject::UI::BuildWeeklyBossPanelViewModel(*Service);
+
+	TestEqual(TEXT("Weekly boss title is localized"), ViewModel.Title.ToString(), FString(TEXT("Weekly Boss")));
+	TestEqual(TEXT("Damage label uses next milestone target"), ViewModel.DamageLabel.ToString(), FString(TEXT("Damage 2,250 / 3,375")));
+	TestEqual(TEXT("Remaining challenge label exposes weekly limit"), ViewModel.RemainingLabel.ToString(), FString(TEXT("Challenges 5 / 7")));
+	TestEqual(TEXT("Reached and claimed milestone label is localized"), ViewModel.MilestoneSummaryLabel.ToString(), FString(TEXT("Reached 3 / Claimed 1")));
+	TestEqual(TEXT("Progress ratio uses next milestone threshold"), ViewModel.ProgressRatio, 2250.0f / 3375.0f);
+	TestTrue(TEXT("Challenge CTA is enabled when attempts remain"), ViewModel.bCanChallenge);
+	TestEqual(TEXT("Challenge hitbox is stable"), ViewModel.ChallengeHitBoxName, FName(TEXT("WeeklyBossChallenge")));
+	TestTrue(TEXT("Milestone rows include claimable next reward"), ViewModel.Rows.Num() >= 1);
+	if (ViewModel.Rows.Num() > 0)
+	{
+		const FIdleHUDWeeklyBossMilestoneRowViewModel& Row = ViewModel.Rows[0];
+		TestEqual(TEXT("First row starts at first unclaimed milestone"), Row.Milestone, 2);
+		TestTrue(TEXT("Reached unclaimed row can be claimed"), Row.bCanClaim);
+		TestEqual(TEXT("Claim hitbox carries milestone number"), Row.ClaimHitBoxName, FName(TEXT("WeeklyBossClaim_2")));
+		TestEqual(TEXT("Reward preview includes gold and essence"), Row.RewardLabel.ToString(), FString(TEXT("Gold 7,500 / Essence 6")));
+	}
+
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
 	return true;
 }
 
