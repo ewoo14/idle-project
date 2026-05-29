@@ -140,7 +140,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FRuneSetGameInstanceSaveVersionTest::RunTest(const FString& Parameters)
 {
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
-	TestEqual(TEXT("Default save version is twelve for rune sets"), SaveGame->SaveVersion, 12);
+	TestEqual(TEXT("Default save version is current (16) for rune sets"), SaveGame->SaveVersion, 16);
 
 	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
 	GameInstance->InitializeRuneServiceForTests();
@@ -148,7 +148,7 @@ bool FRuneSetGameInstanceSaveVersionTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture writes save"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Captured save version is twelve"), CapturedSave->SaveVersion, 12);
+	TestEqual(TEXT("Captured save version is current (16)"), CapturedSave->SaveVersion, 16);
 	TestEqual(TEXT("Captured rune includes set"), CapturedSave->Runes[0].RuneSet, ERuneSet::Offense);
 
 	return true;
