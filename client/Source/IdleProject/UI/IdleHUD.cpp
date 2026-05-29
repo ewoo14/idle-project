@@ -14,6 +14,7 @@
 #include "GameCore/BuffService.h"
 #include "GameCore/ConsumableFormula.h"
 #include "GameCore/DungeonFormula.h"
+#include "GameCore/GuildBossFormula.h"
 #include "GameCore/GuildFormula.h"
 #include "GameCore/GuildService.h"
 #include "GameCore/IdleGameInstance.h"
@@ -95,6 +96,11 @@ const FName GuildAttendHitBoxName(TEXT("GuildAttend"));
 const FName GuildDonateHitBoxName(TEXT("GuildDonate"));
 const FName GuildDonateCycleHitBoxName(TEXT("GuildDonateCycle"));
 const FString GuildShopBuyHitBoxPrefix(TEXT("GuildShopBuy_"));
+// 길드 보스/주간 랭킹(PR-G3) — 동일 Guild~ prefix 로 jumbo ODR 회피.
+const FName GuildBossChallengeHitBoxName(TEXT("GuildBossChallenge"));
+const FName GuildBossClaimHitBoxName(TEXT("GuildBossClaim"));
+const FName GuildTabMyHitBoxName(TEXT("GuildTabMy"));
+const FName GuildTabRankingsHitBoxName(TEXT("GuildTabRankings"));
 // 헌납 금액 프리셋(순환) — 보유 골드로 가능한 만큼만 활성.
 const int64 GuildDonatePresets[] = { 1000, 5000, 10000 };
 constexpr int32 GuildDonatePresetCount = 3;
@@ -2311,7 +2317,7 @@ FIdleHUDLeaderboardPanelViewModel IdleProject::UI::BuildLeaderboardPanelViewMode
 	return ViewModel;
 }
 
-FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems)
+FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems, bool bRankingsView, bool bRankingsLoading, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking)
 {
 	FIdleHUDGuildPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("GUILD_PANEL_TITLE"));
@@ -2428,6 +2434,72 @@ FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGui
 		Row.BuyLabel = IdleProject::Localization::UI(bAfford ? TEXT("GUILD_SHOP_BUY") : TEXT("GUILD_SHOP_INSUFFICIENT"));
 		Row.BuyHitBoxName = FName(*(GuildShopBuyHitBoxPrefix + Item.Id));
 		ViewModel.ShopRows.Add(MoveTemp(Row));
+	}
+
+	// ── 길드 보스(PR-G3, 공유 HP 풀 — 서버 권위 표시) ──
+	// HP = getGuildBossHp(defeated)(서버 snapshot.boss.hp 우선, 0 이면 공식으로 폴백).
+	const int64 BossDefeated = Snapshot.BossDefeatedCount;
+	const int64 BossAccum = FMath::Max<int64>(0, Snapshot.BossAccumDamage);
+	const int64 BossHp = Snapshot.BossHp > 0 ? Snapshot.BossHp : FGuildBossFormula::GetGuildBossHp(Snapshot.BossDefeatedCount);
+	ViewModel.BossTitle = IdleProject::Localization::UI(TEXT("GUILD_BOSS_TITLE"));
+	ViewModel.BossHpRatio = BossHp > 0 ? FMath::Clamp(static_cast<float>(static_cast<double>(BossAccum) / static_cast<double>(BossHp)), 0.0f, 1.0f) : 0.0f;
+	ViewModel.BossHpLabel = FormatLocalizedUI(TEXT("GUILD_BOSS_HP_FORMAT"), [BossAccum, BossHp](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Accum"), FText::FromString(FormatIntegerWithCommas(BossAccum)));
+		Args.Add(TEXT("Hp"), FText::FromString(FormatIntegerWithCommas(BossHp)));
+	});
+	ViewModel.BossDefeatedLabel = FormatLocalizedUI(TEXT("GUILD_BOSS_DEFEATED_FORMAT"), [BossDefeated](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Count"), FText::AsNumber(BossDefeated));
+	});
+	const int32 BossRemaining = FMath::Max(0, Snapshot.BossChallengesRemaining);
+	ViewModel.bCanChallengeBoss = BossRemaining > 0;
+	ViewModel.BossChallengeLabel = FormatLocalizedUI(TEXT("GUILD_BOSS_CHALLENGE_FORMAT"), [BossRemaining](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Remaining"), FText::AsNumber(BossRemaining));
+	});
+	const int32 BossUnclaimed = FMath::Max(0, Snapshot.BossUnclaimedDefeats);
+	ViewModel.bCanClaimBoss = BossUnclaimed > 0;
+	ViewModel.BossClaimLabel = FormatLocalizedUI(TEXT("GUILD_BOSS_CLAIM_FORMAT"), [BossUnclaimed](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Count"), FText::AsNumber(BossUnclaimed));
+	});
+
+	// ── 주간 길드 랭킹 탭(PR-G3) ──
+	ViewModel.bRankingsView = bRankingsView;
+	ViewModel.MyTabLabel = IdleProject::Localization::UI(TEXT("GUILD_TAB_MY"));
+	ViewModel.RankingsTabLabel = IdleProject::Localization::UI(TEXT("GUILD_TAB_RANKINGS"));
+	if (bRankingsView)
+	{
+		ViewModel.RankingsTitle = IdleProject::Localization::UI(TEXT("GUILD_RANKINGS_TITLE"));
+		ViewModel.RankingsEmptyLabel = IdleProject::Localization::UI(TEXT("GUILD_RANKINGS_EMPTY"));
+		ViewModel.RankingsLoadingLabel = IdleProject::Localization::UI(TEXT("GUILD_RANKINGS_LOADING"));
+		ViewModel.MyRankingTitle = IdleProject::Localization::UI(TEXT("GUILD_RANKINGS_MY_TITLE"));
+		const FString SelfGuildId = Summary.Id;
+		ViewModel.MyRankingLabel = MyRanking.Rank > 0
+			? FormatLocalizedUI(TEXT("GUILD_RANKINGS_MY_FORMAT"), [&MyRanking](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Rank"), FText::AsNumber(MyRanking.Rank));
+				Args.Add(TEXT("Weekly"), FText::FromString(FormatIntegerWithCommas(MyRanking.WeeklyContribution)));
+			})
+			: IdleProject::Localization::UI(TEXT("GUILD_RANKINGS_MY_UNRANKED"));
+		for (const FGuildRankingEntry& Entry : Rankings)
+		{
+			FIdleHUDGuildRankingRowViewModel Row;
+			Row.GuildId = Entry.GuildId;
+			Row.bSelf = !SelfGuildId.IsEmpty() && Entry.GuildId == SelfGuildId;
+			Row.RankLabel = FormatLocalizedUI(TEXT("GUILD_RANKINGS_RANK_FORMAT"), [&Entry](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Rank"), FText::AsNumber(Entry.Rank));
+			});
+			Row.NameLabel = FText::FromString(Entry.Name);
+			Row.InfoLabel = FormatLocalizedUI(TEXT("GUILD_RANKINGS_INFO_FORMAT"), [&Entry](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Level"), FText::AsNumber(Entry.Level));
+			});
+			Row.ContributionLabel = FormatLocalizedUIWithInt64(TEXT("GUILD_WEEKLY_CONTRIBUTION_FORMAT"), TEXT("Weekly"), Entry.WeeklyContribution);
+			ViewModel.RankingRows.Add(MoveTemp(Row));
+		}
 	}
 
 	ViewModel.MemberListTitle = IdleProject::Localization::UI(TEXT("GUILD_MEMBER_LIST_TITLE"));
@@ -4004,6 +4076,26 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(GuildShopBuyHitBoxPrefix))
 	{
 		BuyGuildShopItemFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == GuildTabMyHitBoxName)
+	{
+		SetGuildRankingsView(false);
+		return;
+	}
+	if (BoxName == GuildTabRankingsHitBoxName)
+	{
+		SetGuildRankingsView(true);
+		return;
+	}
+	if (BoxName == GuildBossChallengeHitBoxName)
+	{
+		TryChallengeGuildBoss();
+		return;
+	}
+	if (BoxName == GuildBossClaimHitBoxName)
+	{
+		TryClaimGuildBossReward();
 		return;
 	}
 	if (BoxName == ShopGearRollHitBoxName)
@@ -7059,8 +7151,13 @@ void AIdleHUD::DrawGuildPanel()
 		{
 			RefreshGuildShop();
 		}
+		// 주간 랭킹 탭 진입 시 1회 auto-fetch(로딩 가드, 캐시 재사용).
+		if (bGuildRankingsView && !bGuildRankingsLoaded && !bGuildRankingsLoading)
+		{
+			RefreshGuildRankings();
+		}
 	}
-	const FIdleHUDGuildPanelViewModel ViewModel = BuildGuildPanelViewModel(*GuildService, GuildBrowseList, PendingCreateName, bGuildBrowseLoading || bGuildActionPending, bOffline, PlayerGold, DonateAmount, GuildShopItems);
+	const FIdleHUDGuildPanelViewModel ViewModel = BuildGuildPanelViewModel(*GuildService, GuildBrowseList, PendingCreateName, bGuildBrowseLoading || bGuildActionPending, bOffline, PlayerGold, DonateAmount, GuildShopItems, bGuildRankingsView, bGuildRankingsLoading, GuildRankings, GuildMyRanking);
 
 	const UWorld* World = GetWorld();
 	const float FeedbackElapsed = World ? World->GetTimeSeconds() - GuildFeedbackStartTime : 0.0f;
@@ -7085,14 +7182,24 @@ void AIdleHUD::DrawGuildPanel()
 			+ FMath::Max(1, VisibleList) * (RowHeight + RowGap)
 			+ 78.0f * Scale; // 생성 영역
 	}
+	else if (ViewModel.bRankingsView)
+	{
+		// 헤더(요약 2줄) + 탭 행 + 내 길드 순위 + 상위 랭킹 행.
+		const int32 VisibleRanks = FMath::Min(ViewModel.RankingRows.Num(), 8);
+		PanelHeight = 96.0f * Scale + ButtonHeight + RowGap; // 요약 + 탭 행
+		PanelHeight += 48.0f * Scale;                        // 내 길드 순위 영역
+		PanelHeight += 24.0f * Scale + FMath::Max(1, VisibleRanks) * (RowHeight + RowGap);
+	}
 	else
 	{
 		const int32 VisibleMembers = FMath::Min(ViewModel.MemberRows.Num(), 8);
 		PanelHeight = 110.0f * Scale + VisibleMembers * (RowHeight + RowGap);
-		// G2 기여/버프 정보 4줄 + 출석/헌납 버튼 행 + 상점(제목+행).
-		PanelHeight += 132.0f * Scale + ButtonHeight + RowGap;
+		// 탭 행 + G2 기여/버프 정보 4줄 + 출석/헌납 버튼 행 + 상점(제목+행).
+		PanelHeight += ButtonHeight + RowGap + 132.0f * Scale + ButtonHeight + RowGap;
 		const int32 VisibleShop = FMath::Min(ViewModel.ShopRows.Num(), 6);
 		PanelHeight += 24.0f * Scale + FMath::Max(1, VisibleShop) * (RowHeight + RowGap);
+		// 길드 보스 섹션(제목 + HP 바 + 정보 줄 + 도전/수령 버튼 행).
+		PanelHeight += 96.0f * Scale + ButtonHeight + RowGap;
 		if (ViewModel.bShowManage)
 		{
 			const int32 VisibleReq = FMath::Min(ViewModel.RequestRows.Num(), 4);
@@ -7184,6 +7291,52 @@ void AIdleHUD::DrawGuildPanel()
 		}
 		CursorY += 26.0f * Scale;
 
+		// ── 탭 토글(내 길드 / 주간 랭킹, PR-G3) ──
+		const float TabGap = 6.0f * Scale;
+		const float TabWidth = (PanelWidth - Padding * 2.0f - TabGap) * 0.5f;
+		const float MyTabX = X + Padding;
+		const float RankTabX = MyTabX + TabWidth + TabGap;
+		const FLinearColor MyTabColor = !ViewModel.bRankingsView ? Theme::AccentGold : Theme::BgPrimary;
+		const FLinearColor RankTabColor = ViewModel.bRankingsView ? Theme::AccentGold : Theme::BgPrimary;
+		DrawRect(MyTabColor, MyTabX, CursorY, TabWidth, ButtonHeight);
+		DrawRect(RankTabColor, RankTabX, CursorY, TabWidth, ButtonHeight);
+		DrawText(ViewModel.MyTabLabel.ToString(), !ViewModel.bRankingsView ? Theme::BgPrimary : Theme::TextMuted, MyTabX + 10.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		DrawText(ViewModel.RankingsTabLabel.ToString(), ViewModel.bRankingsView ? Theme::BgPrimary : Theme::TextMuted, RankTabX + 10.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		AddHitBox(FVector2D(MyTabX, CursorY), FVector2D(TabWidth, ButtonHeight), GuildTabMyHitBoxName, true, 90);
+		AddHitBox(FVector2D(RankTabX, CursorY), FVector2D(TabWidth, ButtonHeight), GuildTabRankingsHitBoxName, true, 90);
+		CursorY += ButtonHeight + RowGap;
+
+		if (ViewModel.bRankingsView)
+		{
+			// ── 주간 길드 랭킹 탭 ──
+			DrawText(ViewModel.MyRankingTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+			DrawText(ViewModel.MyRankingLabel.ToString(), Theme::TextPrimary, X + Padding + 96.0f * Scale, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+			CursorY += 24.0f * Scale;
+
+			DrawText(ViewModel.RankingsTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+			CursorY += 24.0f * Scale;
+
+			const int32 VisibleRanks = FMath::Min(ViewModel.RankingRows.Num(), 8);
+			if (VisibleRanks == 0)
+			{
+				const FText EmptyText = bGuildRankingsLoading ? ViewModel.RankingsLoadingLabel : ViewModel.RankingsEmptyLabel;
+				DrawText(EmptyText.ToString(), Theme::TextMuted, X + Padding, CursorY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+				CursorY += RowHeight + RowGap;
+			}
+			for (int32 Index = 0; Index < VisibleRanks; ++Index)
+			{
+				DrawGuildRankingRow(ViewModel.RankingRows[Index], X + Padding, CursorY, PanelWidth - Padding * 2.0f, RowHeight);
+				CursorY += RowHeight + RowGap;
+			}
+
+			if (bShowFeedback)
+			{
+				DrawText(GuildFeedbackLabel.ToString(), bGuildFeedbackSuccess ? Theme::AccentGold : Theme::AccentRed, X + Padding, CursorY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+			}
+			RefreshMouseInteraction();
+			return;
+		}
+
 		// ── 길드 레벨/EXP/버프/기여(PR-G2) ──
 		DrawText(ViewModel.LevelLabel.ToString(), Theme::AccentBlue, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 		DrawText(ViewModel.ContributionLabel.ToString(), Theme::AccentGold, X + PanelWidth - Padding - 140.0f * Scale, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
@@ -7245,6 +7398,38 @@ void AIdleHUD::DrawGuildPanel()
 			CursorY += RowHeight + RowGap;
 		}
 		CursorY += 6.0f * Scale;
+
+		// ── 길드 보스 섹션(공유 HP 풀, PR-G3) ──
+		DrawText(ViewModel.BossTitle.ToString(), Theme::AccentRed, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		DrawText(ViewModel.BossDefeatedLabel.ToString(), Theme::AccentGold, X + PanelWidth - Padding - 120.0f * Scale, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+		CursorY += 20.0f * Scale;
+		// 공유 HP 바(누적 데미지 / 보스 HP).
+		const float BossBarWidth = PanelWidth - Padding * 2.0f;
+		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.9f), X + Padding, CursorY, BossBarWidth, 8.0f * Scale);
+		DrawRect(Theme::AccentRed, X + Padding, CursorY, BossBarWidth * FMath::Clamp(ViewModel.BossHpRatio, 0.0f, 1.0f), 8.0f * Scale);
+		CursorY += 12.0f * Scale;
+		DrawText(ViewModel.BossHpLabel.ToString(), Theme::TextMuted, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		CursorY += 20.0f * Scale;
+		// 도전 / 보상 수령 버튼 행.
+		const bool bBossActionAllowed = !bGuildActionPending && !bOffline;
+		const float BossChallengeWidth = 130.0f * Scale;
+		const bool bChallengeEnabled = bBossActionAllowed && ViewModel.bCanChallengeBoss;
+		DrawRect(bChallengeEnabled ? Theme::AccentRed : Theme::BgPrimary, X + Padding, CursorY, BossChallengeWidth, ButtonHeight);
+		DrawText(ViewModel.BossChallengeLabel.ToString(), bChallengeEnabled ? Theme::TextPrimary : Theme::TextMuted, X + Padding + 8.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		if (bChallengeEnabled)
+		{
+			AddHitBox(FVector2D(X + Padding, CursorY), FVector2D(BossChallengeWidth, ButtonHeight), GuildBossChallengeHitBoxName, true, 90);
+		}
+		const float BossClaimWidth = 120.0f * Scale;
+		const float BossClaimX = X + PanelWidth - Padding - BossClaimWidth;
+		const bool bClaimEnabled = bBossActionAllowed && ViewModel.bCanClaimBoss;
+		DrawRect(bClaimEnabled ? Theme::AccentGold : Theme::BgPrimary, BossClaimX, CursorY, BossClaimWidth, ButtonHeight);
+		DrawText(ViewModel.BossClaimLabel.ToString(), bClaimEnabled ? Theme::BgPrimary : Theme::TextMuted, BossClaimX + 8.0f * Scale, CursorY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+		if (bClaimEnabled)
+		{
+			AddHitBox(FVector2D(BossClaimX, CursorY), FVector2D(BossClaimWidth, ButtonHeight), GuildBossClaimHitBoxName, true, 90);
+		}
+		CursorY += ButtonHeight + RowGap + 6.0f * Scale;
 
 		DrawText(ViewModel.MemberListTitle.ToString(), Theme::AccentGold, X + Padding, CursorY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 		CursorY += 22.0f * Scale;
@@ -7856,6 +8041,124 @@ void AIdleHUD::BuyGuildShopItemFromHitBox(FName BoxName)
 		{
 			StrongThis->bGuildActionPending = false;
 			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_PURCHASED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawGuildRankingRow(const FIdleHUDGuildRankingRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	const FLinearColor AccentColor = Row.bSelf ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.52f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(Row.bSelf ? 0.96f : 0.86f), X, Y, Width, Height);
+	DrawRect(AccentColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.RankLabel.ToString(), Row.bSelf ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.NameLabel.ToString(), Row.bSelf ? Theme::AccentGold : Theme::TextPrimary, X + 48.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.InfoLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+	DrawText(Row.ContributionLabel.ToString(), Row.bSelf ? Theme::AccentGold : Theme::AccentBlue, X + Width - 132.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+}
+
+void AIdleHUD::SetGuildRankingsView(bool bRankings)
+{
+	if (bGuildRankingsView == bRankings)
+	{
+		return;
+	}
+	bGuildRankingsView = bRankings;
+	// 랭킹 탭 최초 진입 시 1회 fetch(가드는 DrawGuildPanel 의 auto-fetch 가 처리).
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::RefreshGuildRankings()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || !GuildService->HasGuild() || bGuildRankingsLoading)
+	{
+		return;
+	}
+
+	bGuildRankingsLoading = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelFetchRankings(10, [WeakThis](bool bSuccess, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildRankingsLoading = false;
+			if (bSuccess)
+			{
+				StrongThis->GuildRankings = Rankings;
+				StrongThis->GuildMyRanking = MyRanking;
+				StrongThis->bGuildRankingsLoaded = true;
+			}
+			StrongThis->RefreshMouseInteraction();
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryChallengeGuildBoss()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+	// UI 표시(잔여 도전 > 0)와 일치하는 가드.
+	if (!GuildService->HasGuild() || GuildService->GetBossChallengesRemaining() <= 0)
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelChallengeBoss([WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			// 도전 후 기여/랭킹이 변동되므로 캐시 무효화(다음 탭 진입 시 재조회).
+			StrongThis->bGuildRankingsLoaded = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_BOSS_CHALLENGED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
+		}
+	});
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryClaimGuildBossReward()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UGuildService* GuildService = IdleGameInstance ? IdleGameInstance->GetGuildService() : nullptr;
+	if (!IdleGameInstance || !GuildService || bGuildActionPending)
+	{
+		return;
+	}
+	// UI 표시(미수령 격파 > 0)와 일치하는 가드.
+	if (!GuildService->HasGuild() || GuildService->GetBossUnclaimedDefeats() <= 0)
+	{
+		return;
+	}
+
+	bGuildActionPending = true;
+	TWeakObjectPtr<AIdleHUD> WeakThis(this);
+	IdleGameInstance->GuildPanelClaimBossReward([WeakThis](bool bSuccess)
+	{
+		if (AIdleHUD* StrongThis = WeakThis.Get())
+		{
+			StrongThis->bGuildActionPending = false;
+			StrongThis->SetGuildFeedback(bSuccess ? TEXT("GUILD_FEEDBACK_BOSS_CLAIMED") : TEXT("GUILD_FEEDBACK_FAILED"), bSuccess);
 		}
 	});
 	RefreshMouseInteraction();

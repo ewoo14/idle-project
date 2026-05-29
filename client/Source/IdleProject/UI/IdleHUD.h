@@ -482,6 +482,17 @@ struct IDLEPROJECT_API FIdleHUDGuildRequestRowViewModel
 	FName RejectHitBoxName;
 };
 
+/** 주간 길드 랭킹 1행(PR-G3, 서버 GET /rankings). bSelf 면 내 길드 강조. */
+struct IDLEPROJECT_API FIdleHUDGuildRankingRowViewModel
+{
+	FString GuildId;
+	FText RankLabel;          // #{Rank}
+	FText NameLabel;          // 길드명
+	FText InfoLabel;          // Lv {Level}
+	FText ContributionLabel;  // 주간 기여 {Weekly}
+	bool bSelf = false;       // 내 길드 여부(강조)
+};
+
 /** 길드 패널 전체 뷰모델 — bHasGuild 로 무소속/내 길드 화면 분기. */
 struct IDLEPROJECT_API FIdleHUDGuildPanelViewModel
 {
@@ -534,6 +545,27 @@ struct IDLEPROJECT_API FIdleHUDGuildPanelViewModel
 	FText ShopTitle;
 	FText ShopEmptyLabel;
 	TArray<FIdleHUDGuildShopRowViewModel> ShopRows;
+
+	// ── 길드 보스(PR-G3, 공유 HP 풀 — 서버 권위) ──
+	FText BossTitle;
+	FText BossHpLabel;             // 누적 {Accum} / {Hp}
+	float BossHpRatio = 0.0f;      // accum / hp (0~1)
+	FText BossDefeatedLabel;       // 격파 {Count}회
+	FText BossChallengeLabel;      // 도전 (잔여 {Remaining})
+	bool bCanChallengeBoss = false;
+	FText BossClaimLabel;          // 보상 수령 {Count}
+	bool bCanClaimBoss = false;
+
+	// ── 주간 길드 랭킹 탭(PR-G3) ──
+	bool bRankingsView = false;    // 랭킹 탭 활성 여부(내 길드 화면 한정)
+	FText MyTabLabel;              // 내 길드
+	FText RankingsTabLabel;        // 주간 랭킹
+	FText RankingsTitle;
+	FText RankingsEmptyLabel;
+	FText RankingsLoadingLabel;
+	FText MyRankingTitle;          // 내 길드 순위
+	FText MyRankingLabel;          // #{Rank} · 주간 {Weekly} (순위권 밖이면 -)
+	TArray<FIdleHUDGuildRankingRowViewModel> RankingRows;
 
 	FText MemberListTitle;
 	TArray<FIdleHUDGuildMemberRowViewModel> MemberRows;
@@ -865,7 +897,7 @@ IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRol
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
-IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems);
+IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems, bool bRankingsView, bool bRankingsLoading, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
@@ -1009,6 +1041,11 @@ private:
 	void CycleGuildDonateAmount();
 	void TryGuildDonate();
 	void BuyGuildShopItemFromHitBox(FName BoxName);
+	void DrawGuildRankingRow(const FIdleHUDGuildRankingRowViewModel& Row, float X, float Y, float Width, float Height);
+	void TryChallengeGuildBoss();
+	void TryClaimGuildBossReward();
+	void RefreshGuildRankings();
+	void SetGuildRankingsView(bool bRankings);
 	void SetGuildFeedback(const TCHAR* Key, bool bSuccess);
 	void DrawRunePanel();
 	void DrawRuneCodexPanel();
@@ -1128,6 +1165,12 @@ private:
 	bool bGuildShopLoading = false;            // 상점 비동기 로딩 표시
 	FString GuildShopLoadedForId;              // 상점을 로드한 길드 id(전환/탈퇴 시 무효화)
 	int32 GuildDonatePresetIndex = 0;          // 헌납 금액 프리셋 인덱스(금액 변경 버튼 순환)
+	// ── 길드 보스/주간 랭킹 UI 상태(PR-G3, 서버 권위 — 캐시/표시 전용) ──────────────
+	bool bGuildRankingsView = false;           // 내 길드 화면에서 주간 랭킹 탭 활성 여부
+	TArray<FGuildRankingEntry> GuildRankings;  // 주간 랭킹 캐시(서버 GET /rankings)
+	FGuildRankingEntry GuildMyRanking;         // 내 길드 순위(Rank=0 이면 순위권 밖)
+	bool bGuildRankingsLoading = false;        // 랭킹 비동기 로딩 표시
+	bool bGuildRankingsLoaded = false;         // 진입 시 1회 auto-fetch 가드
 	FText GuildFeedbackLabel;
 	bool bGuildFeedbackSuccess = false;
 	float GuildFeedbackStartTime = -1000.0f;
