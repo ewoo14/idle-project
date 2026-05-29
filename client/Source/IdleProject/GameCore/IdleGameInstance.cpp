@@ -186,7 +186,12 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	{
 		EnsureBuffService();
 		const double GoldMultiplier = 1.0 + static_cast<double>(BuffService ? BuffService->GetGoldBuffPct(GetCurrentUnixSeconds()) : 0.0f);
-		EffectiveAmount = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * GoldMultiplier));
+		// (double)MAX_int64 * 배수는 int64 범위를 넘겨 RoundToInt64에서 오버플로(UB)하므로
+		// 범위 초과 시 EffectiveAmount를 MAX_int64로 포화시킨다(아래 합산 포화 로직과 정합).
+		const double ScaledAmount = static_cast<double>(Amount) * GoldMultiplier;
+		EffectiveAmount = ScaledAmount >= static_cast<double>(MAX_int64)
+			? MAX_int64
+			: FMath::Max<int64>(0, FMath::RoundToInt64(ScaledAmount));
 		if (Gold > MAX_int64 - EffectiveAmount)
 		{
 			Gold = MAX_int64;
