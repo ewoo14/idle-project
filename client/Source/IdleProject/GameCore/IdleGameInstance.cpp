@@ -1367,9 +1367,9 @@ float UIdleGameInstance::GetRuneGoldFindBonus() const
 
 float UIdleGameInstance::GetRuneExpBoostBonus() const
 {
-	const float RuneBonus = RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
-	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f;
-	return RuneBonus + MasteryBonus;
+	// EXP 마스터리 보너스는 AddExp 보편 경로에서 단일 적용된다. 이 getter는
+	// 처치 EXP 계산(IdleMonster)에 쓰이므로 마스터리를 더하면 이중 적용된다.
+	return RuneService ? RuneService->GetEquippedUtilValues().ExpBoost : 0.0f;
 }
 
 float UIdleGameInstance::GetRuneOfflineEffBonus() const

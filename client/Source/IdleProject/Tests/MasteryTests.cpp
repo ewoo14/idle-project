@@ -216,7 +216,10 @@ bool FMasteryUtilityBonusExposureTest::RunTest(const FString& Parameters)
 	Save->Mastery.Add(Beast);
 
 	TestTrue(TEXT("Seeded beast mastery save applies"), GameInstance->ApplyFromSave(Save));
-	TestEqual(TEXT("Rune exp boost getter includes beast mastery bonus"), GameInstance->GetRuneExpBoostBonus(), FMasteryFormula::ExpBoostPct(1));
+	// EXP 마스터리는 AddExp 단일 경로 적용 — 처치 EXP getter는 마스터리를 제외해 이중 적용을 막는다.
+	TestEqual(TEXT("Exp boost getter excludes mastery (no rune)"), GameInstance->GetRuneExpBoostBonus(), 0.0f);
+	// 골드 마스터리는 처치 경로 getter에서 단일 적용된다.
+	TestEqual(TEXT("Gold find getter includes beast mastery bonus"), GameInstance->GetRuneGoldFindBonus(), FMasteryFormula::GoldFindPct(1));
 	return true;
 }
 
