@@ -264,7 +264,7 @@ bool FTitleSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Capture writes V21"), SaveGame->SaveVersion, static_cast<int32>(21));
+	TestEqual(TEXT("Capture writes V22"), SaveGame->SaveVersion, static_cast<int32>(22));
 	TestTrue(TEXT("Saved unlocked set contains tower_conqueror"), SaveGame->UnlockedTitleIds.Contains(TEXT("tower_conqueror")));
 	TestEqual(TEXT("Saved equipped title id"), SaveGame->EquippedTitleId, FString(TEXT("tower_conqueror")));
 
