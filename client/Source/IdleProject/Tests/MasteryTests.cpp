@@ -2,12 +2,45 @@
 
 #include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/IdleCharacter.h"
+#include "CombatSystem/SkillComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "CharacterSystem/LevelFormulas.h"
+#include "GameCore/DungeonFormula.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/MasteryFormula.h"
 #include "GameCore/MasteryService.h"
+#include "GameCore/QuestService.h"
+#include "GameFramework/PlayerController.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+namespace
+{
+struct FIdleGameInstanceWorldContextAccessor : UIdleGameInstance
+{
+	static void Attach(UIdleGameInstance* Instance, FWorldContext* Context)
+	{
+		static_cast<FIdleGameInstanceWorldContextAccessor*>(Instance)->WorldContext = Context;
+	}
+};
+
+FWorldContext* AttachGameInstanceToTestWorld(UIdleGameInstance* GameInstance, UWorld* World)
+{
+	if (!GEngine || !GameInstance || !World)
+	{
+		return nullptr;
+	}
+
+	FWorldContext& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
+	Context.SetCurrentWorld(World);
+	Context.OwningGameInstance = GameInstance;
+	FIdleGameInstanceWorldContextAccessor::Attach(GameInstance, &Context);
+	World->SetGameInstance(GameInstance);
+	return &Context;
+}
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FMasteryFormulaTest,
@@ -145,6 +178,109 @@ bool FMasteryGameInstanceHooksTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryProgressionE2ETest,
+	"IdleProject.Mastery.ProgressionE2E",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMasteryProgressionE2ETest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	TestNotNull(TEXT("Game instance is created"), GameInstance);
+	if (!GameInstance)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	FWorldContext* WorldContext = AttachGameInstanceToTestWorld(GameInstance, World);
+	TestNotNull(TEXT("Game instance has a world context"), WorldContext);
+	if (!WorldContext)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	GameInstance->InitializeQuestServiceForTests(TEXT("2026-05-29"));
+	GameInstance->InitializeDungeonServiceForTests(TEXT("2026-05-29"));
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	APlayerController* PlayerController = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Player controller is spawned"), PlayerController);
+	if (!PlayerController)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->AddController(PlayerController);
+	PlayerController->Possess(Character);
+	TestEqual(TEXT("Test world exposes possessed player character"), World->GetFirstPlayerController() ? Cast<AIdleCharacter>(World->GetFirstPlayerController()->GetPawn()) : nullptr, Character);
+	Character->SetClassId(EClassId::Warrior);
+	GameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+	Character->RefreshDerivedStats();
+
+	const FDerivedStats BaseDerived = Character->GetCurrentDerivedStats();
+	const int64 BaseCombatPower = Character->GetCombatPower();
+
+	for (int32 Index = 0; Index < 100; ++Index)
+	{
+		GameInstance->RecordMonsterKilled();
+	}
+	UMasteryService* Mastery = GameInstance->GetMasteryService();
+	TestNotNull(TEXT("Mastery service exists after progression hook"), Mastery);
+	if (!Mastery)
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	TestEqual(TEXT("Monster kill hook grants combat mastery xp"), Mastery->GetTrackTotalXp(EMasteryTrack::Combat), static_cast<int64>(100));
+	TestEqual(TEXT("Combat mastery reaches level 1"), Mastery->GetTrackLevel(EMasteryTrack::Combat), 1);
+
+	for (int32 Index = 0; Index < 20; ++Index)
+	{
+		GameInstance->RecordGearEnhanced();
+	}
+	TestEqual(TEXT("Gear enhance hook grants equipment mastery xp"), Mastery->GetTrackTotalXp(EMasteryTrack::Equipment), static_cast<int64>(100));
+	TestEqual(TEXT("Equipment mastery reaches level 1"), Mastery->GetTrackLevel(EMasteryTrack::Equipment), 1);
+
+	const FDungeonRunResult DungeonResult = GameInstance->TryRunDungeon(EDungeonType::Gold);
+	TestTrue(TEXT("Dungeon run succeeds for mastery hook"), DungeonResult.bSuccess);
+	TestEqual(TEXT("Dungeon run hook grants abyss mastery xp"), Mastery->GetTrackTotalXp(EMasteryTrack::Abyss), static_cast<int64>(30));
+
+	FQuestState MainQuest;
+	TestTrue(TEXT("Main quest state exists"), GameInstance->GetQuestState(TEXT("main_ch1_001"), MainQuest));
+	TestTrue(TEXT("Kill hook completes first main quest"), MainQuest.bCompleted);
+	const FQuestClaimResult Claim = GameInstance->ClaimQuest(TEXT("main_ch1_001"));
+	TestTrue(TEXT("Quest claim succeeds for mastery hook"), Claim.bSuccess);
+	TestEqual(TEXT("Quest claim hook grants explore mastery xp"), Mastery->GetTrackTotalXp(EMasteryTrack::Explore), static_cast<int64>(20));
+
+	const FMasteryGlobalBonus Bonus = Mastery->GetGlobalBonus();
+	TestEqual(TEXT("World power reflects leveled combat and equipment tracks"), Bonus.WorldPower, static_cast<int64>(2));
+	TestTrue(TEXT("Core mastery bonus is active"), Bonus.CoreStatMultiplier > 1.0f);
+	TestTrue(TEXT("Derived HP increases through mastery core bonus"), Character->GetCurrentDerivedStats().Hp > BaseDerived.Hp);
+	TestTrue(TEXT("Derived physical attack increases through mastery core bonus"), Character->GetCurrentDerivedStats().PhysAtk > BaseDerived.PhysAtk);
+	TestTrue(TEXT("Combat power increases after mastery progression"), Character->GetCombatPower() > BaseCombatPower);
+	TestEqual(TEXT("Combat power remains derived-stat formula"), Character->GetCombatPower(), FCombatPowerFormula::ComputeCombatPower(Character->GetCurrentDerivedStats()));
+
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FMasteryResetPersistenceTest,
 	"IdleProject.Mastery.ResetPersistence",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
@@ -159,15 +295,25 @@ bool FMasteryResetPersistenceTest::RunTest(const FString& Parameters)
 	Combat.Track = static_cast<uint8>(EMasteryTrack::Combat);
 	Combat.TotalXp = 1000;
 	Save->Mastery.Add(Combat);
+	FMasterySaveEntry Equipment;
+	Equipment.Track = static_cast<uint8>(EMasteryTrack::Equipment);
+	Equipment.TotalXp = 1000;
+	Save->Mastery.Add(Equipment);
+	FMasterySaveEntry Explore;
+	Explore.Track = static_cast<uint8>(EMasteryTrack::Explore);
+	Explore.TotalXp = 1000;
+	Save->Mastery.Add(Explore);
 	Save->CharacterLevel = 100;
 	Save->bChapter1BossDefeated = true;
 	TestTrue(TEXT("Seeded mastery save applies"), GameInstance->ApplyFromSave(Save));
+	const float BonusBeforeRebirth = GameInstance->GetMasteryCoreStatMultiplier();
 
 	TestTrue(TEXT("Rebirth succeeds"), GameInstance->Rebirth());
 	TestEqual(
 		TEXT("Rebirth keeps mastery xp"),
 		GameInstance->GetMasteryService() ? GameInstance->GetMasteryService()->GetTrackTotalXp(EMasteryTrack::Combat) : -1,
 		static_cast<int64>(1000));
+	TestEqual(TEXT("Rebirth keeps mastery global bonus"), GameInstance->GetMasteryCoreStatMultiplier(), BonusBeforeRebirth);
 
 	UIdleGameInstance* TranscendGameInstance = NewObject<UIdleGameInstance>();
 	UIdleSaveGame* TranscendSave = NewObject<UIdleSaveGame>();
@@ -175,12 +321,67 @@ bool FMasteryResetPersistenceTest::RunTest(const FString& Parameters)
 	TranscendSave->SaveVersion = 13;
 	TranscendSave->RebirthCount = 5;
 	TranscendSave->Mastery.Add(Combat);
+	TranscendSave->Mastery.Add(Equipment);
+	TranscendSave->Mastery.Add(Explore);
 	TestTrue(TEXT("Seeded transcend mastery save applies"), TranscendGameInstance->ApplyFromSave(TranscendSave));
+	const float BonusBeforeTranscend = TranscendGameInstance->GetMasteryCoreStatMultiplier();
 	TestTrue(TEXT("Transcend succeeds"), TranscendGameInstance->Transcend());
 	TestEqual(
 		TEXT("Transcend keeps mastery xp"),
 		TranscendGameInstance->GetMasteryService() ? TranscendGameInstance->GetMasteryService()->GetTrackTotalXp(EMasteryTrack::Combat) : -1,
 		static_cast<int64>(1000));
+	TestEqual(TEXT("Transcend keeps mastery global bonus"), TranscendGameInstance->GetMasteryCoreStatMultiplier(), BonusBeforeTranscend);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryZeroRegressionTest,
+	"IdleProject.Mastery.ZeroRegression",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMasteryZeroRegressionTest::RunTest(const FString& Parameters)
+{
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient test world is created"), World);
+	if (!World)
+	{
+		return false;
+	}
+
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* LegacySave = NewObject<UIdleSaveGame>();
+	LegacySave->bHasSave = true;
+	LegacySave->SaveVersion = 12;
+	TestTrue(TEXT("Legacy v12 save applies without mastery payload"), GameInstance->ApplyFromSave(LegacySave));
+	World->SetGameInstance(GameInstance);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Idle character is spawned"), Character);
+	if (!Character)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	Character->SetClassId(EClassId::Warrior);
+
+	FDerivedStats ExpectedDerived = FStatFormulas::DeriveStats(FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1), 1);
+	if (const USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
+	{
+		Skills->ApplyPassivesToStats(ExpectedDerived);
+	}
+
+	const UMasteryService* Mastery = GameInstance->GetMasteryService();
+	TestNotNull(TEXT("Mastery service is created for v12 migration"), Mastery);
+	TestEqual(TEXT("Zero mastery world power"), Mastery ? Mastery->GetWorldPower() : -1, static_cast<int64>(0));
+	TestEqual(TEXT("Zero mastery core multiplier"), GameInstance->GetMasteryCoreStatMultiplier(), 1.0f);
+	TestEqual(TEXT("Zero mastery keeps HP unchanged"), Character->GetCurrentDerivedStats().Hp, ExpectedDerived.Hp);
+	TestEqual(TEXT("Zero mastery keeps physical attack unchanged"), Character->GetCurrentDerivedStats().PhysAtk, ExpectedDerived.PhysAtk);
+	TestEqual(TEXT("Zero mastery keeps crit unchanged"), Character->GetCurrentDerivedStats().CritRate, ExpectedDerived.CritRate);
+	TestEqual(TEXT("Zero mastery keeps combat power formula unchanged"), Character->GetCombatPower(), FCombatPowerFormula::ComputeCombatPower(ExpectedDerived));
+
+	World->DestroyWorld(false);
 	return true;
 }
 
