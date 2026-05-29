@@ -11,8 +11,11 @@
 #include "GameCore/IdleSaveGame.h"
 #include "GameCore/MasteryFormula.h"
 #include "GameCore/MasteryService.h"
+#include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
 #include "GameFramework/PlayerController.h"
+#include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/InventoryComponent.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -39,6 +42,25 @@ FWorldContext* AttachGameInstanceToTestWorld(UIdleGameInstance* GameInstance, UW
 	FIdleGameInstanceWorldContextAccessor::Attach(GameInstance, &Context);
 	World->SetGameInstance(GameInstance);
 	return &Context;
+}
+
+FMasterySaveEntry MakeMasteryEntry(EMasteryTrack Track, int64 TotalXp = FMasteryFormula::XpToNext(0))
+{
+	FMasterySaveEntry Entry;
+	Entry.Track = static_cast<uint8>(Track);
+	Entry.TotalXp = TotalXp;
+	return Entry;
+}
+
+FItemInstance MakeMasteryEnhanceItem(FName ItemId, EItemSlot Slot, EItemRarity Rarity)
+{
+	FItemInstance Item;
+	Item.ItemId = ItemId;
+	Item.Slot = Slot;
+	Item.Rarity = Rarity;
+	Item.DisplayName = FText::FromName(ItemId);
+	Item.BonusAtk = 10.0f;
+	return Item;
 }
 }
 
@@ -73,6 +95,17 @@ bool FMasteryFormulaTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Core multiplier level 30 parity anchor"), FMasteryFormula::CoreStatMultiplier(30, 30, 30), 1.0902172327041626f);
 	TestEqual(TEXT("Crit level 30 parity anchor"), FMasteryFormula::CritRateAdd(30), 0.034339871257543564f);
 	TestEqual(TEXT("Gold find level 100 parity anchor"), FMasteryFormula::GoldFindPct(100), 0.09230241179466248f);
+
+	for (const EMasteryTrack Track : { EMasteryTrack::Combat, EMasteryTrack::Equipment, EMasteryTrack::Abyss, EMasteryTrack::Rune, EMasteryTrack::Beast, EMasteryTrack::Explore })
+	{
+		TestEqual(TEXT("Local bonus starts at zero"), FMasteryFormula::GetLocalBonus(Track, 0), 0.0f);
+		TestEqual(TEXT("Negative local bonus starts at zero"), FMasteryFormula::GetLocalBonus(Track, -1), 0.0f);
+		TestTrue(TEXT("Local bonus is monotonic"), FMasteryFormula::GetLocalBonus(Track, 30) > FMasteryFormula::GetLocalBonus(Track, 1));
+		TestEqual(TEXT("Local bonus level 1 parity anchor"), FMasteryFormula::GetLocalBonus(Track, 1), 0.006931471638381481f);
+		TestEqual(TEXT("Local bonus level 30 parity anchor"), FMasteryFormula::GetLocalBonus(Track, 30), 0.034339871257543564f);
+		TestEqual(TEXT("Local bonus level 100 parity anchor"), FMasteryFormula::GetLocalBonus(Track, 100), 0.04615120589733124f);
+	}
+	TestTrue(TEXT("Equipment local bonus never exceeds fifty percent"), FMasteryFormula::GetLocalBonus(EMasteryTrack::Equipment, MAX_int32) <= 0.5f);
 	return true;
 }
 
@@ -89,6 +122,7 @@ bool FMasteryServiceTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Initial combat level"), Service->GetTrackLevel(EMasteryTrack::Combat), 0);
 	Service->AddXp(EMasteryTrack::Combat, 250);
 	TestEqual(TEXT("250 combat xp reaches level 2"), Service->GetTrackLevel(EMasteryTrack::Combat), 2);
+	TestEqual(TEXT("Service exposes combat local bonus"), Service->GetLocalBonus(EMasteryTrack::Combat), FMasteryFormula::GetLocalBonus(EMasteryTrack::Combat, 2));
 	TestEqual(TEXT("Combat total xp is stored"), Service->GetTrackTotalXp(EMasteryTrack::Combat), static_cast<int64>(250));
 	const FMasteryLevelInfo CombatLevelInfo = Service->GetTrackLevelInfo(EMasteryTrack::Combat);
 	TestEqual(TEXT("Level info exposes current level"), CombatLevelInfo.Level, 2);
@@ -219,7 +253,7 @@ bool FMasteryUtilityBonusExposureTest::RunTest(const FString& Parameters)
 	// EXP 마스터리는 AddExp 단일 경로 적용 — 처치 EXP getter는 마스터리를 제외해 이중 적용을 막는다.
 	TestEqual(TEXT("Exp boost getter excludes mastery (no rune)"), GameInstance->GetRuneExpBoostBonus(), 0.0f);
 	// 골드 마스터리는 처치 경로 getter에서 단일 적용된다.
-	TestEqual(TEXT("Gold find getter includes beast mastery bonus"), GameInstance->GetRuneGoldFindBonus(), FMasteryFormula::GoldFindPct(1));
+	TestEqual(TEXT("Gold find getter excludes mastery"), GameInstance->GetRuneGoldFindBonus(), 0.0f);
 	return true;
 }
 
@@ -323,6 +357,121 @@ bool FMasteryProgressionE2ETest::RunTest(const FString& Parameters)
 
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMasteryLocalBonusApplicationTest,
+	"IdleProject.Mastery.LocalBonusApplication",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMasteryLocalBonusApplicationTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* EquipmentGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* EquipmentSave = NewObject<UIdleSaveGame>();
+	EquipmentSave->bHasSave = true;
+	EquipmentSave->SaveVersion = 14;
+	EquipmentSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Equipment));
+	TestTrue(TEXT("Equipment mastery save applies"), EquipmentGameInstance->ApplyFromSave(EquipmentSave));
+	UInventoryComponent* Inventory = NewObject<UInventoryComponent>();
+	Inventory->AddItem(MakeMasteryEnhanceItem(TEXT("rare_mastery_sword"), EItemSlot::Weapon, EItemRarity::Rare));
+	const int64 RareBaseCost = FEnhanceFormula::GetEnhanceCost(0, EItemRarity::Rare);
+	EquipmentGameInstance->AddGold(RareBaseCost);
+	const FEnhanceAttemptResult Enhance = EquipmentGameInstance->TryEnhanceEquipped(EItemSlot::Weapon, Inventory);
+	TestTrue(TEXT("Equipment local bonus still allows enhance attempt"), Enhance.bAttempted);
+	TestTrue(TEXT("Equipment local bonus reduces enhance cost"), Enhance.GoldSpent < RareBaseCost);
+	TestEqual(TEXT("Equipment local bonus leaves unspent reduced gold"), EquipmentGameInstance->GetGold(), RareBaseCost - Enhance.GoldSpent);
+
+	UIdleGameInstance* BeastGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* BeastSave = NewObject<UIdleSaveGame>();
+	BeastSave->bHasSave = true;
+	BeastSave->SaveVersion = 14;
+	BeastSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Beast));
+	TestTrue(TEXT("Beast mastery save applies"), BeastGameInstance->ApplyFromSave(BeastSave));
+	BeastGameInstance->InitializePetSeasonServicesForTests();
+	TestTrue(TEXT("Dog remains equippable for beast local bonus"), BeastGameInstance->EquipPet(TEXT("dog")));
+	TestTrue(TEXT("Beast local bonus scales pet gold percent"), BeastGameInstance->GetEquippedPetGoldBonusPercent() > 20.0f);
+	TestTrue(TEXT("Beast local bonus scales applied pet gold"), BeastGameInstance->ApplyEquippedPetGoldBonus(1000) > 1200);
+
+	UIdleGameInstance* ExploreGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* ExploreSave = NewObject<UIdleSaveGame>();
+	ExploreSave->bHasSave = true;
+	ExploreSave->SaveVersion = 14;
+	ExploreSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Explore));
+	TestTrue(TEXT("Explore mastery save applies"), ExploreGameInstance->ApplyFromSave(ExploreSave));
+	ExploreGameInstance->InitializeQuestServiceForTests(TEXT("2026-05-29"));
+	ExploreGameInstance->RecordQuestProgress(EQuestObjective::KillMonster, 5);
+	const FQuestClaimResult Claim = ExploreGameInstance->ClaimQuest(TEXT("main_ch1_001"));
+	TestTrue(TEXT("Explore local bonus quest claim succeeds"), Claim.bSuccess);
+	TestTrue(TEXT("Explore local bonus scales quest gold"), Claim.RewardGold > 150);
+	TestTrue(TEXT("Explore local bonus scales quest exp"), Claim.RewardExp > 80);
+
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	TestNotNull(TEXT("Transient world exists for dungeon and rune local bonus"), World);
+	if (!World)
+	{
+		return false;
+	}
+	UIdleGameInstance* DungeonGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* DungeonSave = NewObject<UIdleSaveGame>();
+	DungeonSave->bHasSave = true;
+	DungeonSave->SaveVersion = 14;
+	DungeonSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Abyss));
+	TestTrue(TEXT("Abyss mastery save applies"), DungeonGameInstance->ApplyFromSave(DungeonSave));
+	FWorldContext* WorldContext = AttachGameInstanceToTestWorld(DungeonGameInstance, World);
+	TestNotNull(TEXT("Dungeon test world context exists"), WorldContext);
+	if (!WorldContext)
+	{
+		World->DestroyWorld(false);
+		return false;
+	}
+	DungeonGameInstance->InitializeDungeonServiceForTests(TEXT("2026-05-29"));
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AIdleCharacter* Character = World->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	APlayerController* PlayerController = World->SpawnActor<APlayerController>(APlayerController::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Dungeon local bonus character exists"), Character);
+	TestNotNull(TEXT("Dungeon local bonus controller exists"), PlayerController);
+	if (!Character || !PlayerController)
+	{
+		GEngine->DestroyWorldContext(World);
+		World->DestroyWorld(false);
+		return false;
+	}
+	World->AddController(PlayerController);
+	PlayerController->Possess(Character);
+	DungeonGameInstance->AddExp(FLevelFormulas::CumulativeExp(100));
+	Character->RefreshDerivedStats();
+	const FDungeonRunResult BaseDungeon = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, Character->GetCombatPower());
+	const FDungeonRunResult MasteryDungeon = DungeonGameInstance->TryRunDungeon(EDungeonType::Gold);
+	TestTrue(TEXT("Dungeon local bonus run succeeds"), MasteryDungeon.bSuccess);
+	TestTrue(TEXT("Abyss local bonus scales dungeon gold"), MasteryDungeon.GoldReward > BaseDungeon.GoldReward);
+	GEngine->DestroyWorldContext(World);
+	World->DestroyWorld(false);
+
+	UWorld* RuneWorld = UWorld::CreateWorld(EWorldType::Game, false);
+	UIdleGameInstance* RuneGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* RuneSave = NewObject<UIdleSaveGame>();
+	RuneSave->bHasSave = true;
+	RuneSave->SaveVersion = 14;
+	RuneSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Rune));
+	TestTrue(TEXT("Rune mastery save applies"), RuneGameInstance->ApplyFromSave(RuneSave));
+	AttachGameInstanceToTestWorld(RuneGameInstance, RuneWorld);
+	RuneGameInstance->InitializeRuneServiceForTests();
+	AIdleCharacter* RuneCharacter = RuneWorld->SpawnActor<AIdleCharacter>(AIdleCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+	TestNotNull(TEXT("Rune local bonus character exists"), RuneCharacter);
+	if (!RuneCharacter)
+	{
+		GEngine->DestroyWorldContext(RuneWorld);
+		RuneWorld->DestroyWorld(false);
+		return false;
+	}
+	RuneCharacter->SetClassId(EClassId::Warrior);
+	const FDerivedStats ExpectedZeroRune = FStatFormulas::DeriveStats(FStatFormulas::DefaultPrimaryStats(EClassId::Warrior, 1), 1);
+	TestTrue(TEXT("Rune local bonus increases physical attack through rune core path"), RuneCharacter->GetCurrentDerivedStats().PhysAtk > ExpectedZeroRune.PhysAtk);
+	GEngine->DestroyWorldContext(RuneWorld);
+	RuneWorld->DestroyWorld(false);
+
 	return true;
 }
 

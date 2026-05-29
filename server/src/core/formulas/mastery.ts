@@ -51,6 +51,16 @@ export function expBoostPct(beastLv: number): number {
   return Math.fround(0.02 * Math.log(1 + Math.max(0, beastLv)));
 }
 
+export function localBonus(track: number, level: number): number {
+  const safeLevel = Math.max(0, Math.floor(level));
+  if (safeLevel <= 0) {
+    return 0;
+  }
+
+  const raw = Math.fround(0.01 * Math.log(1 + safeLevel));
+  return track === 1 ? Math.min(0.5, raw) : raw;
+}
+
 export function worldPower(trackLevels: number[]): number {
   return trackLevels.reduce((acc, lv) => acc + Math.max(0, Math.floor(lv)), 0);
 }

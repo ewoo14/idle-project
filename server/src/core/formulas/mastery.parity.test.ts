@@ -5,6 +5,7 @@ import {
   dropRateAdd,
   expBoostPct,
   goldFindPct,
+  localBonus,
 } from "./mastery.js";
 
 type MasteryParityAnchor = {
@@ -14,6 +15,7 @@ type MasteryParityAnchor = {
   dropRateAdd: number;
   goldFindPct: number;
   expBoostPct: number;
+  localBonus: number;
 };
 
 const anchors: MasteryParityAnchor[] = [
@@ -24,6 +26,7 @@ const anchors: MasteryParityAnchor[] = [
     dropRateAdd: 0,
     goldFindPct: 0,
     expBoostPct: 0,
+    localBonus: 0,
   },
   {
     level: 1,
@@ -32,6 +35,7 @@ const anchors: MasteryParityAnchor[] = [
     dropRateAdd: 0.006931471638381481,
     goldFindPct: 0.013862943276762962,
     expBoostPct: 0.013862943276762962,
+    localBonus: 0.006931471638381481,
   },
   {
     level: 5,
@@ -40,6 +44,7 @@ const anchors: MasteryParityAnchor[] = [
     dropRateAdd: 0.01791759394109249,
     goldFindPct: 0.03583518788218498,
     expBoostPct: 0.03583518788218498,
+    localBonus: 0.01791759394109249,
   },
   {
     level: 30,
@@ -48,6 +53,7 @@ const anchors: MasteryParityAnchor[] = [
     dropRateAdd: 0.034339871257543564,
     goldFindPct: 0.06867974251508713,
     expBoostPct: 0.06867974251508713,
+    localBonus: 0.034339871257543564,
   },
   {
     level: 100,
@@ -56,6 +62,7 @@ const anchors: MasteryParityAnchor[] = [
     dropRateAdd: 0.04615120589733124,
     goldFindPct: 0.09230241179466248,
     expBoostPct: 0.09230241179466248,
+    localBonus: 0.04615120589733124,
   },
 ];
 
@@ -67,11 +74,15 @@ describe("mastery formula parity with FMasteryFormula", () => {
     dropRateAdd: expectedDrop,
     goldFindPct: expectedGold,
     expBoostPct: expectedExp,
+    localBonus: expectedLocal,
   }) => {
     expect(coreStatMultiplier(level, level, level)).toBe(expectedCore);
     expect(critRateAdd(level)).toBe(expectedCrit);
     expect(dropRateAdd(level)).toBe(expectedDrop);
     expect(goldFindPct(level)).toBe(expectedGold);
     expect(expBoostPct(level)).toBe(expectedExp);
+    for (const track of [0, 1, 2, 3, 4, 5]) {
+      expect(localBonus(track, level)).toBe(expectedLocal);
+    }
   });
 });

@@ -48,3 +48,15 @@ float FMasteryFormula::ExpBoostPct(int32 BeastLv)
 {
 	return 0.02f * FMath::Loge(1.0f + static_cast<float>(FMath::Max(0, BeastLv)));
 }
+
+float FMasteryFormula::GetLocalBonus(EMasteryTrack Track, int32 Level)
+{
+	const int32 SafeLevel = FMath::Max(0, Level);
+	if (SafeLevel <= 0)
+	{
+		return 0.0f;
+	}
+
+	const float RawBonus = 0.01f * FMath::Loge(1.0f + static_cast<float>(SafeLevel));
+	return Track == EMasteryTrack::Equipment ? FMath::Min(0.5f, RawBonus) : RawBonus;
+}

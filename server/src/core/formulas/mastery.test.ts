@@ -6,6 +6,7 @@ import {
   expBoostPct,
   goldFindPct,
   levelFromTotalXp,
+  localBonus,
   MASTERY_TRACK_COUNT,
   MASTERY_XP_BASE,
   MASTERY_XP_GROWTH,
@@ -54,5 +55,18 @@ describe("mastery formula", () => {
 
   it("sums world power from track levels", () => {
     expect(worldPower([1, 2, 3, 4, 5, 6])).toBe(21);
+  });
+
+  it.each([
+    0, 1, 2, 3, 4, 5,
+  ])("computes monotonic local bonus for track %i", (track) => {
+    expect(localBonus(track, 0)).toBe(0);
+    expect(localBonus(track, -1)).toBe(0);
+    expect(localBonus(track, 30)).toBeGreaterThan(localBonus(track, 1));
+  });
+
+  it("caps equipment local cost reduction at fifty percent", () => {
+    expect(localBonus(1, 100)).toBe(Math.fround(0.01 * Math.log(101)));
+    expect(localBonus(1, 1e30)).toBe(0.5);
   });
 });
