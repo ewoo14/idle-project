@@ -521,3 +521,19 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h.
 - [ ] Inflation guardrails cover separate stacking from transcend, tower, and
   achievement, plus the V1.5 deferral of per-track local bonuses.
+
+## PR #75 Balance Checklist Addendum (Section 5)
+
+- [ ] `docs/planning/dungeon-tiers-balance-note.md` documents
+  `TIER_CP_FACTOR = 2.0`, tier 1-5 CP requirements, tier rewards, and the
+  infinite-growth rationale.
+- [ ] `tools/balance-sim/reports/balance-sim-report.md` includes dungeon tier
+  pressure with tier, CP, reward/run, 3-run daily reward, and median Lv50
+  income equivalent.
+- [ ] The 1000-run first-rebirth distribution remains inside the 3-20h review
+  band and keeps median inside the 5-10h target.
+- [ ] The note states that dungeon rewards are not injected into first-rebirth
+  timing until unlock timing and expected daily usage are modeled.
+- [ ] The note covers PR #74 Abyss local mastery as a single-application
+  dungeon reward bonus and warns against double application around tier
+  multiplication.

@@ -12,7 +12,13 @@ class IDLEPROJECT_API UDungeonService : public UObject
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Dungeon")
-	FDungeonRunResult TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc);
+	FDungeonRunResult TryRunDungeon(EDungeonType Type, int64 CombatPower, const FString& TodayUtc, int32 Tier = 1);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Dungeon")
+	int64 GetTierCpRequirement(EDungeonType Type, int32 Tier) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Dungeon")
+	int32 GetMaxAccessibleTier(EDungeonType Type, int64 CombatPower) const;
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Dungeon")
 	int32 GetRemainingEntries(EDungeonType Type, const FString& TodayUtc) const;

@@ -36,6 +36,7 @@ import {
   type DungeonReward,
   getDungeonReward,
   getMinimumCp,
+  getTierCpRequirement,
 } from "../../server/src/core/formulas/dungeon.js";
 import {
   ENHANCE_PITY_THRESHOLD,
@@ -544,6 +545,8 @@ export type DungeonName = "Gold" | "Exp" | "Essence";
 export type DungeonPressureRow = {
   dungeon: DungeonName;
   combatPower: number;
+  tier: number;
+  tierCpRequirement: number;
   minimumCp: number;
   reward: string;
   dailyReward: string;
@@ -1910,28 +1913,28 @@ function buildDungeonPressure(samples: SimulationSample[]): DungeonPressure {
     buildDungeonPressureRow(
       "Gold",
       DUNGEON_TYPE_GOLD,
-      getMinimumCp(DUNGEON_TYPE_GOLD),
+      1,
       medianGoldPerHour,
       medianExpPerHour,
     ),
     buildDungeonPressureRow(
       "Gold",
       DUNGEON_TYPE_GOLD,
-      5500,
+      5,
       medianGoldPerHour,
       medianExpPerHour,
     ),
     buildDungeonPressureRow(
       "Exp",
       DUNGEON_TYPE_EXP,
-      5500,
+      5,
       medianGoldPerHour,
       medianExpPerHour,
     ),
     buildDungeonPressureRow(
       "Essence",
       DUNGEON_TYPE_ESSENCE,
-      5500,
+      5,
       medianGoldPerHour,
       medianExpPerHour,
     ),
@@ -2024,11 +2027,12 @@ function buildMasteryLocalBonusPressure(): MasteryLocalBonusPressure {
 function buildDungeonPressureRow(
   dungeon: DungeonName,
   type: number,
-  combatPower: number,
+  tier: number,
   medianGoldPerHour: number,
   medianExpPerHour: number,
 ): DungeonPressureRow {
-  const reward = getDungeonReward(type, combatPower);
+  const combatPower = getTierCpRequirement(type, tier);
+  const reward = getDungeonReward(type, combatPower, tier);
   const dailyReward = multiplyDungeonReward(reward, DUNGEON_DAILY_ENTRY_LIMIT);
   const dailyIncome = dailyReward.gold > 0 ? dailyReward.gold : dailyReward.exp;
   const medianIncome =
@@ -2041,6 +2045,8 @@ function buildDungeonPressureRow(
   return {
     dungeon,
     combatPower,
+    tier,
+    tierCpRequirement: combatPower,
     minimumCp: getMinimumCp(type),
     reward: formatDungeonReward(reward),
     dailyReward: formatDungeonReward(dailyReward),
@@ -2792,11 +2798,11 @@ function renderMarkdown(report: BalanceReport["json"]): string {
     "",
     "<!-- markdownlint-disable MD013 -->",
     "",
-    "| Dungeon | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |",
+    "| Dungeon | Tier | CP | Min CP | Reward/run | 3-run daily reward | Hours at median Lv50 income |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...report.model.dungeonPressure.rows.map(
       (row) =>
-        `| ${row.dungeon} | ${row.combatPower} | ${row.minimumCp} | ${row.reward} | ${row.dailyReward} | ${row.dailyRewardHoursAtMedianLevel50Income ?? "n/a"} |`,
+        `| ${row.dungeon} | ${row.tier} | ${row.combatPower} | ${row.minimumCp} | ${row.reward} | ${row.dailyReward} | ${row.dailyRewardHoursAtMedianLevel50Income ?? "n/a"} |`,
     ),
     "",
     "<!-- markdownlint-enable MD013 -->",

@@ -20,6 +20,15 @@ bool FDungeonFormulaTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Exp dungeon minimum CP"), FDungeonFormula::GetMinimumCp(EDungeonType::Exp), static_cast<int64>(250));
 	TestEqual(TEXT("Essence dungeon minimum CP"), FDungeonFormula::GetMinimumCp(EDungeonType::Essence), static_cast<int64>(500));
 
+	TestEqual(TEXT("Gold tier one CP equals minimum"), FDungeonFormula::GetTierCpRequirement(EDungeonType::Gold, 1), static_cast<int64>(100));
+	TestEqual(TEXT("Gold tier two CP doubles"), FDungeonFormula::GetTierCpRequirement(EDungeonType::Gold, 2), static_cast<int64>(200));
+	TestEqual(TEXT("Gold tier three CP quadruples"), FDungeonFormula::GetTierCpRequirement(EDungeonType::Gold, 3), static_cast<int64>(400));
+	TestEqual(TEXT("Essence tier three CP quadruples"), FDungeonFormula::GetTierCpRequirement(EDungeonType::Essence, 3), static_cast<int64>(2000));
+	TestEqual(TEXT("Below minimum CP unlocks zero tiers"), FDungeonFormula::GetMaxAccessibleTier(EDungeonType::Gold, 99), 0);
+	TestEqual(TEXT("Minimum CP unlocks tier one"), FDungeonFormula::GetMaxAccessibleTier(EDungeonType::Gold, 100), 1);
+	TestEqual(TEXT("Just below four times minimum unlocks tier two"), FDungeonFormula::GetMaxAccessibleTier(EDungeonType::Gold, 399), 2);
+	TestEqual(TEXT("Four times minimum unlocks tier three"), FDungeonFormula::GetMaxAccessibleTier(EDungeonType::Gold, 400), 3);
+
 	const FDungeonRunResult Gold = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 350);
 	TestTrue(TEXT("Gold reward succeeds at minimum or higher CP"), Gold.bSuccess);
 	TestEqual(TEXT("Gold dungeon only grants gold"), Gold.GoldReward, static_cast<int64>(37417));
@@ -41,6 +50,15 @@ bool FDungeonFormulaTest::RunTest(const FString& Parameters)
 	const FDungeonRunResult Blocked = FDungeonFormula::GetRewardForCp(EDungeonType::Essence, 499);
 	TestFalse(TEXT("Below minimum CP returns failed result"), Blocked.bSuccess);
 	TestEqual(TEXT("Below minimum CP grants no essence"), Blocked.EssenceReward, static_cast<int64>(0));
+
+	const FDungeonRunResult TierOne = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 400, 1);
+	TestEqual(TEXT("Tier one reward remains compatible with default reward"), TierOne.GoldReward, FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 400).GoldReward);
+	const FDungeonRunResult TierTwo = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 400, 2);
+	TestTrue(TEXT("Accessible tier two succeeds"), TierTwo.bSuccess);
+	TestEqual(TEXT("Tier two reward doubles tier one"), TierTwo.GoldReward, TierOne.GoldReward * 2);
+	const FDungeonRunResult TierBlocked = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, 199, 2);
+	TestFalse(TEXT("Inaccessible tier fails"), TierBlocked.bSuccess);
+	TestEqual(TEXT("Inaccessible tier grants zero gold"), TierBlocked.GoldReward, static_cast<int64>(0));
 
 	const FDungeonRunResult Oversized = FDungeonFormula::GetRewardForCp(EDungeonType::Gold, MAX_int64);
 	TestTrue(TEXT("Oversized CP still succeeds"), Oversized.bSuccess);

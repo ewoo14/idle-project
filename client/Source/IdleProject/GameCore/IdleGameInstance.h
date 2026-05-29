@@ -208,7 +208,7 @@ public:
 	int64 ClimbTower();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Dungeon")
-	FDungeonRunResult TryRunDungeon(EDungeonType Type);
+	FDungeonRunResult TryRunDungeon(EDungeonType Type, int32 Tier = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection = false);

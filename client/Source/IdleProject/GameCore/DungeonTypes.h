@@ -24,6 +24,9 @@ struct IDLEPROJECT_API FDungeonRunResult
 	EDungeonType Type = EDungeonType::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Dungeon")
+	int32 Tier = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Dungeon")
 	int64 GoldReward = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Dungeon")

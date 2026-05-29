@@ -1089,11 +1089,34 @@ FName MakeDungeonEnterHitBoxName(EDungeonType Type)
 	return FName(*(DungeonEnterHitBoxPrefix + FString::FromInt(static_cast<int32>(Type))));
 }
 
+FName MakeDungeonEnterHitBoxName(EDungeonType Type, int32 Tier)
+{
+	return FName(*(DungeonEnterHitBoxPrefix + FString::FromInt(static_cast<int32>(Type)) + TEXT("_") + FString::FromInt(FMath::Max(1, Tier))));
+}
+
 EDungeonType DungeonTypeFromHitBoxName(FName BoxName)
 {
 	FString RawType = BoxName.ToString();
 	RawType.RightChopInline(DungeonEnterHitBoxPrefix.Len());
+	int32 DelimiterIndex = INDEX_NONE;
+	if (RawType.FindChar(TEXT('_'), DelimiterIndex))
+	{
+		RawType.LeftInline(DelimiterIndex);
+	}
 	return static_cast<EDungeonType>(FCString::Atoi(*RawType));
+}
+
+int32 DungeonTierFromHitBoxName(FName BoxName)
+{
+	FString RawTier = BoxName.ToString();
+	RawTier.RightChopInline(DungeonEnterHitBoxPrefix.Len());
+	int32 DelimiterIndex = INDEX_NONE;
+	if (!RawTier.FindChar(TEXT('_'), DelimiterIndex))
+	{
+		return 1;
+	}
+	RawTier.RightChopInline(DelimiterIndex + 1);
+	return FMath::Max(1, FCString::Atoi(*RawTier));
 }
 
 const TCHAR* DungeonTypeToLocalizationKey(EDungeonType Type)
@@ -2408,9 +2431,12 @@ FIdleHUDDungeonPanelViewModel IdleProject::UI::BuildDungeonPanelViewModel(const 
 		Row.NameLabel = IdleProject::Localization::UI(DungeonTypeToLocalizationKey(Type));
 		Row.EntryLimit = FDungeonFormula::GetDailyEntryLimit(Type);
 		Row.RemainingEntries = DungeonService.GetRemainingEntries(Type, TodayUtc);
-		Row.RequiredPower = FDungeonFormula::GetMinimumCp(Type);
 		Row.CombatPower = FMath::Max<int64>(0, CombatPower);
-		Row.EnterHitBoxName = MakeDungeonEnterHitBoxName(Type);
+		Row.MaxAccessibleTier = DungeonService.GetMaxAccessibleTier(Type, Row.CombatPower);
+		Row.SelectedTier = FMath::Max(1, Row.MaxAccessibleTier);
+		Row.RequiredPower = DungeonService.GetTierCpRequirement(Type, Row.SelectedTier);
+		Row.NextTierRequirement = DungeonService.GetTierCpRequirement(Type, Row.SelectedTier + 1);
+		Row.EnterHitBoxName = MakeDungeonEnterHitBoxName(Type, Row.SelectedTier);
 		Row.ActionLabel = IdleProject::Localization::UI(TEXT("DUNGEON_ENTER"));
 		Row.bSoldOut = Row.EntryLimit > 0 && Row.RemainingEntries <= 0;
 		Row.bNeedsPower = Row.CombatPower < Row.RequiredPower;
@@ -2421,12 +2447,21 @@ FIdleHUDDungeonPanelViewModel IdleProject::UI::BuildDungeonPanelViewModel(const 
 			Args.Add(TEXT("Remaining"), FText::AsNumber(Row.RemainingEntries));
 			Args.Add(TEXT("Limit"), FText::AsNumber(Row.EntryLimit));
 		});
+		Row.TierLabel = FormatLocalizedUI(TEXT("DUNGEON_TIER_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Tier"), FText::AsNumber(Row.SelectedTier));
+			Args.Add(TEXT("MaxTier"), FText::AsNumber(Row.MaxAccessibleTier));
+		});
 		Row.RequiredPowerLabel = FormatLocalizedUI(TEXT("DUNGEON_CP_FORMAT"), [&Row](FFormatNamedArguments& Args)
 		{
 			Args.Add(TEXT("Current"), FText::FromString(FormatIntegerWithCommas(Row.CombatPower)));
 			Args.Add(TEXT("Required"), FText::FromString(FormatIntegerWithCommas(Row.RequiredPower)));
 		});
-		Row.RewardLabel = BuildDungeonRewardLabel(FDungeonFormula::GetRewardForCp(Type, Row.CombatPower));
+		Row.NextTierLabel = FormatLocalizedUI(TEXT("DUNGEON_NEXT_TIER_CP_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Required"), FText::FromString(FormatIntegerWithCommas(Row.NextTierRequirement)));
+		});
+		Row.RewardLabel = BuildDungeonRewardLabel(FDungeonFormula::GetRewardForCp(Type, Row.CombatPower, Row.SelectedTier));
 		Row.StatusLabel = Row.bSoldOut
 			? IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_SOLD_OUT"))
 			: (Row.bNeedsPower ? IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_NEED_CP")) : IdleProject::Localization::UI(TEXT("DUNGEON_ENTER")));
@@ -5886,7 +5921,7 @@ void AIdleHUD::DrawDungeonPanel()
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
-	const float RowHeight = 68.0f * Scale;
+	const float RowHeight = 82.0f * Scale;
 	const float RowGap = 8.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
@@ -5921,7 +5956,7 @@ void AIdleHUD::DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, f
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 68.0f;
+	const float Scale = Height / 82.0f;
 	const FLinearColor StateColor = Row.bCanEnter
 		? Theme::AccentGold
 		: (Row.bNeedsPower ? Theme::AccentRed : Theme::TextMuted.CopyWithNewOpacity(0.62f));
@@ -5930,9 +5965,11 @@ void AIdleHUD::DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, f
 
 	DrawText(Row.NameLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
 	DrawText(Row.EntriesLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	DrawText(Row.RequiredPowerLabel.ToString(), Row.bNeedsPower ? Theme::AccentRed : Theme::AccentBlue, X + 12.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
-	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 116.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
-	DrawText(Row.StatusLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : StateColor, X + 12.0f * Scale, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.TierLabel.ToString(), Row.MaxAccessibleTier > 0 ? Theme::AccentGold : Theme::TextMuted, X + 12.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.NextTierLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawText(Row.RequiredPowerLabel.ToString(), Row.bNeedsPower ? Theme::AccentRed : Theme::AccentBlue, X + 12.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.StatusLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : StateColor, X + 12.0f * Scale, Y + 67.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 
 	const float ButtonWidth = 72.0f * Scale;
 	const float ButtonHeight = 26.0f * Scale;
@@ -5957,7 +5994,7 @@ void AIdleHUD::TryRunDungeonFromHitBox(FName BoxName)
 		return;
 	}
 
-	const FDungeonRunResult Result = IdleGameInstance->TryRunDungeon(DungeonTypeFromHitBoxName(BoxName));
+	const FDungeonRunResult Result = IdleGameInstance->TryRunDungeon(DungeonTypeFromHitBoxName(BoxName), DungeonTierFromHitBoxName(BoxName));
 	DungeonFeedbackLabel = Result.bSuccess ? BuildDungeonRewardLabel(Result) : IdleProject::Localization::UI(TEXT("DUNGEON_STATUS_NEED_CP"));
 	if (const UWorld* World = GetWorld())
 	{
