@@ -487,6 +487,7 @@ void UIdleGameInstance::Init()
 	EnsureAchievementService();
 	EnsureMasteryService();
 	EnsureTitleService();
+	EnsureMissionService();
 	EnsureLeaderboardService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
@@ -523,6 +524,7 @@ void UIdleGameInstance::Shutdown()
 	AchievementService = nullptr;
 	MasteryService = nullptr;
 	TitleService = nullptr;
+	MissionService = nullptr;
 	LeaderboardService = nullptr;
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
@@ -1719,11 +1721,12 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAchievementService();
 	EnsureMasteryService();
 	EnsureTitleService();
+	EnsureMissionService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 21;
+	SaveGame->SaveVersion = 22;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1831,6 +1834,16 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		}
 		SaveGame->UnlockedTitleIds = TitleService->GetUnlockedTitleIds();
 		SaveGame->EquippedTitleId = TitleService->GetEquippedTitleId();
+	}
+
+	if (MissionService)
+	{
+		// 세이브 시점 기간 경계 처리(stale 진행 리셋) 후 진행/수령/마커 직렬화.
+		MissionService->EnsurePeriodFresh(UQuestService::GetCurrentUtcDateString(), UQuestService::GetCurrentUtcWeekString());
+		SaveGame->MissionProgress = MissionService->GetProgressMap();
+		SaveGame->MissionClaimed = MissionService->GetClaimedSet();
+		SaveGame->MissionDailyResetDate = MissionService->GetDailyResetDate();
+		SaveGame->MissionWeeklyResetWeek = MissionService->GetWeeklyResetWeek();
 	}
 
 	if (BuffService)
@@ -2121,6 +2134,19 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		RecomputeUnlockedTitles();
 	}
 
+	EnsureMissionService();
+	if (MissionService)
+	{
+		// SaveVer 22+ 만 미션 진행/수령/마커 복원, 이전 버전은 빈 값(회귀 안전).
+		const TMap<FString, int64> RestoredProgress = SaveGame->SaveVersion >= 22 ? SaveGame->MissionProgress : TMap<FString, int64>();
+		const TSet<FString> RestoredClaimed = SaveGame->SaveVersion >= 22 ? SaveGame->MissionClaimed : TSet<FString>();
+		const FString RestoredMissionDate = SaveGame->SaveVersion >= 22 ? SaveGame->MissionDailyResetDate : FString();
+		const FString RestoredMissionWeek = SaveGame->SaveVersion >= 22 ? SaveGame->MissionWeeklyResetWeek : FString();
+		MissionService->RestoreState(RestoredProgress, RestoredClaimed, RestoredMissionDate, RestoredMissionWeek);
+		// 로그인 시점 기간 경계 처리(날짜/주 경과분 리셋). 빈 마커(레거시)는 현재 UTC 로 초기화.
+		MissionService->EnsurePeriodFresh(UQuestService::GetCurrentUtcDateString(), UQuestService::GetCurrentUtcWeekString());
+	}
+
 	OnGoldChanged.Broadcast(Gold);
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
 	OnStatPointsChanged.Broadcast();
@@ -2261,6 +2287,12 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type, int32 Tier
 	if (GuildService)
 	{
 		GuildService->AddPendingAutoContribution(GuildAutoContributionPerDungeon);
+	}
+	// 미션 후크: 던전 1회 성공 = DungeonRuns +1(누적 업적 메트릭이 없어 별도 후크, 이중 카운트 없음).
+	EnsureMissionService();
+	if (MissionService)
+	{
+		MissionService->RecordProgress(EMissionMetric::DungeonRuns, 1);
 	}
 	RequestAutosave();
 	return Result;
@@ -3286,6 +3318,46 @@ void UIdleGameInstance::RecordAchievementMetric(EAchievementMetric Metric, int64
 		// 메트릭 갱신 직후 칭호 해금 재계산(영구 해금 — 추가 only).
 		RecomputeUnlockedTitles();
 	}
+
+	// 미션 중앙 후크: 미션 메트릭과 1:1 대응하는 누적형 업적 메트릭만 진행에 누적한다.
+	// (Maximum 모드 메트릭(HighestLevelReached/TowerHighestFloor 등)은 매핑 제외 — 누적형 아님.)
+	// 던전은 누적 메트릭이 없어 TryRunDungeon 에서 별도 후크한다(이중 카운트 방지).
+	EMissionMetric MissionMetric = EMissionMetric::MonstersKilled;
+	bool bHasMissionMetric = false;
+	switch (Metric)
+	{
+	case EAchievementMetric::MonstersKilled:
+		MissionMetric = EMissionMetric::MonstersKilled;
+		bHasMissionMetric = true;
+		break;
+	case EAchievementMetric::BossesKilled:
+		MissionMetric = EMissionMetric::BossesKilled;
+		bHasMissionMetric = true;
+		break;
+	case EAchievementMetric::StagesCleared:
+		MissionMetric = EMissionMetric::StagesCleared;
+		bHasMissionMetric = true;
+		break;
+	case EAchievementMetric::GearEnhanced:
+		MissionMetric = EMissionMetric::GearEnhanced;
+		bHasMissionMetric = true;
+		break;
+	case EAchievementMetric::GoldEarned:
+		MissionMetric = EMissionMetric::GoldEarned;
+		bHasMissionMetric = true;
+		break;
+	default:
+		break;
+	}
+
+	if (bHasMissionMetric && AmountOrValue > 0)
+	{
+		EnsureMissionService();
+		if (MissionService)
+		{
+			MissionService->RecordProgress(MissionMetric, AmountOrValue);
+		}
+	}
 }
 
 void UIdleGameInstance::RecordAchievementItemCollected(const FItemInstance& Item)
@@ -3341,6 +3413,49 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 	}
 	RequestAutosave();
 	return Result;
+}
+
+bool UIdleGameInstance::ClaimMission(const FString& Id)
+{
+	EnsureMissionService();
+	if (!MissionService)
+	{
+		return false;
+	}
+
+	// 수령 전 기간 경계 처리(리셋 직후의 stale 완료 수령 방지).
+	MissionService->EnsurePeriodFresh(UQuestService::GetCurrentUtcDateString(), UQuestService::GetCurrentUtcWeekString());
+
+	FMissionDefinition Definition;
+	if (!MissionService->GetDefinition(Id, Definition))
+	{
+		return false;
+	}
+
+	// 완료 && 미수령 검증 + 수령 마킹(MissionService 가 단일 판정). 실패 시 보상 미지급.
+	if (!MissionService->ClaimMission(Id))
+	{
+		return false;
+	}
+
+	// 보상 단일 지급 지점. rewardType 별로 골드/룬 정수/소비 아이템 지급.
+	switch (Definition.RewardType)
+	{
+	case EMissionReward::Gold:
+		AddGold(Definition.RewardValue);
+		break;
+	case EMissionReward::Essence:
+		RuneEssence = RuneEssence > MAX_int64 - Definition.RewardValue ? MAX_int64 : RuneEssence + Definition.RewardValue;
+		break;
+	case EMissionReward::Consumable:
+		AddConsumable(EConsumableType::AllStatElixir, EConsumableGrade::Standard, static_cast<int32>(FMath::Clamp<int64>(Definition.RewardValue, 0, MAX_int32)));
+		break;
+	default:
+		break;
+	}
+
+	RequestAutosave();
+	return true;
 }
 
 TArray<FQuestState> UIdleGameInstance::GetActiveQuestStates() const
@@ -3839,6 +3954,17 @@ void UIdleGameInstance::RecomputeUnlockedTitles()
 	if (TitleService && AchievementService)
 	{
 		TitleService->RecomputeUnlocked(AchievementService);
+	}
+}
+
+void UIdleGameInstance::EnsureMissionService()
+{
+	if (!MissionService)
+	{
+		MissionService = NewObject<UMissionService>(this);
+		MissionService->InitializeDefaultMissions();
+		// 신규 인스턴스는 현재 UTC 기간으로 마커를 초기화(최초 호출 시 리셋 없음).
+		MissionService->EnsurePeriodFresh(UQuestService::GetCurrentUtcDateString(), UQuestService::GetCurrentUtcWeekString());
 	}
 }
 

@@ -17,6 +17,7 @@ export * from "./enhance.js";
 export * from "./equipment.js";
 export * from "./level.js";
 export * from "./mastery.js";
+export * from "./mission.js";
 export * from "./offline.js";
 export {
   getEffectiveBonusPercent as getEffectivePetBonusPercent,

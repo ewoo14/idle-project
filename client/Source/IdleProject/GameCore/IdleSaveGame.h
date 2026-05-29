@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 21;
+	int32 SaveVersion = 22;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -179,6 +179,19 @@ public:
 
 	UPROPERTY()
 	FString EquippedTitleId;
+
+	// ── 미션(SaveVer 22) — 일일/주간 미션 진행/수령/리셋 마커. 클라 로컬 권위. <22 세이브는 빈 값(회귀 안전) ──
+	UPROPERTY()
+	TMap<FString, int64> MissionProgress;
+
+	UPROPERTY()
+	TSet<FString> MissionClaimed;
+
+	UPROPERTY()
+	FString MissionDailyResetDate;
+
+	UPROPERTY()
+	FString MissionWeeklyResetWeek;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()

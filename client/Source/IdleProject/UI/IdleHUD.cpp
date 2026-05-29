@@ -55,6 +55,10 @@ const FString PetEvolveHitBoxPrefix(TEXT("PetEvolve_"));
 // 칭호 패널(칭호 시스템) — 고유 Title~ prefix 로 jumbo ODR 회피.
 const FString TitleEquipHitBoxPrefix(TEXT("TitleEquip_"));
 const FName TitleUnequipHitBoxName(TEXT("TitleUnequip"));
+// 미션 패널(일일/주간 미션) — 고유 Mission~ prefix 로 jumbo ODR 회피.
+const FString MissionClaimHitBoxPrefix(TEXT("MissionClaim_"));
+const FName MissionDailyTabHitBoxName(TEXT("MissionTabDaily"));
+const FName MissionWeeklyTabHitBoxName(TEXT("MissionTabWeekly"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
@@ -1416,6 +1420,38 @@ FName MakePetEvolveHitBoxName(const FString& PetId)
 FName MakeTitleEquipHitBoxName(const FString& TitleId)
 {
 	return FName(*(TitleEquipHitBoxPrefix + TitleId));
+}
+
+FName MakeMissionClaimHitBoxName(const FString& MissionId)
+{
+	return FName(*(MissionClaimHitBoxPrefix + MissionId));
+}
+
+// 미션 메트릭(처치/보스/스테이지/던전/강화/골드) → 표시명 로컬 키.
+const TCHAR* MissionMetricToLocalizationKey(EMissionMetric Metric)
+{
+	switch (Metric)
+	{
+	case EMissionMetric::MonstersKilled: return TEXT("MISSION_METRIC_MONSTERS_KILLED");
+	case EMissionMetric::BossesKilled:   return TEXT("MISSION_METRIC_BOSSES_KILLED");
+	case EMissionMetric::StagesCleared:  return TEXT("MISSION_METRIC_STAGES_CLEARED");
+	case EMissionMetric::DungeonRuns:    return TEXT("MISSION_METRIC_DUNGEON_RUNS");
+	case EMissionMetric::GearEnhanced:   return TEXT("MISSION_METRIC_GEAR_ENHANCED");
+	case EMissionMetric::GoldEarned:     return TEXT("MISSION_METRIC_GOLD_EARNED");
+	default:                             return TEXT("MISSION_METRIC_MONSTERS_KILLED");
+	}
+}
+
+// 미션 보상 타입(골드/룬정수/소비) → 보상 라벨 포맷 로컬 키({Amount} 인자).
+const TCHAR* MissionRewardToLocalizationKey(EMissionReward RewardType)
+{
+	switch (RewardType)
+	{
+	case EMissionReward::Gold:       return TEXT("MISSION_REWARD_GOLD_FORMAT");
+	case EMissionReward::Essence:    return TEXT("MISSION_REWARD_ESSENCE_FORMAT");
+	case EMissionReward::Consumable: return TEXT("MISSION_REWARD_CONSUMABLE_FORMAT");
+	default:                         return TEXT("MISSION_REWARD_GOLD_FORMAT");
+	}
 }
 
 FName MakeSeasonClaimHitBoxName(int32 Tier)
@@ -3614,6 +3650,64 @@ FIdleHUDTitlePanelViewModel IdleProject::UI::BuildTitlePanelViewModel(const UTit
 	return ViewModel;
 }
 
+FIdleHUDMissionPanelViewModel IdleProject::UI::BuildMissionPanelViewModel(const UMissionService& MissionService, EMissionPeriod ActivePeriod)
+{
+	FIdleHUDMissionPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("MISSION_PANEL_TITLE"));
+	ViewModel.DailyTabLabel = IdleProject::Localization::UI(TEXT("MISSION_TAB_DAILY"));
+	ViewModel.WeeklyTabLabel = IdleProject::Localization::UI(TEXT("MISSION_TAB_WEEKLY"));
+	ViewModel.EmptyLabel = IdleProject::Localization::UI(TEXT("MISSION_EMPTY"));
+	ViewModel.ActivePeriod = ActivePeriod;
+
+	const TArray<FMissionProgressView> Views = MissionService.GetProgressViews();
+	ViewModel.Rows.Reserve(Views.Num());
+	for (const FMissionProgressView& View : Views)
+	{
+		// 선택된 기간(일일/주간)에 해당하는 미션만 표시한다.
+		if (View.Period != ActivePeriod)
+		{
+			continue;
+		}
+
+		FIdleHUDMissionRowViewModel Row;
+		Row.MissionId = View.Id;
+		Row.bCompleted = View.bCompleted;
+		Row.bClaimed = View.bClaimed;
+		Row.bCanClaim = View.bCompleted && !View.bClaimed;
+
+		// 목표 설명: 메트릭 표시명 + 목표치.
+		const FText MetricLabel = IdleProject::Localization::UI(MissionMetricToLocalizationKey(View.Metric));
+		Row.ObjectiveLabel = FormatLocalizedUI(TEXT("MISSION_OBJECTIVE_FORMAT"), [&MetricLabel, &View](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Metric"), MetricLabel);
+			Args.Add(TEXT("Target"), FText::FromString(FormatIntegerWithCommas(View.Target)));
+		});
+
+		// 진행: 현재/목표(현재는 목표로 clamp 해 과표시 방지).
+		const int64 DisplayProgress = View.Target > 0 ? FMath::Min(View.Progress, View.Target) : View.Progress;
+		Row.ProgressLabel = FormatLocalizedUI(TEXT("MISSION_PROGRESS_FORMAT"), [DisplayProgress, &View](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Current"), FText::FromString(FormatIntegerWithCommas(DisplayProgress)));
+			Args.Add(TEXT("Target"), FText::FromString(FormatIntegerWithCommas(View.Target)));
+		});
+		Row.ProgressRatio = View.Target > 0
+			? FMath::Clamp(static_cast<float>(View.Progress) / static_cast<float>(View.Target), 0.0f, 1.0f)
+			: (View.bCompleted ? 1.0f : 0.0f);
+
+		// 보상: 타입별 포맷 + 값.
+		Row.RewardLabel = FormatLocalizedUIWithInt64(MissionRewardToLocalizationKey(View.RewardType), TEXT("Amount"), View.RewardValue);
+
+		// 수령 버튼: 완료&미수령=수령, 수령됨=수령완료, 미완료=진행(라벨 비표시 — 버튼 비활성).
+		Row.ActionLabel = View.bClaimed
+			? IdleProject::Localization::UI(TEXT("MISSION_ACTION_CLAIMED"))
+			: IdleProject::Localization::UI(TEXT("MISSION_ACTION_CLAIM"));
+
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FText IdleProject::UI::BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier)
 {
 	const FAchievementDefinition* Definition = FindAchievementDefinitionById(AchievementId);
@@ -4169,6 +4263,7 @@ void AIdleHUD::DrawHUD()
 	DrawClassSelectionPanel();
 	DrawPetPanel();
 	DrawTitlePanel();
+	DrawMissionPanel();
 	DrawSeasonPassPanel();
 	DrawQuestLog();
 	DrawOfflineRewardModal();
@@ -4217,6 +4312,21 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(TitleEquipHitBoxPrefix))
 	{
 		EquipTitleFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == MissionDailyTabHitBoxName)
+	{
+		SelectMissionPeriod(EMissionPeriod::Daily);
+		return;
+	}
+	if (BoxName == MissionWeeklyTabHitBoxName)
+	{
+		SelectMissionPeriod(EMissionPeriod::Weekly);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(MissionClaimHitBoxPrefix))
+	{
+		ClaimMissionFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(SeasonClaimHitBoxPrefix))
@@ -9217,6 +9327,145 @@ void AIdleHUD::UnequipTitleAction()
 	}
 
 	IdleGameInstance->UnequipTitle();
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawMissionPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UMissionService* MissionService = IdleGameInstance ? IdleGameInstance->GetMissionService() : nullptr;
+	if (!MissionService)
+	{
+		return;
+	}
+
+	const FIdleHUDMissionPanelViewModel ViewModel = BuildMissionPanelViewModel(*MissionService, SelectedMissionPeriod);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 470.0f * Scale;
+	const float HeaderHeight = 44.0f * Scale;
+	const float TabHeight = 26.0f * Scale;
+	const float RowHeight = 50.0f * Scale;
+	const float RowGap = 4.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const int32 RowCount = FMath::Max(1, ViewModel.Rows.Num());
+	const float PanelHeight = HeaderHeight + TabHeight + 8.0f * Scale + RowCount * RowHeight + FMath::Max(0, RowCount - 1) * RowGap + Padding;
+	const float X = 28.0f * Scale;
+	const float Y = 360.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+
+	// 일일/주간 탭 2개를 균등 배치(선택 탭=골드, 비선택=어둡게).
+	const float TabGap = 6.0f * Scale;
+	const float TabRowWidth = PanelWidth - Padding * 2.0f;
+	const float TabWidth = (TabRowWidth - TabGap) / 2.0f;
+	const float TabY = Y + HeaderHeight;
+	const float DailyTabX = X + Padding;
+	const float WeeklyTabX = DailyTabX + TabWidth + TabGap;
+	const bool bDailyActive = ViewModel.ActivePeriod == EMissionPeriod::Daily;
+	DrawRect(bDailyActive ? Theme::AccentGold : Theme::BgPrimary, DailyTabX, TabY, TabWidth, TabHeight);
+	DrawRect(!bDailyActive ? Theme::AccentGold : Theme::BgPrimary, WeeklyTabX, TabY, TabWidth, TabHeight);
+	DrawText(ViewModel.DailyTabLabel.ToString(), bDailyActive ? Theme::BgPrimary : Theme::TextMuted, DailyTabX + 8.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(ViewModel.WeeklyTabLabel.ToString(), !bDailyActive ? Theme::BgPrimary : Theme::TextMuted, WeeklyTabX + 8.0f * Scale, TabY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	AddHitBox(FVector2D(DailyTabX, TabY), FVector2D(TabWidth, TabHeight), MissionDailyTabHitBoxName, true, 86);
+	AddHitBox(FVector2D(WeeklyTabX, TabY), FVector2D(TabWidth, TabHeight), MissionWeeklyTabHitBoxName, true, 87);
+
+	float RowY = TabY + TabHeight + 8.0f * Scale;
+	if (ViewModel.Rows.Num() == 0)
+	{
+		DrawText(ViewModel.EmptyLabel.ToString(), Theme::TextMuted, X + Padding, RowY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	}
+	for (const FIdleHUDMissionRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawMissionRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawMissionRow(const FIdleHUDMissionRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 50.0f;
+	// 수령 가능=골드, 수령 완료=흐림, 진행중=블루로 상태 막대를 칠한다.
+	const FLinearColor StateColor = Row.bClaimed
+		? Theme::TextMuted.CopyWithNewOpacity(0.46f)
+		: (Row.bCanClaim ? Theme::AccentGold : Theme::AccentBlue);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+
+	// 1행: 목표 설명 + 보상.
+	DrawText(Row.ObjectiveLabel.ToString(), Row.bClaimed ? Theme::TextMuted : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::AccentGold, X + 10.0f * Scale, Y + 26.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+
+	// 진행 바(현재/목표, clamp) + 진행 라벨.
+	const float BarY = Y + Height - 8.0f * Scale;
+	const float BarWidth = 200.0f * Scale;
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.80f), X + 10.0f * Scale, BarY, BarWidth, 4.0f * Scale);
+	DrawRect(StateColor, X + 10.0f * Scale, BarY, BarWidth * Row.ProgressRatio, 4.0f * Scale);
+	DrawText(Row.ProgressLabel.ToString(), Theme::TextMuted, X + 220.0f * Scale, Y + Height - 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.50f * Scale);
+
+	// 수령 버튼: 수령 가능=활성(골드), 수령 완료=비활성(수령완료), 미완료=비활성(수령).
+	const float ButtonWidth = 68.0f * Scale;
+	const float ButtonHeight = 22.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 7.0f * Scale;
+	const float ButtonY = Y + 8.0f * Scale;
+	DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, ButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	if (Row.bCanClaim)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakeMissionClaimHitBoxName(Row.MissionId), true, 88);
+	}
+}
+
+void AIdleHUD::SelectMissionPeriod(EMissionPeriod Period)
+{
+	SelectedMissionPeriod = Period;
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ClaimMissionFromHitBox(FName BoxName)
+{
+	using namespace IdleProject::UI;
+
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString MissionId = BoxName.ToString();
+	MissionId.RightChopInline(MissionClaimHitBoxPrefix.Len());
+	if (MissionId.IsEmpty())
+	{
+		return;
+	}
+
+	if (IdleGameInstance->ClaimMission(MissionId))
+	{
+		UE_LOG(LogTemp, Display, TEXT("[Mission] ClaimMission success missionId=%s"), *MissionId);
+	}
 	RefreshMouseInteraction();
 }
 

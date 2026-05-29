@@ -286,7 +286,7 @@ bool FMasteryGameInstanceHooksTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture writes v21"), CapturedSave->SaveVersion, 21);
+	TestEqual(TEXT("Capture writes v22"), CapturedSave->SaveVersion, 22);
 	TestEqual(TEXT("Mastery save includes six tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	UIdleGameInstance* RestoredGameInstance = NewObject<UIdleGameInstance>();

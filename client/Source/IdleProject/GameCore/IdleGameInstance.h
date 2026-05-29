@@ -10,6 +10,7 @@
 #include "GameCore/GuildTypes.h"
 #include "GameCore/LeaderboardTypes.h"
 #include "GameCore/MasteryService.h"
+#include "GameCore/MissionService.h"
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
@@ -176,6 +177,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UTitleService* GetTitleService() const { return TitleService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UMissionService* GetMissionService() const
+	{
+		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장.
+		const_cast<UIdleGameInstance*>(this)->EnsureMissionService();
+		return MissionService;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	ULeaderboardService* GetLeaderboardService() const { return LeaderboardService; }
@@ -528,6 +537,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Quest")
 	FQuestClaimResult ClaimQuest(const FString& QuestId);
 
+	// 미션 보상 수령 단일 진입점. 완료 && 미수령이면 MissionService 마킹 후 보상(골드/정수/소비) 지급 + 자동저장. 성공 시 true.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Mission")
+	bool ClaimMission(const FString& Id);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Quest")
 	TArray<FQuestState> GetActiveQuestStates() const;
 
@@ -660,6 +673,9 @@ private:
 	TObjectPtr<UTitleService> TitleService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UMissionService> MissionService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<ULeaderboardService> LeaderboardService;
 
 	UPROPERTY(Transient)
@@ -766,6 +782,7 @@ private:
 	void EnsureAchievementService();
 	void EnsureMasteryService();
 	void EnsureTitleService();
+	void EnsureMissionService();
 	// 업적 메트릭 갱신/로그인/세이브 시 호출 — 달성한 칭호를 영구 해금한다(AchievementService 기준).
 	void RecomputeUnlockedTitles();
 	void EnsureLeaderboardService();
