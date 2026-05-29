@@ -542,6 +542,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	bool TryUnlockPet(const FString& PetId);
 
+	// 보유 펫 진화 진입점 — 현재 별 기준 골드 비용 검증·단일 차감 후 별 1 증가.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
+	bool EvolvePet(const FString& PetId);
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Pet")
 	FPetFeedResult TryFeedPet(const FString& PetId);
 

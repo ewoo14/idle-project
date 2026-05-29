@@ -72,7 +72,7 @@ bool FIdleSaveGameDefaultsTest::RunTest(const FString& Parameters)
 		return false;
 	}
 
-	TestEqual(TEXT("SaveVersion starts at V19"), SaveGame->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("SaveVersion starts at V20"), SaveGame->SaveVersion, static_cast<int32>(20));
 	TestFalse(TEXT("Fresh save object is not marked as captured"), SaveGame->bHasSave);
 	TestEqual(TEXT("Fresh save keeps level one"), SaveGame->CharacterLevel, static_cast<int32>(1));
 	TestEqual(TEXT("Fresh save keeps first next exp value"), SaveGame->NextExp, static_cast<int64>(150));
@@ -122,6 +122,8 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	SourceSave->OwnedPetIds.Add(TEXT("cat"));
 	SourceSave->PetLevels.Add(TEXT("dog"), 2);
 	SourceSave->PetLevels.Add(TEXT("bird"), 4);
+	SourceSave->PetStars.Add(TEXT("dog"), 3);
+	SourceSave->PetStars.Add(TEXT("bird"), 1);
 	FQuestSaveEntry QuestEntry;
 	QuestEntry.QuestId = TEXT("main_ch1_001");
 	QuestEntry.Type = EQuestType::Main;
@@ -156,7 +158,7 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("CaptureToSave captures current game state"), GameInstance->CaptureToSave(CapturedSave));
 
 	TestTrue(TEXT("Captured save is marked as populated"), CapturedSave->bHasSave);
-	TestEqual(TEXT("Captured save writes V19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("Captured save writes V20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("Gold round trips"), CapturedSave->Gold, SourceSave->Gold);
 	TestEqual(TEXT("Character level round trips"), CapturedSave->CharacterLevel, SourceSave->CharacterLevel);
 	TestEqual(TEXT("Current exp round trips"), CapturedSave->CurrentExp, SourceSave->CurrentExp);
@@ -183,6 +185,8 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Owned cat round trips"), CapturedSave->OwnedPetIds.Contains(TEXT("cat")));
 	TestEqual(TEXT("Dog level round trips"), CapturedSave->PetLevels.FindRef(TEXT("dog")), static_cast<int32>(2));
 	TestEqual(TEXT("Bird level round trips"), CapturedSave->PetLevels.FindRef(TEXT("bird")), static_cast<int32>(4));
+	TestEqual(TEXT("Dog star round trips"), CapturedSave->PetStars.FindRef(TEXT("dog")), static_cast<int32>(3));
+	TestEqual(TEXT("Bird star round trips"), CapturedSave->PetStars.FindRef(TEXT("bird")), static_cast<int32>(1));
 	TestEqual(TEXT("Quest payload round trips"), CapturedSave->Quests.Num(), 12);
 	const FQuestSaveEntry* CapturedQuest = CapturedSave->Quests.FindByPredicate([](const FQuestSaveEntry& Entry)
 	{
@@ -217,6 +221,8 @@ bool FIdleSaveSystemApplyCaptureRoundTripTest::RunTest(const FString& Parameters
 	TestTrue(TEXT("Pet restore applies owned cat"), PetService ? PetService->IsPetOwned(TEXT("cat")) : false);
 	TestEqual(TEXT("Pet restore applies dog level"), PetService ? PetService->GetPetLevel(TEXT("dog")) : INDEX_NONE, static_cast<int32>(2));
 	TestEqual(TEXT("Pet restore applies bird level"), PetService ? PetService->GetPetLevel(TEXT("bird")) : INDEX_NONE, static_cast<int32>(4));
+	TestEqual(TEXT("Pet restore applies dog star"), PetService ? PetService->GetPetStar(TEXT("dog")) : INDEX_NONE, static_cast<int32>(3));
+	TestEqual(TEXT("Pet restore applies bird star"), PetService ? PetService->GetPetStar(TEXT("bird")) : INDEX_NONE, static_cast<int32>(1));
 
 	return true;
 }
@@ -249,7 +255,7 @@ bool FIdleSaveSystemLegacyV7StageMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after legacy migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Capture after legacy migration writes V19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("Capture after legacy migration writes V20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("Migrated capture keeps stage five"), CapturedSave->StageStage, 5);
 	TestEqual(TEXT("Migrated capture keeps highest cleared chapter"), CapturedSave->StageHighestClearedChapter, 1);
 
@@ -282,7 +288,7 @@ bool FIdleSaveSystemMasteryV12MigrationTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v12 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated capture writes v19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("Migrated capture writes v20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("Migrated capture writes all mastery tracks"), CapturedSave->Mastery.Num(), FMasteryFormula::TrackCount);
 
 	return true;
@@ -306,7 +312,7 @@ bool FIdleSaveSystemConsumableV13MigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v13 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated consumable capture writes v19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("Migrated consumable capture writes v20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("Migrated capture has no consumable stock"), CapturedSave->Consumables.Num(), 0);
 
 	return true;
@@ -345,7 +351,7 @@ bool FIdleSaveSystemConsumableGradeV15MigrationTest::RunTest(const FString& Para
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v15 grade migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("v15 grade migration capture writes v19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("v15 grade migration capture writes v20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("v15 migrated capture keeps a single entry"), CapturedSave->Consumables.Num(), 1);
 	TestEqual(TEXT("v15 migrated capture records Standard grade"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Grade : 255, static_cast<uint8>(EConsumableGrade::Standard));
 	TestEqual(TEXT("v15 migrated capture keeps stock"), CapturedSave->Consumables.IsValidIndex(0) ? CapturedSave->Consumables[0].Count : -1, 3);
@@ -371,7 +377,7 @@ bool FIdleSaveSystemWeeklyBossV14MigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* CapturedSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after v14 migration succeeds"), GameInstance->CaptureToSave(CapturedSave));
-	TestEqual(TEXT("Migrated weekly boss capture writes v19"), CapturedSave->SaveVersion, static_cast<int32>(19));
+	TestEqual(TEXT("Migrated weekly boss capture writes v20"), CapturedSave->SaveVersion, static_cast<int32>(20));
 	TestEqual(TEXT("Migrated weekly boss damage remains zero"), CapturedSave->WeeklyBossDamage, static_cast<int64>(0));
 
 	return true;
