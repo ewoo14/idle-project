@@ -477,3 +477,17 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
   tooltip keys covered by `IdleProject.Localization.CsvIntegrity`.
 - [ ] `.gitattributes` continues to LFS-track future exported binary UI assets;
   this PR adds no binary art assets.
+
+## PR #72 Balance Checklist Addendum (Section 5)
+
+- [ ] `docs/planning/mastery-v1-balance-note.md` documents the mastery XP curve,
+  cumulative XP anchors, and level 5/30/100 bonus anchors.
+- [ ] The level-100 all-track review point shows
+  `1 + 0.02 * ln(1 + 300) = 1.114...` core pressure and explains why this is
+  bounded long-tail growth rather than a replacement prestige multiplier.
+- [ ] The note states that mastery is not injected into the sampled
+  first-rebirth run until acquisition timing is modeled in `tools/balance-sim`.
+- [ ] The current 1000-run rebirth distribution remains documented as p10
+  4.919h, median 5.328h, p90 5.751h, min 4.564h, max 6.144h.
+- [ ] Inflation guardrails cover separate stacking from transcend, tower, and
+  achievement, plus the V1.5 deferral of per-track local bonuses.

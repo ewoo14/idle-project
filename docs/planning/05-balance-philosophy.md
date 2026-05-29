@@ -1897,3 +1897,42 @@ Guardrails:
 - Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
   after changing enhancement success rates, rarity cost multipliers, or
   protection sourcing.
+
+---
+
+## PR #72 Unified Mastery Balance Review
+
+PR #72 adds six permanent mastery tracks with a shared geometric XP curve and
+logarithmic global bonuses. The detailed review artifact is
+`docs/planning/mastery-v1-balance-note.md`.
+
+Formula anchors:
+
+- XP curve: `XpToNext(level) = floor(100 * 1.15^level)`.
+- Core stats: `1 + 0.02 * ln(1 + Combat + Equipment + Explore)`.
+- Crit and drop: `0.01 * ln(1 + trackLevel)` as flat percentage-point adds.
+- Gold and EXP: `0.02 * ln(1 + Beast)` as economy percent gains.
+
+At the level-100 all-track review point, Combat + Equipment + Explore equals
+300 and the mastery core multiplier is x1.114. This is visible long-tail
+pressure, but it is deliberately smaller than mature transcend, tower, rune,
+equipment-depth, and achievement layers. Mastery is therefore a permanent
+background ladder rather than a replacement prestige system.
+
+The current 1000-run first-rebirth simulator output is unchanged because mastery
+acquisition is not injected into first-rebirth timing yet: p10 4.919h, median
+5.328h, p90 5.751h, min 4.564h, max 6.144h. Median remains inside the 5-10h
+target and every sampled run remains inside the 3-20h review band.
+
+Guardrails:
+
+- Keep mastery XP separate from the character level curve in `LevelCurveDB.csv`.
+- Keep mastery bonuses out of reset cleanup; rebirth and transcend must preserve
+  mastery XP.
+- Apply mastery core pressure once as its own multiplier after existing
+  transcend, tower, and achievement multipliers.
+- Do not tune first-rebirth pacing from mastery until `tools/balance-sim`
+  explicitly models mastery acquisition timing.
+- Re-run `cd server; npm run test -- mastery` after changing mastery constants,
+  and re-run `cd server; npm run balance:sim` if mastery enters the sampled
+  first-rebirth model.
