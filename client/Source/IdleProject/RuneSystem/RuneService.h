@@ -28,6 +28,19 @@ public:
 	bool EnhanceRune(int32 OwnedIndex);
 	bool TryDisenchantRune(int32 OwnedIndex, int64& OutEssenceRefund);
 
+	/** 보유 룬 세트를 Offense/Bastion/Vitality/Fortune 중 균등 랜덤으로 재설정. 자원 검증/차감은 GameInstance가 수행. */
+	bool RerollRuneSet(int32 OwnedIndex, FRandomStream& Rng);
+
+	/**
+	 * 보유 룬 등급 상승 시도. Mythic이거나 인덱스 무효이면 false(시도 불성립).
+	 * 시도가 성립하면 true를 반환하고, SuccessChance 확률로 Rarity를 한 단계 올린다(bOutSucceeded로 결과 전달).
+	 * RNG/확률은 GameInstance가 주입(테스트는 1/0 경계로 결정적 검증).
+	 */
+	bool TryUpgradeRuneRarity(int32 OwnedIndex, float SuccessChance, FRandomStream& Rng, bool& bOutSucceeded);
+
+	/** Src 강화 레벨을 Dst로 전송(Dst=max(Dst,Src)) 후 Src 룬 삭제·장착 슬롯 인덱스 갱신. 자원 검증/차감은 GameInstance. */
+	bool TransferEnhancement(int32 SrcIndex, int32 DstIndex);
+
 	FRuneCoreMultipliers GetEquippedCoreMultipliers() const;
 	FRuneUtilValues GetEquippedUtilValues() const;
 	const TArray<FRuneInstance>& GetOwnedRunes() const { return OwnedRunes; }

@@ -2682,6 +2682,99 @@ bool UIdleGameInstance::TryBuyRuneRoll()
 	return true;
 }
 
+bool UIdleGameInstance::TryRerollRuneSet(int32 OwnedIndex)
+{
+	EnsureRuneService();
+	if (!RuneService || !RuneService->GetOwnedRunes().IsValidIndex(OwnedIndex))
+	{
+		return false;
+	}
+
+	const FRuneInstance& Rune = RuneService->GetOwnedRunes()[OwnedIndex];
+	const int64 EssenceCost = FRuneFormula::GetRerollSetEssenceCost(Rune.Rarity);
+	if (EssenceCost <= 0 || RuneEssence < EssenceCost)
+	{
+		return false;
+	}
+
+	if (!RuneService->RerollRuneSet(OwnedIndex, RuneRandomStream))
+	{
+		return false;
+	}
+
+	// 단일 지점 차감(서비스 성공 이후).
+	RuneEssence -= EssenceCost;
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TryUpgradeRuneRarity(int32 OwnedIndex, bool& bOutSucceeded)
+{
+	bOutSucceeded = false;
+	EnsureRuneService();
+	if (!RuneService || !RuneService->GetOwnedRunes().IsValidIndex(OwnedIndex))
+	{
+		return false;
+	}
+
+	const EItemRarity CurrentRarity = RuneService->GetOwnedRunes()[OwnedIndex].Rarity;
+	if (CurrentRarity < EItemRarity::Common || CurrentRarity >= EItemRarity::Mythic)
+	{
+		// Mythic 상한: 시도 불가(자원 차감 없음).
+		return false;
+	}
+
+	const int64 EssenceCost = FRuneFormula::GetRarityUpgradeEssenceCost(CurrentRarity);
+	const int64 GoldCost = FRuneFormula::GetRarityUpgradeGoldCost(CurrentRarity);
+	if (EssenceCost <= 0 || GoldCost <= 0 || RuneEssence < EssenceCost || Gold < GoldCost)
+	{
+		return false;
+	}
+
+	const float SuccessChance = FRuneFormula::GetRarityUpgradeChance(CurrentRarity);
+	if (!RuneService->TryUpgradeRuneRarity(OwnedIndex, SuccessChance, RuneRandomStream, bOutSucceeded))
+	{
+		return false;
+	}
+
+	// 단일 지점 차감(성공/실패 무관, 시도 성립 시 소모).
+	RuneEssence -= EssenceCost;
+	AddGold(-GoldCost);
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::TransferRuneEnhancement(int32 SrcIndex, int32 DstIndex)
+{
+	EnsureRuneService();
+	if (!RuneService || SrcIndex == DstIndex
+		|| !RuneService->GetOwnedRunes().IsValidIndex(SrcIndex)
+		|| !RuneService->GetOwnedRunes().IsValidIndex(DstIndex))
+	{
+		return false;
+	}
+
+	const int32 SourceLevel = RuneService->GetOwnedRunes()[SrcIndex].EnhanceLevel;
+	const int64 EssenceCost = FRuneFormula::GetTransferEssenceCost(SourceLevel);
+	if (EssenceCost <= 0 || RuneEssence < EssenceCost)
+	{
+		return false;
+	}
+
+	if (!RuneService->TransferEnhancement(SrcIndex, DstIndex))
+	{
+		return false;
+	}
+
+	// 단일 지점 차감(서비스 성공 이후).
+	RuneEssence -= EssenceCost;
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
 bool UIdleGameInstance::TryCraftClassRune(EItemRarity Rarity)
 {
 	EnsureRuneService();
