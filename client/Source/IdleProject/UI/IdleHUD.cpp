@@ -51,6 +51,7 @@ const FString ClassSelectionHitBoxPrefix(TEXT("ClassSelect_"));
 const FString QuestClaimHitBoxPrefix(TEXT("QuestClaim_"));
 const FString PetEquipHitBoxPrefix(TEXT("PetEquip_"));
 const FString PetFeedHitBoxPrefix(TEXT("PetFeed_"));
+const FString PetEvolveHitBoxPrefix(TEXT("PetEvolve_"));
 const FString SeasonClaimHitBoxPrefix(TEXT("SeasonClaim_"));
 const FString SkillRankHitBoxPrefix(TEXT("SkillRank_"));
 const FString EnhanceSlotHitBoxPrefix(TEXT("EnhanceSlot_"));
@@ -1161,6 +1162,31 @@ FText BuildPetFeedCostLabel(int64 FeedCost)
 	});
 }
 
+FText BuildPetStarLabel(int32 Star)
+{
+	return FormatLocalizedUI(TEXT("PET_STAR_FORMAT"), [Star](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Star"), FText::AsNumber(FMath::Max(0, Star)));
+	});
+}
+
+FText BuildPetEvolveCostLabel(int64 EvolveCost)
+{
+	return FormatLocalizedUI(TEXT("PET_EVOLVE_COST_FORMAT"), [EvolveCost](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(EvolveCost)));
+	});
+}
+
+FText BuildPetEvolveEffectLabel(int32 NextStar)
+{
+	const float NextBonusPercent = (FPetLevelFormula::GetPetStarMultiplier(NextStar) - 1.0f) * 100.0f;
+	return FormatLocalizedUI(TEXT("PET_EVOLVE_EFFECT_FORMAT"), [NextBonusPercent](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Percent"), FText::FromString(FString::Printf(TEXT("%.0f%%"), NextBonusPercent)));
+	});
+}
+
 FText SeasonRewardToLabel(ESeasonRewardType Type, int64 Amount)
 {
 	switch (Type)
@@ -1276,6 +1302,11 @@ FName MakePetEquipHitBoxName(const FString& PetId)
 FName MakePetFeedHitBoxName(const FString& PetId)
 {
 	return FName(*(PetFeedHitBoxPrefix + PetId));
+}
+
+FName MakePetEvolveHitBoxName(const FString& PetId)
+{
+	return FName(*(PetEvolveHitBoxPrefix + PetId));
 }
 
 FName MakeSeasonClaimHitBoxName(int32 Tier)
@@ -3663,7 +3694,7 @@ TArray<FIdleHUDClassSelectionOptionViewModel> IdleProject::UI::BuildClassSelecti
 	return Options;
 }
 
-FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel, TFunctionRef<bool(const FString&)> IsPetOwned)
+FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<FPetDefinition>& PetDefinitions, const FString& EquippedPetId, float GoldBonusPercent, float DropBonusPercent, int64 Gold, TFunctionRef<int32(const FString&)> GetPetLevel, TFunctionRef<bool(const FString&)> IsPetOwned, TFunctionRef<int32(const FString&)> GetPetStar)
 {
 	FIdleHUDPetPanelViewModel ViewModel;
 	ViewModel.Title = IdleProject::Localization::UI(TEXT("PET_PANEL_TITLE"));
@@ -3705,6 +3736,16 @@ FIdleHUDPetPanelViewModel IdleProject::UI::BuildPetPanelViewModel(const TArray<F
 		Row.bCanFeed = bCanFeed;
 		Row.bFeedDisabled = !bCanFeed;
 		Row.bMaxLevel = bMaxLevel;
+
+		const int32 Star = FMath::Max(0, GetPetStar(Definition.PetId));
+		const int64 EvolveCost = FPetLevelFormula::GetPetEvolveCost(Star);
+		const bool bCanEvolve = bOwned && EvolveCost > 0 && Gold >= EvolveCost;
+		Row.StarLabel = BuildPetStarLabel(Star);
+		Row.EvolveActionLabel = IdleProject::Localization::UI(TEXT("ACTION_EVOLVE"));
+		Row.EvolveCostLabel = BuildPetEvolveCostLabel(EvolveCost);
+		Row.EvolveEffectLabel = BuildPetEvolveEffectLabel(Star + 1);
+		Row.bCanEvolve = bCanEvolve;
+
 		Row.StatusLabel = !bOwned
 			? IdleProject::Localization::UI(TEXT("PET_STATUS_LOCKED"))
 			: (bMaxLevel
@@ -3990,6 +4031,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(PetFeedHitBoxPrefix))
 	{
 		TryFeedPetFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(PetEvolveHitBoxPrefix))
+	{
+		TryEvolvePetFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(SeasonClaimHitBoxPrefix))
@@ -8675,6 +8721,10 @@ void AIdleHUD::DrawPetPanel()
 		[PetService](const FString& PetId)
 		{
 			return PetService->IsPetOwned(PetId);
+		},
+		[PetService](const FString& PetId)
+		{
+			return PetService->GetPetStar(PetId);
 		});
 
 	const UWorld* World = GetWorld();
@@ -8684,7 +8734,7 @@ void AIdleHUD::DrawPetPanel()
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = 460.0f * Scale;
 	const float HeaderHeight = 44.0f * Scale;
-	const float RowHeight = 30.0f * Scale;
+	const float RowHeight = 52.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowPetFeedback ? 26.0f * Scale : 0.0f;
@@ -8723,12 +8773,14 @@ void AIdleHUD::DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, 
 {
 	using namespace IdleProject::UI;
 
-	const float Scale = Height / 30.0f;
+	const float Scale = Height / 52.0f;
 	const FLinearColor StateColor = Row.bEquipped ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.56f);
 	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
 	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
 
+	// 1행: 이름/별/레벨/보너스/먹이 비용/상태 + 장착/먹이 버튼
 	DrawText(Row.Name.ToString(), Row.bEquipped ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawText(Row.StarLabel.ToString(), Theme::AccentGold, X + 10.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
 	DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, X + 76.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 	DrawText(Row.BonusLabel.ToString(), Theme::TextMuted, X + 136.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 	DrawText(Row.FeedCostLabel.ToString(), Theme::TextMuted, X + 214.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
@@ -8752,6 +8804,20 @@ void AIdleHUD::DrawPetRow(const FIdleHUDPetRowViewModel& Row, float X, float Y, 
 	if (Row.bCanFeed)
 	{
 		AddHitBox(FVector2D(FeedButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetFeedHitBoxName(Row.PetId), true, 83);
+	}
+
+	// 2행: 진화 비용/다음 별 효과 + 진화 버튼 (보유·골드 충분 시 활성)
+	const float EvolveRowY = Y + 30.0f * Scale;
+	DrawText(Row.EvolveCostLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, EvolveRowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+	DrawText(Row.EvolveEffectLabel.ToString(), Theme::AccentGold, X + 136.0f * Scale, EvolveRowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.56f * Scale);
+
+	const float EvolveButtonX = X + Width - ButtonWidth - 6.0f * Scale;
+	const float EvolveButtonY = EvolveRowY;
+	DrawRect(Row.bCanEvolve ? Theme::AccentGold : Theme::BgPanel, EvolveButtonX, EvolveButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.EvolveActionLabel.ToString(), Row.bCanEvolve ? Theme::BgPrimary : Theme::TextMuted, EvolveButtonX + 6.0f * Scale, EvolveButtonY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+	if (Row.bCanEvolve)
+	{
+		AddHitBox(FVector2D(EvolveButtonX, EvolveButtonY), FVector2D(ButtonWidth, ButtonHeight), MakePetEvolveHitBoxName(Row.PetId), true, 84);
 	}
 }
 
@@ -8791,6 +8857,45 @@ void AIdleHUD::TryFeedPetFromHitBox(FName BoxName)
 	if (!PetId.IsEmpty())
 	{
 		IdleGameInstance->TryFeedPet(PetId);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryEvolvePetFromHitBox(FName BoxName)
+{
+	using namespace IdleProject::UI;
+
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString PetId = BoxName.ToString();
+	PetId.RightChopInline(PetEvolveHitBoxPrefix.Len());
+	if (!PetId.IsEmpty())
+	{
+		const bool bEvolved = IdleGameInstance->EvolvePet(PetId);
+		if (bEvolved)
+		{
+			const UPetService* PetService = IdleGameInstance->GetPetService();
+			const int32 NewStar = PetService ? PetService->GetPetStar(PetId) : 0;
+			bPetFeedbackSuccess = true;
+			PetFeedbackLabel = FormatLocalizedUI(TEXT("PET_EVOLVE_FEEDBACK_SUCCESS_FORMAT"), [NewStar](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Star"), FText::AsNumber(NewStar));
+			});
+		}
+		else
+		{
+			bPetFeedbackSuccess = false;
+			PetFeedbackLabel = IdleProject::Localization::UI(TEXT("PET_EVOLVE_FEEDBACK_BLOCKED"));
+		}
+		const UWorld* World = GetWorld();
+		PetFeedbackStartTime = World ? World->GetTimeSeconds() : 0.0f;
 	}
 	RefreshMouseInteraction();
 }

@@ -479,6 +479,10 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 		[Pets](const FString& PetId)
 		{
 			return Pets->IsPetOwned(PetId);
+		},
+		[Pets](const FString& PetId)
+		{
+			return Pets->GetPetStar(PetId);
 		});
 
 	TestEqual(TEXT("Pet HUD shows expanded pet catalog"), PetPanel.Rows.Num(), 10);
@@ -501,6 +505,12 @@ bool FPetSeasonHudViewModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Locked cat row disables feed"), PetPanel.Rows[2].bFeedDisabled);
 	TestEqual(TEXT("Locked cat row uses localized locked action"), PetPanel.Rows[2].ActionLabel.ToString(), FString(TEXT("Locked")));
 	TestEqual(TEXT("Locked cat row uses localized locked status"), PetPanel.Rows[2].StatusLabel.ToString(), FString(TEXT("Locked")));
+	TestTrue(TEXT("Dog row shows zero-star label"), PetPanel.Rows[0].StarLabel.ToString().Contains(TEXT("0")));
+	TestTrue(TEXT("Dog row exposes evolve cost label"), PetPanel.Rows[0].EvolveCostLabel.ToString().Contains(TEXT("50,000")));
+	TestTrue(TEXT("Dog row exposes next-star effect label"), PetPanel.Rows[0].EvolveEffectLabel.ToString().Contains(TEXT("15%")));
+	TestTrue(TEXT("Dog row exposes evolve action label"), PetPanel.Rows[0].EvolveActionLabel.ToString().Len() > 0);
+	TestFalse(TEXT("Dog row cannot evolve when gold is below the evolve cost"), PetPanel.Rows[0].bCanEvolve);
+	TestFalse(TEXT("Locked cat row cannot evolve"), PetPanel.Rows[2].bCanEvolve);
 	TestTrue(TEXT("Equipped pet summary includes scaled gold bonus"), PetPanel.GoldBonusLabel.ToString().Contains(TEXT("22%")));
 	TestTrue(TEXT("Equipped pet summary includes drop bonus"), PetPanel.DropBonusLabel.ToString().Contains(TEXT("0%")));
 
