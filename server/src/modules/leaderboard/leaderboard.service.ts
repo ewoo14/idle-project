@@ -17,6 +17,14 @@ export type LeaderboardRepo = {
   ): Promise<void>;
   listPower(seasonId: number, limit: number): Promise<LeaderboardRow[]>;
   listRebirth(seasonId: number, limit: number): Promise<LeaderboardRow[]>;
+  getPowerRank(
+    seasonId: number,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null>;
+  getRebirthRank(
+    seasonId: number,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null>;
 };
 
 export type LeaderboardCache = {
@@ -84,6 +92,18 @@ export class LeaderboardService {
     return cached.length > 0
       ? cached
       : this.repo.listRebirth(seasonId, normalizedLimit);
+  }
+
+  async getMyRank(
+    kind: "power" | "rebirth",
+    seasonId: number,
+    characterId: string,
+  ) {
+    const row =
+      kind === "power"
+        ? await this.repo.getPowerRank(seasonId, characterId)
+        : await this.repo.getRebirthRank(seasonId, characterId);
+    return row ?? { rank: 0, score: 0n };
   }
 }
 

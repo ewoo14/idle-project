@@ -6,8 +6,14 @@ import {
   LeaderboardCacheRedis,
   LeaderboardRepoPg,
 } from "./leaderboard.repo.js";
-import { leaderboardQuerySchema } from "./leaderboard.schema.js";
-import { LeaderboardService } from "./leaderboard.service.js";
+import {
+  leaderboardQuerySchema,
+  myRankQuerySchema,
+} from "./leaderboard.schema.js";
+import {
+  type LeaderboardRow,
+  LeaderboardService,
+} from "./leaderboard.service.js";
 
 export async function leaderboardRoutes(
   app: FastifyInstance,
@@ -27,7 +33,24 @@ export async function leaderboardRoutes(
     async (request) => {
       const query = request.query as { season: number; limit?: number };
       const data = await service.getPower(query.season, query.limit ?? 100);
-      return { ok: true, data };
+      return { ok: true, data: data.map(serializeLeaderboardRow) };
+    },
+  );
+
+  app.get(
+    "/power/me",
+    {
+      schema: myRankQuerySchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const query = request.query as { season: number; characterId: string };
+      const data = await service.getMyRank(
+        "power",
+        query.season,
+        query.characterId,
+      );
+      return { ok: true, data: serializeMyRank(data) };
     },
   );
 
@@ -40,7 +63,39 @@ export async function leaderboardRoutes(
     async (request) => {
       const query = request.query as { season: number; limit?: number };
       const data = await service.getRebirth(query.season, query.limit ?? 100);
-      return { ok: true, data };
+      return { ok: true, data: data.map(serializeLeaderboardRow) };
     },
   );
+
+  app.get(
+    "/rebirth/me",
+    {
+      schema: myRankQuerySchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const query = request.query as { season: number; characterId: string };
+      const data = await service.getMyRank(
+        "rebirth",
+        query.season,
+        query.characterId,
+      );
+      return { ok: true, data: serializeMyRank(data) };
+    },
+  );
+}
+
+function serializeLeaderboardRow(row: LeaderboardRow) {
+  return {
+    characterId: row.characterId,
+    score: row.score.toString(),
+    rank: row.rank,
+  };
+}
+
+function serializeMyRank(row: Omit<LeaderboardRow, "characterId">) {
+  return {
+    rank: row.rank,
+    score: row.score.toString(),
+  };
 }

@@ -65,6 +65,56 @@ export class LeaderboardRepoPg {
       rank: Number(row.rank),
     }));
   }
+
+  async getPowerRank(
+    seasonId: number,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null> {
+    const result = await this.pool.query(
+      `select rank, score
+       from (
+         select character_id,
+                rank() over (order by power_score desc) as rank,
+                power_score as score
+         from leaderboard_power
+         where season_id = $1
+       ) ranked
+       where character_id = $2`,
+      [seasonId, characterId],
+    );
+    const row = result.rows[0];
+    return row
+      ? {
+          rank: Number(row.rank),
+          score: BigInt(row.score),
+        }
+      : null;
+  }
+
+  async getRebirthRank(
+    seasonId: number,
+    characterId: string,
+  ): Promise<Omit<LeaderboardRow, "characterId"> | null> {
+    const result = await this.pool.query(
+      `select rank, score
+       from (
+         select character_id,
+                rank() over (order by rebirth_count desc) as rank,
+                rebirth_count as score
+         from leaderboard_rebirth
+         where season_id = $1
+       ) ranked
+       where character_id = $2`,
+      [seasonId, characterId],
+    );
+    const row = result.rows[0];
+    return row
+      ? {
+          rank: Number(row.rank),
+          score: BigInt(row.score),
+        }
+      : null;
+  }
 }
 
 export class LeaderboardCacheRedis {
