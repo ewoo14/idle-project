@@ -1225,9 +1225,11 @@ void UIdleGameInstance::AddExp(int64 Amount)
 	}
 
 	EnsureBuffService();
+	EnsureMasteryService();
 	const double ExpMultiplier =
 		1.0
-		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f);
+		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f)
+		+ static_cast<double>(MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f);
 	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
@@ -1442,7 +1444,8 @@ int64 UIdleGameInstance::GetAchievementMetricValue(EAchievementMetric Metric) co
 float UIdleGameInstance::GetRuneGoldFindBonus() const
 {
 	const float RuneBonus = RuneService ? RuneService->GetEquippedUtilValues().GoldFind : 0.0f;
-	return RuneBonus;
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().GoldFindPct : 0.0f;
+	return RuneBonus + MasteryBonus;
 }
 
 float UIdleGameInstance::GetRuneExpBoostBonus() const
@@ -1835,7 +1838,8 @@ float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 	const float PetMultiplier = 1.0f + GetEquippedPetDropBonusPercent() / 100.0f;
 	const float PetAdjusted = FMath::Clamp(BaseChance * PetMultiplier, 0.0f, 1.0f);
 	const float ConsumableBonus = BuffService ? BuffService->GetDropBuffAdd(GetCurrentUnixSeconds()) : 0.0f;
-	return FMath::Clamp(PetAdjusted + ConsumableBonus, 0.0f, 1.0f);
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
+	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus, 0.0f, 1.0f);
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const

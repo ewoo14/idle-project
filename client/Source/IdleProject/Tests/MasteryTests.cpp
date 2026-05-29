@@ -251,9 +251,21 @@ bool FMasteryUtilityBonusExposureTest::RunTest(const FString& Parameters)
 
 	TestTrue(TEXT("Seeded beast mastery save applies"), GameInstance->ApplyFromSave(Save));
 	// EXP 마스터리는 AddExp 단일 경로 적용 — 처치 EXP getter는 마스터리를 제외해 이중 적용을 막는다.
+	const float BeastExpBoost = FMasteryFormula::ExpBoostPct(1);
+	const float BeastGoldFind = FMasteryFormula::GoldFindPct(1);
+	GameInstance->AddExp(50);
+	TestEqual(TEXT("AddExp applies beast global exp boost once"), GameInstance->GetCurrentExp(), FMath::RoundToInt64(50.0 * (1.0 + static_cast<double>(BeastExpBoost))));
 	TestEqual(TEXT("Exp boost getter excludes mastery (no rune)"), GameInstance->GetRuneExpBoostBonus(), 0.0f);
 	// 골드 마스터리는 처치 경로 getter에서 단일 적용된다.
-	TestEqual(TEXT("Gold find getter excludes mastery"), GameInstance->GetRuneGoldFindBonus(), 0.0f);
+	TestEqual(TEXT("Gold find getter includes beast global mastery"), GameInstance->GetRuneGoldFindBonus(), BeastGoldFind);
+
+	UIdleGameInstance* AbyssGameInstance = NewObject<UIdleGameInstance>();
+	UIdleSaveGame* AbyssSave = NewObject<UIdleSaveGame>();
+	AbyssSave->bHasSave = true;
+	AbyssSave->SaveVersion = 13;
+	AbyssSave->Mastery.Add(MakeMasteryEntry(EMasteryTrack::Abyss));
+	TestTrue(TEXT("Seeded abyss mastery save applies"), AbyssGameInstance->ApplyFromSave(AbyssSave));
+	TestEqual(TEXT("Drop chance includes abyss global mastery add"), AbyssGameInstance->ApplyEquippedPetDropBonusChance(0.05f), 0.05f + FMasteryFormula::DropRateAdd(1));
 	return true;
 }
 
