@@ -3,13 +3,18 @@ import { pool } from "../../core/db.js";
 import { rateLimitPolicies } from "../../plugins/rate-limit.js";
 import { GuildRepoPg } from "./guild.repo.js";
 import {
+  guildAttendanceSchema,
+  guildContributeSchema,
   guildCreateSchema,
+  guildDonateSchema,
   guildGetSchema,
   guildJoinSchema,
   guildLeaveSchema,
   guildListSchema,
   guildRankSchema,
   guildRequestActionSchema,
+  guildShopBuySchema,
+  guildShopSchema,
   guildSnapshotSchema,
   guildUpdateSchema,
 } from "./guild.schema.js";
@@ -210,6 +215,109 @@ export async function guildRoutes(app: FastifyInstance) {
         params.id,
         params.charId,
         body.rank,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 일일 출석 기여 (1일 1회, +50)
+  app.post(
+    "/:id/attendance",
+    {
+      preHandler: app.authenticate,
+      schema: guildAttendanceSchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const body = request.body as { characterId: string };
+      const data = await service.attendance(
+        request.user.sub,
+        body.characterId,
+        params.id,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 재화 헌납 기여 (클라 권위 골드, 일일 상한)
+  app.post(
+    "/:id/donate",
+    {
+      preHandler: app.authenticate,
+      schema: guildDonateSchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const body = request.body as { characterId: string; gold: number };
+      const data = await service.donate(
+        request.user.sub,
+        body.characterId,
+        params.id,
+        body.gold,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 전투/던전 자동 기여 델타 플러시 (주간 상한)
+  app.post(
+    "/:id/contribute",
+    {
+      preHandler: app.authenticate,
+      schema: guildContributeSchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const body = request.body as { characterId: string; amount: number };
+      const data = await service.contribute(
+        request.user.sub,
+        body.characterId,
+        params.id,
+        body.amount,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 길드 상점 카탈로그 (멤버)
+  app.get(
+    "/:id/shop",
+    {
+      preHandler: app.authenticate,
+      schema: guildShopSchema,
+      config: { rateLimit: rateLimitPolicies.read },
+    },
+    async (request) => {
+      const params = request.params as { id: string };
+      const query = request.query as { characterId: string };
+      const data = await service.shop(
+        request.user.sub,
+        query.characterId,
+        params.id,
+      );
+      return { ok: true, data };
+    },
+  );
+
+  // 길드 상점 구매 (포인트 차감 + 보상 반환)
+  app.post(
+    "/:id/shop/:itemId/buy",
+    {
+      preHandler: app.authenticate,
+      schema: guildShopBuySchema,
+      config: { rateLimit: rateLimitPolicies.mutate },
+    },
+    async (request) => {
+      const params = request.params as { id: string; itemId: string };
+      const body = request.body as { characterId: string };
+      const data = await service.shopBuy(
+        request.user.sub,
+        body.characterId,
+        params.id,
+        params.itemId,
       );
       return { ok: true, data };
     },

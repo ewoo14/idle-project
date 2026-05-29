@@ -14,6 +14,96 @@ export const OFFICER_SLOT_CAP = 3; // 간부 최대 인원
 export const GUILD_NAME_MIN = 2;
 export const GUILD_NAME_MAX = 16;
 
+// ── 기여도 상수 (클라 UE GuildFormula 와 parity 필수, 스펙 §4) ────────────────
+export const ATTENDANCE_REWARD = 50; // 일일 출석 1회 기여
+export const DONATION_GOLD_PER_POINT = 1000; // floor(gold/1000) 기여
+export const DONATION_DAILY_CAP = 500; // 헌납 일일 기여 상한
+export const AUTO_WEEKLY_CAP = 2000; // 전투/던전 자동 기여 주간 상한
+
+// ── 길드 레벨/버프 공식 상수 (클라 parity — 단독 export, 스펙 §4) ─────────────
+export const GUILD_LEVEL_BASE = 10_000; // 레벨 1→2 임계 기준값
+export const GUILD_LEVEL_GROWTH = 1.6; // 레벨당 임계 성장률
+export const GUILD_BUFF_PER_LEVEL = 0.004; // 레벨당 버프 계수(공격/골드 +0.4%)
+
+export type GuildBuff = { attackPct: number; goldPct: number };
+
+/**
+ * 누적 EXP → 길드 레벨(무한 기하). 레벨 L 도달 누적 임계는
+ * Σ_{i=1}^{L-1} floor(BASE * GROWTH^(i-1)). 레벨은 1 부터 시작한다.
+ * 클라(UE) `GetGuildLevel` 과 동일 결과를 보장한다.
+ */
+export function getGuildLevel(exp: bigint): number {
+  if (exp <= 0n) {
+    return 1;
+  }
+  let level = 1;
+  let cumulative = 0n;
+  // 무한 곡선이지만 임계는 기하급수라 현실적 EXP 에서 수십 레벨 내 수렴.
+  while (true) {
+    const step = BigInt(
+      Math.floor(GUILD_LEVEL_BASE * GUILD_LEVEL_GROWTH ** (level - 1)),
+    );
+    if (exp < cumulative + step) {
+      return level;
+    }
+    cumulative += step;
+    level += 1;
+  }
+}
+
+/** 길드 레벨 → 영구 버프(공격 +0.4%*L, 골드 +0.4%*L). 클라 `GetGuildBuff` parity. */
+export function getGuildBuff(level: number): GuildBuff {
+  const pct = GUILD_BUFF_PER_LEVEL * level;
+  return { attackPct: pct, goldPct: pct };
+}
+
+// ── 길드 상점 카탈로그 (서버 상수, 소비형 보상) ──────────────────────────────
+export type GuildShopItem = {
+  id: string;
+  name: string; // 한글 표기명(클라 로컬라이즈 키 매핑용)
+  price: number; // 개인 기여 포인트 가격
+  reward: { type: string; amount: number }; // 소비형 보상(클라가 세이브 반영)
+};
+
+export const GUILD_SHOP_CATALOG: readonly GuildShopItem[] = [
+  {
+    id: "protection_scroll",
+    name: "강화 보호서",
+    price: 120,
+    reward: { type: "protectionScroll", amount: 5 },
+  },
+  {
+    id: "reset_cube",
+    name: "잠재 재설정 큐브",
+    price: 200,
+    reward: { type: "resetCube", amount: 3 },
+  },
+  {
+    id: "gold_pouch",
+    name: "골드 주머니",
+    price: 150,
+    reward: { type: "gold", amount: 100_000 },
+  },
+  {
+    id: "exp_potion",
+    name: "지혜의 물약",
+    price: 180,
+    reward: { type: "expPotion", amount: 5 },
+  },
+  {
+    id: "rank_cube",
+    name: "잠재 등급 큐브",
+    price: 400,
+    reward: { type: "rankCube", amount: 1 },
+  },
+  {
+    id: "essence",
+    name: "룬 정수",
+    price: 300,
+    reward: { type: "essence", amount: 3 },
+  },
+] as const;
+
 export type GuildRank = "master" | "vice" | "officer" | "member";
 export type GuildJoinMode = "open" | "approval";
 
@@ -71,6 +161,10 @@ export type GuildMemberRecord = {
   totalContribution: bigint;
   contributionPoints: bigint;
   lastAttendanceDate: string | null;
+  weeklyAutoContribution: bigint;
+  lastDonationDate: string | null;
+  dailyDonation: bigint;
+  weeklyResetId: string | null;
 };
 
 export type GuildJoinRequestRecord = {
@@ -148,6 +242,32 @@ export type GuildRepo = {
   }): Promise<void>;
   /** 해산: 길드·멤버·신청 행 전부 삭제(cascade). */
   disbandGuild(guildId: string): Promise<void>;
+  /**
+   * 기여 누적(트랜잭션, 원자적). 한 호출에서:
+   *  - guilds.exp += amount, guilds.level = newLevel, guilds.week_id = weekId
+   *  - guild_members 의 기여 누적(contribution_points/weekly_contribution/total_contribution += amount)
+   *  - patch 로 지정한 컬럼(주간 자동/일일 헌납/출석일/리셋값) 갱신
+   * weeklyReset=true 면 같은 트랜잭션에서 해당 멤버의 weekly_contribution/weekly_auto_contribution 을 먼저 0 으로 리셋한 뒤 누적한다.
+   */
+  applyContribution(input: {
+    guildId: string;
+    characterId: string;
+    amount: bigint;
+    newLevel: number;
+    weekId: string;
+    weeklyReset: boolean;
+    patch: {
+      lastAttendanceDate?: string;
+      weeklyAutoContributionDelta?: bigint;
+      dailyDonation?: bigint;
+      lastDonationDate?: string;
+    };
+  }): Promise<GuildMemberRecord | null>;
+  /** 개인 기여 포인트 차감(상점 구매, 조건부 update — 잔액 부족 시 null). */
+  spendContributionPoints(input: {
+    characterId: string;
+    cost: bigint;
+  }): Promise<GuildMemberRecord | null>;
 };
 
 export class GuildService {
@@ -498,9 +618,17 @@ export class GuildService {
       ? await this.repo.listRequests(membership.guildId)
       : [];
 
+    const now = this.now();
+    const today = toUtcDate(now);
+    const guildResponse = this.toGuildResponse(guild);
     return {
-      guild: this.toGuildResponse(guild),
-      me: this.toMemberResponse(membership),
+      guild: guildResponse,
+      me: {
+        ...this.toMemberResponse(membership),
+        canAttend: membership.lastAttendanceDate !== today,
+        donationRemaining: this.donationRemaining(membership, today).toString(),
+      },
+      buff: guildResponse.buff,
       members: members.map((m) => this.toMemberResponse(m)),
       requests: requests.map((r) => ({
         characterId: r.characterId,
@@ -509,7 +637,265 @@ export class GuildService {
     };
   }
 
+  /**
+   * 일일 출석 기여(+50). UTC date 기준 1일 1회. 이미 출석했으면 ConflictError.
+   */
+  async attendance(userId: string, characterId: string, guildId: string) {
+    const { membership, guild } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    const now = this.now();
+    const today = toUtcDate(now);
+    const weekId = toUtcWeek(now);
+    const weeklyReset = this.needsWeeklyReset(membership, weekId);
+
+    if (membership.lastAttendanceDate === today) {
+      throw new ConflictError("오늘은 이미 출석했습니다.", {
+        code: "GUILD_ATTENDANCE_DONE",
+      });
+    }
+
+    const amount = BigInt(ATTENDANCE_REWARD);
+    const updated = await this.repo.applyContribution({
+      guildId,
+      characterId,
+      amount,
+      newLevel: getGuildLevel(guild.exp + amount),
+      weekId,
+      weeklyReset,
+      patch: { lastAttendanceDate: today },
+    });
+    if (!updated) {
+      throw new NotFoundError("길드에 소속되어 있지 않습니다.", {
+        code: "GUILD_NOT_MEMBER",
+      });
+    }
+    return {
+      status: "attended" as const,
+      gained: amount.toString(),
+      contributionPoints: updated.contributionPoints.toString(),
+    };
+  }
+
+  /**
+   * 재화 헌납 기여(floor(gold/1000)). 골드는 클라 권위이므로 서버는 차감하지 않고
+   * 보고된 gold 를 신뢰하되 일일 상한(DONATION_DAILY_CAP)으로 어뷰즈를 억제한다.
+   */
+  async donate(
+    userId: string,
+    characterId: string,
+    guildId: string,
+    gold: number,
+  ) {
+    const { membership, guild } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    if (!Number.isFinite(gold) || gold < 0) {
+      throw new ValidationError("헌납 골드 값이 올바르지 않습니다.", {
+        code: "GUILD_DONATE_INVALID",
+      });
+    }
+    const now = this.now();
+    const today = toUtcDate(now);
+    const weekId = toUtcWeek(now);
+    const weeklyReset = this.needsWeeklyReset(membership, weekId);
+
+    // 일일 누적(날짜 변경 시 0 부터). 클라 권위 gold → floor 기여, 잔여 상한으로 캡.
+    const dayDonated =
+      membership.lastDonationDate === today ? membership.dailyDonation : 0n;
+    const remaining = BigInt(DONATION_DAILY_CAP) - dayDonated;
+    if (remaining <= 0n) {
+      throw new ValidationError("오늘 헌납 기여 상한에 도달했습니다.", {
+        code: "GUILD_DONATE_CAP",
+      });
+    }
+    const rawAmount = BigInt(Math.floor(gold / DONATION_GOLD_PER_POINT));
+    if (rawAmount <= 0n) {
+      throw new ValidationError(
+        `헌납은 최소 ${DONATION_GOLD_PER_POINT} 골드부터 가능합니다.`,
+        { code: "GUILD_DONATE_TOO_SMALL" },
+      );
+    }
+    const amount = rawAmount < remaining ? rawAmount : remaining;
+
+    const updated = await this.repo.applyContribution({
+      guildId,
+      characterId,
+      amount,
+      newLevel: getGuildLevel(guild.exp + amount),
+      weekId,
+      weeklyReset,
+      patch: {
+        lastDonationDate: today,
+        dailyDonation: dayDonated + amount,
+      },
+    });
+    if (!updated) {
+      throw new NotFoundError("길드에 소속되어 있지 않습니다.", {
+        code: "GUILD_NOT_MEMBER",
+      });
+    }
+    return {
+      status: "donated" as const,
+      gained: amount.toString(),
+      dailyRemaining: (remaining - amount).toString(),
+      contributionPoints: updated.contributionPoints.toString(),
+    };
+  }
+
+  /**
+   * 전투/던전 자동 기여 델타 플러시. 주간 자동 상한(AUTO_WEEKLY_CAP)으로 캡.
+   * 클라가 누적한 델타(autoAmount)를 보고하면 잔여 상한만큼 적립한다.
+   */
+  async contribute(
+    userId: string,
+    characterId: string,
+    guildId: string,
+    autoAmount: number,
+  ) {
+    const { membership, guild } = await this.assertMember(
+      userId,
+      characterId,
+      guildId,
+    );
+    if (!Number.isFinite(autoAmount) || autoAmount < 0) {
+      throw new ValidationError("자동 기여 값이 올바르지 않습니다.", {
+        code: "GUILD_CONTRIBUTE_INVALID",
+      });
+    }
+    const now = this.now();
+    const weekId = toUtcWeek(now);
+    const weeklyReset = this.needsWeeklyReset(membership, weekId);
+
+    // 주간 리셋 대상이면 자동 누적은 0 부터 다시 계산.
+    const weekAuto = weeklyReset ? 0n : membership.weeklyAutoContribution;
+    const remaining = BigInt(AUTO_WEEKLY_CAP) - weekAuto;
+    if (remaining <= 0n) {
+      return {
+        status: "capped" as const,
+        gained: "0",
+        weeklyRemaining: "0",
+        contributionPoints: membership.contributionPoints.toString(),
+      };
+    }
+    const rawAmount = BigInt(Math.floor(autoAmount));
+    const amount = rawAmount < remaining ? rawAmount : remaining;
+    if (amount <= 0n) {
+      return {
+        status: "noop" as const,
+        gained: "0",
+        weeklyRemaining: remaining.toString(),
+        contributionPoints: membership.contributionPoints.toString(),
+      };
+    }
+
+    const updated = await this.repo.applyContribution({
+      guildId,
+      characterId,
+      amount,
+      newLevel: getGuildLevel(guild.exp + amount),
+      weekId,
+      weeklyReset,
+      patch: { weeklyAutoContributionDelta: amount },
+    });
+    if (!updated) {
+      throw new NotFoundError("길드에 소속되어 있지 않습니다.", {
+        code: "GUILD_NOT_MEMBER",
+      });
+    }
+    return {
+      status: "contributed" as const,
+      gained: amount.toString(),
+      weeklyRemaining: (remaining - amount).toString(),
+      contributionPoints: updated.contributionPoints.toString(),
+    };
+  }
+
+  /** 길드 상점 카탈로그 조회(멤버). */
+  async shop(userId: string, characterId: string, guildId: string) {
+    await this.assertMember(userId, characterId, guildId);
+    return {
+      items: GUILD_SHOP_CATALOG.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        reward: item.reward,
+      })),
+    };
+  }
+
+  /**
+   * 길드 상점 구매. 카탈로그 가격 검증 → 개인 기여 포인트 차감 → 보상 반환(소비형).
+   * 보상은 클라가 캐릭터 세이브에 반영한다(테이블 없음).
+   */
+  async shopBuy(
+    userId: string,
+    characterId: string,
+    guildId: string,
+    itemId: string,
+  ) {
+    await this.assertMember(userId, characterId, guildId);
+    const item = GUILD_SHOP_CATALOG.find((i) => i.id === itemId);
+    if (!item) {
+      throw new NotFoundError("상점 아이템을 찾을 수 없습니다.", {
+        code: "GUILD_SHOP_ITEM_NOT_FOUND",
+      });
+    }
+    const updated = await this.repo.spendContributionPoints({
+      characterId,
+      cost: BigInt(item.price),
+    });
+    if (!updated) {
+      throw new ConflictError("기여 포인트가 부족합니다.", {
+        code: "GUILD_SHOP_INSUFFICIENT_POINTS",
+      });
+    }
+    return {
+      status: "purchased" as const,
+      itemId: item.id,
+      reward: item.reward,
+      contributionPoints: updated.contributionPoints.toString(),
+    };
+  }
+
   // ── 내부 헬퍼 ───────────────────────────────────────────────────────────────
+
+  /**
+   * 멤버의 주간 마커가 현재 주와 다르면 주간 리셋이 필요(멤버별 lazy 리셋).
+   * 길드 단위가 아니라 멤버 단위로 추적해야 다른 멤버가 먼저 활동해도 누락 없이 리셋된다.
+   */
+  private needsWeeklyReset(member: GuildMemberRecord, weekId: string): boolean {
+    return member.weeklyResetId !== weekId;
+  }
+
+  /** 헌납 일일 잔여 상한(오늘 누적 기준). */
+  private donationRemaining(member: GuildMemberRecord, today: string): bigint {
+    const dayDonated =
+      member.lastDonationDate === today ? member.dailyDonation : 0n;
+    const remaining = BigInt(DONATION_DAILY_CAP) - dayDonated;
+    return remaining > 0n ? remaining : 0n;
+  }
+
+  /** 액터가 해당 길드 멤버인지 검증하고 membership+guild 반환(기여 라우트 공통). */
+  private async assertMember(
+    userId: string,
+    characterId: string,
+    guildId: string,
+  ): Promise<{ membership: GuildMemberRecord; guild: GuildRecord }> {
+    await this.assertCharacter(userId, characterId);
+    const membership = await this.repo.getMembership(characterId);
+    if (!membership || membership.guildId !== guildId) {
+      throw new NotFoundError("길드에 소속되어 있지 않습니다.", {
+        code: "GUILD_NOT_MEMBER",
+      });
+    }
+    const guild = await this.assertGuild(guildId);
+    return { membership, guild };
+  }
 
   /** 위임 후보 선정: 부길드장 우선, 없으면 총기여 최다 멤버. 본인 제외. */
   private pickSuccessor(
@@ -583,15 +969,18 @@ export class GuildService {
   }
 
   private toGuildResponse(guild: GuildRecord) {
+    // level 은 누적 exp 로 재계산(저장 denorm 과 무관하게 항상 권위 일치).
+    const level = getGuildLevel(guild.exp);
     return {
       id: guild.id,
       name: guild.name,
       notice: guild.notice,
       joinMode: guild.joinMode,
-      level: guild.level,
+      level,
       exp: guild.exp.toString(),
       masterCharacterId: guild.masterCharacterId,
       memberCount: guild.memberCount,
+      buff: getGuildBuff(level),
     };
   }
 
@@ -604,4 +993,24 @@ export class GuildService {
       contributionPoints: member.contributionPoints.toString(),
     };
   }
+}
+
+// ── 주간/일자 키 헬퍼 (quest 모듈과 동일 알고리즘 — ISO week, UTC date) ────────
+/** UTC 날짜 문자열(YYYY-MM-DD). 출석/헌납 일일 리셋 기준. */
+function toUtcDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** ISO week 문자열(YYYY-Www). 주간 기여/자동 상한 리셋 기준(quest/leaderboard parity). */
+function toUtcWeek(date: Date): string {
+  const utcDate = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+  const day = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((utcDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
+  );
+  return `${utcDate.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }

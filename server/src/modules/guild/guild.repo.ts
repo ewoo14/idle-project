@@ -26,7 +26,11 @@ const MEMBER_COLUMNS = `guild_id as "guildId",
   weekly_contribution as "weeklyContribution",
   total_contribution as "totalContribution",
   contribution_points as "contributionPoints",
-  last_attendance_date as "lastAttendanceDate"`;
+  last_attendance_date as "lastAttendanceDate",
+  weekly_auto_contribution as "weeklyAutoContribution",
+  last_donation_date as "lastDonationDate",
+  daily_donation as "dailyDonation",
+  weekly_reset_id as "weeklyResetId"`;
 
 function mapGuild(row: Record<string, unknown>): GuildRecord {
   return {
@@ -53,6 +57,10 @@ function mapMember(row: Record<string, unknown>): GuildMemberRecord {
     totalContribution: BigInt(row.totalContribution as string),
     contributionPoints: BigInt(row.contributionPoints as string),
     lastAttendanceDate: (row.lastAttendanceDate as string | null) ?? null,
+    weeklyAutoContribution: BigInt(row.weeklyAutoContribution as string),
+    lastDonationDate: (row.lastDonationDate as string | null) ?? null,
+    dailyDonation: BigInt(row.dailyDonation as string),
+    weeklyResetId: (row.weeklyResetId as string | null) ?? null,
   };
 }
 
@@ -381,6 +389,77 @@ export class GuildRepoPg implements GuildRepo {
   async disbandGuild(guildId: string): Promise<void> {
     // guild_members / guild_join_requests 는 FK cascade 로 함께 삭제된다.
     await this.pool.query(`delete from guilds where id = $1`, [guildId]);
+  }
+
+  async applyContribution(input: {
+    guildId: string;
+    characterId: string;
+    amount: bigint;
+    newLevel: number;
+    weekId: string;
+    weeklyReset: boolean;
+    patch: {
+      lastAttendanceDate?: string;
+      weeklyAutoContributionDelta?: bigint;
+      dailyDonation?: bigint;
+      lastDonationDate?: string;
+    };
+  }): Promise<GuildMemberRecord | null> {
+    return this.withTransaction(async (client) => {
+      // 1) 길드 EXP/레벨/주간 키 갱신(EXP·레벨은 영속).
+      await client.query(
+        `update guilds
+         set exp = exp + $2, level = $3, week_id = $4
+         where id = $1`,
+        [input.guildId, input.amount.toString(), input.newLevel, input.weekId],
+      );
+
+      // 2) 멤버 기여 누적. weeklyReset 면 weekly 컬럼을 0 부터(=리셋 후 누적).
+      //    weekly_contribution/weekly_auto_contribution 은 리셋 분기로 계산.
+      const weeklyBase = input.weeklyReset ? "0" : "weekly_contribution";
+      const autoBase = input.weeklyReset ? "0" : "weekly_auto_contribution";
+      const autoDelta = input.patch.weeklyAutoContributionDelta ?? 0n;
+
+      const result = await client.query(
+        `update guild_members
+         set contribution_points = contribution_points + $2,
+             total_contribution = total_contribution + $2,
+             weekly_contribution = ${weeklyBase} + $2,
+             weekly_auto_contribution = ${autoBase} + $3,
+             weekly_reset_id = $4,
+             last_attendance_date = coalesce($5, last_attendance_date),
+             daily_donation = coalesce($6, daily_donation),
+             last_donation_date = coalesce($7, last_donation_date)
+         where character_id = $1 and guild_id = $8
+         returning ${MEMBER_COLUMNS}`,
+        [
+          input.characterId,
+          input.amount.toString(),
+          autoDelta.toString(),
+          input.weekId,
+          input.patch.lastAttendanceDate ?? null,
+          input.patch.dailyDonation?.toString() ?? null,
+          input.patch.lastDonationDate ?? null,
+          input.guildId,
+        ],
+      );
+      return result.rows[0] ? mapMember(result.rows[0]) : null;
+    });
+  }
+
+  async spendContributionPoints(input: {
+    characterId: string;
+    cost: bigint;
+  }): Promise<GuildMemberRecord | null> {
+    // 조건부 update — 잔액 부족 시 0행(원자적 차감).
+    const result = await this.pool.query(
+      `update guild_members
+       set contribution_points = contribution_points - $2
+       where character_id = $1 and contribution_points >= $2
+       returning ${MEMBER_COLUMNS}`,
+      [input.characterId, input.cost.toString()],
+    );
+    return result.rows[0] ? mapMember(result.rows[0]) : null;
   }
 
   private async withTransaction<T>(

@@ -486,6 +486,87 @@ void UApiClient::UpdateGuildSettings(const FString& GuildId, const FString& Acto
 	SendRequestWithCallback(TEXT("PATCH"), FString::Printf(TEXT("/v1/guilds/%s"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
 }
 
+void UApiClient::GuildAttendance(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid attendance input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/attendance"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::GuildDonate(const FString& GuildId, const FString& CharacterId, int64 Gold, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty() || Gold <= 0)
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid donate input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	JsonObject->SetNumberField(TEXT("gold"), static_cast<double>(Gold));
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/donate"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::GuildContribute(const FString& GuildId, const FString& CharacterId, int64 Amount, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty() || Amount <= 0)
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid contribute input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	JsonObject->SetNumberField(TEXT("amount"), static_cast<double>(Amount));
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/contribute"), *GuildId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
+void UApiClient::GetGuildShop(const FString& GuildId, const FString& CharacterId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild shop input"));
+		}
+		return;
+	}
+
+	const FString Path = FString::Printf(TEXT("/v1/guilds/%s/shop?characterId=%s"), *GuildId, *CharacterId);
+	SendRequestWithCallback(TEXT("GET"), Path, FString(), MoveTemp(Callback));
+}
+
+void UApiClient::BuyGuildShopItem(const FString& GuildId, const FString& CharacterId, const FString& ItemId, TFunction<void(bool, FString)> Callback)
+{
+	if (GuildId.IsEmpty() || CharacterId.IsEmpty() || ItemId.IsEmpty())
+	{
+		if (Callback)
+		{
+			Callback(false, TEXT("invalid guild shop buy input"));
+		}
+		return;
+	}
+
+	TSharedRef<FJsonObject> JsonObject = MakeShared<FJsonObject>();
+	JsonObject->SetStringField(TEXT("characterId"), CharacterId);
+	SendRequestWithCallback(TEXT("POST"), FString::Printf(TEXT("/v1/guilds/%s/shop/%s/buy"), *GuildId, *ItemId), SerializeJsonObject(JsonObject), MoveTemp(Callback));
+}
+
 bool UApiClient::RequestOfflinePreview(int32 Level, int64 LastSeenUnixSec, int64 NowUnixSec, int32 RebirthCount)
 {
 	const FString Path = FString::Printf(

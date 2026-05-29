@@ -189,6 +189,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
 	void RefreshGuildSnapshot();
 
+	/**
+	 * 누적된 자동 기여 델타(던전 클리어·보스 도전)를 서버로 플러시(POST contribute).
+	 * 소속 길드가 있고 pending>0 일 때만 호출되며, 성공 시 스냅샷을 재동기화한다.
+	 * 세이브/재접속 시점에 호출(주간 상한은 GuildService/서버가 클램프).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Guild")
+	void FlushPendingGuildContribution();
+
 	// ── 길드 패널 UI 액션 배선(서버 권위 — 완료 시 스냅샷 재동기화) ───────────────
 	/** 길드 목록 조회(무소속 화면). 파싱된 요약 배열을 콜백으로 전달(UI 캐시용). */
 	void GuildPanelRefreshList(const FString& Query, TFunction<void(bool, const TArray<FGuildSummary>&)> OnComplete);
@@ -206,6 +214,14 @@ public:
 	void GuildPanelSetRank(const FString& GuildId, const FString& TargetCharacterId, EGuildRank NewRank, TFunction<void(bool)> OnComplete);
 	/** 길드 설정(가입 모드 토글 등, 길드장/부) → 성공 시 스냅샷 갱신. */
 	void GuildPanelUpdateJoinMode(const FString& GuildId, EGuildJoinMode NewJoinMode, TFunction<void(bool)> OnComplete);
+	/** 일일 출석(+기여) → 성공 시 스냅샷 갱신. */
+	void GuildPanelAttendance(TFunction<void(bool)> OnComplete);
+	/** 골드 헌납(floor(gold/1000) 기여, 일일 상한 서버 검증) → 성공 시 스냅샷 갱신. */
+	void GuildPanelDonate(int64 DonateGold, TFunction<void(bool)> OnComplete);
+	/** 길드 상점 카탈로그 조회(별도 fetch). 파싱된 아이템 배열을 콜백으로 전달(UI 캐시용). */
+	void GuildPanelFetchShop(TFunction<void(bool, const TArray<FGuildShopItemInfo>&)> OnComplete);
+	/** 길드 상점 구매(포인트 차감, 서버 검증) → 성공 시 스냅샷 갱신. */
+	void GuildPanelBuyShopItem(const FString& ItemId, TFunction<void(bool)> OnComplete);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Network")
 	const FString& GetApiBaseUrl() const { return ApiBaseUrl; }
@@ -383,6 +399,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Potential")
 	int64 GetRankCubes() const { return RankCubes; }
+
+	/**
+	 * 길드 상점 구매 보상(서버 `shopBuy` 응답 reward)을 캐릭터에 실제 지급한다.
+	 * RewardType 은 서버 카탈로그 type 문자열(gold/expPotion/essence/protectionScroll/resetCube/rankCube).
+	 * 알 수 없는 타입은 무시(로그)하며, Amount<=0 은 지급하지 않는다.
+	 */
+	void ApplyGuildShopReward(const FString& RewardType, int64 Amount);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Progression")
 	int32 GetCharacterLevel() const { return CharacterLevel; }
@@ -667,6 +690,9 @@ private:
 	static const TCHAR* SaveSlotName;
 	static constexpr float AutosaveDebounceSeconds = 1.0f;
 	static constexpr int32 CloudSaveApiVersion = 4;
+	// 길드 자동 기여 누적량(소량, 주간 상한은 GuildService/서버가 클램프).
+	static constexpr int64 GuildAutoContributionPerDungeon = 5;
+	static constexpr int64 GuildAutoContributionPerBoss = 10;
 	UInventoryComponent* FindPlayerInventory() const;
 	AIdleCharacter* FindPlayerCharacter() const;
 	EClassId GetCurrentClassIdForRunes() const;

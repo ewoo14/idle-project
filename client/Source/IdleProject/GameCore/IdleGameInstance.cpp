@@ -127,6 +127,122 @@ void GuildInstanceParseListResponse(const FString& JsonBody, TArray<FGuildSummar
 		OutSummaries.Add(MoveTemp(Summary));
 	}
 }
+
+// 길드 상점 응답(`{ok,data:{items:[{id,name,price,reward}]}}`) 파싱 — 가격은 정수 포인트.
+void GuildInstanceParseShopResponse(const FString& JsonBody, TArray<FGuildShopItemInfo>& OutItems)
+{
+	OutItems.Reset();
+	if (JsonBody.IsEmpty())
+	{
+		return;
+	}
+
+	TSharedPtr<FJsonObject> ResponseJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonBody);
+	if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !ResponseJson.IsValid())
+	{
+		return;
+	}
+
+	bool bOk = false;
+	if (!ResponseJson->TryGetBoolField(TEXT("ok"), bOk) || !bOk)
+	{
+		return;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObjectPtr = nullptr;
+	if (!ResponseJson->TryGetObjectField(TEXT("data"), DataObjectPtr) || !DataObjectPtr || !DataObjectPtr->IsValid())
+	{
+		return;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* ItemArray = nullptr;
+	if (!(*DataObjectPtr)->TryGetArrayField(TEXT("items"), ItemArray) || !ItemArray)
+	{
+		return;
+	}
+
+	OutItems.Reserve(ItemArray->Num());
+	for (const TSharedPtr<FJsonValue>& Value : *ItemArray)
+	{
+		const TSharedPtr<FJsonObject> ItemObject = Value.IsValid() ? Value->AsObject() : nullptr;
+		if (!ItemObject.IsValid())
+		{
+			continue;
+		}
+
+		FGuildShopItemInfo Item;
+		ItemObject->TryGetStringField(TEXT("id"), Item.Id);
+		ItemObject->TryGetStringField(TEXT("name"), Item.Name);
+		double Price = 0.0;
+		if (ItemObject->TryGetNumberField(TEXT("price"), Price))
+		{
+			Item.Price = FMath::Max<int64>(0, static_cast<int64>(Price));
+		}
+		if (!Item.Id.IsEmpty())
+		{
+			OutItems.Add(MoveTemp(Item));
+		}
+	}
+}
+
+/**
+ * 길드 상점 구매 응답({ok,data:{reward:{type,amount},...}})에서 보상 타입/수량을 파싱한다.
+ * 성공 시 true 와 OutType/OutAmount 를 채우며, ok≠true·reward 누락 시 false.
+ */
+bool GuildInstanceParseBuyReward(const FString& JsonBody, FString& OutType, int64& OutAmount)
+{
+	OutType.Reset();
+	OutAmount = 0;
+	if (JsonBody.IsEmpty())
+	{
+		return false;
+	}
+
+	TSharedPtr<FJsonObject> ResponseJson;
+	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(JsonBody);
+	if (!FJsonSerializer::Deserialize(Reader, ResponseJson) || !ResponseJson.IsValid())
+	{
+		return false;
+	}
+
+	bool bOk = false;
+	if (!ResponseJson->TryGetBoolField(TEXT("ok"), bOk) || !bOk)
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObjectPtr = nullptr;
+	if (!ResponseJson->TryGetObjectField(TEXT("data"), DataObjectPtr) || !DataObjectPtr || !DataObjectPtr->IsValid())
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>* RewardObjectPtr = nullptr;
+	if (!(*DataObjectPtr)->TryGetObjectField(TEXT("reward"), RewardObjectPtr) || !RewardObjectPtr || !RewardObjectPtr->IsValid())
+	{
+		return false;
+	}
+
+	const TSharedPtr<FJsonObject>& Reward = *RewardObjectPtr;
+	if (!Reward->TryGetStringField(TEXT("type"), OutType) || OutType.IsEmpty())
+	{
+		return false;
+	}
+
+	// amount 는 서버가 number 로 직렬화(소비형 소량). 숫자/문자열 모두 허용.
+	double AmountNumber = 0.0;
+	FString AmountString;
+	if (Reward->TryGetNumberField(TEXT("amount"), AmountNumber))
+	{
+		OutAmount = static_cast<int64>(AmountNumber);
+	}
+	else if (Reward->TryGetStringField(TEXT("amount"), AmountString))
+	{
+		OutAmount = FCString::Atoi64(*AmountString);
+	}
+	return true;
+}
 FPrimaryStats ClampPrimaryStats(const FPrimaryStats& Stats)
 {
 	return FPrimaryStats(
@@ -281,7 +397,11 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	if (Amount > 0)
 	{
 		EnsureBuffService();
-		const double GoldMultiplier = 1.0 + static_cast<double>(BuffService ? BuffService->GetGoldBuffPct(GetCurrentUnixSeconds()) : 0.0f);
+		EnsureGuildService();
+		// 길드 골드 버프는 소비 버프와 동일한 단일 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+		const double GoldBuffPct = static_cast<double>(BuffService ? BuffService->GetGoldBuffPct(GetCurrentUnixSeconds()) : 0.0f);
+		const double GuildGoldPct = static_cast<double>(GuildService ? GuildService->GetGuildBuff().GoldPct : 0.0f);
+		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct;
 		// (double)MAX_int64 * 배수는 int64 범위를 넘겨 RoundToInt64에서 오버플로(UB)하므로
 		// 범위 초과 시 EffectiveAmount를 MAX_int64로 포화시킨다(아래 합산 포화 로직과 정합).
 		const double ScaledAmount = static_cast<double>(Amount) * GoldMultiplier;
@@ -323,6 +443,8 @@ void UIdleGameInstance::SaveProgress()
 	if (UGameplayStatics::SaveGameToSlot(SaveGame, SaveSlotName, 0))
 	{
 		OnProgressSaved.Broadcast();
+		// 세이브 시점에 미플러시 자동 기여를 서버로 플러시(소속·pending>0 일 때만 동작).
+		FlushPendingGuildContribution();
 		if (!bCloudUploadSuppressed)
 		{
 			UploadToCloud();
@@ -639,8 +761,76 @@ void UIdleGameInstance::RefreshGuildSnapshot()
 			if (StrongInner->GuildService)
 			{
 				// 서버 권위 — 성공 시 스냅샷 캐시 갱신(무소속이면 false 로 캐시 비움).
-				StrongInner->GuildService->ParseSnapshotJson(bSuccess ? Body : FString());
+				const bool bParsed = StrongInner->GuildService->ParseSnapshotJson(bSuccess ? Body : FString());
+				// 재접속 동기화 직후 미플러시 자동 기여가 있으면 서버로 플러시(주간 상한 클램프).
+				if (bParsed && StrongInner->GuildService->GetPendingAutoContribution() > 0)
+				{
+					StrongInner->FlushPendingGuildContribution();
+				}
 			}
+		});
+	});
+}
+
+void UIdleGameInstance::FlushPendingGuildContribution()
+{
+	EnsureGuildService();
+	if (!ApiClient || !GuildService || !GuildService->HasGuild())
+	{
+		return;
+	}
+	if (GuildService->GetPendingAutoContribution() <= 0)
+	{
+		return;
+	}
+
+	const FString GuildId = GuildService->GetCachedGuildId();
+	if (GuildId.IsEmpty())
+	{
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			return;
+		}
+
+		StrongThis->EnsureGuildService();
+		if (!StrongThis->GuildService || !StrongThis->GuildService->HasGuild())
+		{
+			return;
+		}
+
+		// 주간 상한 클램프 후 소비. 0 이면 플러시 불필요.
+		const int64 Amount = StrongThis->GuildService->ConsumePendingAutoContribution();
+		if (Amount <= 0)
+		{
+			return;
+		}
+
+		StrongThis->ApiClient->GuildContribute(GuildId, CharacterId, Amount, [WeakThis, Amount](bool bSuccess, FString)
+		{
+			UIdleGameInstance* StrongInner = WeakThis.Get();
+			if (!StrongInner)
+			{
+				return;
+			}
+			StrongInner->EnsureGuildService();
+			if (!bSuccess)
+			{
+				// 실패 시 소비분을 되돌려 다음 기회에 재시도(유실 방지).
+				if (StrongInner->GuildService)
+				{
+					StrongInner->GuildService->AddPendingAutoContribution(Amount);
+				}
+				return;
+			}
+			// 성공 → 서버 권위 스냅샷 재동기화(레벨/버프/포인트 갱신).
+			StrongInner->RefreshGuildSnapshot();
 		});
 	});
 }
@@ -967,6 +1157,242 @@ void UIdleGameInstance::GuildPanelUpdateJoinMode(const FString& GuildId, EGuildJ
 	});
 }
 
+void UIdleGameInstance::GuildPanelAttendance(TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->GuildAttendance(GuildId, CharacterId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelDonate(int64 DonateGold, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	// 보유 골드 검증은 UI 가 선처리하지만, 안전하게 여기서도 클램프(음수/초과 거부).
+	if (!ApiClient || GuildId.IsEmpty() || DonateGold <= 0 || DonateGold > GetGold())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, DonateGold, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->GuildDonate(GuildId, CharacterId, DonateGold, [WeakThis, DonateGold, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString)
+		{
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					// 헌납분 골드 차감(서버 권위 — 성공 응답 후 로컬 재화 반영).
+					StrongInner->AddGold(-DonateGold);
+					StrongInner->RequestAutosave();
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::GuildPanelFetchShop(TFunction<void(bool, const TArray<FGuildShopItemInfo>&)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	if (!ApiClient || GuildId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false, TArray<FGuildShopItemInfo>());
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false, TArray<FGuildShopItemInfo>());
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->GetGuildShop(GuildId, CharacterId, [OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString Body)
+		{
+			TArray<FGuildShopItemInfo> Items;
+			if (bSuccess)
+			{
+				GuildInstanceParseShopResponse(Body, Items);
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess, Items);
+			}
+		});
+	});
+}
+
+void UIdleGameInstance::ApplyGuildShopReward(const FString& RewardType, int64 Amount)
+{
+	// 음수/0 보상은 지급하지 않는다(서버 카탈로그는 항상 양수지만 방어).
+	if (Amount <= 0)
+	{
+		return;
+	}
+
+	if (RewardType == TEXT("gold"))
+	{
+		// 골드: 펫/룬 보너스가 곱해지지 않는 직접 지급(정식 AddGold 경로).
+		AddGold(Amount);
+		return;
+	}
+	if (RewardType == TEXT("expPotion"))
+	{
+		// 경험치 물약: EXP 부스트 소비 아이템(WisdomBooster) 으로 누적(정식 AddConsumable 경로).
+		AddConsumable(EConsumableType::WisdomBooster, EConsumableGrade::Standard, static_cast<int32>(FMath::Min<int64>(Amount, MAX_int32)));
+		return;
+	}
+	if (RewardType == TEXT("essence"))
+	{
+		// 룬 에센스: 던전 Essence 보상과 동일한 오버플로 안전 누적 경로.
+		RuneEssence = RuneEssence > MAX_int64 - Amount ? MAX_int64 : RuneEssence + Amount;
+		RequestAutosave();
+		return;
+	}
+	if (RewardType == TEXT("protectionScroll"))
+	{
+		// 강화 보호서(#71 강화 재화): 실존 카운터에 오버플로 안전 누적.
+		ProtectionScrolls = ProtectionScrolls > MAX_int64 - Amount ? MAX_int64 : ProtectionScrolls + Amount;
+		RequestAutosave();
+		return;
+	}
+	if (RewardType == TEXT("resetCube"))
+	{
+		// 잠재 재설정 큐브(#71 잠재 재화): 실존 카운터에 오버플로 안전 누적.
+		ResetCubes = ResetCubes > MAX_int64 - Amount ? MAX_int64 : ResetCubes + Amount;
+		RequestAutosave();
+		return;
+	}
+	if (RewardType == TEXT("rankCube"))
+	{
+		// 잠재 등급 큐브(#71 잠재 재화): 실존 카운터에 오버플로 안전 누적.
+		RankCubes = RankCubes > MAX_int64 - Amount ? MAX_int64 : RankCubes + Amount;
+		RequestAutosave();
+		return;
+	}
+
+	// 알 수 없는 보상 타입은 무시(서버 카탈로그 확장 시 클라 미배선 케이스).
+	UE_LOG(LogTemp, Warning, TEXT("[GuildShop] 알 수 없는 보상 타입 무시: type=%s amount=%lld"), *RewardType, Amount);
+}
+
+void UIdleGameInstance::GuildPanelBuyShopItem(const FString& ItemId, TFunction<void(bool)> OnComplete)
+{
+	EnsureGuildService();
+	const FString GuildId = GuildService ? GuildService->GetCachedGuildId() : FString();
+	if (!ApiClient || GuildId.IsEmpty() || ItemId.IsEmpty())
+	{
+		if (OnComplete)
+		{
+			OnComplete(false);
+		}
+		return;
+	}
+
+	TWeakObjectPtr<UIdleGameInstance> WeakThis(this);
+	ApiClient->EnsureCharacter([WeakThis, GuildId, ItemId, OnComplete = MoveTemp(OnComplete)](bool bCharacterOk, FString CharacterId) mutable
+	{
+		UIdleGameInstance* StrongThis = WeakThis.Get();
+		if (!StrongThis || !StrongThis->ApiClient || !bCharacterOk || CharacterId.IsEmpty())
+		{
+			if (OnComplete)
+			{
+				OnComplete(false);
+			}
+			return;
+		}
+
+		StrongThis->ApiClient->BuyGuildShopItem(GuildId, CharacterId, ItemId, [WeakThis, OnComplete = MoveTemp(OnComplete)](bool bSuccess, FString Body)
+		{
+			// 성공 시 응답 본문(data.reward)을 파싱해 실제 보상을 캐릭터에 지급한 뒤
+			// 세이브/스냅샷을 갱신한다(포인트 차감은 서버 권위 — 스냅샷 재동기화로 반영).
+			if (UIdleGameInstance* StrongInner = WeakThis.Get())
+			{
+				if (bSuccess)
+				{
+					FString RewardType;
+					int64 RewardAmount = 0;
+					if (GuildInstanceParseBuyReward(Body, RewardType, RewardAmount))
+					{
+						StrongInner->ApplyGuildShopReward(RewardType, RewardAmount);
+						StrongInner->RequestAutosave();
+					}
+					StrongInner->RefreshGuildSnapshot();
+				}
+			}
+			if (OnComplete)
+			{
+				OnComplete(bSuccess);
+			}
+		});
+	});
+}
+
 bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 {
 	if (!SaveGame)
@@ -987,7 +1413,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureWeeklyBossService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 17;
+	SaveGame->SaveVersion = 18;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1103,9 +1529,29 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	{
 		FString GuildId;
 		uint8 GuildRank = 0;
-		GuildService->ExportSave(GuildId, GuildRank);
+		int32 GuildLevel = 1;
+		float GuildAttackPct = 0.0f;
+		float GuildGoldPct = 0.0f;
+		int64 ContributionPoints = 0;
+		int64 PendingAutoContribution = 0;
+		FString LastAttendanceDate;
+		GuildService->ExportSave(
+			GuildId,
+			GuildRank,
+			GuildLevel,
+			GuildAttackPct,
+			GuildGoldPct,
+			ContributionPoints,
+			PendingAutoContribution,
+			LastAttendanceDate);
 		SaveGame->CachedGuildId = GuildId;
 		SaveGame->CachedGuildRank = GuildRank;
+		SaveGame->CachedGuildLevel = GuildLevel;
+		SaveGame->CachedGuildAttackPct = GuildAttackPct;
+		SaveGame->CachedGuildGoldPct = GuildGoldPct;
+		SaveGame->CachedContributionPoints = ContributionPoints;
+		SaveGame->PendingAutoContribution = PendingAutoContribution;
+		SaveGame->LastGuildAttendanceDate = LastAttendanceDate;
 	}
 
 	return true;
@@ -1242,13 +1688,27 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 	EnsureGuildService();
 	if (GuildService)
 	{
-		if (SaveGame->SaveVersion >= 17)
+		if (SaveGame->SaveVersion >= 18)
 		{
-			GuildService->ImportSave(SaveGame->CachedGuildId, SaveGame->CachedGuildRank);
+			// v18+: 레벨/버프/포인트/pending/출석일 전체 복원(오프라인 버프 캐시 적용).
+			GuildService->ImportSave(
+				SaveGame->CachedGuildId,
+				SaveGame->CachedGuildRank,
+				SaveGame->CachedGuildLevel,
+				SaveGame->CachedGuildAttackPct,
+				SaveGame->CachedGuildGoldPct,
+				SaveGame->CachedContributionPoints,
+				SaveGame->PendingAutoContribution,
+				SaveGame->LastGuildAttendanceDate);
+		}
+		else if (SaveGame->SaveVersion >= 17)
+		{
+			// v17(PR-G1): 길드 id/rank 만 존재 → 무길드버프(레벨1·0%)로 복원. 서버 재동기화 시 갱신.
+			GuildService->ImportSave(SaveGame->CachedGuildId, SaveGame->CachedGuildRank, 1, 0.0f, 0.0f, 0, 0, FString());
 		}
 		else
 		{
-			GuildService->ImportSave(FString(), 0);
+			GuildService->ImportSave(FString(), 0, 1, 0.0f, 0.0f, 0, 0, FString());
 		}
 	}
 
@@ -1438,6 +1898,12 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type, int32 Tier
 		}
 		RequestAutosave();
 	}
+	// 길드 자동 기여: 던전 클리어당 소량 누적(플러시는 세이브/재접속 시).
+	EnsureGuildService();
+	if (GuildService)
+	{
+		GuildService->AddPendingAutoContribution(GuildAutoContributionPerDungeon);
+	}
 	RequestAutosave();
 	return Result;
 }
@@ -1456,6 +1922,12 @@ FWeeklyBossChallengeResult UIdleGameInstance::TryChallengeWeeklyBoss()
 	Result = WeeklyBossService->Challenge(Character->GetCombatPower(), UQuestService::GetCurrentUtcWeekString());
 	if (Result.bSuccess)
 	{
+		// 길드 자동 기여: 보스 도전당 소량 누적(플러시는 세이브/재접속 시).
+		EnsureGuildService();
+		if (GuildService)
+		{
+			GuildService->AddPendingAutoContribution(GuildAutoContributionPerBoss);
+		}
 		RequestAutosave();
 	}
 	return Result;

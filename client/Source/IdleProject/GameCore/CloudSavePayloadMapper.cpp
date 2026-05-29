@@ -73,6 +73,12 @@ bool FCloudSavePayloadMapper::SaveToPayloadJson(const UIdleSaveGame& SaveGame, F
 	Payload->SetNumberField(TEXT("weeklyBossClaimedMilestones"), FMath::Max(0, SaveGame.WeeklyBossClaimedMilestones));
 	Payload->SetStringField(TEXT("cachedGuildId"), SaveGame.CachedGuildId);
 	Payload->SetNumberField(TEXT("cachedGuildRank"), static_cast<int32>(SaveGame.CachedGuildRank));
+	Payload->SetNumberField(TEXT("cachedGuildLevel"), FMath::Max(1, SaveGame.CachedGuildLevel));
+	Payload->SetNumberField(TEXT("cachedGuildAttackPct"), static_cast<double>(FMath::Max(0.0f, SaveGame.CachedGuildAttackPct)));
+	Payload->SetNumberField(TEXT("cachedGuildGoldPct"), static_cast<double>(FMath::Max(0.0f, SaveGame.CachedGuildGoldPct)));
+	Payload->SetNumberField(TEXT("cachedContributionPoints"), static_cast<double>(FMath::Max<int64>(0, SaveGame.CachedContributionPoints)));
+	Payload->SetNumberField(TEXT("pendingAutoContribution"), static_cast<double>(FMath::Max<int64>(0, SaveGame.PendingAutoContribution)));
+	Payload->SetStringField(TEXT("lastGuildAttendanceDate"), SaveGame.LastGuildAttendanceDate);
 	const TArray<int32> MasteryLevels = ComputeMasteryLevels(SaveGame);
 	int64 WorldPower = 0;
 	TArray<TSharedPtr<FJsonValue>> MasteryLevelValues;
@@ -172,6 +178,30 @@ bool FCloudSavePayloadMapper::PayloadJsonToSave(const FString& PayloadJson, UIdl
 	if (Payload->TryGetNumberField(TEXT("cachedGuildRank"), NumericValue))
 	{
 		OutSaveGame.CachedGuildRank = static_cast<uint8>(FMath::Clamp(static_cast<int32>(NumericValue), 0, 3));
+	}
+	if (Payload->TryGetNumberField(TEXT("cachedGuildLevel"), NumericValue))
+	{
+		OutSaveGame.CachedGuildLevel = FMath::Max(1, static_cast<int32>(NumericValue));
+	}
+	if (Payload->TryGetNumberField(TEXT("cachedGuildAttackPct"), NumericValue))
+	{
+		OutSaveGame.CachedGuildAttackPct = FMath::Max(0.0f, static_cast<float>(NumericValue));
+	}
+	if (Payload->TryGetNumberField(TEXT("cachedGuildGoldPct"), NumericValue))
+	{
+		OutSaveGame.CachedGuildGoldPct = FMath::Max(0.0f, static_cast<float>(NumericValue));
+	}
+	if (Payload->TryGetNumberField(TEXT("cachedContributionPoints"), NumericValue))
+	{
+		OutSaveGame.CachedContributionPoints = FMath::Max<int64>(0, static_cast<int64>(NumericValue));
+	}
+	if (Payload->TryGetNumberField(TEXT("pendingAutoContribution"), NumericValue))
+	{
+		OutSaveGame.PendingAutoContribution = FMath::Max<int64>(0, static_cast<int64>(NumericValue));
+	}
+	if (Payload->TryGetStringField(TEXT("lastGuildAttendanceDate"), StringValue))
+	{
+		OutSaveGame.LastGuildAttendanceDate = StringValue;
 	}
 
 	return true;

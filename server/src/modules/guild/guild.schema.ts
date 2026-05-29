@@ -114,3 +114,63 @@ export const guildRankSchema = {
   },
   response: okResponse,
 } as const;
+
+// ── PR-G2: 기여/상점 ─────────────────────────────────────────────────────────
+
+const guildShopItemParams = {
+  type: "object",
+  required: ["id", "itemId"],
+  additionalProperties: false,
+  properties: { id: uuid, itemId: { type: "string", maxLength: 64 } },
+} as const;
+
+// 일일 출석(멤버 본인) — body 는 characterId 만.
+export const guildAttendanceSchema = {
+  params: guildIdParams,
+  body: characterBody,
+  response: okResponse,
+} as const;
+
+// 재화 헌납 — 클라 권위 골드(서버 미차감). 일일 상한으로 어뷰즈 억제.
+export const guildDonateSchema = {
+  params: guildIdParams,
+  body: {
+    type: "object",
+    required: ["characterId", "gold"],
+    additionalProperties: false,
+    properties: {
+      characterId: uuid,
+      gold: { type: "integer", minimum: 0 },
+    },
+  },
+  response: okResponse,
+} as const;
+
+// 전투/던전 자동 기여 델타 플러시 — 주간 상한 검증.
+export const guildContributeSchema = {
+  params: guildIdParams,
+  body: {
+    type: "object",
+    required: ["characterId", "amount"],
+    additionalProperties: false,
+    properties: {
+      characterId: uuid,
+      amount: { type: "integer", minimum: 0 },
+    },
+  },
+  response: okResponse,
+} as const;
+
+// 길드 상점 카탈로그 조회(멤버) — querystring 으로 characterId.
+export const guildShopSchema = {
+  params: guildIdParams,
+  querystring: characterBody,
+  response: okResponse,
+} as const;
+
+// 길드 상점 구매 — 포인트 차감 + 보상 반환(소비형).
+export const guildShopBuySchema = {
+  params: guildShopItemParams,
+  body: characterBody,
+  response: okResponse,
+} as const;
