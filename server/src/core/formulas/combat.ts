@@ -38,6 +38,17 @@ export function applyCrit(
   return isCrit ? baseDamage * Math.max(1, critDmg) : baseDamage;
 }
 
+/**
+ * 저주(Curse) 피해 증폭 - UE5 client CombatComponent::TakeDamageTyped 미러.
+ * 저주 활성 시 받는 피해를 (1 + curseMagnitude) 배로 증폭합니다. 저주가 없으면(0) 원본 피해를 그대로 반환합니다.
+ */
+export function applyCurseAmplification(
+  damage: number,
+  curseMagnitude: number,
+): number {
+  return damage * (1 + Math.max(0, curseMagnitude));
+}
+
 export type SkillElement =
   | "None"
   | "Fire"

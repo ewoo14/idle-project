@@ -320,6 +320,131 @@ bool FCombatStatusFreezeReapplyTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusCurseAmplifyTest,
+	"IdleProject.Combat.Status.CurseAmplifiesDamage",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusCurseAmplifyTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+
+	// 저주 활성: 받는 피해 +20% (100 -> 120)
+	Combat->ApplyStatus(ESkillStatusEffect::Curse, 4.0f, 0.2f, 10.0f);
+	TestTrue(TEXT("Curse is active after applying"), Combat->HasActiveStatus(ESkillStatusEffect::Curse));
+	TestEqual(TEXT("Curse magnitude is reported"), Combat->GetActiveStatusMagnitude(ESkillStatusEffect::Curse), 0.2f);
+
+	Combat->TakeDamageTyped(100.0f, Owner, false, EDamageKind::Physical);
+	TestEqual(TEXT("Curse amplifies incoming damage by magnitude"), Combat->CurrentHp, 880.0f);
+
+	// 만료 후 원복: 증폭 없는 100 피해
+	Combat->TickStatuses(15.0f);
+	TestFalse(TEXT("Expired curse is removed"), Combat->HasActiveStatus(ESkillStatusEffect::Curse));
+	TestEqual(TEXT("Removed curse no longer reports magnitude"), Combat->GetActiveStatusMagnitude(ESkillStatusEffect::Curse), 0.0f);
+
+	Combat->TakeDamageTyped(100.0f, Owner, false, EDamageKind::Physical);
+	TestEqual(TEXT("Damage returns to base after curse expiry"), Combat->CurrentHp, 780.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusCurseRegressionTest,
+	"IdleProject.Combat.Status.CurseAbsentDamageUnchanged",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusCurseRegressionTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f);
+
+	// 저주가 없으면 피해 불변(회귀)
+	TestEqual(TEXT("No curse reports zero magnitude"), Combat->GetActiveStatusMagnitude(ESkillStatusEffect::Curse), 0.0f);
+	Combat->TakeDamageTyped(100.0f, Owner, false, EDamageKind::Physical);
+	TestEqual(TEXT("Damage is unchanged without curse"), Combat->CurrentHp, 900.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCombatStatusCurseIndependentOfDoTTest,
+	"IdleProject.Combat.Status.CurseIndependentOfOtherStatuses",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCombatStatusCurseIndependentOfDoTTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* Combat = NewObject<UCombatComponent>(Owner);
+	Owner->AddInstanceComponent(Combat);
+	Combat->InitializeCombat(1000.0f, 10.0f, 0.0f, 2.0f);
+
+	// 저주 + 중독 + 빙결 동시 적용 -> 각각 독립 동작
+	Combat->ApplyStatus(ESkillStatusEffect::Curse, 5.0f, 0.5f, 10.0f);
+	Combat->ApplyStatus(ESkillStatusEffect::Poison, 5.0f, 4.0f, 10.0f);
+	Combat->ApplyStatus(ESkillStatusEffect::Freeze, 5.0f, 0.25f, 10.0f);
+
+	TestTrue(TEXT("Curse coexists with poison"), Combat->HasActiveStatus(ESkillStatusEffect::Curse));
+	TestTrue(TEXT("Poison coexists with curse"), Combat->HasActiveStatus(ESkillStatusEffect::Poison));
+	TestTrue(TEXT("Freeze coexists with curse"), Combat->HasActiveStatus(ESkillStatusEffect::Freeze));
+
+	// 빙결 슬로우는 저주와 독립으로 적용
+	Combat->TickStatuses(10.0f);
+	TestEqual(TEXT("Freeze slow applies independently of curse"), Combat->AtkSpeed, 1.5f);
+
+	// 중독 DoT 1틱(4) 도 저주 50% 증폭을 받아 6 피해
+	Combat->TickStatuses(11.0f);
+	TestEqual(TEXT("Poison DoT tick is amplified by active curse"), Combat->CurrentHp, 994.0f);
+
+	// 직접 피해도 저주 증폭(100 -> 150)
+	Combat->TakeDamageTyped(100.0f, Owner, false, EDamageKind::Physical);
+	TestEqual(TEXT("Direct damage amplified by curse alongside other statuses"), Combat->CurrentHp, 844.0f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillDarkCurseApplicationTest,
+	"IdleProject.Combat.Skills.DarkSkillAppliesCurse",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillDarkCurseApplicationTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AIdleMonster* Target = NewObject<AIdleMonster>();
+	UCombatComponent* TargetCombat = Target->GetCombat();
+	TestNotNull(TEXT("Monster combat component exists"), TargetCombat);
+	if (!TargetCombat)
+	{
+		return false;
+	}
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.5f);
+	TargetCombat->InitializeCombat(1000.0f, 10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.5f);
+
+	// Thief 의 Shadow Stab(Dark)이 적중 시 저주를 부여
+	Skills->LoadDefaultThiefSkills();
+	Skills->MarkSkillCast(TEXT("smoke_bomb"), 10.0f);
+	Skills->MarkSkillCast(TEXT("backstab"), 10.0f);
+
+	TArray<AActor*> AoeTargets;
+	Skills->TickSkills(10.0f, Target, AoeTargets);
+
+	TestTrue(TEXT("Dark skill applies curse status"), TargetCombat->HasActiveStatus(ESkillStatusEffect::Curse));
+	TestEqual(TEXT("Curse magnitude matches Dark skill definition"), TargetCombat->GetActiveStatusMagnitude(ESkillStatusEffect::Curse), 0.2f);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSkillElementStatusApplicationTest,
 	"IdleProject.Combat.Skills.ElementStatusApplication",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -956,7 +1081,7 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 
 	Skills->LoadDefaultThiefSkills();
 	const TArray<FExpectedSkillDefinition> ThiefSkills = {
-		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 3.0f, ESkillElement::Dark},
+		{TEXT("shadow_stab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageSingle, 3.0f, 2.3f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Curse, 4.0f, 0.2f, ESkillElement::Dark},
 		{TEXT("smoke_bomb"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None},
 		{TEXT("evasion_stance"), EClassId::Thief, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f, 0.0f, 0.0f},
 		{TEXT("backstab"), EClassId::Thief, ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f, 0.0f, 0.0f},
@@ -1031,7 +1156,7 @@ bool FSkillDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("spirit_bolt"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageSingle, 3.2f, 1.9f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.5f, ESkillElement::None},
 		{TEXT("familiar_swarm"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None},
 		{TEXT("arcane_binding"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f, 0.0f, 0.0f},
-		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.2f, ESkillElement::Dark},
+		{TEXT("void_call"), EClassId::Summoner, ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Curse, 3.0f, 0.15f, ESkillElement::Dark},
 		{TEXT("pact_mastery"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f, 0.0f, 0.0f},
 		{TEXT("spirit_reservoir"), EClassId::Summoner, ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f},
 		{TEXT("grand_familiar"), EClassId::Summoner, ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning},

@@ -101,6 +101,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat|Status")
 	bool HasActiveStatus(ESkillStatusEffect Type) const;
 
+	/** 지정한 상태가 활성일 때 가장 강한 Magnitude를 반환합니다(없으면 0). 저주 피해 증폭 등에서 사용합니다. */
+	UFUNCTION(BlueprintPure, Category = "Idle|Combat|Status")
+	float GetActiveStatusMagnitude(ESkillStatusEffect Type) const;
+
 	const TArray<FActiveSkillStatus>& GetActiveStatuses() const { return ActiveStatuses; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Combat")
