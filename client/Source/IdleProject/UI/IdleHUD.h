@@ -910,6 +910,30 @@ struct IDLEPROJECT_API FIdleHUDMasteryPanelViewModel
 	TArray<FIdleHUDMasteryTrackRowViewModel> Rows;
 };
 
+// 칭호 패널 행 뷰모델. 해금 칭호는 장착/해제 버튼, 미해금은 해금 조건/진행을 표시한다.
+struct IDLEPROJECT_API FIdleHUDTitleRowViewModel
+{
+	FString TitleId;
+	FText Name;
+	FText BonusLabel;
+	FText StatusLabel;
+	FText ConditionLabel;
+	FText ProgressLabel;
+	FText ActionLabel;
+	float ProgressRatio = 0.0f;
+	bool bUnlocked = false;
+	bool bEquipped = false;
+	// 장착 가능(해금 && 미장착) — 장착 버튼 활성.
+	bool bCanEquip = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDTitlePanelViewModel
+{
+	FText Title;
+	FText EquippedLabel;
+	TArray<FIdleHUDTitleRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -949,6 +973,7 @@ IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 
 IDLEPROJECT_API FIdleHUDDungeonPanelViewModel BuildDungeonPanelViewModel(const UDungeonService& DungeonService, int64 CombatPower, const FString& TodayUtc);
 IDLEPROJECT_API FIdleHUDAchievementViewModel BuildAchievementViewModel(const UAchievementService& AchievementService);
 IDLEPROJECT_API FIdleHUDMasteryPanelViewModel BuildMasteryPanelViewModel(const UMasteryService& MasteryService);
+IDLEPROJECT_API FIdleHUDTitlePanelViewModel BuildTitlePanelViewModel(const UTitleService& TitleService, const UAchievementService& AchievementService);
 IDLEPROJECT_API FText BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
 IDLEPROJECT_API FIdleHUDCloudSyncViewModel BuildCloudSyncViewModel(ECloudSyncState State);
@@ -1146,6 +1171,10 @@ private:
 	void EquipPetFromHitBox(FName BoxName);
 	void TryFeedPetFromHitBox(FName BoxName);
 	void TryEvolvePetFromHitBox(FName BoxName);
+	void DrawTitlePanel();
+	void DrawTitleRow(const FIdleHUDTitleRowViewModel& Row, float X, float Y, float Width, float Height);
+	void EquipTitleFromHitBox(FName BoxName);
+	void UnequipTitleAction();
 	void DrawSeasonPassPanel();
 	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimSeasonTierFromHitBox(FName BoxName);

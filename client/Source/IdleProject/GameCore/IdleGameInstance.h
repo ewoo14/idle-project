@@ -15,6 +15,7 @@
 #include "GameCore/QuestService.h"
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
+#include "GameCore/TitleService.h"
 #include "GameCore/TowerService.h"
 #include "GameCore/WeeklyBossTypes.h"
 #include "ItemSystem/ItemTypes.h"
@@ -172,6 +173,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UMasteryService* GetMasteryService() const { return MasteryService; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UTitleService* GetTitleService() const { return TitleService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	ULeaderboardService* GetLeaderboardService() const { return LeaderboardService; }
@@ -468,6 +472,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
 	float GetMasteryCoreStatMultiplier() const;
 
+	// 장착 칭호 AllStatPct 보너스를 곱 배수(1.0 + value)로 반환. 미장착/타 타입=1.0. 캐릭터 스탯 단일 적용 지점에서만 사용.
+	UFUNCTION(BlueprintPure, Category = "Idle|Title")
+	float GetTitleAllStatMultiplier() const;
+
+	// 장착 칭호 CritDmgPct 보너스를 가산값(비율)으로 반환. 미장착/타 타입=0.0. CritDmg 단일 가산 지점에서만 사용.
+	UFUNCTION(BlueprintPure, Category = "Idle|Title")
+	float GetTitleCritDamageBonus() const;
+
+	// 칭호 장착/해제 진입점. 성공 시 캐릭터 스탯 갱신 + 자동 저장 요청.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Title")
+	bool EquipTitle(const FString& TitleId);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Title")
+	void UnequipTitle();
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Achievement")
 	int32 GetAchievementTotalPoints() const;
 
@@ -638,6 +657,9 @@ private:
 	TObjectPtr<UMasteryService> MasteryService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UTitleService> TitleService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<ULeaderboardService> LeaderboardService;
 
 	UPROPERTY(Transient)
@@ -743,6 +765,9 @@ private:
 	void EnsureRuneService();
 	void EnsureAchievementService();
 	void EnsureMasteryService();
+	void EnsureTitleService();
+	// 업적 메트릭 갱신/로그인/세이브 시 호출 — 달성한 칭호를 영구 해금한다(AchievementService 기준).
+	void RecomputeUnlockedTitles();
 	void EnsureLeaderboardService();
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();

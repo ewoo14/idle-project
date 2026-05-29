@@ -486,6 +486,7 @@ void UIdleGameInstance::Init()
 	EnsureRuneService();
 	EnsureAchievementService();
 	EnsureMasteryService();
+	EnsureTitleService();
 	EnsureLeaderboardService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
@@ -521,6 +522,7 @@ void UIdleGameInstance::Shutdown()
 	RuneService = nullptr;
 	AchievementService = nullptr;
 	MasteryService = nullptr;
+	TitleService = nullptr;
 	LeaderboardService = nullptr;
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
@@ -557,10 +559,14 @@ void UIdleGameInstance::AddGold(int64 Amount)
 	{
 		EnsureBuffService();
 		EnsureGuildService();
+		EnsureTitleService();
 		// 길드 골드 버프는 소비 버프와 동일한 단일 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
 		const double GoldBuffPct = static_cast<double>(BuffService ? BuffService->GetGoldBuffPct(GetCurrentUnixSeconds()) : 0.0f);
 		const double GuildGoldPct = static_cast<double>(GuildService ? GuildService->GetGuildBuff().GoldPct : 0.0f);
-		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct;
+		// 칭호 GoldPct 도 같은 단일 골드획득 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+		const FTitleBonus TitleBonus = TitleService ? TitleService->GetEquippedTitleBonus() : FTitleBonus();
+		const double TitleGoldPct = TitleBonus.Type == ETitleBonus::GoldPct ? static_cast<double>(TitleBonus.Value) : 0.0;
+		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct + TitleGoldPct;
 		// (double)MAX_int64 * 배수는 int64 범위를 넘겨 RoundToInt64에서 오버플로(UB)하므로
 		// 범위 초과 시 EffectiveAmount를 MAX_int64로 포화시킨다(아래 합산 포화 로직과 정합).
 		const double ScaledAmount = static_cast<double>(Amount) * GoldMultiplier;
@@ -1712,11 +1718,12 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureSeasonService();
 	EnsureAchievementService();
 	EnsureMasteryService();
+	EnsureTitleService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 20;
+	SaveGame->SaveVersion = 21;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1813,6 +1820,17 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	if (MasteryService)
 	{
 		SaveGame->Mastery = MasteryService->ExportSave();
+	}
+
+	if (TitleService)
+	{
+		// 세이브 시점에도 최신 메트릭 기준 해금 재계산(누락 방지).
+		if (AchievementService)
+		{
+			TitleService->RecomputeUnlocked(AchievementService);
+		}
+		SaveGame->UnlockedTitleIds = TitleService->GetUnlockedTitleIds();
+		SaveGame->EquippedTitleId = TitleService->GetEquippedTitleId();
 	}
 
 	if (BuffService)
@@ -2090,6 +2108,17 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		EnsureQuestService();
 		EnsureSeasonService();
 		EnsureAchievementService();
+	}
+
+	EnsureTitleService();
+	if (TitleService)
+	{
+		// SaveVer 21+ 만 칭호 해금/장착 복원, 이전 버전은 빈 값(회귀 안전).
+		const TSet<FString> RestoredUnlocked = SaveGame->SaveVersion >= 21 ? SaveGame->UnlockedTitleIds : TSet<FString>();
+		const FString RestoredEquipped = SaveGame->SaveVersion >= 21 ? SaveGame->EquippedTitleId : FString();
+		TitleService->RestoreState(RestoredUnlocked, RestoredEquipped);
+		// 로그인 시 현재 메트릭 기준으로 누락 해금 보강(레거시 세이브 마이그레이션 포함).
+		RecomputeUnlockedTitles();
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -2859,10 +2888,15 @@ void UIdleGameInstance::AddExp(int64 Amount)
 
 	EnsureBuffService();
 	EnsureMasteryService();
+	EnsureTitleService();
+	// 칭호 ExpPct 도 같은 단일 EXP 배수 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+	const FTitleBonus TitleExpBonus = TitleService ? TitleService->GetEquippedTitleBonus() : FTitleBonus();
+	const double TitleExpPct = TitleExpBonus.Type == ETitleBonus::ExpPct ? static_cast<double>(TitleExpBonus.Value) : 0.0;
 	const double ExpMultiplier =
 		1.0
 		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f)
-		+ static_cast<double>(MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f);
+		+ static_cast<double>(MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f)
+		+ TitleExpPct;
 	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
@@ -3064,6 +3098,52 @@ float UIdleGameInstance::GetMasteryCoreStatMultiplier() const
 	return MasteryService ? MasteryService->GetGlobalBonus().CoreStatMultiplier : 1.0f;
 }
 
+float UIdleGameInstance::GetTitleAllStatMultiplier() const
+{
+	if (!TitleService)
+	{
+		return 1.0f;
+	}
+	const FTitleBonus Bonus = TitleService->GetEquippedTitleBonus();
+	return Bonus.Type == ETitleBonus::AllStatPct ? 1.0f + Bonus.Value : 1.0f;
+}
+
+float UIdleGameInstance::GetTitleCritDamageBonus() const
+{
+	if (!TitleService)
+	{
+		return 0.0f;
+	}
+	const FTitleBonus Bonus = TitleService->GetEquippedTitleBonus();
+	return Bonus.Type == ETitleBonus::CritDmgPct ? Bonus.Value : 0.0f;
+}
+
+bool UIdleGameInstance::EquipTitle(const FString& TitleId)
+{
+	EnsureTitleService();
+	if (!TitleService || !TitleService->EquipTitle(TitleId))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+void UIdleGameInstance::UnequipTitle()
+{
+	EnsureTitleService();
+	if (!TitleService)
+	{
+		return;
+	}
+
+	TitleService->UnequipTitle();
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+}
+
 int32 UIdleGameInstance::GetAchievementTotalPoints() const
 {
 	return AchievementService ? AchievementService->GetTotalPoints() : 0;
@@ -3203,6 +3283,8 @@ void UIdleGameInstance::RecordAchievementMetric(EAchievementMetric Metric, int64
 	if (AchievementService)
 	{
 		AchievementService->RecordMetric(Metric, AmountOrValue);
+		// 메트릭 갱신 직후 칭호 해금 재계산(영구 해금 — 추가 only).
+		RecomputeUnlockedTitles();
 	}
 }
 
@@ -3212,6 +3294,8 @@ void UIdleGameInstance::RecordAchievementItemCollected(const FItemInstance& Item
 	if (AchievementService)
 	{
 		AchievementService->RecordItemCollected(Item.ItemId);
+		// 수집 메트릭(ItemsCollected/UniqueItemsFound) 갱신 → 칭호 해금 재계산.
+		RecomputeUnlockedTitles();
 	}
 }
 
@@ -3736,6 +3820,25 @@ void UIdleGameInstance::EnsureMasteryService()
 	{
 		MasteryService = NewObject<UMasteryService>(this);
 		MasteryService->Initialize();
+	}
+}
+
+void UIdleGameInstance::EnsureTitleService()
+{
+	if (!TitleService)
+	{
+		TitleService = NewObject<UTitleService>(this);
+		TitleService->InitializeDefaultTitles();
+	}
+}
+
+void UIdleGameInstance::RecomputeUnlockedTitles()
+{
+	EnsureTitleService();
+	EnsureAchievementService();
+	if (TitleService && AchievementService)
+	{
+		TitleService->RecomputeUnlocked(AchievementService);
 	}
 }
 
