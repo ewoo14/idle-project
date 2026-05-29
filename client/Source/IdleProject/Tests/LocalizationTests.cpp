@@ -248,6 +248,52 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TestTrue(*FString::Printf(TEXT("UI English contains required cloud sync key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
 		}
+
+		if (TableName == TEXT("Story"))
+		{
+			const TArray<FString> RequiredChapter5StoryKeys = {
+				TEXT("STORY_CHAPTER_05_TITLE"),
+				TEXT("STORY_CHAPTER_05_SUMMARY"),
+				TEXT("STORY_MAP_C05_M01_NAME"),
+				TEXT("STORY_MAP_C05_M01_SUMMARY"),
+				TEXT("STORY_MAP_C05_M05_NAME"),
+				TEXT("STORY_MAP_C05_M05_SUMMARY"),
+				TEXT("STORY_MAP_C05_M10_NAME"),
+				TEXT("STORY_MAP_C05_M10_SUMMARY"),
+				TEXT("STORY_ELITE_C05_VOID_HERALD_NAME"),
+				TEXT("STORY_ELITE_C05_VOID_HERALD_SUMMARY"),
+				TEXT("STORY_BOSS_C05_VERKAS_TRUE_NAME"),
+				TEXT("STORY_BOSS_C05_VERKAS_TRUE_SUMMARY"),
+				TEXT("STORY_VOIDHEART_SUMMARY"),
+			};
+
+			for (const FString& RequiredKey : RequiredChapter5StoryKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("Story Korean contains required chapter 5 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("Story English contains required chapter 5 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+		}
+
+		if (TableName == TEXT("StoryText"))
+		{
+			const TArray<FString> RequiredChapter5StoryTextKeys = {
+				TEXT("STORY_C05_M01_INTRO_01"),
+				TEXT("STORY_C05_M01_CLEAR_01"),
+				TEXT("STORY_C05_M05_ELITE_01"),
+				TEXT("STORY_C05_M05_ELITE_02"),
+				TEXT("STORY_C05_M05_CLEAR_01"),
+				TEXT("STORY_C05_M10_BOSS_01"),
+				TEXT("STORY_C05_M10_BOSS_02"),
+				TEXT("STORY_C05_M10_CLEAR_01"),
+				TEXT("STORY_C05_M10_CLEAR_02"),
+			};
+
+			for (const FString& RequiredKey : RequiredChapter5StoryTextKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("StoryText Korean contains required chapter 5 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("StoryText English contains required chapter 5 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+		}
 	}
 
 	return true;
