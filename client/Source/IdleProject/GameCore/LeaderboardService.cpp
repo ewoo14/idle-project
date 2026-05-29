@@ -12,7 +12,7 @@ bool DeserializeObject(const FString& JsonBody, TSharedPtr<FJsonObject>& OutObje
 	return FJsonSerializer::Deserialize(Reader, OutObject) && OutObject.IsValid();
 }
 
-bool IsOkEnvelope(const TSharedPtr<FJsonObject>& JsonObject)
+bool IsOkLeaderboardEnvelope(const TSharedPtr<FJsonObject>& JsonObject)
 {
 	bool bOk = false;
 	return JsonObject.IsValid() && JsonObject->TryGetBoolField(TEXT("ok"), bOk) && bOk;
@@ -67,7 +67,7 @@ TArray<FLeaderboardEntry> ULeaderboardService::ParseListJson(const FString& Json
 	TSharedPtr<FJsonObject> ResponseJson;
 	const TArray<TSharedPtr<FJsonValue>>* DataArray = nullptr;
 	if (DeserializeObject(JsonBody, ResponseJson)
-		&& IsOkEnvelope(ResponseJson)
+		&& IsOkLeaderboardEnvelope(ResponseJson)
 		&& ResponseJson->TryGetArrayField(TEXT("data"), DataArray)
 		&& DataArray)
 	{
@@ -100,7 +100,7 @@ FLeaderboardEntry ULeaderboardService::ParseMyRankJson(const FString& JsonBody, 
 	TSharedPtr<FJsonObject> ResponseJson;
 	const TSharedPtr<FJsonObject>* DataObject = nullptr;
 	if (DeserializeObject(JsonBody, ResponseJson)
-		&& IsOkEnvelope(ResponseJson)
+		&& IsOkLeaderboardEnvelope(ResponseJson)
 		&& ResponseJson->TryGetObjectField(TEXT("data"), DataObject)
 		&& DataObject
 		&& DataObject->IsValid())
