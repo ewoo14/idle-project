@@ -934,6 +934,32 @@ struct IDLEPROJECT_API FIdleHUDTitlePanelViewModel
 	TArray<FIdleHUDTitleRowViewModel> Rows;
 };
 
+// 미션 패널 행 뷰모델. 미션별 목표 설명·진행 바·보상·수령 버튼 상태를 담는다.
+struct IDLEPROJECT_API FIdleHUDMissionRowViewModel
+{
+	FString MissionId;
+	FText ObjectiveLabel;   // 메트릭 표시명 + 목표치(예: "몬스터 처치 100")
+	FText ProgressLabel;    // 현재/목표(예: "40 / 100")
+	FText RewardLabel;      // 보상 타입 + 값(예: "골드 +5,000")
+	FText ActionLabel;      // 수령/수령완료
+	float ProgressRatio = 0.0f;
+	bool bCompleted = false;
+	bool bClaimed = false;
+	// 수령 가능(완료 && 미수령) — 수령 버튼 활성.
+	bool bCanClaim = false;
+};
+
+// 미션 패널 뷰모델. 선택된 기간(일일/주간) 탭에 해당하는 미션 행만 담는다.
+struct IDLEPROJECT_API FIdleHUDMissionPanelViewModel
+{
+	FText Title;
+	FText DailyTabLabel;
+	FText WeeklyTabLabel;
+	FText EmptyLabel;
+	EMissionPeriod ActivePeriod = EMissionPeriod::Daily;
+	TArray<FIdleHUDMissionRowViewModel> Rows;
+};
+
 namespace IdleProject::UI
 {
 IDLEPROJECT_API FText RarityToLabel(EItemRarity Rarity);
@@ -974,6 +1000,7 @@ IDLEPROJECT_API FIdleHUDDungeonPanelViewModel BuildDungeonPanelViewModel(const U
 IDLEPROJECT_API FIdleHUDAchievementViewModel BuildAchievementViewModel(const UAchievementService& AchievementService);
 IDLEPROJECT_API FIdleHUDMasteryPanelViewModel BuildMasteryPanelViewModel(const UMasteryService& MasteryService);
 IDLEPROJECT_API FIdleHUDTitlePanelViewModel BuildTitlePanelViewModel(const UTitleService& TitleService, const UAchievementService& AchievementService);
+IDLEPROJECT_API FIdleHUDMissionPanelViewModel BuildMissionPanelViewModel(const UMissionService& MissionService, EMissionPeriod ActivePeriod);
 IDLEPROJECT_API FText BuildAchievementUnlockedFeedbackLabel(const FString& AchievementId, int32 Tier);
 IDLEPROJECT_API FText BuildProgressSavedFeedbackLabel();
 IDLEPROJECT_API FIdleHUDCloudSyncViewModel BuildCloudSyncViewModel(ECloudSyncState State);
@@ -1175,6 +1202,10 @@ private:
 	void DrawTitleRow(const FIdleHUDTitleRowViewModel& Row, float X, float Y, float Width, float Height);
 	void EquipTitleFromHitBox(FName BoxName);
 	void UnequipTitleAction();
+	void DrawMissionPanel();
+	void DrawMissionRow(const FIdleHUDMissionRowViewModel& Row, float X, float Y, float Width, float Height);
+	void SelectMissionPeriod(EMissionPeriod Period);
+	void ClaimMissionFromHitBox(FName BoxName);
 	void DrawSeasonPassPanel();
 	void DrawSeasonTierRow(const FIdleHUDSeasonTierRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimSeasonTierFromHitBox(FName BoxName);
@@ -1222,6 +1253,8 @@ private:
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
 	bool bLeaderboardLoading = false;
+	// 미션 패널 선택 탭(일일/주간) — 표시 전용 로컬 상태.
+	EMissionPeriod SelectedMissionPeriod = EMissionPeriod::Daily;
 	int32 SelectedRuneOwnedIndex = INDEX_NONE;
 	int32 RuneTransferTargetOwnedIndex = INDEX_NONE;
 	FText RuneActionFeedbackLabel;
