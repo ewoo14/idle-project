@@ -626,6 +626,42 @@ struct IDLEPROJECT_API FIdleHUDRuneOwnedRowViewModel
 	bool bCanDisenchant = false;
 };
 
+struct IDLEPROJECT_API FIdleHUDRuneActionViewModel
+{
+	int32 SourceOwnedIndex = INDEX_NONE;
+	int32 TransferTargetOwnedIndex = INDEX_NONE;
+	bool bHasSelection = false;
+	bool bIsMythic = false;
+
+	FText TitleLabel;
+	FText CurrentSetLabel;
+	FText RerollCostLabel;
+	FText RerollActionLabel;
+	FText UpgradeInfoLabel;
+	FText UpgradeActionLabel;
+	FText TransferTargetLabel;
+	FText TransferCostLabel;
+	FText TransferActionLabel;
+	FText TransferCycleLabel;
+	FText EmptyLabel;
+
+	FName RerollHitBoxName;
+	FName UpgradeHitBoxName;
+	FName TransferHitBoxName;
+	FName TransferCycleHitBoxName;
+
+	int64 RerollEssenceCost = 0;
+	int64 UpgradeEssenceCost = 0;
+	int64 UpgradeGoldCost = 0;
+	int64 TransferEssenceCost = 0;
+	float UpgradeChance = 0.0f;
+
+	bool bCanReroll = false;
+	bool bCanUpgrade = false;
+	bool bCanTransfer = false;
+	bool bCanCycleTarget = false;
+};
+
 struct IDLEPROJECT_API FIdleHUDRuneSetRowViewModel
 {
 	ERuneSet RuneSet = ERuneSet::None;
@@ -665,6 +701,7 @@ struct IDLEPROJECT_API FIdleHUDRuneViewModel
 	TArray<FIdleHUDRuneOwnedRowViewModel> OwnedRows;
 	FText SetTitle;
 	TArray<FIdleHUDRuneSetRowViewModel> SetRows;
+	FIdleHUDRuneActionViewModel Action;
 };
 
 struct IDLEPROJECT_API FIdleHUDRuneCodexCellViewModel
@@ -898,7 +935,7 @@ IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(c
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
 IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems, bool bRankingsView, bool bRankingsLoading, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking);
-IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex);
+IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex, int32 TransferTargetOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
@@ -1053,11 +1090,18 @@ private:
 	void DrawRuneSetRow(const FIdleHUDRuneSetRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawRuneSlot(const FIdleHUDRuneSlotViewModel& Slot, float X, float Y, float Width, float Height);
 	void DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float X, float Y, float Width, float Height);
+	void DrawRuneActionSection(const FIdleHUDRuneActionViewModel& Action, float X, float Y, float Width, float Height);
 	void SelectRuneFromHitBox(FName BoxName);
 	void EquipSelectedRuneFromHitBox(FName BoxName);
 	void UnequipRuneFromHitBox(FName BoxName);
 	void TryEnhanceRuneFromHitBox(FName BoxName);
 	void TryDisenchantRuneFromHitBox(FName BoxName);
+	void TryRerollRuneSetAction();
+	void TryUpgradeRuneRarityAction();
+	void TryTransferRuneEnhancementAction();
+	void CycleRuneTransferTarget();
+	int32 ResolveRuneTransferTargetIndex() const;
+	void SetRuneActionFeedback(const TCHAR* Key, bool bSuccess);
 	void TryBuyRuneRoll();
 	void TryCraftClassRune();
 	void DrawEnhancePanel();
@@ -1144,6 +1188,10 @@ private:
 	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
 	bool bLeaderboardLoading = false;
 	int32 SelectedRuneOwnedIndex = INDEX_NONE;
+	int32 RuneTransferTargetOwnedIndex = INDEX_NONE;
+	FText RuneActionFeedbackLabel;
+	bool bRuneActionFeedbackSuccess = false;
+	float RuneActionFeedbackStartTime = -1000.0f;
 	float BossSpecialAttackStartTime = -1000.0f;
 	float StageFeedbackStartTime = -1000.0f;
 	float TowerFeedbackStartTime = -1000.0f;

@@ -78,6 +78,10 @@ const FName ShopResetCubeHitBoxName(TEXT("ShopResetCube"));
 const FName ShopRankCubeHitBoxName(TEXT("ShopRankCube"));
 const FName ShopRuneRollHitBoxName(TEXT("ShopRuneRoll"));
 const FName CraftClassRuneHitBoxName(TEXT("CraftClassRune"));
+const FName RuneRerollSetHitBoxName(TEXT("RuneRerollSet"));
+const FName RuneUpgradeRarityHitBoxName(TEXT("RuneUpgradeRarity"));
+const FName RuneTransferHitBoxName(TEXT("RuneTransfer"));
+const FName RuneTransferCycleHitBoxName(TEXT("RuneTransferCycle"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
 // 길드 패널(PR-G1) — 고유 prefix(Guild~)로 jumbo ODR 회피.
@@ -2585,7 +2589,7 @@ FIdleHUDGuildPanelViewModel IdleProject::UI::BuildGuildPanelViewModel(const UGui
 	return ViewModel;
 }
 
-FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex)
+FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex, int32 TransferTargetOwnedIndex)
 {
 	FIdleHUDRuneViewModel ViewModel;
 	ViewModel.Title = RuneText(TEXT("RUNE_PANEL_TITLE"));
@@ -2761,6 +2765,116 @@ FIdleHUDRuneViewModel IdleProject::UI::BuildRuneViewModel(const URuneService& Ru
 		Row.bCanEnhance = ViewModel.RuneEssence >= Row.EnhanceEssenceCost && ViewModel.Gold >= Row.EnhanceGoldCost;
 		Row.bCanDisenchant = !Row.bEquipped && Row.DisenchantEssence > 0;
 		ViewModel.OwnedRows.Add(Row);
+	}
+
+	// 선택 룬 액션(세트 리롤 / 등급 상승 / 강화 전송) — 룬 확장4.
+	FIdleHUDRuneActionViewModel& Action = ViewModel.Action;
+	Action.TitleLabel = RuneText(TEXT("RUNE_ACTION_SECTION_TITLE"));
+	Action.EmptyLabel = RuneText(TEXT("RUNE_ACTION_NO_SELECTION"));
+	Action.RerollHitBoxName = RuneRerollSetHitBoxName;
+	Action.UpgradeHitBoxName = RuneUpgradeRarityHitBoxName;
+	Action.TransferHitBoxName = RuneTransferHitBoxName;
+	Action.TransferCycleHitBoxName = RuneTransferCycleHitBoxName;
+	Action.RerollActionLabel = RuneText(TEXT("RUNE_ACTION_REROLL_SET"));
+	Action.UpgradeActionLabel = RuneText(TEXT("RUNE_ACTION_UPGRADE_RARITY"));
+	Action.TransferActionLabel = RuneText(TEXT("RUNE_ACTION_TRANSFER"));
+	Action.TransferCycleLabel = RuneText(TEXT("RUNE_TRANSFER_CYCLE"));
+	Action.SourceOwnedIndex = SelectedOwnedIndex;
+	Action.bHasSelection = OwnedRunes.IsValidIndex(SelectedOwnedIndex);
+
+	if (Action.bHasSelection)
+	{
+		const FRuneInstance& Source = OwnedRunes[SelectedOwnedIndex];
+
+		// 세트 리롤
+		Action.CurrentSetLabel = FormatLocalizedRune(TEXT("RUNE_CURRENT_SET_FORMAT"), [&Source](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Set"), RuneSetToLabel(Source.RuneSet));
+		});
+		Action.RerollEssenceCost = FRuneFormula::GetRerollSetEssenceCost(Source.Rarity);
+		Action.RerollCostLabel = FormatLocalizedRune(TEXT("RUNE_REROLL_COST_FORMAT"), [&Action](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Action.RerollEssenceCost)));
+		});
+		Action.bCanReroll = Action.RerollEssenceCost > 0 && ViewModel.RuneEssence >= Action.RerollEssenceCost;
+
+		// 등급 상승 시도
+		Action.bIsMythic = Source.Rarity >= EItemRarity::Mythic;
+		Action.UpgradeEssenceCost = FRuneFormula::GetRarityUpgradeEssenceCost(Source.Rarity);
+		Action.UpgradeGoldCost = FRuneFormula::GetRarityUpgradeGoldCost(Source.Rarity);
+		Action.UpgradeChance = FRuneFormula::GetRarityUpgradeChance(Source.Rarity);
+		if (Action.bIsMythic)
+		{
+			Action.UpgradeInfoLabel = RuneText(TEXT("RUNE_UPGRADE_MAX"));
+			Action.bCanUpgrade = false;
+		}
+		else
+		{
+			const EItemRarity NextRarity = static_cast<EItemRarity>(static_cast<int32>(Source.Rarity) + 1);
+			const int32 ChancePercent = FMath::RoundToInt(Action.UpgradeChance * 100.0f);
+			Action.UpgradeInfoLabel = FormatLocalizedRune(TEXT("RUNE_UPGRADE_INFO_FORMAT"), [&Action, NextRarity, ChancePercent](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Next"), RarityToLabel(NextRarity));
+				Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Action.UpgradeEssenceCost)));
+				Args.Add(TEXT("Gold"), FText::FromString(FormatIntegerWithCommas(Action.UpgradeGoldCost)));
+				Args.Add(TEXT("Chance"), FText::AsNumber(ChancePercent));
+			});
+			Action.bCanUpgrade = Action.UpgradeEssenceCost > 0
+				&& ViewModel.RuneEssence >= Action.UpgradeEssenceCost
+				&& ViewModel.Gold >= Action.UpgradeGoldCost;
+		}
+
+		// 강화 전송 — target = 선택 룬과 다른 유효 인덱스(없으면 INDEX_NONE).
+		int32 ResolvedTarget = INDEX_NONE;
+		if (OwnedRunes.IsValidIndex(TransferTargetOwnedIndex) && TransferTargetOwnedIndex != SelectedOwnedIndex)
+		{
+			ResolvedTarget = TransferTargetOwnedIndex;
+		}
+		else
+		{
+			for (int32 Candidate = 0; Candidate < OwnedRunes.Num(); ++Candidate)
+			{
+				if (Candidate != SelectedOwnedIndex)
+				{
+					ResolvedTarget = Candidate;
+					break;
+				}
+			}
+		}
+		Action.TransferTargetOwnedIndex = ResolvedTarget;
+
+		int32 OtherCount = 0;
+		for (int32 Candidate = 0; Candidate < OwnedRunes.Num(); ++Candidate)
+		{
+			if (Candidate != SelectedOwnedIndex)
+			{
+				++OtherCount;
+			}
+		}
+		Action.bCanCycleTarget = OtherCount >= 2;
+
+		Action.TransferEssenceCost = FRuneFormula::GetTransferEssenceCost(Source.EnhanceLevel);
+		Action.TransferCostLabel = FormatLocalizedRune(TEXT("RUNE_TRANSFER_COST_FORMAT"), [&Action](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Essence"), FText::FromString(FormatIntegerWithCommas(Action.TransferEssenceCost)));
+		});
+
+		if (OwnedRunes.IsValidIndex(ResolvedTarget))
+		{
+			const FRuneInstance& Target = OwnedRunes[ResolvedTarget];
+			Action.TransferTargetLabel = FormatLocalizedRune(TEXT("RUNE_TRANSFER_TARGET_FORMAT"), [&Target](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Type"), ClassRuneTypeToLabel(Target));
+				Args.Add(TEXT("Rarity"), RarityToLabel(Target.Rarity));
+				Args.Add(TEXT("Level"), FText::AsNumber(FMath::Max(0, Target.EnhanceLevel)));
+			});
+			Action.bCanTransfer = ViewModel.RuneEssence >= Action.TransferEssenceCost;
+		}
+		else
+		{
+			Action.TransferTargetLabel = RuneText(TEXT("RUNE_TRANSFER_NO_TARGET"));
+			Action.bCanTransfer = false;
+		}
 	}
 
 	return ViewModel;
@@ -3936,6 +4050,26 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(RuneDisenchantHitBoxPrefix))
 	{
 		TryDisenchantRuneFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == RuneRerollSetHitBoxName)
+	{
+		TryRerollRuneSetAction();
+		return;
+	}
+	if (BoxName == RuneUpgradeRarityHitBoxName)
+	{
+		TryUpgradeRuneRarityAction();
+		return;
+	}
+	if (BoxName == RuneTransferHitBoxName)
+	{
+		TryTransferRuneEnhancementAction();
+		return;
+	}
+	if (BoxName == RuneTransferCycleHitBoxName)
+	{
+		CycleRuneTransferTarget();
 		return;
 	}
 	if (BoxName.ToString().StartsWith(StatAllocationHitBoxPrefix))
@@ -5350,7 +5484,8 @@ void AIdleHUD::DrawRunePanel()
 		IdleGameInstance->GetRuneEssence(),
 		IdleGameInstance->GetGold(),
 		GlobalStageIndex,
-		SelectedRuneOwnedIndex);
+		SelectedRuneOwnedIndex,
+		RuneTransferTargetOwnedIndex);
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
 	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.26f, 380.0f * Scale, 500.0f * Scale);
@@ -5366,7 +5501,8 @@ void AIdleHUD::DrawRunePanel()
 	const int32 VisibleRows = FMath::Min(ViewModel.OwnedRows.Num(), 2);
 	const float SetSectionHeight = SetHeaderHeight + ViewModel.SetRows.Num() * SetRowHeight + FMath::Max(0, ViewModel.SetRows.Num() - 1) * SetGap + 8.0f * Scale;
 	const float SlotSectionHeight = (FRuneFormula::RuneSlotCount * SlotHeight) + 16.0f * Scale;
-	const float PanelHeight = HeaderHeight + CraftHeight + SetSectionHeight + SlotSectionHeight + FMath::Max(1, VisibleRows) * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
+	const float ActionSectionHeight = 124.0f * Scale;
+	const float PanelHeight = HeaderHeight + CraftHeight + SetSectionHeight + SlotSectionHeight + FMath::Max(1, VisibleRows) * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + ActionSectionHeight + Padding;
 	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
 	const float Y = 282.0f * Scale;
 	const float Border = 2.0f * Scale;
@@ -5440,6 +5576,9 @@ void AIdleHUD::DrawRunePanel()
 			RowY += RowHeight + RowGap;
 		}
 	}
+
+	RowY += 6.0f * Scale;
+	DrawRuneActionSection(ViewModel.Action, X + Padding, RowY, PanelWidth - Padding * 2.0f, ActionSectionHeight - 6.0f * Scale);
 
 	RefreshMouseInteraction();
 }
@@ -5623,6 +5762,77 @@ void AIdleHUD::DrawRuneOwnedRow(const FIdleHUDRuneOwnedRowViewModel& Row, float 
 	}
 }
 
+void AIdleHUD::DrawRuneActionSection(const FIdleHUDRuneActionViewModel& Action, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = FMath::Clamp(Height / 118.0f, 0.5f, 2.0f);
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), X, Y, Width, Height);
+	DrawRect(Theme::RarityMythicEnd, X, Y, 4.0f * Scale, Height);
+
+	DrawText(Action.TitleLabel.ToString(), Theme::TextPrimary, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+
+	if (!Action.bHasSelection)
+	{
+		DrawText(Action.EmptyLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 26.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		return;
+	}
+
+	const float ButtonWidth = 70.0f * Scale;
+	const float ButtonHeight = 19.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+
+	// 세트 리롤
+	const float RerollY = Y + 24.0f * Scale;
+	DrawText(Action.CurrentSetLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, RerollY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Action.RerollCostLabel.ToString(), Action.bCanReroll ? Theme::TextMuted : Theme::AccentRed, X + 10.0f * Scale, RerollY + 12.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	DrawRect(Action.bCanReroll ? Theme::AccentBlue : Theme::BgPanel, ButtonX, RerollY, ButtonWidth, ButtonHeight);
+	DrawText(Action.RerollActionLabel.ToString(), Action.bCanReroll ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, RerollY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	if (Action.bCanReroll)
+	{
+		AddHitBox(FVector2D(ButtonX, RerollY), FVector2D(ButtonWidth, ButtonHeight), Action.RerollHitBoxName, true, 91);
+	}
+
+	// 등급 상승 시도
+	const float UpgradeY = RerollY + 26.0f * Scale;
+	DrawText(Action.UpgradeInfoLabel.ToString(), Action.bIsMythic ? Theme::RarityMythicEnd : (Action.bCanUpgrade ? Theme::TextMuted : Theme::AccentRed), X + 10.0f * Scale, UpgradeY + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	DrawRect(Action.bCanUpgrade ? Theme::AccentGold : Theme::BgPanel, ButtonX, UpgradeY, ButtonWidth, ButtonHeight);
+	DrawText(Action.UpgradeActionLabel.ToString(), Action.bCanUpgrade ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, UpgradeY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	if (Action.bCanUpgrade)
+	{
+		AddHitBox(FVector2D(ButtonX, UpgradeY), FVector2D(ButtonWidth, ButtonHeight), Action.UpgradeHitBoxName, true, 92);
+	}
+
+	// 강화 전송
+	const float TransferY = UpgradeY + 26.0f * Scale;
+	DrawText(Action.TransferTargetLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, TransferY, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	DrawText(Action.TransferCostLabel.ToString(), Action.bCanTransfer ? Theme::TextMuted : Theme::AccentRed, X + 10.0f * Scale, TransferY + 12.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+
+	const float CycleWidth = 56.0f * Scale;
+	const float CycleX = ButtonX - CycleWidth - 6.0f * Scale;
+	DrawRect(Action.bCanCycleTarget ? Theme::BgPanel : Theme::BgPanel.CopyWithNewOpacity(0.6f), CycleX, TransferY, CycleWidth, ButtonHeight);
+	DrawText(Action.TransferCycleLabel.ToString(), Action.bCanCycleTarget ? Theme::TextPrimary : Theme::TextMuted, CycleX + 6.0f * Scale, TransferY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.52f * Scale);
+	if (Action.bCanCycleTarget)
+	{
+		AddHitBox(FVector2D(CycleX, TransferY), FVector2D(CycleWidth, ButtonHeight), Action.TransferCycleHitBoxName, true, 93);
+	}
+
+	DrawRect(Action.bCanTransfer ? Theme::RarityMythicStart : Theme::BgPanel, ButtonX, TransferY, ButtonWidth, ButtonHeight);
+	DrawText(Action.TransferActionLabel.ToString(), Action.bCanTransfer ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 8.0f * Scale, TransferY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	if (Action.bCanTransfer)
+	{
+		AddHitBox(FVector2D(ButtonX, TransferY), FVector2D(ButtonWidth, ButtonHeight), Action.TransferHitBoxName, true, 94);
+	}
+
+	// 피드백(성공/실패) — 일정 시간 후 사라짐.
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - RuneActionFeedbackStartTime : 1000.0f;
+	if (!RuneActionFeedbackLabel.IsEmpty() && FeedbackElapsed <= 3.0f)
+	{
+		DrawText(RuneActionFeedbackLabel.ToString(), bRuneActionFeedbackSuccess ? Theme::AccentGold : Theme::AccentRed, X + 10.0f * Scale, TransferY + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+	}
+}
+
 void AIdleHUD::SelectRuneFromHitBox(FName BoxName)
 {
 	FString RawIndex = BoxName.ToString();
@@ -5700,6 +5910,154 @@ void AIdleHUD::TryDisenchantRuneFromHitBox(FName BoxName)
 	{
 		SelectedRuneOwnedIndex = INDEX_NONE;
 	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::SetRuneActionFeedback(const TCHAR* Key, bool bSuccess)
+{
+	RuneActionFeedbackLabel = IdleProject::Localization::Text(TEXT("Rune"), Key);
+	bRuneActionFeedbackSuccess = bSuccess;
+	if (const UWorld* World = GetWorld())
+	{
+		RuneActionFeedbackStartTime = World->GetTimeSeconds();
+	}
+}
+
+void AIdleHUD::TryRerollRuneSetAction()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	const bool bSuccess = IdleGameInstance->TryRerollRuneSet(SelectedRuneOwnedIndex);
+	SetRuneActionFeedback(bSuccess ? TEXT("RUNE_FEEDBACK_REROLL_DONE") : TEXT("RUNE_FEEDBACK_FAILED"), bSuccess);
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryUpgradeRuneRarityAction()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	bool bUpgradeSucceeded = false;
+	const bool bAttempted = IdleGameInstance->TryUpgradeRuneRarity(SelectedRuneOwnedIndex, bUpgradeSucceeded);
+	if (!bAttempted)
+	{
+		SetRuneActionFeedback(TEXT("RUNE_FEEDBACK_FAILED"), false);
+	}
+	else
+	{
+		SetRuneActionFeedback(bUpgradeSucceeded ? TEXT("RUNE_FEEDBACK_UPGRADE_SUCCESS") : TEXT("RUNE_FEEDBACK_UPGRADE_FAIL"), bUpgradeSucceeded);
+	}
+	RefreshMouseInteraction();
+}
+
+int32 AIdleHUD::ResolveRuneTransferTargetIndex() const
+{
+	if (!IdleGameInstance)
+	{
+		return INDEX_NONE;
+	}
+	const URuneService* RuneService = IdleGameInstance->GetRuneService();
+	if (!RuneService || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return INDEX_NONE;
+	}
+
+	const TArray<FRuneInstance>& OwnedRunes = RuneService->GetOwnedRunes();
+	if (!OwnedRunes.IsValidIndex(SelectedRuneOwnedIndex))
+	{
+		return INDEX_NONE;
+	}
+	if (OwnedRunes.IsValidIndex(RuneTransferTargetOwnedIndex) && RuneTransferTargetOwnedIndex != SelectedRuneOwnedIndex)
+	{
+		return RuneTransferTargetOwnedIndex;
+	}
+	for (int32 Candidate = 0; Candidate < OwnedRunes.Num(); ++Candidate)
+	{
+		if (Candidate != SelectedRuneOwnedIndex)
+		{
+			return Candidate;
+		}
+	}
+	return INDEX_NONE;
+}
+
+void AIdleHUD::CycleRuneTransferTarget()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return;
+	}
+	const URuneService* RuneService = IdleGameInstance->GetRuneService();
+	if (!RuneService)
+	{
+		return;
+	}
+
+	const TArray<FRuneInstance>& OwnedRunes = RuneService->GetOwnedRunes();
+	if (!OwnedRunes.IsValidIndex(SelectedRuneOwnedIndex))
+	{
+		return;
+	}
+
+	const int32 Current = ResolveRuneTransferTargetIndex();
+	const int32 Count = OwnedRunes.Num();
+	const int32 Start = OwnedRunes.IsValidIndex(Current) ? Current : SelectedRuneOwnedIndex;
+	for (int32 Step = 1; Step <= Count; ++Step)
+	{
+		const int32 Candidate = (Start + Step) % Count;
+		if (Candidate != SelectedRuneOwnedIndex)
+		{
+			RuneTransferTargetOwnedIndex = Candidate;
+			break;
+		}
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::TryTransferRuneEnhancementAction()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance || SelectedRuneOwnedIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	const int32 TargetIndex = ResolveRuneTransferTargetIndex();
+	if (TargetIndex == INDEX_NONE)
+	{
+		SetRuneActionFeedback(TEXT("RUNE_FEEDBACK_FAILED"), false);
+		RefreshMouseInteraction();
+		return;
+	}
+
+	const bool bSuccess = IdleGameInstance->TransferRuneEnhancement(SelectedRuneOwnedIndex, TargetIndex);
+	if (bSuccess)
+	{
+		// source(SelectedRuneOwnedIndex) 삭제 → 인덱스 재정렬. 선택/타깃 참조 초기화.
+		SelectedRuneOwnedIndex = INDEX_NONE;
+		RuneTransferTargetOwnedIndex = INDEX_NONE;
+	}
+	SetRuneActionFeedback(bSuccess ? TEXT("RUNE_FEEDBACK_TRANSFER_DONE") : TEXT("RUNE_FEEDBACK_FAILED"), bSuccess);
 	RefreshMouseInteraction();
 }
 
