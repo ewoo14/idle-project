@@ -44,6 +44,19 @@ export const putSaveSchema = {
             minItems: 0,
             maxItems: 6,
           },
+          consumables: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["type", "count", "buffEndUnixSec"],
+              additionalProperties: false,
+              properties: {
+                type: { type: "integer", minimum: 0, maximum: 5 },
+                count: { type: "integer", minimum: 0 },
+                buffEndUnixSec: { type: "integer", minimum: 0 },
+              },
+            },
+          },
         },
       },
     },

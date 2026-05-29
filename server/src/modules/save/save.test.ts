@@ -182,6 +182,7 @@ describe("SaveService", () => {
         skillPoints: 12,
         worldPower: 21,
         masteryLevels: [1, 2, 3, 4, 5, 6],
+        consumables: [{ type: 4, count: 2, buffEndUnixSec: 1_234_567_890 }],
         customClientField: "kept",
       },
     });
@@ -235,6 +236,19 @@ describe("SaveService", () => {
       items: { type: "integer", minimum: 0 },
       minItems: 0,
       maxItems: 6,
+    });
+    expect(payloadSchema.properties.consumables).toEqual({
+      type: "array",
+      items: {
+        type: "object",
+        required: ["type", "count", "buffEndUnixSec"],
+        additionalProperties: false,
+        properties: {
+          type: { type: "integer", minimum: 0, maximum: 5 },
+          count: { type: "integer", minimum: 0 },
+          buffEndUnixSec: { type: "integer", minimum: 0 },
+        },
+      },
     });
     expect(payloadSchema.additionalProperties).toBe(true);
   });

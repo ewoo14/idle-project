@@ -28,6 +28,11 @@ export type SavePayload = {
   transcendCount?: number;
   towerHighestFloor?: number;
   skillPoints?: number;
+  consumables?: Array<{
+    type: number;
+    count: number;
+    buffEndUnixSec: number;
+  }>;
   [key: string]: unknown;
 };
 
@@ -160,6 +165,7 @@ export function validateSavePayload(
   validateNonNegativeIntegerExtension(payload, "transcendCount", context);
   validateNonNegativeIntegerExtension(payload, "towerHighestFloor", context);
   validateNonNegativeIntegerExtension(payload, "skillPoints", context);
+  validateConsumables(payload, context);
   if (
     payload.gold !== undefined &&
     (!Number.isInteger(payload.gold) || payload.gold < character.gold)
@@ -213,6 +219,7 @@ function rejectSave(
         transcendCount: payload.transcendCount,
         towerHighestFloor: payload.towerHighestFloor,
         skillPoints: payload.skillPoints,
+        consumables: payload.consumables,
       },
     },
     "save payload rejected",
@@ -220,6 +227,38 @@ function rejectSave(
   throw new ValidationError("세이브 payload 검증에 실패했습니다.", {
     code: "SAVE_VALIDATION_FAILED",
   });
+}
+
+function validateConsumables(
+  payload: SavePayload,
+  context:
+    | {
+        userId: string;
+        characterId: string;
+        logger: SaveLogger;
+      }
+    | undefined,
+) {
+  if (payload.consumables === undefined) {
+    return;
+  }
+  if (!Array.isArray(payload.consumables)) {
+    rejectSave(context, payload, "consumables must be an array");
+  }
+  for (const entry of payload.consumables) {
+    if (
+      !entry ||
+      !Number.isInteger(entry.type) ||
+      entry.type < 0 ||
+      entry.type > 5 ||
+      !Number.isInteger(entry.count) ||
+      entry.count < 0 ||
+      !Number.isInteger(entry.buffEndUnixSec) ||
+      entry.buffEndUnixSec < 0
+    ) {
+      rejectSave(context, payload, "consumables contain an invalid entry");
+    }
+  }
 }
 
 function validateNonNegativeIntegerExtension(
