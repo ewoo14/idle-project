@@ -60,3 +60,23 @@ float FMasteryFormula::GetLocalBonus(EMasteryTrack Track, int32 Level)
 	const float RawBonus = 0.01f * FMath::Loge(1.0f + static_cast<float>(SafeLevel));
 	return Track == EMasteryTrack::Equipment ? FMath::Min(0.5f, RawBonus) : RawBonus;
 }
+
+float FMasteryFormula::GetLocalBonus2(EMasteryTrack Track, int32 Level)
+{
+	const int32 SafeLevel = FMath::Max(0, Level);
+	if (SafeLevel <= 0)
+	{
+		return 0.0f;
+	}
+
+	const float RawBonus = 0.01f * FMath::Loge(1.0f + static_cast<float>(SafeLevel));
+	// Equipment(큐브 가격 절감)·Beast(펫 먹이 비용 절감)는 비용 절감 비율이므로 0.5 상한 클램프.
+	const bool bCostReduction = Track == EMasteryTrack::Equipment || Track == EMasteryTrack::Beast;
+	return bCostReduction ? FMath::Min(0.5f, RawBonus) : RawBonus;
+}
+
+int32 FMasteryFormula::GetAbyssBonusEntries(int32 Level)
+{
+	const int32 SafeLevel = FMath::Max(0, Level);
+	return FMath::Clamp(SafeLevel / 50, 0, 3);
+}

@@ -88,6 +88,44 @@ bool FDungeonServiceRunLimitResetTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FDungeonServiceAbyssBonusEntriesTest,
+	"IdleProject.GameCore.Dungeon.ServiceAbyssBonusEntries",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FDungeonServiceAbyssBonusEntriesTest::RunTest(const FString& Parameters)
+{
+	UDungeonService* Dungeons = NewObject<UDungeonService>();
+	const FString Today = TEXT("2026-05-28");
+	Dungeons->EnsureDailyReset(Today);
+
+	// 심연 마스터리 2종: 보너스 입장 +2 → 기본 3 + 2 = 5회 입장 가능.
+	TestEqual(TEXT("Bonus entries extend remaining count"), Dungeons->GetRemainingEntries(EDungeonType::Gold, Today, 2), 5);
+
+	for (int32 Index = 0; Index < 3; ++Index)
+	{
+		const FDungeonRunResult Run = Dungeons->TryRunDungeon(EDungeonType::Gold, 350, Today, 1, 2);
+		TestTrue(TEXT("Base entry run succeeds with bonus"), Run.bSuccess);
+	}
+	// 기본 3회 소진 후에도 보너스 입장 덕분에 4·5번째 입장 가능.
+	TestEqual(TEXT("Two bonus entries remain after base limit"), Dungeons->GetRemainingEntries(EDungeonType::Gold, Today, 2), 2);
+	const FDungeonRunResult FourthRun = Dungeons->TryRunDungeon(EDungeonType::Gold, 350, Today, 1, 2);
+	TestTrue(TEXT("Fourth run succeeds via bonus entry"), FourthRun.bSuccess);
+	const FDungeonRunResult FifthRun = Dungeons->TryRunDungeon(EDungeonType::Gold, 350, Today, 1, 2);
+	TestTrue(TEXT("Fifth run succeeds via bonus entry"), FifthRun.bSuccess);
+	const FDungeonRunResult SixthRun = Dungeons->TryRunDungeon(EDungeonType::Gold, 350, Today, 1, 2);
+	TestFalse(TEXT("Sixth run fails after extended limit"), SixthRun.bSuccess);
+	TestEqual(TEXT("Extended limit fully consumed"), Dungeons->GetRemainingEntries(EDungeonType::Gold, Today, 2), 0);
+
+	// 보너스 0이면 기존 동작과 동일(회귀).
+	UDungeonService* Baseline = NewObject<UDungeonService>();
+	Baseline->EnsureDailyReset(Today);
+	TestEqual(TEXT("Zero bonus keeps base three entries"), Baseline->GetRemainingEntries(EDungeonType::Gold, Today, 0), 3);
+	TestEqual(TEXT("Default argument keeps base three entries"), Baseline->GetRemainingEntries(EDungeonType::Gold, Today), 3);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FDungeonServiceTierGateAndEntryTest,
 	"IdleProject.GameCore.Dungeon.ServiceTierGateAndEntry",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -235,7 +273,7 @@ bool FIdleGameInstanceDungeonSaveMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* Captured = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after migration succeeds"), GameInstance->CaptureToSave(Captured));
-	TestEqual(TEXT("Captured save writes V15"), Captured->SaveVersion, static_cast<int32>(15));
+	TestEqual(TEXT("Captured save writes V16"), Captured->SaveVersion, static_cast<int32>(16));
 	TestEqual(TEXT("Captured dungeon entry array has three rows"), Captured->DungeonEntriesUsed.Num(), 3);
 
 	return true;

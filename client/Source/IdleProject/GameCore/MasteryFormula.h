@@ -17,4 +17,10 @@ struct IDLEPROJECT_API FMasteryFormula
 	static float GoldFindPct(int32 BeastLv);
 	static float ExpBoostPct(int32 BeastLv);
 	static float GetLocalBonus(EMasteryTrack Track, int32 Level);
+
+	// V2 로컬 보너스(트랙당 2종째). 1종과 동일 ln 곡선·계수(0.01)이며 Equipment/Beast 비용 절감은 0.5 상한 클램프.
+	static float GetLocalBonus2(EMasteryTrack Track, int32 Level);
+
+	// 심연 2종: 던전 일일 입장 추가 정수 보너스. floor(level/50), 상한 +3.
+	static int32 GetAbyssBonusEntries(int32 Level);
 };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  abyssBonusEntries,
   coreStatMultiplier,
   critRateAdd,
   dropRateAdd,
@@ -7,6 +8,7 @@ import {
   goldFindPct,
   levelFromTotalXp,
   localBonus,
+  localBonus2,
   MASTERY_TRACK_COUNT,
   MASTERY_XP_BASE,
   MASTERY_XP_GROWTH,
@@ -68,5 +70,37 @@ describe("mastery formula", () => {
   it("caps equipment local cost reduction at fifty percent", () => {
     expect(localBonus(1, 100)).toBe(Math.fround(0.01 * Math.log(101)));
     expect(localBonus(1, 1e30)).toBe(0.5);
+  });
+
+  it.each([
+    0, 1, 2, 3, 4, 5,
+  ])("computes monotonic local bonus2 for track %i", (track) => {
+    expect(localBonus2(track, 0)).toBe(0);
+    expect(localBonus2(track, -1)).toBe(0);
+    expect(localBonus2(track, 30)).toBeGreaterThan(localBonus2(track, 1));
+  });
+
+  it("mirrors localBonus curve for non-clamped tracks", () => {
+    for (const track of [0, 2, 3, 5]) {
+      expect(localBonus2(track, 30)).toBe(localBonus(track, 30));
+      expect(localBonus2(track, 100)).toBe(localBonus(track, 100));
+    }
+  });
+
+  it("caps equipment and beast cost reduction at fifty percent", () => {
+    expect(localBonus2(1, 1e30)).toBe(0.5);
+    expect(localBonus2(4, 1e30)).toBe(0.5);
+    expect(localBonus2(1, 5)).toBe(Math.fround(0.01 * Math.log(6)));
+    expect(localBonus2(4, 5)).toBe(Math.fround(0.01 * Math.log(6)));
+  });
+
+  it("converts abyss level into integer bonus entries with a cap of three", () => {
+    expect(abyssBonusEntries(0)).toBe(0);
+    expect(abyssBonusEntries(-10)).toBe(0);
+    expect(abyssBonusEntries(49)).toBe(0);
+    expect(abyssBonusEntries(50)).toBe(1);
+    expect(abyssBonusEntries(99)).toBe(1);
+    expect(abyssBonusEntries(150)).toBe(3);
+    expect(abyssBonusEntries(1000)).toBe(3);
   });
 });

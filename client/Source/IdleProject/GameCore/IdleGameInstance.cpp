@@ -919,7 +919,9 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type, int32 Tier
 		return Result;
 	}
 
-	Result = DungeonService->TryRunDungeon(Type, Character->GetCombatPower(), UQuestService::GetCurrentUtcDateString(), Tier);
+	// 심연 마스터리 2종: 던전 일일 입장 +N(정수 보너스)을 한도에 더함.
+	const int32 AbyssBonusEntries = MasteryService ? MasteryService->GetAbyssBonusEntries() : 0;
+	Result = DungeonService->TryRunDungeon(Type, Character->GetCombatPower(), UQuestService::GetCurrentUtcDateString(), Tier, AbyssBonusEntries);
 	if (!Result.bSuccess)
 	{
 		return Result;
@@ -1184,16 +1186,26 @@ bool UIdleGameInstance::TryBuyProtectionScroll()
 	return TryBuyShopResource(FShopFormula::GetProtectionScrollCost(GlobalStageIndex), ProtectionScrolls);
 }
 
+int64 UIdleGameInstance::ApplyEquipmentCubeCostReduction(int64 BaseCost)
+{
+	// 장비 마스터리 2종: 잠재 큐브 골드 가격 ×(1 - min(0.5, GetLocalBonus2(Equipment))). 1종 강화 비용 절감과 별도.
+	EnsureMasteryService();
+	const float Reduction = MasteryService ? MasteryService->GetLocalBonus2(EMasteryTrack::Equipment) : 0.0f;
+	return FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseCost) * (1.0 - static_cast<double>(Reduction))));
+}
+
 bool UIdleGameInstance::TryBuyResetCube()
 {
 	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
-	return TryBuyShopResource(FShopFormula::GetResetCubeCost(GlobalStageIndex), ResetCubes);
+	const int64 Cost = ApplyEquipmentCubeCostReduction(FShopFormula::GetResetCubeCost(GlobalStageIndex));
+	return TryBuyShopResource(Cost, ResetCubes);
 }
 
 bool UIdleGameInstance::TryBuyRankCube()
 {
 	const int32 GlobalStageIndex = StageService ? StageService->GetGlobalStageIndex() : 0;
-	return TryBuyShopResource(FShopFormula::GetRankCubeCost(GlobalStageIndex), RankCubes);
+	const int64 Cost = ApplyEquipmentCubeCostReduction(FShopFormula::GetRankCubeCost(GlobalStageIndex));
+	return TryBuyShopResource(Cost, RankCubes);
 }
 
 void UIdleGameInstance::AddConsumable(EConsumableType Type, EConsumableGrade Grade, int32 Amount)
@@ -1355,7 +1367,11 @@ bool UIdleGameInstance::TryDisenchantRune(int32 OwnedIndex)
 		return false;
 	}
 
-	RuneEssence = Refund > MAX_int64 - RuneEssence ? MAX_int64 : RuneEssence + Refund;
+	// 룬 마스터리 2종: 분해 에센스 획득 ×(1 + GetLocalBonus2(Rune)). 1종 코어 가산과 별도 단일.
+	EnsureMasteryService();
+	const float RuneEssenceBonus = MasteryService ? MasteryService->GetLocalBonus2(EMasteryTrack::Rune) : 0.0f;
+	const int64 BonusRefund = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Refund) * (1.0 + static_cast<double>(RuneEssenceBonus))));
+	RuneEssence = BonusRefund > MAX_int64 - RuneEssence ? MAX_int64 : RuneEssence + BonusRefund;
 	RequestAutosave();
 	return true;
 }
@@ -1749,7 +1765,9 @@ FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, 
 {
 	const int32 EffectiveRebirthCount = RebirthCountOverride >= 0 ? RebirthCountOverride : RebirthCount;
 	FOfflineRewardResult Reward = FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
-	const double OfflineMultiplier = 1.0 + static_cast<double>(GetRuneOfflineEffBonus());
+	// 탐험 마스터리 2종: 오프라인 보상 ×(1 + GetLocalBonus2(Explore)). 1종 퀘스트 보상과 별도 단일.
+	const double ExploreOfflineBonus = static_cast<double>(MasteryService ? MasteryService->GetLocalBonus2(EMasteryTrack::Explore) : 0.0f);
+	const double OfflineMultiplier = (1.0 + static_cast<double>(GetRuneOfflineEffBonus())) * (1.0 + ExploreOfflineBonus);
 	Reward.Gold = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Gold) * OfflineMultiplier));
 	Reward.Exp = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Exp) * OfflineMultiplier));
 	return Reward;
@@ -1996,7 +2014,13 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 		return Result;
 	}
 
-	const int64 Cost = FPetLevelFormula::GetFeedCost(CurrentLevel);
+	// 야성 마스터리 2종: 펫 먹이 골드 비용 ×(1 - min(0.5, GetLocalBonus2(Beast))). 1종 펫 보너스와 별도 단일.
+	const float BeastFeedReduction = MasteryService ? MasteryService->GetLocalBonus2(EMasteryTrack::Beast) : 0.0f;
+	const int64 BaseFeedCost = FPetLevelFormula::GetFeedCost(CurrentLevel);
+	// 비용 절감이 양수 비용을 0으로 만들어 먹이 가능 판정을 가리지 않도록 최소 1로 유지.
+	const int64 Cost = BaseFeedCost > 0
+		? FMath::Max<int64>(1, FMath::RoundToInt64(static_cast<double>(BaseFeedCost) * (1.0 - static_cast<double>(BeastFeedReduction))))
+		: BaseFeedCost;
 	if (Cost <= 0 || Gold < Cost)
 	{
 		OnPetFed.Broadcast(Result);

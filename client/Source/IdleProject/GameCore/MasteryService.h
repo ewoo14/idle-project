@@ -37,6 +37,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
 	float GetLocalBonus(EMasteryTrack Track) const;
 
+	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
+	float GetLocalBonus2(EMasteryTrack Track) const;
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Mastery")
+	int32 GetAbyssBonusEntries() const;
+
 	TArray<FMasterySaveEntry> ExportSave() const;
 	void ImportSave(const TArray<FMasterySaveEntry>& Entries);
 
