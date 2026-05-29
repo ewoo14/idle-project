@@ -765,6 +765,11 @@ FDungeonRunResult UIdleGameInstance::TryRunDungeon(EDungeonType Type)
 		return Result;
 	}
 
+	const double AbyssRewardMultiplier = 1.0 + static_cast<double>(MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Abyss) : 0.0f);
+	Result.GoldReward = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Result.GoldReward) * AbyssRewardMultiplier));
+	Result.ExpReward = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Result.ExpReward) * AbyssRewardMultiplier));
+	Result.EssenceReward = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Result.EssenceReward) * AbyssRewardMultiplier));
+
 	AddGold(Result.GoldReward);
 	AddExp(Result.ExpReward);
 	if (MasteryService)
@@ -817,7 +822,10 @@ FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, bool
 
 	const FItemInstance* EquippedItem = Inventory->GetEquippedItem(Slot);
 	const EItemRarity Rarity = EquippedItem ? EquippedItem->Rarity : EItemRarity::None;
-	const int64 Cost = FEnhanceFormula::GetEnhanceCost(CurrentLevel, Rarity);
+	EnsureMasteryService();
+	const float EquipmentCostReduction = MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Equipment) : 0.0f;
+	const int64 BaseCost = FEnhanceFormula::GetEnhanceCost(CurrentLevel, Rarity);
+	const int64 Cost = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(BaseCost) * (1.0 - static_cast<double>(EquipmentCostReduction))));
 	const bool bHasProtection = ProtectionScrolls > 0;
 	if (Cost <= 0 || Gold < Cost || (bUseProtection && FEnhanceFormula::IsRiskLevel(CurrentLevel) && !bHasProtection))
 	{
@@ -1217,10 +1225,11 @@ void UIdleGameInstance::AddExp(int64 Amount)
 	}
 
 	EnsureBuffService();
+	EnsureMasteryService();
 	const double ExpMultiplier =
 		1.0
-		+ static_cast<double>(GetMasteryService() ? GetMasteryService()->GetGlobalBonus().ExpBoostPct : 0.0f)
-		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f);
+		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f)
+		+ static_cast<double>(MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f);
 	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
@@ -1590,6 +1599,10 @@ FQuestClaimResult UIdleGameInstance::ClaimQuest(const FString& QuestId)
 		return Result;
 	}
 
+	const double ExploreRewardMultiplier = 1.0 + static_cast<double>(MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Explore) : 0.0f);
+	Result.RewardGold = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Result.RewardGold) * ExploreRewardMultiplier));
+	Result.RewardExp = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Result.RewardExp) * ExploreRewardMultiplier));
+
 	AddGold(Result.RewardGold);
 	AddExp(Result.RewardExp);
 	RecordAchievementMetric(EAchievementMetric::QuestsCompleted, 1);
@@ -1778,35 +1791,55 @@ FPetFeedResult UIdleGameInstance::TryFeedPet(const FString& PetId)
 
 float UIdleGameInstance::GetEquippedPetGoldBonusPercent() const
 {
-	return PetService ? PetService->GetEquippedPetGoldBonusPercent() : 0.0f;
+	const float BaseBonus = PetService ? PetService->GetEquippedPetGoldBonusPercent() : 0.0f;
+	const float BeastBonus = MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Beast) : 0.0f;
+	return BaseBonus * (1.0f + BeastBonus);
 }
 
 float UIdleGameInstance::GetEquippedPetDropBonusPercent() const
 {
-	return PetService ? PetService->GetEquippedPetDropBonusPercent() : 0.0f;
+	const float BaseBonus = PetService ? PetService->GetEquippedPetDropBonusPercent() : 0.0f;
+	const float BeastBonus = MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Beast) : 0.0f;
+	return BaseBonus * (1.0f + BeastBonus);
 }
 
 float UIdleGameInstance::GetEquippedPetExpBonusPercent() const
 {
-	return PetService ? PetService->GetEquippedPetExpBonusPercent() : 0.0f;
+	const float BaseBonus = PetService ? PetService->GetEquippedPetExpBonusPercent() : 0.0f;
+	const float BeastBonus = MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Beast) : 0.0f;
+	return BaseBonus * (1.0f + BeastBonus);
 }
 
 FPetStatBonus UIdleGameInstance::GetEquippedPetStatBonus() const
 {
-	return PetService ? PetService->GetEquippedPetStatBonus() : FPetStatBonus();
+	FPetStatBonus Bonus = PetService ? PetService->GetEquippedPetStatBonus() : FPetStatBonus();
+	const float BeastMultiplier = 1.0f + (MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Beast) : 0.0f);
+	Bonus.PhysAtkPct *= BeastMultiplier;
+	Bonus.MagicAtkPct *= BeastMultiplier;
+	Bonus.PhysDefPct *= BeastMultiplier;
+	Bonus.MagicDefPct *= BeastMultiplier;
+	Bonus.HpPct *= BeastMultiplier;
+	return Bonus;
 }
 
 int64 UIdleGameInstance::ApplyEquippedPetGoldBonus(int64 BaseAmount) const
 {
-	return PetService ? PetService->ApplyGoldBonus(BaseAmount) : BaseAmount;
+	if (BaseAmount <= 0)
+	{
+		return 0;
+	}
+
+	const double Multiplier = 1.0 + static_cast<double>(GetEquippedPetGoldBonusPercent()) / 100.0;
+	return FMath::FloorToInt64(static_cast<double>(BaseAmount) * Multiplier);
 }
 
 float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 {
-	const float PetAdjusted = PetService ? PetService->ApplyDropBonusChance(BaseChance) : BaseChance;
-	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
+	const float PetMultiplier = 1.0f + GetEquippedPetDropBonusPercent() / 100.0f;
+	const float PetAdjusted = FMath::Clamp(BaseChance * PetMultiplier, 0.0f, 1.0f);
 	const float ConsumableBonus = BuffService ? BuffService->GetDropBuffAdd(GetCurrentUnixSeconds()) : 0.0f;
-	return PetAdjusted + MasteryBonus + ConsumableBonus;
+	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
+	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus, 0.0f, 1.0f);
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const

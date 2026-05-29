@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameCore/MasteryTypes.h"
 
 struct IDLEPROJECT_API FMasteryFormula
 {
@@ -15,4 +16,5 @@ struct IDLEPROJECT_API FMasteryFormula
 	static float DropRateAdd(int32 AbyssLv);
 	static float GoldFindPct(int32 BeastLv);
 	static float ExpBoostPct(int32 BeastLv);
+	static float GetLocalBonus(EMasteryTrack Track, int32 Level);
 };

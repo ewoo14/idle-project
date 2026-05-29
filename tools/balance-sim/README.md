@@ -86,6 +86,11 @@ reports the 10-pet catalog at Lv0 and Lv10, and compares stat-facing pet
 bonuses against Lv100 CP/DPS review loadouts. Pet bonuses are not injected into
 the sampled first-rebirth run until acquisition timing is modeled.
 
+PR #74 adds mastery local bonus pressure. The simulator imports `mastery.ts`,
+reports Combat, Equipment, Abyss, Rune, Beast, and Explore local bonus anchors
+at levels 5, 30, and 100, and keeps local mastery out of the sampled
+first-rebirth run until acquisition timing is modeled.
+
 ## V1 Interpretation
 
 The V1 pass is a distribution check, not a curve rewrite. It validates the

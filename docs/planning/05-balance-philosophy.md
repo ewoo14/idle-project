@@ -1981,3 +1981,38 @@ Guardrails:
   achievements.
 - Re-run `npm run balance:sim` and `npm test -- tests/balance-sim.test.ts`
   after changing consumable values, duration, acquisition, or shop pricing.
+
+## PR #74 Mastery Local Bonuses Balance Review
+
+PR #74 adds one local bonus lane to each of the six permanent mastery tracks.
+The detailed review artifact is
+`docs/planning/mastery-local-bonuses-balance-note.md`.
+
+Formula anchors:
+
+- Combat, Abyss, Rune, Beast, and Explore:
+  `0.01 * ln(1 + trackLevel)`.
+- Equipment: `min(0.50, 0.01 * ln(1 + trackLevel))`, returned as an
+  enhancement gold-cost discount.
+
+At the level-100 review point, every local lane is about 4.615%. This is lower
+than PR #72's global Beast economy coefficient and is intentionally modest
+because PR #74 touches six separate system surfaces: kill rewards, enhancement
+costs, dungeon rewards, rune codex value, pet bonuses, and quest rewards.
+
+The current 1000-run first-rebirth simulator output is unchanged because local
+mastery acquisition is not injected into first-rebirth timing yet: p10 4.919h,
+median 5.328h, p90 5.751h, min 4.564h, max 6.144h. Median remains inside the
+5-10h target and every sampled run remains inside the 3-20h review band.
+
+Guardrails:
+
+- Keep local bonuses single-application by system; do not apply the same track
+  through both a source-specific path and a generic reward helper.
+- Keep Equipment capped at 50% so infinite mastery cannot erase enhancement
+  gold costs.
+- Do not tune first-rebirth pacing from local mastery until `tools/balance-sim`
+  explicitly models mastery acquisition timing and expected per-track levels.
+- Re-run `cd server; npm run test -- tests/balance-sim.test.ts` and
+  `cd server; npm run balance:sim` after changing local-bonus constants or
+  injecting mastery acquisition into the sampled run.

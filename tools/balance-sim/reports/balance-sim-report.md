@@ -500,6 +500,30 @@
 
 <!-- markdownlint-enable MD013 -->
 
+## Mastery Local Bonus Pressure
+
+- Formula: `0.01 * ln(1 + level); Equipment capped at 50%`.
+- Source: `server/src/core/formulas/mastery.ts`.
+- Local mastery bonuses are not injected into the sampled first-rebirth
+  timing model until acquisition timing and expected per-track levels are
+  modeled explicitly.
+- Equipment returns a discount value and is capped at 50%; the other tracks
+  use the same uncapped logarithmic coefficient as an additive or
+  multiplicative lane at one application point.
+
+<!-- markdownlint-disable MD013 -->
+
+| Track | Effect | Lv5 | Lv30 | Lv100 | Cap | First rebirth injected |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Combat | Kill reward | 1.792% | 3.434% | 4.615% | n/a | no |
+| Equipment | Enhancement gold discount | 1.792% | 3.434% | 4.615% | 50% | no |
+| Abyss | Dungeon reward | 1.792% | 3.434% | 4.615% | n/a | no |
+| Rune | Rune codex additive value | 1.792% | 3.434% | 4.615% | n/a | no |
+| Beast | Pet bonus | 1.792% | 3.434% | 4.615% | n/a | no |
+| Explore | Quest reward | 1.792% | 3.434% | 4.615% | n/a | no |
+
+<!-- markdownlint-enable MD013 -->
+
 ## Rune Codex Collection Pressure
 
 - Total cells: 63
@@ -561,6 +585,7 @@
 ## Formula Sources
 
 - server/src/core/formulas/level.ts
+- server/src/core/formulas/mastery.ts
 - server/src/core/formulas/combat.ts
 - server/src/core/formulas/consumable.ts
 - server/src/core/formulas/stats.ts

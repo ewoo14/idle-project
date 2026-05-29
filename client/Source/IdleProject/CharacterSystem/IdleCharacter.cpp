@@ -206,7 +206,9 @@ void AIdleCharacter::RefreshDerivedStats()
 		if (const URuneService* RuneService = IdleGameInstance->GetRuneService())
 		{
 			const FRuneCoreMultipliers RuneMultipliers = RuneService->GetEquippedCoreMultipliers();
-			const float CodexCore = RuneService->GetCodexBonus().CoreStatAdd;
+			const UMasteryService* MasteryService = IdleGameInstance->GetMasteryService();
+			const float RuneMasteryBonus = MasteryService ? MasteryService->GetLocalBonus(EMasteryTrack::Rune) : 0.0f;
+			const float CodexCore = RuneService->GetCodexBonus().CoreStatAdd + RuneMasteryBonus;
 			Derived.PhysAtk *= RuneMultipliers.PhysAtk + CodexCore;
 			Derived.MagicAtk *= RuneMultipliers.MagicAtk + CodexCore;
 			Derived.PhysDef *= RuneMultipliers.PhysDef + CodexCore;

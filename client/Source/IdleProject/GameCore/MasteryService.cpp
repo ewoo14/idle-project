@@ -87,6 +87,11 @@ FMasteryGlobalBonus UMasteryService::GetGlobalBonus() const
 	return Bonus;
 }
 
+float UMasteryService::GetLocalBonus(EMasteryTrack Track) const
+{
+	return FMasteryFormula::GetLocalBonus(Track, GetTrackLevel(Track));
+}
+
 TArray<FMasterySaveEntry> UMasteryService::ExportSave() const
 {
 	TArray<FMasterySaveEntry> Entries;
