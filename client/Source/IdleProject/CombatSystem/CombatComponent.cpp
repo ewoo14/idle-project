@@ -58,7 +58,10 @@ void UCombatComponent::TakeDamageTyped(float Damage, AActor* Instigator, bool bW
 		return;
 	}
 
-	const float AppliedDamage = FMath::Max(0.0f, Damage);
+	// 저주(Curse): 받는 피해 증폭 디버프. 단일 적용 지점에서 Magnitude 비율만큼 증폭합니다.
+	const float CurseMagnitude = GetActiveStatusMagnitude(ESkillStatusEffect::Curse);
+	const float AmplifiedDamage = Damage * (1.0f + FMath::Max(0.0f, CurseMagnitude));
+	const float AppliedDamage = FMath::Max(0.0f, AmplifiedDamage);
 	CurrentHp = FMath::Clamp(CurrentHp - AppliedDamage, 0.0f, MaxHp);
 	OnHpChanged.Broadcast(CurrentHp);
 
@@ -150,6 +153,19 @@ bool UCombatComponent::HasActiveStatus(ESkillStatusEffect Type) const
 	{
 		return Status.Type == Type;
 	});
+}
+
+float UCombatComponent::GetActiveStatusMagnitude(ESkillStatusEffect Type) const
+{
+	float MaxMagnitude = 0.0f;
+	for (const FActiveSkillStatus& Status : ActiveStatuses)
+	{
+		if (Status.Type == Type)
+		{
+			MaxMagnitude = FMath::Max(MaxMagnitude, Status.Magnitude);
+		}
+	}
+	return MaxMagnitude;
 }
 
 void UCombatComponent::RemoveStatusAttackSpeedSlow()

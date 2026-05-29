@@ -1598,6 +1598,10 @@ bool TryBuildStatusIndicator(ESkillStatusEffect Type, const TArray<FActiveSkillS
 		OutIndicator.Label = TEXT("F");
 		OutIndicator.Color = IdleProject::UI::Theme::AccentBlue;
 		return true;
+	case ESkillStatusEffect::Curse:
+		OutIndicator.Label = TEXT("C");
+		OutIndicator.Color = IdleProject::UI::Theme::ElementDark;
+		return true;
 	case ESkillStatusEffect::None:
 	default:
 		return false;
@@ -3293,7 +3297,8 @@ TArray<FIdleHUDStatusIndicatorViewModel> IdleProject::UI::BuildStatusIndicatorVi
 	const ESkillStatusEffect DisplayOrder[] = {
 		ESkillStatusEffect::Poison,
 		ESkillStatusEffect::Burn,
-		ESkillStatusEffect::Freeze
+		ESkillStatusEffect::Freeze,
+		ESkillStatusEffect::Curse
 	};
 
 	for (const ESkillStatusEffect Type : DisplayOrder)

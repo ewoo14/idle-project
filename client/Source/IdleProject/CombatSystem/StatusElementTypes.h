@@ -9,7 +9,8 @@ enum class ESkillStatusEffect : uint8
 	None = 0 UMETA(DisplayName = "None"),
 	Poison = 1 UMETA(DisplayName = "Poison"),
 	Burn = 2 UMETA(DisplayName = "Burn"),
-	Freeze = 3 UMETA(DisplayName = "Freeze")
+	Freeze = 3 UMETA(DisplayName = "Freeze"),
+	Curse = 4 UMETA(DisplayName = "Curse")
 };
 
 UENUM(BlueprintType)

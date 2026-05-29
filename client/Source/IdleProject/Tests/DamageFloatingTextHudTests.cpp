@@ -393,9 +393,15 @@ bool FStatusIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 	Poison.EndTime = 14.0f;
 	Statuses.Add(Poison);
 
+	FActiveSkillStatus Curse;
+	Curse.Type = ESkillStatusEffect::Curse;
+	Curse.EndTime = 16.0f;
+	Curse.Magnitude = 0.2f;
+	Statuses.Add(Curse);
+
 	const TArray<FIdleHUDStatusIndicatorViewModel> Indicators = BuildStatusIndicatorViewModels(Statuses, 12.0f, 1.0f);
 
-	TestEqual(TEXT("HUD shows one indicator per active status"), Indicators.Num(), 3);
+	TestEqual(TEXT("HUD shows one indicator per active status"), Indicators.Num(), 4);
 	TestEqual(TEXT("Poison is shown first for stable horizontal layout"), static_cast<int32>(Indicators[0].Type), static_cast<int32>(ESkillStatusEffect::Poison));
 	TestEqual(TEXT("Poison uses a compact glyph"), Indicators[0].Label, FString(TEXT("P")));
 	TestEqual(TEXT("Poison uses green rarity token"), Indicators[0].Color.R, RarityUnique.R);
@@ -408,6 +414,10 @@ bool FStatusIndicatorHudViewModelTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Freeze is shown third for stable horizontal layout"), static_cast<int32>(Indicators[2].Type), static_cast<int32>(ESkillStatusEffect::Freeze));
 	TestEqual(TEXT("Freeze uses a compact glyph"), Indicators[2].Label, FString(TEXT("F")));
 	TestEqual(TEXT("Freeze uses blue token"), Indicators[2].Color.B, AccentBlue.B);
+
+	TestEqual(TEXT("Curse is shown fourth for stable horizontal layout"), static_cast<int32>(Indicators[3].Type), static_cast<int32>(ESkillStatusEffect::Curse));
+	TestEqual(TEXT("Curse uses a compact glyph"), Indicators[3].Label, FString(TEXT("C")));
+	TestEqual(TEXT("Curse uses dark element token"), Indicators[3].Color.R, ElementDark.R);
 
 	FActiveSkillStatus ExpiredPoison;
 	ExpiredPoison.Type = ESkillStatusEffect::Poison;

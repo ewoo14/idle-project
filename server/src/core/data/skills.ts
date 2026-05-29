@@ -15,7 +15,7 @@ export type SkillDefinition = {
   buffDuration: number;
   gaugeGainOnHit: number;
   gaugeGainOnTakeDamage: number;
-  statusEffect: "none" | "poison" | "burn" | "freeze";
+  statusEffect: "none" | "poison" | "burn" | "freeze" | "curse";
   statusDuration: number;
   statusMagnitude: number;
   element: "none" | "fire" | "ice" | "lightning" | "holy" | "dark";
@@ -346,9 +346,9 @@ export const thiefSkillDefinitions: SkillDefinition[] = defineSkills([
     buffDuration: 0,
     gaugeGainOnHit: 0,
     gaugeGainOnTakeDamage: 0,
-    statusEffect: "poison",
-    statusDuration: 3,
-    statusMagnitude: 3,
+    statusEffect: "curse",
+    statusDuration: 4,
+    statusMagnitude: 0.2,
     element: "dark",
   },
   {
@@ -781,9 +781,9 @@ export const summonerSkillDefinitions: SkillDefinition[] = defineSkills([
     buffDuration: 0,
     gaugeGainOnHit: 1.5,
     gaugeGainOnTakeDamage: 0,
-    statusEffect: "freeze",
-    statusDuration: 2,
-    statusMagnitude: 0.2,
+    statusEffect: "curse",
+    statusDuration: 3,
+    statusMagnitude: 0.15,
     element: "dark",
   },
   {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyCrit,
+  applyCurseAmplification,
   computeClassDamage,
   computeDamage,
   computeElementMultiplier,
@@ -58,6 +59,19 @@ describe("combat formulas", () => {
 
   it("computes magic damage with the same curve using MagicAtk vs MagicDef", () => {
     expect(computeMagicDamage(80, 20)).toBe(68);
+  });
+
+  it("증폭한다: 저주 활성 시 받는 피해를 Magnitude 비율만큼", () => {
+    // 클라 CombatComponent::TakeDamageTyped 미러: damage x (1 + curseMagnitude)
+    expect(applyCurseAmplification(100, 0.2)).toBe(120);
+    expect(applyCurseAmplification(100, 0.15)).toBeCloseTo(115);
+    expect(applyCurseAmplification(50, 0.5)).toBe(75);
+  });
+
+  it("원복한다: 저주가 없으면(Magnitude 0) 피해 불변", () => {
+    expect(applyCurseAmplification(100, 0)).toBe(100);
+    // 음수 방어: 0으로 클램프되어 증폭 없음
+    expect(applyCurseAmplification(100, -0.5)).toBe(100);
   });
 
   it("computes element multipliers for weakness, resistance, and neutral hits", () => {
