@@ -55,11 +55,23 @@ bool FRuneHudViewModelTest::RunTest(const FString& Parameters)
 		125,
 		20000,
 		12,
-		1);
+		1,
+		0);
 
 	TestEqual(TEXT("Rune panel exposes seven slots"), ViewModel.Slots.Num(), FRuneFormula::RuneSlotCount);
 	TestEqual(TEXT("Rune panel exposes owned rows"), ViewModel.OwnedRows.Num(), 2);
 	TestEqual(TEXT("Selected index is retained"), ViewModel.SelectedOwnedIndex, 1);
+
+	// 룬 확장4: 선택 룬 액션 섹션.
+	TestTrue(TEXT("Action section has selection"), ViewModel.Action.bHasSelection);
+	TestEqual(TEXT("Action source index matches selection"), ViewModel.Action.SourceOwnedIndex, 1);
+	TestEqual(TEXT("Reroll essence cost matches formula"), ViewModel.Action.RerollEssenceCost, FRuneFormula::GetRerollSetEssenceCost(EItemRarity::Mythic));
+	TestTrue(TEXT("Mythic selection cannot upgrade rarity"), ViewModel.Action.bIsMythic);
+	TestFalse(TEXT("Mythic upgrade disabled"), ViewModel.Action.bCanUpgrade);
+	TestEqual(TEXT("Transfer target resolves to other rune"), ViewModel.Action.TransferTargetOwnedIndex, 0);
+	TestEqual(TEXT("Reroll hitbox exposed"), ViewModel.Action.RerollHitBoxName, FName(TEXT("RuneRerollSet")));
+	TestEqual(TEXT("Upgrade hitbox exposed"), ViewModel.Action.UpgradeHitBoxName, FName(TEXT("RuneUpgradeRarity")));
+	TestEqual(TEXT("Transfer hitbox exposed"), ViewModel.Action.TransferHitBoxName, FName(TEXT("RuneTransfer")));
 	TestEqual(TEXT("Essence label is localized"), ViewModel.EssenceLabel.ToString(), FString(TEXT("Rune Essence 125")));
 
 	const FIdleHUDRuneSlotViewModel& EquippedSlot = ViewModel.Slots[0];
@@ -105,6 +117,7 @@ bool FRuneClassSlotHudViewModelTest::RunTest(const FString& Parameters)
 		150,
 		0,
 		12,
+		INDEX_NONE,
 		INDEX_NONE);
 
 	TestEqual(TEXT("Class craft button label is localized"), ViewModel.ClassCraftButtonLabel.ToString(), FString(TEXT("Craft Class Rune")));
@@ -123,7 +136,8 @@ bool FRuneClassSlotHudViewModelTest::RunTest(const FString& Parameters)
 		10,
 		0,
 		12,
-		0);
+		0,
+		INDEX_NONE);
 	const FIdleHUDRuneSlotViewModel& EmptyClassSlot = EmptyViewModel.Slots[FClassRuneFormula::ClassRuneSlotIndex];
 	TestEqual(TEXT("Empty class slot uses class empty copy"), EmptyClassSlot.TypeLabel.ToString(), FString(TEXT("No class rune")));
 	TestEqual(TEXT("Selected class rune can equip into class slot"), EmptyClassSlot.ActionHitBoxName, FName(TEXT("RuneEquip_6")));
@@ -159,6 +173,7 @@ bool FRuneSetHudViewModelTest::RunTest(const FString& Parameters)
 		150,
 		20000,
 		12,
+		INDEX_NONE,
 		INDEX_NONE);
 
 	TestEqual(TEXT("Rune set panel title is localized"), ViewModel.SetTitle.ToString(), FString(TEXT("Rune Sets")));

@@ -329,4 +329,145 @@ bool FRuneGameInstanceSaveAndEconomyTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneServiceRerollUpgradeTransferTest,
+	"IdleProject.Rune.Service.RerollUpgradeTransfer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneServiceRerollUpgradeTransferTest::RunTest(const FString& Parameters)
+{
+	// 세트 리롤: 세트가 Offense~Fortune 범위로 설정된다(현재와 같아도 성공).
+	URuneService* RuneService = NewObject<URuneService>();
+	RuneService->AddRune(MakeRune(TEXT("phys_rare"), ERuneType::PhysAtk, EItemRarity::Rare, 0));
+	FRandomStream RerollStream(777);
+	TestTrue(TEXT("Reroll succeeds on a valid owned index"), RuneService->RerollRuneSet(0, RerollStream));
+	const ERuneSet RolledSet = RuneService->GetOwnedRunes()[0].RuneSet;
+	TestTrue(TEXT("Rerolled set is within Offense..Fortune"), RolledSet >= ERuneSet::Offense && RolledSet <= ERuneSet::Fortune);
+	TestFalse(TEXT("Reroll on invalid index fails"), RuneService->RerollRuneSet(99, RerollStream));
+
+	// 등급 상승: chance=1 강제 성공 → +1, chance=0 강제 실패 → 불변.
+	bool bUpgraded = false;
+	FRandomStream UpgradeStream(123);
+	TestTrue(TEXT("Forced-success upgrade attempt succeeds"), RuneService->TryUpgradeRuneRarity(0, 1.0f, UpgradeStream, bUpgraded));
+	TestTrue(TEXT("Forced-success upgrade sets success flag"), bUpgraded);
+	TestEqual(TEXT("Forced-success upgrade raises rarity by one (Rare->Epic)"), RuneService->GetOwnedRunes()[0].Rarity, EItemRarity::Epic);
+
+	TestTrue(TEXT("Forced-failure upgrade attempt is still a valid attempt"), RuneService->TryUpgradeRuneRarity(0, 0.0f, UpgradeStream, bUpgraded));
+	TestFalse(TEXT("Forced-failure upgrade clears success flag"), bUpgraded);
+	TestEqual(TEXT("Forced-failure upgrade leaves rarity unchanged"), RuneService->GetOwnedRunes()[0].Rarity, EItemRarity::Epic);
+
+	// Mythic 상한: 시도 불성립.
+	RuneService->AddRune(MakeRune(TEXT("phys_mythic"), ERuneType::PhysAtk, EItemRarity::Mythic, 0));
+	TestFalse(TEXT("Mythic rune cannot be upgraded"), RuneService->TryUpgradeRuneRarity(1, 1.0f, UpgradeStream, bUpgraded));
+	TestFalse(TEXT("Mythic upgrade rejection keeps success flag false"), bUpgraded);
+	TestEqual(TEXT("Mythic rune stays Mythic"), RuneService->GetOwnedRunes()[1].Rarity, EItemRarity::Mythic);
+
+	// 전송: Dst = max(Dst, Src), Src 삭제, 길이 감소, 장착 인덱스 정합.
+	URuneService* TransferService = NewObject<URuneService>();
+	TransferService->AddRune(MakeRune(TEXT("low"), ERuneType::PhysAtk, EItemRarity::Rare, 2));   // index 0 (src)
+	TransferService->AddRune(MakeRune(TEXT("high"), ERuneType::MagicAtk, EItemRarity::Rare, 8));  // index 1 (dst)
+	TransferService->AddRune(MakeRune(TEXT("tail"), ERuneType::Hp, EItemRarity::Rare, 0));        // index 2
+	TestTrue(TEXT("Equip dst before transfer"), TransferService->TryEquipRune(0, 1));
+	TestTrue(TEXT("Equip a rune after src before transfer"), TransferService->TryEquipRune(1, 2));
+
+	TestFalse(TEXT("Transfer to same index fails"), TransferService->TransferEnhancement(0, 0));
+	TestFalse(TEXT("Transfer with invalid index fails"), TransferService->TransferEnhancement(0, 99));
+
+	TestTrue(TEXT("Transfer src->dst succeeds"), TransferService->TransferEnhancement(0, 1));
+	TestEqual(TEXT("Source rune removed reduces owned count"), TransferService->GetOwnedRunes().Num(), 2);
+	// src(idx0) 삭제 후: 이전 dst(idx1)->0, tail(idx2)->1.
+	TestEqual(TEXT("Dst level becomes max(dst, src)"), TransferService->GetOwnedRunes()[0].EnhanceLevel, 8);
+	TestEqual(TEXT("Equipped slot tracking dst shifts down by one"), TransferService->GetEquippedOwnedIndex(0), 0);
+	TestEqual(TEXT("Equipped slot tracking post-src rune shifts down by one"), TransferService->GetEquippedOwnedIndex(1), 1);
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneFormulaRerollUpgradeTransferParityTest,
+	"IdleProject.Rune.Formula.RerollUpgradeTransferParity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneFormulaRerollUpgradeTransferParityTest::RunTest(const FString& Parameters)
+{
+	// 서버 rune.ts 표값 1:1 앵커(Common..Mythic = 1..7).
+	TestEqual(TEXT("Reroll essence cost Common"), FRuneFormula::GetRerollSetEssenceCost(EItemRarity::Common), static_cast<int64>(20));
+	TestEqual(TEXT("Reroll essence cost Rare"), FRuneFormula::GetRerollSetEssenceCost(EItemRarity::Rare), static_cast<int64>(50));
+	TestEqual(TEXT("Reroll essence cost Mythic"), FRuneFormula::GetRerollSetEssenceCost(EItemRarity::Mythic), static_cast<int64>(1500));
+
+	TestEqual(TEXT("Upgrade essence cost Common"), FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity::Common), static_cast<int64>(100));
+	TestEqual(TEXT("Upgrade essence cost Transcendent"), FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity::Transcendent), static_cast<int64>(10000));
+	TestEqual(TEXT("Upgrade essence cost Mythic guarded to zero"), FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity::Mythic), static_cast<int64>(0));
+
+	TestEqual(TEXT("Upgrade gold cost Common"), FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity::Common), static_cast<int64>(5000));
+	TestEqual(TEXT("Upgrade gold cost Transcendent"), FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity::Transcendent), static_cast<int64>(1500000));
+	TestEqual(TEXT("Upgrade gold cost Mythic guarded to zero"), FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity::Mythic), static_cast<int64>(0));
+
+	TestEqual(TEXT("Upgrade chance Common (float parity)"), FRuneFormula::GetRarityUpgradeChance(EItemRarity::Common), 0.6f);
+	TestEqual(TEXT("Upgrade chance Legendary (float parity)"), FRuneFormula::GetRarityUpgradeChance(EItemRarity::Legendary), 0.12f);
+	TestEqual(TEXT("Upgrade chance Transcendent (float parity)"), FRuneFormula::GetRarityUpgradeChance(EItemRarity::Transcendent), 0.05f);
+	TestEqual(TEXT("Upgrade chance Mythic guarded to zero"), FRuneFormula::GetRarityUpgradeChance(EItemRarity::Mythic), 0.0f);
+
+	TestEqual(TEXT("Transfer cost at level zero"), FRuneFormula::GetTransferEssenceCost(0), static_cast<int64>(50));
+	TestEqual(TEXT("Transfer cost at level ten"), FRuneFormula::GetTransferEssenceCost(10), static_cast<int64>(300));
+	TestEqual(TEXT("Transfer cost clamps negative level to base"), FRuneFormula::GetTransferEssenceCost(-5), static_cast<int64>(50));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FRuneGameInstanceRerollUpgradeTransferTest,
+	"IdleProject.Rune.GameInstance.RerollUpgradeTransfer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FRuneGameInstanceRerollUpgradeTransferTest::RunTest(const FString& Parameters)
+{
+	// 세트 리롤: 정수 충분 시 차감, 부족 시 거부.
+	UIdleGameInstance* GameInstance = NewObject<UIdleGameInstance>();
+	GameInstance->InitializeRuneServiceForTests();
+	GameInstance->AddRuneForTests(MakeRune(TEXT("phys_rare"), ERuneType::PhysAtk, EItemRarity::Rare, 0));
+
+	TestFalse(TEXT("Reroll rejected without essence"), GameInstance->TryRerollRuneSet(0));
+	GameInstance->AddRuneEssenceForTests(FRuneFormula::GetRerollSetEssenceCost(EItemRarity::Rare));
+	TestTrue(TEXT("Reroll succeeds when essence is sufficient"), GameInstance->TryRerollRuneSet(0));
+	TestEqual(TEXT("Reroll deducts essence exactly once"), GameInstance->GetRuneEssence(), static_cast<int64>(0));
+
+	// 등급 상승: 자원 부족 거부, 자원 충분 시 시도(단일 차감).
+	bool bUpgraded = false;
+	TestFalse(TEXT("Upgrade rejected without resources"), GameInstance->TryUpgradeRuneRarity(0, bUpgraded));
+	GameInstance->AddRuneEssenceForTests(FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity::Rare));
+	GameInstance->AddGold(FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity::Rare));
+	const int64 EssenceBeforeUpgrade = GameInstance->GetRuneEssence();
+	const int64 GoldBeforeUpgrade = GameInstance->GetGold();
+	TestTrue(TEXT("Upgrade attempt succeeds with resources"), GameInstance->TryUpgradeRuneRarity(0, bUpgraded));
+	TestEqual(TEXT("Upgrade deducts essence once"), GameInstance->GetRuneEssence(), EssenceBeforeUpgrade - FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity::Rare));
+	TestEqual(TEXT("Upgrade deducts gold once"), GameInstance->GetGold(), GoldBeforeUpgrade - FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity::Rare));
+
+	// Mythic 거부(자원 무차감).
+	GameInstance->AddRuneForTests(MakeRune(TEXT("mythic"), ERuneType::PhysAtk, EItemRarity::Mythic, 0));
+	GameInstance->AddRuneEssenceForTests(1000000);
+	GameInstance->AddGold(10000000);
+	const int64 EssenceBeforeMythic = GameInstance->GetRuneEssence();
+	const int64 GoldBeforeMythic = GameInstance->GetGold();
+	TestFalse(TEXT("Mythic rune upgrade rejected at game instance"), GameInstance->TryUpgradeRuneRarity(1, bUpgraded));
+	TestEqual(TEXT("Rejected Mythic upgrade does not spend essence"), GameInstance->GetRuneEssence(), EssenceBeforeMythic);
+	TestEqual(TEXT("Rejected Mythic upgrade does not spend gold"), GameInstance->GetGold(), GoldBeforeMythic);
+
+	// 전송: 정수 차감·source 삭제·길이 감소.
+	UIdleGameInstance* TransferInstance = NewObject<UIdleGameInstance>();
+	TransferInstance->InitializeRuneServiceForTests();
+	TransferInstance->AddRuneForTests(MakeRune(TEXT("src"), ERuneType::PhysAtk, EItemRarity::Rare, 3));
+	TransferInstance->AddRuneForTests(MakeRune(TEXT("dst"), ERuneType::MagicAtk, EItemRarity::Rare, 1));
+
+	TestFalse(TEXT("Transfer rejected without essence"), TransferInstance->TransferRuneEnhancement(0, 1));
+	const int64 TransferCost = FRuneFormula::GetTransferEssenceCost(3);
+	TransferInstance->AddRuneEssenceForTests(TransferCost);
+	TestTrue(TEXT("Transfer succeeds when essence is sufficient"), TransferInstance->TransferRuneEnhancement(0, 1));
+	TestEqual(TEXT("Transfer deducts essence exactly once"), TransferInstance->GetRuneEssence(), static_cast<int64>(0));
+	TestEqual(TEXT("Transfer removes source rune"), TransferInstance->GetRuneService()->GetOwnedRunes().Num(), 1);
+	TestEqual(TEXT("Transferred dst takes max enhance level"), TransferInstance->GetRuneService()->GetOwnedRunes()[0].EnhanceLevel, 3);
+
+	return true;
+}
+
 #endif

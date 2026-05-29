@@ -15,6 +15,11 @@ struct IDLEPROJECT_API FRuneFormula
 	static int64 GetEnhanceEssenceCost(int32 CurrentLevel);
 	static int64 GetEnhanceGoldCost(int32 CurrentLevel);
 	static int64 GetDisenchantEssence(EItemRarity Rarity, int32 EnhanceLevel);
+	static int64 GetRerollSetEssenceCost(EItemRarity Rarity);
+	static int64 GetRarityUpgradeEssenceCost(EItemRarity Rarity);
+	static int64 GetRarityUpgradeGoldCost(EItemRarity Rarity);
+	static float GetRarityUpgradeChance(EItemRarity Rarity);
+	static int64 GetTransferEssenceCost(int32 SourceLevel);
 	static bool RollRuneDrop(int32 MonsterLevel, bool bIsBoss, FRandomStream& Rng, FRuneInstance& OutRune);
 	static int64 GetShopRuneRollCost(int32 ProgressIndex);
 	static FRuneInstance RollShopRune(int32 ProgressIndex, FRandomStream& Rng);

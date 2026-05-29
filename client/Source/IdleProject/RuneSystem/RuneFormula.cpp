@@ -92,6 +92,20 @@ FName MakeRuneId(ERuneType Type, EItemRarity Rarity, int32 ProgressIndex)
 	return FName(*FString::Printf(TEXT("rune_%d_%d_%d"), static_cast<int32>(Type), static_cast<int32>(Rarity), FMath::Max(0, ProgressIndex)));
 }
 
+// 서버 rune.ts parity 미러. 레어도 정수(None=0, Common=1 .. Mythic=7) 인덱싱. Mythic(7) 상승 비용/확률=0.
+constexpr int64 RuneRerollSetEssenceByRarity[8] = {0, 20, 50, 100, 200, 400, 800, 1500};
+constexpr int64 RuneRarityUpgradeEssenceByRarity[8] = {0, 100, 250, 600, 1500, 4000, 10000, 0};
+constexpr int64 RuneRarityUpgradeGoldByRarity[8] = {0, 5000, 15000, 50000, 150000, 500000, 1500000, 0};
+constexpr float RuneRarityUpgradeChanceByRarity[8] = {0.0f, 0.6f, 0.45f, 0.3f, 0.2f, 0.12f, 0.05f, 0.0f};
+constexpr int64 RuneTransferEssenceBase = 50;
+constexpr int64 RuneTransferEssenceStep = 25;
+
+bool RuneIsValidRarity(EItemRarity Rarity)
+{
+	const int32 Value = static_cast<int32>(Rarity);
+	return Value >= static_cast<int32>(EItemRarity::Common) && Value <= static_cast<int32>(EItemRarity::Mythic);
+}
+
 int64 SquareCost(int64 BaseCost, int32 CurrentLevel)
 {
 	const int64 NextLevel = static_cast<int64>(FMath::Max(0, CurrentLevel)) + 1;
@@ -175,6 +189,32 @@ int64 FRuneFormula::GetDisenchantEssence(EItemRarity Rarity, int32 EnhanceLevel)
 		return 0;
 	}
 	return Tuning.DisenchantBase + static_cast<int64>(FMath::Max(0, EnhanceLevel)) * 2;
+}
+
+int64 FRuneFormula::GetRerollSetEssenceCost(EItemRarity Rarity)
+{
+	return RuneIsValidRarity(Rarity) ? RuneRerollSetEssenceByRarity[static_cast<int32>(Rarity)] : 0;
+}
+
+int64 FRuneFormula::GetRarityUpgradeEssenceCost(EItemRarity Rarity)
+{
+	return RuneIsValidRarity(Rarity) ? RuneRarityUpgradeEssenceByRarity[static_cast<int32>(Rarity)] : 0;
+}
+
+int64 FRuneFormula::GetRarityUpgradeGoldCost(EItemRarity Rarity)
+{
+	return RuneIsValidRarity(Rarity) ? RuneRarityUpgradeGoldByRarity[static_cast<int32>(Rarity)] : 0;
+}
+
+float FRuneFormula::GetRarityUpgradeChance(EItemRarity Rarity)
+{
+	// 서버 Math.fround parity: 상수 테이블이 이미 float 표현이므로 그대로 반환(C++ float = IEEE754 single).
+	return RuneIsValidRarity(Rarity) ? RuneRarityUpgradeChanceByRarity[static_cast<int32>(Rarity)] : 0.0f;
+}
+
+int64 FRuneFormula::GetTransferEssenceCost(int32 SourceLevel)
+{
+	return RuneTransferEssenceBase + static_cast<int64>(FMath::Max(0, SourceLevel)) * RuneTransferEssenceStep;
 }
 
 bool FRuneFormula::RollRuneDrop(int32 MonsterLevel, bool bIsBoss, FRandomStream& Rng, FRuneInstance& OutRune)

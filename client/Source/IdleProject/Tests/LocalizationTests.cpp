@@ -394,6 +394,36 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TestTrue(*FString::Printf(TEXT("StoryText English contains required chapter 5 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
 		}
+
+		if (TableName == TEXT("Rune"))
+		{
+			const TArray<FString> RequiredRuneActionKeys = {
+				TEXT("RUNE_ACTION_SECTION_TITLE"),
+				TEXT("RUNE_ACTION_NO_SELECTION"),
+				TEXT("RUNE_ACTION_REROLL_SET"),
+				TEXT("RUNE_ACTION_UPGRADE_RARITY"),
+				TEXT("RUNE_ACTION_TRANSFER"),
+				TEXT("RUNE_TRANSFER_CYCLE"),
+				TEXT("RUNE_CURRENT_SET_FORMAT"),
+				TEXT("RUNE_REROLL_COST_FORMAT"),
+				TEXT("RUNE_UPGRADE_INFO_FORMAT"),
+				TEXT("RUNE_UPGRADE_MAX"),
+				TEXT("RUNE_TRANSFER_TARGET_FORMAT"),
+				TEXT("RUNE_TRANSFER_NO_TARGET"),
+				TEXT("RUNE_TRANSFER_COST_FORMAT"),
+				TEXT("RUNE_FEEDBACK_REROLL_DONE"),
+				TEXT("RUNE_FEEDBACK_UPGRADE_SUCCESS"),
+				TEXT("RUNE_FEEDBACK_UPGRADE_FAIL"),
+				TEXT("RUNE_FEEDBACK_TRANSFER_DONE"),
+				TEXT("RUNE_FEEDBACK_FAILED"),
+			};
+
+			for (const FString& RequiredKey : RequiredRuneActionKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("Rune Korean contains required rune action key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("Rune English contains required rune action key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+		}
 	}
 
 	return true;

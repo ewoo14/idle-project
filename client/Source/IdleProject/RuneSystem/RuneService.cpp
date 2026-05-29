@@ -153,6 +153,72 @@ bool URuneService::TryDisenchantRune(int32 OwnedIndex, int64& OutEssenceRefund)
 	return true;
 }
 
+bool URuneService::RerollRuneSet(int32 OwnedIndex, FRandomStream& Rng)
+{
+	if (!OwnedRunes.IsValidIndex(OwnedIndex))
+	{
+		return false;
+	}
+
+	// Offense(1)~Fortune(4) 균등 랜덤. 현재와 같아도 소비(결과 균등).
+	const int32 SetValue = Rng.RandRange(static_cast<int32>(ERuneSet::Offense), static_cast<int32>(ERuneSet::Fortune));
+	OwnedRunes[OwnedIndex].RuneSet = static_cast<ERuneSet>(SetValue);
+	return true;
+}
+
+bool URuneService::TryUpgradeRuneRarity(int32 OwnedIndex, float SuccessChance, FRandomStream& Rng, bool& bOutSucceeded)
+{
+	bOutSucceeded = false;
+	if (!OwnedRunes.IsValidIndex(OwnedIndex))
+	{
+		return false;
+	}
+
+	const EItemRarity CurrentRarity = OwnedRunes[OwnedIndex].Rarity;
+	if (CurrentRarity < EItemRarity::Common || CurrentRarity >= EItemRarity::Mythic)
+	{
+		// Mythic(최고) 또는 유효하지 않은 등급은 상승 불가 → 시도 불성립.
+		return false;
+	}
+
+	// 확률 경계(1/0)에서 결정적: FRand() < Chance. Chance>=1 항상 성공, Chance<=0 항상 실패.
+	if (Rng.FRand() < SuccessChance)
+	{
+		OwnedRunes[OwnedIndex].Rarity = static_cast<EItemRarity>(static_cast<int32>(CurrentRarity) + 1);
+		bOutSucceeded = true;
+	}
+	return true;
+}
+
+bool URuneService::TransferEnhancement(int32 SrcIndex, int32 DstIndex)
+{
+	if (SrcIndex == DstIndex || !OwnedRunes.IsValidIndex(SrcIndex) || !OwnedRunes.IsValidIndex(DstIndex))
+	{
+		return false;
+	}
+
+	OwnedRunes[DstIndex].EnhanceLevel = FMath::Max(OwnedRunes[DstIndex].EnhanceLevel, OwnedRunes[SrcIndex].EnhanceLevel);
+
+	OwnedRunes.RemoveAt(SrcIndex);
+
+	// source 삭제로 밀린 인덱스 보정: src 뒤를 가리키던 장착 슬롯은 -1 감소, src 자체를 가리켰다면 해제.
+	// 주의: EnsureSlotCount()는 OwnedRunes 범위 밖 인덱스를 INDEX_NONE으로 클램프하므로,
+	// 반드시 인덱스 보정을 끝낸 뒤에 호출해야 한다(보정 전 호출 시 src 뒤 인덱스가 범위밖으로 오인돼 소실).
+	for (int32& EquippedIndex : EquippedSlots)
+	{
+		if (EquippedIndex > SrcIndex)
+		{
+			--EquippedIndex;
+		}
+		else if (EquippedIndex == SrcIndex)
+		{
+			EquippedIndex = INDEX_NONE;
+		}
+	}
+	EnsureSlotCount();
+	return true;
+}
+
 FRuneCoreMultipliers URuneService::GetEquippedCoreMultipliers() const
 {
 	FRuneCoreMultipliers Result;

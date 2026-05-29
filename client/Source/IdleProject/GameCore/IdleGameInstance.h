@@ -338,6 +338,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	bool TryBuyRuneRoll();
 
+	/** 보유 룬 세트 리롤(룬 정수 비용). 성공 시 세트 균등 랜덤 재설정. */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryRerollRuneSet(int32 OwnedIndex);
+
+	/** 보유 룬 등급 상승 시도(룬 정수+골드 비용, 확률). 성공 여부는 bOutSucceeded. 반환=시도 성립(자원 차감). */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TryUpgradeRuneRarity(int32 OwnedIndex, bool& bOutSucceeded);
+
+	/** 강화 레벨 전송(룬 정수 비용, source 레벨 비례). Dst=max(Dst,Src), Src 삭제. */
+	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
+	bool TransferRuneEnhancement(int32 SrcIndex, int32 DstIndex);
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Rune")
 	bool TryCraftClassRune(EItemRarity Rarity = EItemRarity::Common);
 
