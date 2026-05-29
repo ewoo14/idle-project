@@ -537,3 +537,17 @@ TM 종합 시 **블로커는 0개** 가 머지 조건.
 - [ ] The note covers PR #74 Abyss local mastery as a single-application
   dungeon reward bonus and warns against double application around tier
   multiplication.
+
+## PR #76 Balance Checklist Addendum (Section 5)
+
+- [ ] `docs/planning/leaderboard-v1-note.md` documents Power as the current
+  server `computePowerScore` CP proxy and Rebirth as validated rebirth count.
+- [ ] The note states that PR #76 leaderboard display does not modify
+  `LevelCurveDB.csv`, `MonsterDB.csv`, reward formulas, save payloads, or
+  first-rebirth pacing.
+- [ ] Season handling is explicitly bounded to V1 season id behavior, with
+  season creation/closeout/backfill deferred to operator follow-up work.
+- [ ] Rank-tier reward follow-up requires claim persistence and finalized
+  season snapshots before any rewards are added.
+- [ ] `npm run balance:sim` still reports median first rebirth inside 5-10h and
+  every sampled run inside the 3-20h review band.

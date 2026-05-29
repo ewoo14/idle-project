@@ -35,8 +35,8 @@
 
 ## Task 4: 밸런스/문서 (balance)
 **Files:** Create `docs/planning/leaderboard-v1-note.md`.
-- [ ] 랭킹 모델(Power=computePowerScore/CP 파생, Rebirth=count), 시즌 분리, 점수 무변경(공식 영향 없음) 명시. 시즌 보상 후속 설계 메모.
-- [ ] 커밋 `docs: 리더보드 V1 노트 (PR #76)`.
+- [x] 랭킹 모델(Power=computePowerScore/CP 파생, Rebirth=count), 시즌 분리, 점수 무변경(공식 영향 없음) 명시. 시즌 보상 후속 설계 메모.
+- [x] 커밋 `docs: 리더보드 V1 노트 (PR #76)`.
 
 ## Task 5: QA (qa)
 **Files:** `Tests/LeaderboardTests.cpp` 보강 + `leaderboard.test.ts` 보강 + qa 노트.
