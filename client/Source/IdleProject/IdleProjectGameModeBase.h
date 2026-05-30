@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "GameCore/MapThemeTypes.h"
 #include "GameCore/StageService.h"
 #include "IdleProjectGameModeBase.generated.h"
 
@@ -22,6 +23,13 @@ public:
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 
 	static bool ShouldSpawnMonsterAsBoss(bool bRequestedBoss, bool bHasStageService, const FStageInfo& StageInfo);
+
+	// 챕터 테마 적용(조명/바닥색/프롭 교체). 헤드리스 테스트 진입점.
+	void ApplyMapTheme(int32 Chapter);
+
+	// 헤드리스 테스트용 thin 진입점/게터.
+	void SpawnDefaultEnvironmentForTest() { SpawnDefaultEnvironment(); }
+	int32 GetThemePropCountForTest() const { return ThemeProps.Num(); }
 
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Battle")
@@ -46,6 +54,20 @@ private:
 	 * PR #7 (hotfix-06-light-sky) 추가. BP 맵 자산 도입 시 본 함수 호출 제거 가능.
 	 */
 	void SpawnDefaultEnvironment();
+
+	UFUNCTION()
+	void HandleStageChangedForTheme(FStageInfo NewStageInfo);
+
+	UPROPERTY()
+	TObjectPtr<class ADirectionalLight> ThemeSun = nullptr;
+	UPROPERTY()
+	TObjectPtr<class ASkyLight> ThemeSky = nullptr;
+	UPROPERTY()
+	TObjectPtr<class AStaticMeshActor> ThemeGround = nullptr;
+	UPROPERTY()
+	TArray<TObjectPtr<class AStaticMeshActor>> ThemeProps;
+
+	int32 AppliedThemeChapter = -1;
 
 	bool bInitialMonstersSpawned = false;
 	bool bDefaultEnvironmentSpawned = false;
