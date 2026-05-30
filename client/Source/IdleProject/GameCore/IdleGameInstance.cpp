@@ -535,6 +535,7 @@ void UIdleGameInstance::Shutdown()
 	AttendanceService = nullptr;
 	TreasureBoxService = nullptr;
 	RebirthPerkService = nullptr;
+	AutomationPolicyService = nullptr;
 	GuildService = nullptr;
 	Super::Shutdown();
 }
@@ -1738,9 +1739,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAttendanceService();
 	EnsureTreasureBoxService();
 	EnsureRebirthPerkService();
+	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 25;
+	SaveGame->SaveVersion = 26;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1894,6 +1896,15 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	{
 		// 환생 특성 분배 직렬화(총 포인트는 RebirthCount 파생이라 미저장).
 		SaveGame->RebirthPerkAllocations = RebirthPerkService->GetAllocations();
+	}
+
+	if (AutomationPolicyService)
+	{
+		// 자동화 정책 직렬화(SaveVer 26+). 클라 세이브 권위.
+		SaveGame->AutomationProgressionMode = AutomationPolicyService->GetMode();
+		SaveGame->AutomationFarmLockStage = AutomationPolicyService->GetFarmLockStage();
+		SaveGame->bAutomationAutoBossChallenge = AutomationPolicyService->GetAutoBossChallenge();
+		SaveGame->AutomationPushDeathThreshold = AutomationPolicyService->GetPushDeathThreshold();
 	}
 
 	if (GuildService)
@@ -2212,6 +2223,24 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 			SaveGame->SaveVersion >= 24 ? SaveGame->RebirthPerkAllocations : TMap<ERebirthPerk, int32>();
 		RebirthPerkService->RestoreState(RestoredAllocations);
 		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
+	}
+
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		if (SaveGame->SaveVersion >= 26)
+		{
+			AutomationPolicyService->RestoreState(
+				SaveGame->AutomationProgressionMode,
+				SaveGame->AutomationFarmLockStage,
+				SaveGame->bAutomationAutoBossChallenge,
+				SaveGame->AutomationPushDeathThreshold);
+		}
+		else
+		{
+			// <26 세이브: 기본값(전진/보스자동ON/임계3) 마이그레이션
+			AutomationPolicyService->RestoreState(EProgressionMode::Advance, 1, true, 3);
+		}
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -4307,6 +4336,47 @@ void UIdleGameInstance::EnsureRebirthPerkService()
 		// 현재 환생 횟수로 총 포인트 동기화(환생 풀 = 1/환생, 서버 parity).
 		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
 	}
+}
+
+void UIdleGameInstance::EnsureAutomationPolicyService()
+{
+	if (!AutomationPolicyService)
+	{
+		AutomationPolicyService = NewObject<UAutomationPolicyService>(this);
+	}
+}
+
+void UIdleGameInstance::SetAutomationProgressionMode(EProgressionMode InMode)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetMode(InMode);
+	}
+}
+
+void UIdleGameInstance::SetAutomationFarmLockStage(int32 InGlobalStage)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetFarmLockStage(InGlobalStage);
+	}
+}
+
+void UIdleGameInstance::SetAutomationAutoBossChallenge(bool bValue)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetAutoBossChallenge(bValue);
+	}
+}
+
+bool UIdleGameInstance::IsAutomationFeatureUnlocked(EAutomationFeature Feature) const
+{
+	const int32 HighestChapter = StageService ? StageService->GetHighestClearedChapter() : 0;
+	return UAutomationPolicyService::IsFeatureUnlocked(Feature, HighestChapter, RebirthCount);
 }
 
 void UIdleGameInstance::EnsureGuildService()
