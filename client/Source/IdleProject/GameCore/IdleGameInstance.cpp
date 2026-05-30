@@ -4405,13 +4405,13 @@ int64 UIdleGameInstance::SellInventoryItem(int32 ItemIndex)
 	{
 		return 0;
 	}
-	const int64 Gold = Inv->SellItem(ItemIndex);
-	if (Gold > 0)
+	const int64 GoldGained = Inv->SellItem(ItemIndex);
+	if (GoldGained > 0)
 	{
-		AddGold(Gold);
+		AddGold(GoldGained);
 		RefreshPlayerCharacterStats();
 	}
-	return Gold;
+	return GoldGained;
 }
 
 bool UIdleGameInstance::HandleDroppedEquipment(UInventoryComponent* Inv, const FItemInstance& Item)
