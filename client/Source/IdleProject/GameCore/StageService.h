@@ -45,7 +45,7 @@ class IDLEPROJECT_API UStageService : public UObject
 
 public:
 	static constexpr int32 StagesPerChapter = 10;
-	static constexpr int32 TotalChapters = 7;
+	static constexpr int32 TotalChapters = 8;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void InitializeDefaultStages();
