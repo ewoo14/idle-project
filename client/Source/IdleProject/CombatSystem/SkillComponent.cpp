@@ -91,6 +91,7 @@ void USkillComponent::LoadDefaultWarriorSkills()
 	Skills.Add(MakeSkill(TEXT("whirlwind"), EClassId::Warrior, TEXT("회전베기"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.8f, 0.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("shield_up"), EClassId::Warrior, TEXT("방패 올리기"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.5f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("charge"), EClassId::Warrior, TEXT("돌진"), ESkillType::Active, ESkillEffectType::DashDamage, 10.0f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("earthen_cleave"), EClassId::Warrior, TEXT("대지 가르기"), ESkillType::Active, ESkillEffectType::DamageAoe, 6.0f, 3.2f, 0.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("weapon_mastery"), EClassId::Warrior, TEXT("무기 숙련"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("toughness"), EClassId::Warrior, TEXT("강인함"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("berserkers_fury"), EClassId::Warrior, TEXT("광전사의 분노"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.0f, 0.3f, 4.0f, 8.0f, 5.0f));
@@ -104,6 +105,7 @@ void USkillComponent::LoadDefaultMageSkills()
 	Skills.Add(MakeSkill(TEXT("chain_lightning"), EClassId::Mage, TEXT("Chain Lightning"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.7f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Lightning));
 	Skills.Add(MakeSkill(TEXT("mana_shield"), EClassId::Mage, TEXT("Mana Shield"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.35f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("meteor"), EClassId::Mage, TEXT("Meteor"), ESkillType::Active, ESkillEffectType::DamageAoe, 14.0f, 2.8f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Freeze, 2.0f, 0.25f, ESkillElement::Ice));
+	Skills.Add(MakeSkill(TEXT("flame_storm"), EClassId::Mage, TEXT("화염 폭풍"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Burn, 3.0f, 3.5f, ESkillElement::Fire));
 	Skills.Add(MakeSkill(TEXT("spell_mastery"), EClassId::Mage, TEXT("Spell Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("mana_flow"), EClassId::Mage, TEXT("Mana Flow"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("arcane_overload"), EClassId::Mage, TEXT("Arcane Overload"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.5f, 0.25f, 4.0f, 9.0f, 3.0f));
@@ -117,6 +119,7 @@ void USkillComponent::LoadDefaultArcherSkills()
 	Skills.Add(MakeSkill(TEXT("arrow_rain"), EClassId::Archer, TEXT("Arrow Rain"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("focus"), EClassId::Archer, TEXT("Focus"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("piercing_arrow"), EClassId::Archer, TEXT("Piercing Arrow"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.0f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("multi_shot"), EClassId::Archer, TEXT("다중 사격"), ESkillType::Active, ESkillEffectType::DamageAoe, 5.5f, 3.2f, 0.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("critical_eye"), EClassId::Archer, TEXT("Critical Eye"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("quick_draw"), EClassId::Archer, TEXT("Quick Draw"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("eagle_eye"), EClassId::Archer, TEXT("Eagle Eye"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.0f, 0.25f, 4.0f, 10.0f, 2.0f));
@@ -130,6 +133,7 @@ void USkillComponent::LoadDefaultThiefSkills()
 	Skills.Add(MakeSkill(TEXT("smoke_bomb"), EClassId::Thief, TEXT("Smoke Bomb"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.5f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Poison, 3.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("evasion_stance"), EClassId::Thief, TEXT("Evasion Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.2f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("backstab"), EClassId::Thief, TEXT("Backstab"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.1f, 0.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("shadow_strike"), EClassId::Thief, TEXT("그림자 일격"), ESkillType::Active, ESkillEffectType::DamageSingle, 6.0f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, ESkillStatusEffect::Curse, 4.0f, 0.2f, ESkillElement::Dark));
 	Skills.Add(MakeSkill(TEXT("nimble_hands"), EClassId::Thief, TEXT("Nimble Hands"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("lucky_instinct"), EClassId::Thief, TEXT("Lucky Instinct"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.05f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("assassinate"), EClassId::Thief, TEXT("Assassinate"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 5.3f, 0.25f, 4.0f, 11.0f, 1.0f));
@@ -143,6 +147,7 @@ void USkillComponent::LoadDefaultClericSkills()
 	Skills.Add(MakeSkill(TEXT("heal"), EClassId::Cleric, TEXT("Heal"), ESkillType::Active, ESkillEffectType::Heal, 6.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("blessing"), EClassId::Cleric, TEXT("Blessing"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.15f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("purify"), EClassId::Cleric, TEXT("Purify"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.25f, 4.0f));
+	Skills.Add(MakeSkill(TEXT("divine_grace"), EClassId::Cleric, TEXT("신성 가호"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.3f, 5.0f, 0.0f, 0.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
 	Skills.Add(MakeSkill(TEXT("wisdom_training"), EClassId::Cleric, TEXT("Wisdom Training"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.1f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("divine_vitality"), EClassId::Cleric, TEXT("Divine Vitality"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("sanctuary"), EClassId::Cleric, TEXT("Sanctuary"), ESkillType::Ultimate, ESkillEffectType::Heal, 0.0f, 0.0f, 0.4f, 0.0f, 6.0f, 6.0f));
@@ -156,6 +161,7 @@ void USkillComponent::LoadDefaultPaladinSkills()
 	Skills.Add(MakeSkill(TEXT("radiant_sweep"), EClassId::Paladin, TEXT("Radiant Sweep"), ESkillType::Active, ESkillEffectType::DamageAoe, 8.0f, 1.6f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
 	Skills.Add(MakeSkill(TEXT("guardian_aegis"), EClassId::Paladin, TEXT("Guardian Aegis"), ESkillType::Active, ESkillEffectType::SelfBuff, 12.0f, 0.0f, 0.45f, 5.0f, 0.0f, 2.0f));
 	Skills.Add(MakeSkill(TEXT("lay_on_hands"), EClassId::Paladin, TEXT("Lay on Hands"), ESkillType::Active, ESkillEffectType::Heal, 10.0f, 0.0f, 0.18f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("judgment"), EClassId::Paladin, TEXT("심판"), ESkillType::Active, ESkillEffectType::DamageSingle, 8.0f, 2.4f, 0.0f, 0.0f, 1.0f, 1.0f, ESkillStatusEffect::None, 0.0f, 0.0f, ESkillElement::Holy));
 	Skills.Add(MakeSkill(TEXT("sacred_oath"), EClassId::Paladin, TEXT("Sacred Oath"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("bulwark_training"), EClassId::Paladin, TEXT("Bulwark Training"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("divine_bastion"), EClassId::Paladin, TEXT("Divine Bastion"), ESkillType::Ultimate, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.35f, 5.0f, 5.0f, 8.0f));
@@ -169,6 +175,7 @@ void USkillComponent::LoadDefaultBerserkerSkills()
 	Skills.Add(MakeSkill(TEXT("blood_surge"), EClassId::Berserker, TEXT("Blood Surge"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.5f, 1.65f, 0.0f, 0.0f, 2.0f, 0.0f, ESkillStatusEffect::Burn, 2.0f, 3.0f, ESkillElement::Fire));
 	Skills.Add(MakeSkill(TEXT("frenzy_stance"), EClassId::Berserker, TEXT("Frenzy Stance"), ESkillType::Active, ESkillEffectType::SelfBuff, 11.0f, 0.0f, 0.3f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("savage_leap"), EClassId::Berserker, TEXT("Savage Leap"), ESkillType::Active, ESkillEffectType::DashDamage, 9.0f, 2.05f, 0.0f, 0.0f, 2.0f, 0.0f));
+	Skills.Add(MakeSkill(TEXT("blood_rage"), EClassId::Berserker, TEXT("피의 격노"), ESkillType::Active, ESkillEffectType::DamageSingle, 6.0f, 3.0f, 0.0f, 0.0f, 2.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("blood_frenzy"), EClassId::Berserker, TEXT("Blood Frenzy"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("pain_to_power"), EClassId::Berserker, TEXT("Pain to Power"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.08f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("berserk_apex"), EClassId::Berserker, TEXT("Berserk Apex"), ESkillType::Ultimate, ESkillEffectType::DamageSingle, 0.0f, 6.5f, 0.35f, 4.0f, 12.0f, 2.0f));
@@ -182,6 +189,7 @@ void USkillComponent::LoadDefaultSummonerSkills()
 	Skills.Add(MakeSkill(TEXT("familiar_swarm"), EClassId::Summoner, TEXT("Familiar Swarm"), ESkillType::Active, ESkillEffectType::DamageAoe, 7.0f, 1.45f, 0.0f, 0.0f, 1.0f, 0.0f, ESkillStatusEffect::Poison, 4.0f, 2.0f, ESkillElement::None));
 	Skills.Add(MakeSkill(TEXT("arcane_binding"), EClassId::Summoner, TEXT("Arcane Binding"), ESkillType::Active, ESkillEffectType::SelfBuff, 10.0f, 0.0f, 0.22f, 4.0f));
 	Skills.Add(MakeSkill(TEXT("void_call"), EClassId::Summoner, TEXT("Void Call"), ESkillType::Active, ESkillEffectType::DamageAoe, 12.0f, 2.0f, 0.0f, 0.0f, 1.5f, 0.0f, ESkillStatusEffect::Curse, 3.0f, 0.15f, ESkillElement::Dark));
+	Skills.Add(MakeSkill(TEXT("spirit_burst"), EClassId::Summoner, TEXT("정령 폭발"), ESkillType::Active, ESkillEffectType::DamageAoe, 6.0f, 3.4f, 0.0f, 0.0f, 1.0f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("pact_mastery"), EClassId::Summoner, TEXT("Pact Mastery"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.15f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("spirit_reservoir"), EClassId::Summoner, TEXT("Spirit Reservoir"), ESkillType::Passive, ESkillEffectType::SelfBuff, 0.0f, 0.0f, 0.2f, 0.0f));
 	Skills.Add(MakeSkill(TEXT("grand_familiar"), EClassId::Summoner, TEXT("Grand Familiar"), ESkillType::Ultimate, ESkillEffectType::DamageAoe, 0.0f, 5.7f, 0.25f, 4.0f, 10.0f, 3.0f, ESkillStatusEffect::Poison, 5.0f, 4.0f, ESkillElement::Lightning));

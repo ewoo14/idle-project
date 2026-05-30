@@ -100,6 +100,19 @@ const expectedSkillDefinitionsByClass = new Map<
         gaugeGainOnTakeDamage: 0,
       },
       {
+        skillId: "earthen_cleave",
+        classId: 1,
+        displayName: "대지 가르기",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 6,
+        damageCoeff: 3.2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
         skillId: "weapon_mastery",
         classId: 1,
         displayName: "무기 숙련",
@@ -205,6 +218,23 @@ const expectedSkillDefinitionsByClass = new Map<
         element: "ice",
       },
       {
+        skillId: "flame_storm",
+        classId: 2,
+        displayName: "화염 폭풍",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 7,
+        damageCoeff: 3,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "burn",
+        statusDuration: 3,
+        statusMagnitude: 3.5,
+        element: "fire",
+      },
+      {
         skillId: "spell_mastery",
         classId: 2,
         displayName: "Spell Mastery",
@@ -295,6 +325,19 @@ const expectedSkillDefinitionsByClass = new Map<
         effectType: "dash_damage",
         cooldown: 9,
         damageCoeff: 2,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "multi_shot",
+        classId: 3,
+        displayName: "다중 사격",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 5.5,
+        damageCoeff: 3.2,
         buffMagnitude: 0,
         buffDuration: 0,
         gaugeGainOnHit: 0,
@@ -404,6 +447,23 @@ const expectedSkillDefinitionsByClass = new Map<
         gaugeGainOnTakeDamage: 0,
       },
       {
+        skillId: "shadow_strike",
+        classId: 4,
+        displayName: "그림자 일격",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 6,
+        damageCoeff: 3,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+        statusEffect: "curse",
+        statusDuration: 4,
+        statusMagnitude: 0.2,
+        element: "dark",
+      },
+      {
         skillId: "nimble_hands",
         classId: 4,
         displayName: "Nimble Hands",
@@ -499,6 +559,20 @@ const expectedSkillDefinitionsByClass = new Map<
         buffDuration: 4,
         gaugeGainOnHit: 0,
         gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "divine_grace",
+        classId: 5,
+        displayName: "신성 가호",
+        type: "active",
+        effectType: "self_buff",
+        cooldown: 12,
+        damageCoeff: 0,
+        buffMagnitude: 0.3,
+        buffDuration: 5,
+        gaugeGainOnHit: 0,
+        gaugeGainOnTakeDamage: 0,
+        element: "holy",
       },
       {
         skillId: "wisdom_training",
@@ -599,6 +673,20 @@ const expectedSkillDefinitionsByClass = new Map<
         gaugeGainOnTakeDamage: 0,
       },
       {
+        skillId: "judgment",
+        classId: 6,
+        displayName: "심판",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 8,
+        damageCoeff: 2.4,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 1,
+        element: "holy",
+      },
+      {
         skillId: "sacred_oath",
         classId: 6,
         displayName: "Sacred Oath",
@@ -693,6 +781,19 @@ const expectedSkillDefinitionsByClass = new Map<
         effectType: "dash_damage",
         cooldown: 9,
         damageCoeff: 2.05,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 2,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
+        skillId: "blood_rage",
+        classId: 7,
+        displayName: "피의 격노",
+        type: "active",
+        effectType: "damage_single",
+        cooldown: 6,
+        damageCoeff: 3,
         buffMagnitude: 0,
         buffDuration: 0,
         gaugeGainOnHit: 2,
@@ -805,6 +906,19 @@ const expectedSkillDefinitionsByClass = new Map<
         element: "dark",
       },
       {
+        skillId: "spirit_burst",
+        classId: 8,
+        displayName: "정령 폭발",
+        type: "active",
+        effectType: "damage_aoe",
+        cooldown: 6,
+        damageCoeff: 3.4,
+        buffMagnitude: 0,
+        buffDuration: 0,
+        gaugeGainOnHit: 1,
+        gaugeGainOnTakeDamage: 0,
+      },
+      {
         skillId: "pact_mastery",
         classId: 8,
         displayName: "Pact Mastery",
@@ -853,56 +967,56 @@ const expectedSkillDefinitionsByClass = new Map<
 
 describe("warriorSkillDefinitions", () => {
   it("mirrors the seven V1 warrior skills with server-readable fields", () => {
-    expect(warriorSkillDefinitions).toHaveLength(7);
+    expect(warriorSkillDefinitions).toHaveLength(8);
     expect(warriorSkillDefinitions).toEqual(expectedSkillsForClass(1));
   });
 });
 
 describe("mageSkillDefinitions", () => {
   it("mirrors the seven V1 mage skills with server-readable fields", () => {
-    expect(mageSkillDefinitions).toHaveLength(7);
+    expect(mageSkillDefinitions).toHaveLength(8);
     expect(mageSkillDefinitions).toEqual(expectedSkillsForClass(2));
   });
 });
 
 describe("archerSkillDefinitions", () => {
   it("mirrors the seven V1 archer skills with server-readable fields", () => {
-    expect(archerSkillDefinitions).toHaveLength(7);
+    expect(archerSkillDefinitions).toHaveLength(8);
     expect(archerSkillDefinitions).toEqual(expectedSkillsForClass(3));
   });
 });
 
 describe("thiefSkillDefinitions", () => {
   it("mirrors the seven V1 thief skills with server-readable fields", () => {
-    expect(thiefSkillDefinitions).toHaveLength(7);
+    expect(thiefSkillDefinitions).toHaveLength(8);
     expect(thiefSkillDefinitions).toEqual(expectedSkillsForClass(4));
   });
 });
 
 describe("clericSkillDefinitions", () => {
   it("mirrors the seven V1 cleric skills including heal effects", () => {
-    expect(clericSkillDefinitions).toHaveLength(7);
+    expect(clericSkillDefinitions).toHaveLength(8);
     expect(clericSkillDefinitions).toEqual(expectedSkillsForClass(5));
   });
 });
 
 describe("paladinSkillDefinitions", () => {
   it("mirrors the seven class expansion paladin skills including holy tank effects", () => {
-    expect(paladinSkillDefinitions).toHaveLength(7);
+    expect(paladinSkillDefinitions).toHaveLength(8);
     expect(paladinSkillDefinitions).toEqual(expectedSkillsForClass(6));
   });
 });
 
 describe("berserkerSkillDefinitions", () => {
   it("mirrors the seven class expansion berserker skills including rage effects", () => {
-    expect(berserkerSkillDefinitions).toHaveLength(7);
+    expect(berserkerSkillDefinitions).toHaveLength(8);
     expect(berserkerSkillDefinitions).toEqual(expectedSkillsForClass(7));
   });
 });
 
 describe("summonerSkillDefinitions", () => {
   it("mirrors the seven class expansion summoner skills including status effects", () => {
-    expect(summonerSkillDefinitions).toHaveLength(7);
+    expect(summonerSkillDefinitions).toHaveLength(8);
     expect(summonerSkillDefinitions).toEqual(expectedSkillsForClass(8));
   });
 });
@@ -927,13 +1041,13 @@ describe("skill definition parity by class", () => {
     }
   });
 
-  it("contains 56 skill definitions across the eight supported classes", () => {
+  it("contains 64 skill definitions across the eight supported classes", () => {
     const allSkills = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((classId) =>
       getSkillDefinitionsForClass(classId),
     );
 
-    expect(allSkills).toHaveLength(56);
-    expect(new Set(allSkills.map((skill) => skill.skillId)).size).toBe(56);
+    expect(allSkills).toHaveLength(64);
+    expect(new Set(allSkills.map((skill) => skill.skillId)).size).toBe(64);
     expect(new Set(allSkills.map((skill) => skill.effectType))).toContain(
       "heal",
     );
