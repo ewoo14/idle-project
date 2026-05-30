@@ -65,28 +65,30 @@ evaluateSkillRule(condition, hpThresholdPct, ctx): boolean
 - `selfHpPct`는 [0,1] 클램프. 음수/NaN 가드(회귀안전, P1 패턴).
 - 클라 `UAutomationPolicyService::EvaluateSkillRule`가 1:1 미러(float 정합).
 
-## 5. TickSkills 연동
+## 5. TickSkills 연동 (시그니처 churn 최소화)
 
-`TickSkills` 시그니처에 컨텍스트를 추가한다(기존 호출부 갱신):
+`TickSkills`는 BattleAIComponent + 11개 CombatTests에서 호출된다. 시그니처를 깨지 않기 위해 **기본 인자 1개만 추가**하고, 나머지 컨텍스트는 내부 계산한다.
 
 ```
+// bIsBossElite 만 기본 인자 추가 → 기존 3-인자 호출부(테스트 11곳) 무변경 컴파일.
 void TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets,
-                const FSkillTickContext& Ctx);
+                bool bIsBossElite = false);
 
-USTRUCT FSkillTickContext {
-  float SelfHpPct = 1.0f;     // 소유자 CombatComponent CurrentHp/MaxHp
-  bool bIsBossElite = false;  // 현재 인카운터 보스/엘리트 여부
-};
+// 규칙은 캐시(주입형). 기본 빈 → 전부 Always → 기존 동작(완전 하위호환).
+void SetAutoRules(const TArray<FSkillAutoRule>& InRules);
 ```
+
+내부 컨텍스트 산출:
+- `selfHpPct` = 소유자 `UCombatComponent`(GetOwner()->FindComponentByClass) `CurrentHp/MaxHp`, [0,1] 클램프. Combat 없으면 1.0.
+- `bIsBossElite` = 호출부 인자. BattleAIComponent가 `Cast<AIdleMonster>(Target)`의 `IsBoss() || IsElite()`로 전달. 테스트는 기본 false.
+- `buffActive`(MaintainBuff용) = `LastCastTimeBySkill.Contains(SkillId) && (Now - LastCast) < Skill.BuffDuration` (per-skill, 신규 저장 불필요).
 
 동작:
-1. 규칙 조회용 헬퍼 `GetRuleFor(SkillId) -> FSkillAutoRule`(없으면 Always 기본).
-2. 스킬을 **Priority 오름차순**(동률 선언 순서)으로 평가.
-3. 각 스킬: `EvaluateSkillRule(rule, ctx)` && 준비(궁극기=게이지/Active=쿨다운) → 발동.
-4. 궁극기 "먼저 발동" 의미 보존: 궁극기는 Priority 기본을 가장 높게(예: -1) 두어 규칙 통과 시 우선. 단 규칙(BossEliteOnly 등)에 막히면 건너뛴다.
-5. `MaintainBuff`의 `buffActive`는 SkillComponent의 기존 타임드 버프 추적(`UpdateTimedBuffs`)에서 해당 스킬 버프 활성 여부로 산출.
+1. `GetRuleFor(SkillId) -> FSkillAutoRule`(없으면 Always 기본).
+2. 스킬을 **Priority 오름차순**(동률 선언 순서)으로 평가. 궁극기는 Priority 기본 -1(가장 먼저)로 보존하되 규칙 게이트 통과 시에만.
+3. 각 스킬: `UAutomationPolicyService::EvaluateSkillRule(rule, ctx)` && 준비(궁극기=게이지/Active=쿨다운) → 발동.
 
-**컨텍스트 주입**: 호출부(전투 AI/캐릭터 틱)가 소유자 HP%와 인카운터 보스/엘리트 플래그(StageService `GetCurrentStageInfo().bBossStage/bEliteStage` 또는 대상 몬스터 IsBoss)를 채워 전달. 규칙(SkillRules)은 GameInstance `AutomationPolicy`에서 SkillComponent로 동기(장착 스킬 로드 시/정책 변경 시 캐시) — 전투 컴포넌트가 GameInstance를 직접 참조하지 않도록 주입형.
+**규칙 주입**: GameInstance `AutomationPolicy.SkillRules`를 플레이어 SkillComponent에 `SetAutoRules`로 동기(스킬 로드 시/정책 변경 시). 전투 컴포넌트는 GameInstance를 직접 참조하지 않음(주입형, 의존성 역전).
 
 ## 6. 해금 / 슬롯
 - `SkillTactics` 해금 = 챕터 3 클리어(`isFeatureUnlocked`, P1 정의). 미해금 시 모든 스킬 `Always`(기존 동작), 규칙 편집 잠금.
