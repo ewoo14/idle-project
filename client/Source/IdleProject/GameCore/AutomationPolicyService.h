@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameCore/AutomationTypes.h"
+#include "ItemSystem/ItemTypes.h"
 #include "UObject/Object.h"
 #include "AutomationPolicyService.generated.h"
 
@@ -93,6 +94,25 @@ public:
 
 	void RestoreSkillRules(const TArray<FSkillAutoRule>& InRules);
 
+	// ── 자동 장비 정책(P3, 클라 세이브 권위) ──
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	bool GetAutoEquipByPower() const { return bAutoEquipByPower; }
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutoEquipByPower(bool b) { bAutoEquipByPower = b; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	bool GetAutoSell() const { return bAutoSell; }
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutoSell(bool b) { bAutoSell = b; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	EItemRarity GetAutoSellMaxRarity() const { return AutoSellMaxRarity; }
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutoSellMaxRarity(EItemRarity R) { AutoSellMaxRarity = R; }
+
+	void RestoreGearPolicy(bool bInAutoEquip, bool bInAutoSell, EItemRarity InMaxRarity);
+
 private:
 	UPROPERTY()
 	EProgressionMode Mode = EProgressionMode::Advance;
@@ -108,4 +128,14 @@ private:
 
 	UPROPERTY()
 	TArray<FSkillAutoRule> SkillRules;
+
+	// 자동 장비 정책(P3). SaveVer 28+.
+	UPROPERTY()
+	bool bAutoEquipByPower = false;
+
+	UPROPERTY()
+	bool bAutoSell = false;
+
+	UPROPERTY()
+	EItemRarity AutoSellMaxRarity = EItemRarity::Common;
 };

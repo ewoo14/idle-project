@@ -133,3 +133,10 @@ void UAutomationPolicyService::RestoreSkillRules(const TArray<FSkillAutoRule>& I
 {
 	SkillRules = InRules;
 }
+
+void UAutomationPolicyService::RestoreGearPolicy(bool bInAutoEquip, bool bInAutoSell, EItemRarity InMaxRarity)
+{
+	bAutoEquipByPower = bInAutoEquip;
+	bAutoSell = bInAutoSell;
+	AutoSellMaxRarity = InMaxRarity;
+}

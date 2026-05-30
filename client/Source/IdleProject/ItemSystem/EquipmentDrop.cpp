@@ -71,12 +71,17 @@ void AEquipmentDrop::Tick(float DeltaSeconds)
 	{
 		if (UInventoryComponent* Inventory = TargetCharacter->FindComponentByClass<UInventoryComponent>())
 		{
-			if (Inventory->AddItem(Payload))
+			// 드랍 픽업은 자동화 핸들러 경유(자동 매각/자동 장착). 보관된 경우만 획득 업적.
+			if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
 			{
-				if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
+				if (GameInstance->HandleDroppedEquipment(Inventory, Payload))
 				{
 					GameInstance->RecordAchievementItemCollected(Payload);
 				}
+			}
+			else
+			{
+				Inventory->AddItem(Payload); // GameInstance 없으면 기존 동작
 			}
 		}
 		Destroy();
