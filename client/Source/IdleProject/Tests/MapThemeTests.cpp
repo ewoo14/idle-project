@@ -21,6 +21,7 @@ bool FMapThemeLibraryTest::RunTest(const FString& Parameters)
 		const FMapTheme T = FMapThemeLibrary::GetTheme(C);
 		TestTrue(FString::Printf(TEXT("chapter %d has props"), C), T.Props.Num() > 0);
 		TestTrue(FString::Printf(TEXT("chapter %d sun intensity"), C), T.SunIntensity > 0.0f);
+		TestTrue(FString::Printf(TEXT("chapter %d fog density"), C), T.FogDensity > 0.0f);
 	}
 	// 클램프: 0/9 → 1/8 동일.
 	const FMapTheme Low = FMapThemeLibrary::GetTheme(0);
@@ -52,6 +53,25 @@ bool FMapThemeMaterialAssetTest::RunTest(const FString& Parameters)
 	FLinearColor Out;
 	const bool bHas = MID && MID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Out);
 	TestTrue(TEXT("Color 벡터 파라미터 존재"), bHas);
+
+	// M_MapTheme Metallic 스칼라 파라미터.
+	{
+		UMaterialInstanceDynamic* M2 = UMaterialInstanceDynamic::Create(Mat, nullptr);
+		float V;
+		TestTrue(TEXT("M_MapTheme Metallic 파라미터"), M2 && M2->GetScalarParameterValue(FMaterialParameterInfo(TEXT("Metallic")), V));
+	}
+	// M_Sky 로드 + SkyTint 파라미터.
+	UMaterialInterface* SkyMat = Cast<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Maps/M_Sky.M_Sky")).TryLoad());
+	TestNotNull(TEXT("M_Sky 로드"), SkyMat);
+	if (SkyMat)
+	{
+		UMaterialInstanceDynamic* SkyMID = UMaterialInstanceDynamic::Create(SkyMat, nullptr);
+		FLinearColor Tint;
+		TestTrue(TEXT("M_Sky SkyTint 파라미터"), SkyMID && SkyMID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("SkyTint")), Tint));
+	}
+	// TC_MapSky 큐브맵 로드.
+	UObject* CubeObj = FSoftObjectPath(TEXT("/Game/Maps/TC_MapSky.TC_MapSky")).TryLoad();
+	TestNotNull(TEXT("TC_MapSky 로드"), CubeObj);
 	return true;
 }
 
@@ -100,6 +120,21 @@ bool FMapThemeApplyTest::RunTest(const FString& Parameters)
 			const FLinearColor Expected = FMapThemeLibrary::GetTheme(1).GroundColor;
 			TestTrue(TEXT("ground MID Color == ch1 GroundColor"), GroundColor.Equals(Expected, 0.01f));
 		}
+	}
+
+	// 안개 밀도 == 테마.
+	TestEqual(TEXT("fog density == ch1"), GM->GetFogDensityForTest(), FMapThemeLibrary::GetTheme(1).FogDensity);
+	// 스카이 틴트(에셋 유효 시) == 테마.
+	FLinearColor SkyTint;
+	if (GM->GetSkyTintForTest(SkyTint))
+	{
+		TestTrue(TEXT("sky tint == ch1"), SkyTint.Equals(FMapThemeLibrary::GetTheme(1).SkyTint, 0.01f));
+	}
+	// 프롭 0 질감 스칼라(에셋 유효 시) — Roughness 존재.
+	float PropRough;
+	if (GM->GetPropScalarForTest(0, TEXT("Roughness"), PropRough))
+	{
+		TestTrue(TEXT("prop0 roughness set"), PropRough >= 0.0f);
 	}
 
 	World->DestroyWorld(false);
