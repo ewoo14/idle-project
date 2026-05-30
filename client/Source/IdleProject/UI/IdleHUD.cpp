@@ -8166,11 +8166,12 @@ void AIdleHUD::DrawTowerPanel()
 	const bool bShowFeedback = !TowerFeedbackLabel.IsEmpty() && FeedbackElapsed <= TowerFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
 	const float PanelHeight = 198.0f * Scale + FeedbackHeight;
-	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
-	const float Y = 214.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Padding = 14.0f * Scale;
 	const float Border = 2.0f * Scale;
 	const FLinearColor StateColor = ViewModel.bCanClimb ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.72f);
@@ -8256,14 +8257,15 @@ void AIdleHUD::DrawDungeonPanel()
 	const bool bShowFeedback = !DungeonFeedbackLabel.IsEmpty() && FeedbackElapsed <= DungeonFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 82.0f * Scale;
 	const float RowGap = 8.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
 	const float PanelHeight = 54.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
-	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
-	const float Y = 428.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -8363,15 +8365,16 @@ void AIdleHUD::DrawWeeklyBossPanel()
 	const bool bShowFeedback = !WeeklyBossFeedbackLabel.IsEmpty() && FeedbackElapsed <= WeeklyBossFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 44.0f * Scale;
 	const float RowGap = 6.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 4);
 	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
 	const float PanelHeight = 132.0f * Scale + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding + FeedbackHeight;
-	const float X = (Canvas->SizeX - PanelWidth) * 0.5f;
-	const float Y = 650.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
