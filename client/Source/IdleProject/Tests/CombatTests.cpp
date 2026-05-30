@@ -1416,10 +1416,50 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Rank-up availability is exposed"), Slots[0].bCanRankUp);
 	TestEqual(TEXT("Unranked active skill still shows zero rank"), Slots[1].Rank, static_cast<int32>(0));
 
+	// 각 슬롯의 Element 가 소스 스킬과 일치하는지 확인(공명 전술 배지 데이터).
+	TMap<FName, ESkillElement> SourceElementById;
+	for (const FSkillDefinition& Skill : Skills->Skills)
+	{
+		if (Skill.Type == ESkillType::Active)
+		{
+			SourceElementById.Add(Skill.SkillId, Skill.Element);
+		}
+	}
+	for (const FIdleHUDSkillSlotViewModel& Slot : Slots)
+	{
+		const ESkillElement* Expected = SourceElementById.Find(Slot.SkillId);
+		TestNotNull(TEXT("Slot maps to a source active skill"), Expected);
+		if (Expected)
+		{
+			TestTrue(TEXT("Slot element mirrors source skill element"), Slot.Element == *Expected);
+		}
+	}
+
 	const FIdleHUDUltimateViewModel Ultimate = IdleProject::UI::BuildUltimateViewModel(*Skills);
 	TestEqual(TEXT("Gauge ratio is normalized"), Ultimate.GaugeRatio, 1.0f);
 	TestTrue(TEXT("Ultimate ready flag is exposed"), Ultimate.bReady);
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FElementLegendViewModelTest,
+	"IdleProject.UI.HUD.ElementLegend",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FElementLegendViewModelTest::RunTest(const FString& Parameters)
+{
+	IdleProject::Localization::SetLanguageForTests(TEXT("ko"));
+
+	const FIdleHUDElementLegendViewModel Legend = IdleProject::UI::BuildElementLegendViewModel();
+	TestEqual(TEXT("5 elements"), Legend.Elements.Num(), 5);
+	for (const FIdleHUDElementLegendEntry& Entry : Legend.Elements)
+	{
+		TestFalse(TEXT("element label non-empty"), Entry.Label.IsEmpty());
+		TestFalse(TEXT("element icon non-empty"), Entry.IconLabel.IsEmpty());
+	}
+	TestFalse(TEXT("weak note non-empty"), Legend.WeakNote.IsEmpty());
+	TestFalse(TEXT("resist note non-empty"), Legend.ResistNote.IsEmpty());
 	return true;
 }
 
