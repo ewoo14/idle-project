@@ -356,6 +356,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch6_004"), EQuestType::Main, TEXT("Silence the Echo of Collapse"), EQuestObjective::ClimbTower, 45, 150000, 112000, TEXT("main_ch6_003"), TEXT("6-5"));
 	AddDefinition(TEXT("main_ch6_005"), EQuestType::Main, TEXT("Cross the Crumbling Thunder Bridge"), EQuestObjective::KillMonster, 130, 169000, 126000, TEXT("main_ch6_004"), TEXT("6-8"));
 	AddDefinition(TEXT("main_ch6_006"), EQuestType::Main, TEXT("Seal the Hollow of Ending"), EQuestObjective::DefeatBoss, 1, 200000, 150000, TEXT("main_ch6_005"), TEXT("6-10"));
+	AddDefinition(TEXT("main_ch7_001"), EQuestType::Main, TEXT("Enter the Sundered Vault"), EQuestObjective::KillMonster, 140, 224000, 168000, TEXT("main_ch6_006"), TEXT("7-1"));
+	AddDefinition(TEXT("main_ch7_002"), EQuestType::Main, TEXT("Chart the Drowned Reliquary"), EQuestObjective::ClearMap, 1, 252000, 189000, TEXT("main_ch7_001"), TEXT("7-2"));
+	AddDefinition(TEXT("main_ch7_003"), EQuestType::Main, TEXT("Strength for the Severed Gate"), EQuestObjective::ReachLevel, 85, 285000, 214000, TEXT("main_ch7_002"), TEXT("7-4"));
+	AddDefinition(TEXT("main_ch7_004"), EQuestType::Main, TEXT("Silence the Severing Choir"), EQuestObjective::ClimbTower, 50, 322000, 242000, TEXT("main_ch7_003"), TEXT("7-5"));
+	AddDefinition(TEXT("main_ch7_005"), EQuestType::Main, TEXT("Cross the Severed Thunder Span"), EQuestObjective::KillMonster, 145, 363000, 273000, TEXT("main_ch7_004"), TEXT("7-8"));
+	AddDefinition(TEXT("main_ch7_006"), EQuestType::Main, TEXT("Sever the Last Tether"), EQuestObjective::DefeatBoss, 1, 428000, 321000, TEXT("main_ch7_005"), TEXT("7-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);

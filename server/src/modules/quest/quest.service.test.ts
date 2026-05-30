@@ -386,6 +386,66 @@ describe("QuestService", () => {
         chapterMapId: "6-10",
       },
       {
+        questId: "main_ch7_001",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 140,
+        rewardGold: 224000,
+        rewardExp: 168000,
+        prerequisiteQuestId: "main_ch6_006",
+        chapterMapId: "7-1",
+      },
+      {
+        questId: "main_ch7_002",
+        type: "main",
+        objective: "clear_map",
+        targetCount: 1,
+        rewardGold: 252000,
+        rewardExp: 189000,
+        prerequisiteQuestId: "main_ch7_001",
+        chapterMapId: "7-2",
+      },
+      {
+        questId: "main_ch7_003",
+        type: "main",
+        objective: "reach_level",
+        targetCount: 85,
+        rewardGold: 285000,
+        rewardExp: 214000,
+        prerequisiteQuestId: "main_ch7_002",
+        chapterMapId: "7-4",
+      },
+      {
+        questId: "main_ch7_004",
+        type: "main",
+        objective: "climb_tower",
+        targetCount: 50,
+        rewardGold: 322000,
+        rewardExp: 242000,
+        prerequisiteQuestId: "main_ch7_003",
+        chapterMapId: "7-5",
+      },
+      {
+        questId: "main_ch7_005",
+        type: "main",
+        objective: "kill_monster",
+        targetCount: 145,
+        rewardGold: 363000,
+        rewardExp: 273000,
+        prerequisiteQuestId: "main_ch7_004",
+        chapterMapId: "7-8",
+      },
+      {
+        questId: "main_ch7_006",
+        type: "main",
+        objective: "defeat_boss",
+        targetCount: 1,
+        rewardGold: 428000,
+        rewardExp: 321000,
+        prerequisiteQuestId: "main_ch7_005",
+        chapterMapId: "7-10",
+      },
+      {
         questId: "daily_kill_monsters",
         type: "daily",
         objective: "kill_monster",
@@ -1062,6 +1122,118 @@ describe("QuestService", () => {
         progress: 1,
         completed: true,
         chapterMapId: "6-10",
+      }),
+    );
+  });
+
+  it("unlocks and progresses chapter seven main quests through existing objective hooks", async () => {
+    const killRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch6_006",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const killService = new QuestService(killRepo);
+
+    const killResults = await killService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "kill_monster", amount: 140 },
+    );
+
+    expect(killResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch7_001",
+        progress: 140,
+        completed: true,
+        chapterMapId: "7-1",
+      }),
+    );
+
+    const levelRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch7_002",
+          progress: 1,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const levelService = new QuestService(levelRepo);
+
+    const towerRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch7_003",
+          progress: 85,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const towerService = new QuestService(towerRepo);
+
+    const bossRepo = createRepo({
+      progress: [
+        progressRecord({
+          questId: "main_ch7_004",
+          progress: 50,
+          completed: true,
+          claimed: true,
+        }),
+        progressRecord({
+          questId: "main_ch7_005",
+          progress: 145,
+          completed: true,
+          claimed: true,
+        }),
+      ],
+    });
+    const bossService = new QuestService(bossRepo);
+
+    const levelResults = await levelService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "reach_level", amount: 85 },
+    );
+    const towerResults = await towerService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "climb_tower", amount: 50 },
+    );
+    const bossResults = await bossService.addProgressForObjective(
+      userId,
+      characterId,
+      { objective: "defeat_boss", amount: 1 },
+    );
+
+    expect(levelResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch7_003",
+        progress: 85,
+        completed: true,
+        chapterMapId: "7-4",
+      }),
+    );
+    expect(towerResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch7_004",
+        progress: 50,
+        completed: true,
+        chapterMapId: "7-5",
+      }),
+    );
+    expect(bossResults).toContainEqual(
+      expect.objectContaining({
+        questId: "main_ch7_006",
+        progress: 1,
+        completed: true,
+        chapterMapId: "7-10",
       }),
     );
   });
