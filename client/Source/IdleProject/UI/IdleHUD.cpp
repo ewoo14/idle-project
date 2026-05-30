@@ -7231,15 +7231,16 @@ void AIdleHUD::DrawStatAllocationPanel()
 		IdleGameInstance->GetAvailableStatPoints());
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 300.0f * Scale;
+	float PanelWidth = 300.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 46.0f * Scale;
 	const float RowHeight = 30.0f * Scale;
 	const float RowGap = 5.0f * Scale;
 	const float Padding = 12.0f * Scale;
 	const float FooterHeight = 36.0f * Scale;
 	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + FooterHeight + Padding;
-	const float X = Canvas->SizeX - 700.0f * Scale;
-	const float Y = 92.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -7510,8 +7511,8 @@ void AIdleHUD::DrawStatInfoPanel()
 		IdleCharacter->GetCombatPower());
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float ToggleX = Canvas->SizeX - 392.0f * Scale;
-	const float ToggleY = 92.0f * Scale;
+	const float ToggleX = PanelRegionX; // 도킹 영역 기준
+	const float ToggleY = PanelRegionY; // 도킹 영역 기준
 	DrawStatInfoToggle(ViewModel, ToggleX, ToggleY, Scale);
 	if (!bStatInfoVisible)
 	{
@@ -7519,14 +7520,15 @@ void AIdleHUD::DrawStatInfoPanel()
 		return;
 	}
 
-	const float PanelWidth = 364.0f * Scale;
+	float PanelWidth = 364.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 84.0f * Scale;
 	const float RowHeight = 25.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const int32 RowCount = FMath::Max(ViewModel.PrimaryRows.Num(), ViewModel.DerivedRows.Num());
 	const float PanelHeight = HeaderHeight + RowCount * RowHeight + FMath::Max(0, RowCount - 1) * RowGap + Padding;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = ToggleY + 38.0f * Scale;
 	const float Border = 2.0f * Scale;
 	const float ColumnGap = 12.0f * Scale;
@@ -9844,12 +9846,13 @@ void AIdleHUD::DrawMasteryPanel()
 
 	const FIdleHUDMasteryPanelViewModel ViewModel = BuildMasteryPanelViewModel(*MasteryService);
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 56.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = 72.0f * Scale + ViewModel.Rows.Num() * RowHeight + Padding;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 454.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
