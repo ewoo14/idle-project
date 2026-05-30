@@ -6,6 +6,7 @@
 #include "CombatSystem/CombatComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -85,9 +86,6 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 		}
 	}
 
-	// SkyAtmosphere 는 UE 5.7 모듈 의존성 추가 필요 — DirectionalLight + SkyLight 만으로 충분히 가시화.
-	// 후속 PR 에서 BP 자산 (W_MainMenu.umap 등) 도입 시 함께 추가.
-
 	// 바닥 — Engine 기본 Plane mesh 를 50배 확대 (5000 unit 반경)
 	if (UStaticMesh* PlaneMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane")))
 	{
@@ -111,6 +109,19 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 		if (UExponentialHeightFogComponent* FogComp = ThemeFog->GetComponent())
 		{
 			FogComp->SetFogDensity(0.005f); // 낮은 기본 밀도: 대기 원근감만, 과도한 안개 방지
+		}
+	}
+
+	// 대기 산란 하늘(SkyAtmosphere). 실제 물리 기반 대기 산란 → 낮/석양/밤 자연스러운 색상 전환.
+	// ASkyAtmosphere 는 Engine 모듈(SkyAtmosphereComponent.h) 포함 — 별도 Build.cs 모듈 불필요.
+	ThemeAtmosphere = World->SpawnActor<ASkyAtmosphere>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	// 태양을 대기 산란 광원으로 연결(SkyAtmosphere 가 이 DirectionalLight 를 태양으로 인식).
+	if (ThemeSun)
+	{
+		if (UDirectionalLightComponent* SunComp = Cast<UDirectionalLightComponent>(ThemeSun->GetLightComponent()))
+		{
+			SunComp->SetAtmosphereSunLight(true);
+			SunComp->MarkRenderStateDirty();
 		}
 	}
 
@@ -150,6 +161,11 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 				SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			}
 			ThemeSkySphere->SetActorScale3D(FVector(-100.0f, -100.0f, -100.0f)); // 음수=역방향(안쪽이 보임)
+		}
+		// SkyAtmosphere 와 이중 하늘 충돌 방지: 절차적 스카이 스피어 숨김(SkyLight=ThemeSky 는 그대로 유지).
+		if (ThemeSkySphere)
+		{
+			ThemeSkySphere->SetActorHiddenInGame(true);
 		}
 	}
 

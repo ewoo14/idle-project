@@ -110,6 +110,10 @@ private:
 
 	bool bSkyAssetsLoadAttempted = false;
 
+	// 대기 산란 하늘(ASkyAtmosphere). ThemeSun 을 대기 광원으로 연결.
+	UPROPERTY(Transient)
+	TObjectPtr<class ASkyAtmosphere> ThemeAtmosphere = nullptr;
+
 	bool bInitialMonstersSpawned = false;
 	bool bDefaultEnvironmentSpawned = false;
 };
