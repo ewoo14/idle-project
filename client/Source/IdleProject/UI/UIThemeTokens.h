@@ -29,4 +29,16 @@ inline constexpr FLinearColor RarityLegendary = FLinearColor(0xF0 / 255.f, 0xA0 
 inline constexpr FLinearColor RarityTranscendent = FLinearColor(0x40 / 255.f, 0xD0 / 255.f, 0xE8 / 255.f, 1.f);
 inline constexpr FLinearColor RarityMythicStart = FLinearColor(0xFF / 255.f, 0x7B / 255.f, 0x00 / 255.f, 1.f);
 inline constexpr FLinearColor RarityMythicEnd = FLinearColor(0x00 / 255.f, 0xB4 / 255.f, 0xFF / 255.f, 1.f);
+
+// ── 원신 팔레트(비주얼 파운데이션) ──
+inline constexpr FLinearColor PanelCream     = FLinearColor(0.953f, 0.933f, 0.886f, 0.94f);
+inline constexpr FLinearColor PanelSlate     = FLinearColor(0.231f, 0.255f, 0.322f, 0.93f);
+inline constexpr FLinearColor FrameGold      = FLinearColor(0.784f, 0.667f, 0.431f, 1.0f);
+inline constexpr FLinearColor FrameGoldLight = FLinearColor(1.0f,   0.965f, 0.875f, 1.0f);
+inline constexpr FLinearColor TextSlate      = FLinearColor(0.227f, 0.255f, 0.314f, 1.0f);
+inline constexpr FLinearColor TextWarmGray   = FLinearColor(0.478f, 0.431f, 0.345f, 1.0f);
+inline constexpr FLinearColor TextOnSlate    = FLinearColor(0.953f, 0.918f, 0.824f, 1.0f);
+inline constexpr FLinearColor AccentGoldWarm = FLinearColor(0.827f, 0.737f, 0.553f, 1.0f);
+inline constexpr FLinearColor StarGold       = FLinearColor(0.953f, 0.663f, 0.227f, 1.0f);
+inline constexpr float        PanelCornerRadius = 14.0f;
 }
