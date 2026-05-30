@@ -4651,7 +4651,9 @@ void AIdleHUD::DrawPanelSubTabs()
 	const float TabH = 30.0f * Scale;
 	float X = PanelRegionX;
 	float Y = PanelRegionY;
-	const float MaxX = PanelRegionX + PanelRegionW;
+	// 모바일: 우측 상단 닫기(X) 버튼(30*Scale)과 충돌하지 않도록 여백 확보.
+	const float CloseReserve = (HudLayoutMode == EHudLayoutMode::Mobile) ? (34.0f * Scale) : 0.0f;
+	const float MaxX = PanelRegionX + PanelRegionW - CloseReserve;
 	for (const EHudPanel P : Panels)
 	{
 		const FString Label = IdleProject::Localization::UI(*PanelLocKey(P)).ToString();
