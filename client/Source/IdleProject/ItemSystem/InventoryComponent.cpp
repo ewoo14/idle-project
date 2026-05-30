@@ -1,6 +1,7 @@
 #include "ItemSystem/InventoryComponent.h"
 
 #include "ItemSystem/EnhanceFormula.h"
+#include "ItemSystem/ItemSellFormula.h"
 #include "ItemSystem/SetBonusFormula.h"
 #include "ItemSystem/UniqueTraitFormula.h"
 
@@ -352,4 +353,75 @@ void UInventoryComponent::RestoreState(const TArray<FItemInstance>& InItems, con
 		}
 		OnEquippedChanged.Broadcast(Slot);
 	}
+}
+
+int64 UInventoryComponent::SellItem(int32 ItemIndex)
+{
+	if (!Items.IsValidIndex(ItemIndex))
+	{
+		return 0;
+	}
+	const FItemInstance& Item = Items[ItemIndex];
+	if (Item.bLocked)
+	{
+		return 0;
+	}
+	// 장착 중인 아이템은 매각 거부.
+	for (const TPair<EItemSlot, int32>& Pair : EquippedIndex)
+	{
+		if (Pair.Value == ItemIndex)
+		{
+			return 0;
+		}
+	}
+
+	const int64 Value = FItemSellFormula::ComputeSellValue(Item.Rarity, Item.EnhanceLevel);
+	Items.RemoveAt(ItemIndex);
+
+	// 제거로 인한 인덱스 시프트: ItemIndex 보다 큰 장착 인덱스 -1 보정.
+	for (TPair<EItemSlot, int32>& Pair : EquippedIndex)
+	{
+		if (Pair.Value > ItemIndex)
+		{
+			Pair.Value -= 1;
+		}
+	}
+	return Value;
+}
+
+int32 UInventoryComponent::AutoEquipBestPerSlot()
+{
+	int32 EquipCount = 0;
+	// 슬롯별 최고 파워 인덱스 수집(None 슬롯 제외).
+	TMap<EItemSlot, int32> BestIndexBySlot;
+	TMap<EItemSlot, int64> BestPowerBySlot;
+	for (int32 i = 0; i < Items.Num(); ++i)
+	{
+		const FItemInstance& It = Items[i];
+		if (It.Slot == EItemSlot::None)
+		{
+			continue;
+		}
+		const int64 Power = FItemSellFormula::ComputeItemPower(It);
+		const int64* Cur = BestPowerBySlot.Find(It.Slot);
+		if (!Cur || Power > *Cur)
+		{
+			BestPowerBySlot.Add(It.Slot, Power);
+			BestIndexBySlot.Add(It.Slot, i);
+		}
+	}
+	// 장착품보다 강하면 교체.
+	for (const TPair<EItemSlot, int32>& Pair : BestIndexBySlot)
+	{
+		const EItemSlot Slot = Pair.Key;
+		const int32 BestIdx = Pair.Value;
+		const FItemInstance* Equipped = GetEquippedItem(Slot);
+		const int64 EquippedPower = Equipped ? FItemSellFormula::ComputeItemPower(*Equipped) : -1;
+		if (BestPowerBySlot[Slot] > EquippedPower)
+		{
+			EquipItem(BestIdx);
+			EquipCount += 1;
+		}
+	}
+	return EquipCount;
 }
