@@ -4579,6 +4579,11 @@ void AIdleHUD::DrawNavShell()
 	}
 	else
 	{
+		// 패널이 열려 있으면 전투 씬 위에 디밍(전체 화면) — 탭바·서브탭·패널보다 먼저.
+		if (IsNavOpen(HudNav))
+		{
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.45f), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+		}
 		DrawCategoryTabBar();
 		const float TabBarH = 84.0f * Scale;
 		PanelRegionW = FMath::Min(Canvas->SizeX - 24.0f * Scale, 560.0f * Scale);
@@ -4639,6 +4644,9 @@ void AIdleHUD::DrawPanelSubTabs()
 {
 	using namespace IdleProject::UI;
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	// 뮤테이션 전 영역 상단/우측 끝을 캡처 — 닫기 버튼 배치에 사용.
+	const float RegionTopY = PanelRegionY;
+	const float RegionRightX = PanelRegionX + PanelRegionW;
 	const TArray<EHudPanel>& Panels = PanelsForCategory(HudNav.ActiveCategory);
 	const float TabH = 30.0f * Scale;
 	float X = PanelRegionX;
@@ -4659,6 +4667,17 @@ void AIdleHUD::DrawPanelSubTabs()
 			GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
 		AddHitBox(FVector2D(X, Y), FVector2D(TabW, TabH), NavPanelHitBox(P), true);
 		X += TabW + 4.0f * Scale;
+	}
+	// 모바일 전용: 패널 영역 우측 상단에 닫기(X) 버튼 — 서브탭 행 위 오버레이.
+	if (HudLayoutMode == EHudLayoutMode::Mobile)
+	{
+		const float CloseSize = 30.0f * Scale;
+		const float CloseX = RegionRightX - CloseSize;
+		const float CloseY = RegionTopY;
+		DrawRect(Theme::BgPanel, CloseX, CloseY, CloseSize, CloseSize);
+		DrawText(TEXT("X"), Theme::TextPrimary, CloseX + 10.0f * Scale, CloseY + 6.0f * Scale,
+			GEngine ? GEngine->GetSmallFont() : nullptr, 0.85f * Scale);
+		AddHitBox(FVector2D(CloseX, CloseY), FVector2D(CloseSize, CloseSize), FName(TEXT("NavClose")), true);
 	}
 	const float Used = (Y + TabH) - PanelRegionY;
 	PanelRegionY += Used + 8.0f * Scale;
@@ -4723,6 +4742,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 		{
 			const int32 Id = FCString::Atoi(*Name.RightChop(9));
 			IdleProject::UI::SelectPanel(HudNav, (IdleProject::UI::EHudPanel)Id);
+			return;
+		}
+		if (BoxName == FName(TEXT("NavClose")))
+		{
+			IdleProject::UI::CloseNav(HudNav);
 			return;
 		}
 	}
