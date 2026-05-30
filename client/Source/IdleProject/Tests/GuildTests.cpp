@@ -68,6 +68,9 @@ bool FGuildServiceApplySnapshotTest::RunTest(const FString& Parameters)
 	Snapshot.Guild.Id = TEXT("guild-123");
 	Snapshot.Guild.Name = TEXT("Test Guild");
 	Snapshot.Guild.Level = 4;
+	// denorm 계약: FGuildSnapshot.GuildLevel 은 FGuildSummary.Level 과 동일 값.
+	// ApplySnapshot 은 GuildExp==0 일 때 top-level GuildLevel 을 신뢰하므로 함께 설정.
+	Snapshot.GuildLevel = 4;
 	Snapshot.Guild.MemberCount = 12;
 	Snapshot.Guild.JoinMode = EGuildJoinMode::Approval;
 
