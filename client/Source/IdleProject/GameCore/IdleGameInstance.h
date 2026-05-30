@@ -559,6 +559,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
 	void SetAutomationAutoSellMaxRarity(EItemRarity Rarity);
 
+	// ── 자동 소비/효율(P4) BP 진입점. 데이터 구동 HUD(신규 C++ 위젯 없음) ──
+	// 자동 버프 유지: ON 시 만료된 버프를 보유분으로 자동 재사용(처치 틱에서 호출).
+	void MaintainBuffsIfEnabled();
+
+	// 자동 매각가 효율 업그레이드(골드 충분 시 레벨++). 성공 여부.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	bool UpgradeSellValue();
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	int64 GetSellValueUpgradeCost() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationAutoMaintainBuff(bool bValue);
+
 	// ── 스킬 자동 전술 규칙(P2) BP 진입점. 데이터 구동 HUD(신규 C++ 위젯 없음) ──
 	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
 	void SetAutomationSkillRule(const FSkillAutoRule& Rule);

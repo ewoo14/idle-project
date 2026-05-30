@@ -199,6 +199,8 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 			GameInstance->RecordAchievementMetric(EAchievementMetric::BossesKilled, 1);
 		}
 		GameInstance->RecordMonsterKilled();
+		// 자동 버프 유지(P4): ON 시 만료 버프를 보유분으로 자동 재사용.
+		GameInstance->MaintainBuffsIfEnabled();
 	}
 
 	FTimerHandle RespawnTimerHandle;
