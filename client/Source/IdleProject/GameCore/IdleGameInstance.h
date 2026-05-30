@@ -36,6 +36,7 @@ class ULeaderboardService;
 class AIdleCharacter;
 class UIdleSaveGame;
 class URuneService;
+class USkillComponent;
 class UWeeklyBossService;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGoldChanged, int64, NewGold);
@@ -540,6 +541,20 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
 	bool IsAutomationFeatureUnlocked(EAutomationFeature Feature) const;
+
+	// ── 스킬 자동 전술 규칙(P2) BP 진입점. 데이터 구동 HUD(신규 C++ 위젯 없음) ──
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationSkillRule(const FSkillAutoRule& Rule);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void ClearAutomationSkillRule(FName SkillId);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	TArray<FSkillAutoRule> GetAutomationSkillRules() const;
+
+	// 정책의 스킬 규칙을 지정 SkillComponent 에 주입(스킬 로드/규칙 변경 시).
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SyncSkillRulesTo(USkillComponent* SkillComp);
 
 	// 스테이지 클리어로 자동 전진(+1)이 일어난 직후, 진행 정책에 따라 위치를 보정한다.
 	// Advance: 무동작(이미 전진 완료). Hold(FarmLock/보스게이트): 목표로 점프. Retreat: 클리어 경로엔 없음.

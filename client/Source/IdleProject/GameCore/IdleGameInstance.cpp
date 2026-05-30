@@ -2300,6 +2300,8 @@ bool UIdleGameInstance::ApplyCharacterSaveState(
 	if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
 	{
 		Skills->RestoreRankState(SkillRanks, SkillPoints);
+		// 복원된 자동화 스킬 규칙을 플레이어 SkillComponent 에 주입(런타임 적용).
+		SyncSkillRulesTo(Skills);
 		bAppliedAnyState = true;
 	}
 
@@ -4382,6 +4384,39 @@ bool UIdleGameInstance::IsAutomationFeatureUnlocked(EAutomationFeature Feature) 
 {
 	const int32 HighestChapter = StageService ? StageService->GetHighestClearedChapter() : 0;
 	return UAutomationPolicyService::IsFeatureUnlocked(Feature, HighestChapter, RebirthCount);
+}
+
+void UIdleGameInstance::SetAutomationSkillRule(const FSkillAutoRule& Rule)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetSkillRule(Rule);
+	}
+}
+
+void UIdleGameInstance::ClearAutomationSkillRule(FName SkillId)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->ClearSkillRule(SkillId);
+	}
+}
+
+TArray<FSkillAutoRule> UIdleGameInstance::GetAutomationSkillRules() const
+{
+	const UAutomationPolicyService* Service = GetAutomationPolicyService();
+	return Service ? Service->GetSkillRules() : TArray<FSkillAutoRule>();
+}
+
+void UIdleGameInstance::SyncSkillRulesTo(USkillComponent* SkillComp)
+{
+	EnsureAutomationPolicyService();
+	if (SkillComp && AutomationPolicyService)
+	{
+		SkillComp->SetAutoRules(AutomationPolicyService->GetSkillRules());
+	}
 }
 
 void UIdleGameInstance::ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss)
