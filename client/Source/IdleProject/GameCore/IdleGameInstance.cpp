@@ -24,6 +24,7 @@
 #include "Internationalization/IdleLocalization.h"
 #include "ItemSystem/EnhanceFormula.h"
 #include "ItemSystem/InventoryComponent.h"
+#include "ItemSystem/ItemSellFormula.h"
 #include "ItemSystem/PotentialFormula.h"
 #include "ItemSystem/ItemFactory.h"
 #include "ItemSystem/RarityMigration.h"
@@ -1742,7 +1743,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 27;
+	SaveGame->SaveVersion = 28;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1906,6 +1907,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->bAutomationAutoBossChallenge = AutomationPolicyService->GetAutoBossChallenge();
 		SaveGame->AutomationPushDeathThreshold = AutomationPolicyService->GetPushDeathThreshold();
 		SaveGame->AutomationSkillRules = AutomationPolicyService->GetSkillRules();
+		// 자동 장비 정책 직렬화(SaveVer 28+).
+		SaveGame->bAutomationAutoEquipByPower = AutomationPolicyService->GetAutoEquipByPower();
+		SaveGame->bAutomationAutoSell = AutomationPolicyService->GetAutoSell();
+		SaveGame->AutomationAutoSellMaxRarity = AutomationPolicyService->GetAutoSellMaxRarity();
 	}
 
 	if (GuildService)
@@ -2246,6 +2251,19 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		// 스킬 규칙은 SaveVer 27+ 에서만 존재. 미만이면 빈(전부 Always).
 		AutomationPolicyService->RestoreSkillRules(
 			SaveGame->SaveVersion >= 27 ? SaveGame->AutomationSkillRules : TArray<FSkillAutoRule>());
+
+		// 자동 장비 정책은 SaveVer 28+ 에서만 존재. 미만이면 기본(OFF/OFF/Common).
+		if (SaveGame->SaveVersion >= 28)
+		{
+			AutomationPolicyService->RestoreGearPolicy(
+				SaveGame->bAutomationAutoEquipByPower,
+				SaveGame->bAutomationAutoSell,
+				SaveGame->AutomationAutoSellMaxRarity);
+		}
+		else
+		{
+			AutomationPolicyService->RestoreGearPolicy(false, false, EItemRarity::Common);
+		}
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -4377,6 +4395,81 @@ void UIdleGameInstance::SetAutomationAutoBossChallenge(bool bValue)
 	if (AutomationPolicyService)
 	{
 		AutomationPolicyService->SetAutoBossChallenge(bValue);
+	}
+}
+
+int64 UIdleGameInstance::SellInventoryItem(int32 ItemIndex)
+{
+	UInventoryComponent* Inv = FindPlayerInventory();
+	if (!Inv)
+	{
+		return 0;
+	}
+	const int64 GoldGained = Inv->SellItem(ItemIndex);
+	if (GoldGained > 0)
+	{
+		AddGold(GoldGained);
+		RefreshPlayerCharacterStats();
+	}
+	return GoldGained;
+}
+
+bool UIdleGameInstance::HandleDroppedEquipment(UInventoryComponent* Inv, const FItemInstance& Item)
+{
+	EnsureAutomationPolicyService();
+	if (!Inv)
+	{
+		return false;
+	}
+
+	// 자동 매각: 토글 ON + 등급 필터 이하 + 안전 제외 화이트리스트 통과 시 골드화(미보관).
+	if (AutomationPolicyService && AutomationPolicyService->GetAutoSell()
+		&& static_cast<uint8>(Item.Rarity) <= static_cast<uint8>(AutomationPolicyService->GetAutoSellMaxRarity())
+		&& Item.Rarity != EItemRarity::None
+		&& !Item.bLocked && Item.EnhanceLevel <= 0
+		&& Item.PotentialGrade == EPotentialGrade::None
+		&& Item.UniqueTrait1 == EUniqueTrait::None && Item.UniqueTrait2 == EUniqueTrait::None)
+	{
+		AddGold(FItemSellFormula::ComputeSellValue(Item.Rarity, Item.EnhanceLevel));
+		return false; // 매각됨, 미보관
+	}
+
+	if (!Inv->AddItem(Item))
+	{
+		return false;
+	}
+	if (AutomationPolicyService && AutomationPolicyService->GetAutoEquipByPower())
+	{
+		Inv->AutoEquipBestPerSlot();
+	}
+	RefreshPlayerCharacterStats();
+	return true;
+}
+
+void UIdleGameInstance::SetAutomationAutoEquip(bool bValue)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetAutoEquipByPower(bValue);
+	}
+}
+
+void UIdleGameInstance::SetAutomationAutoSell(bool bValue)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetAutoSell(bValue);
+	}
+}
+
+void UIdleGameInstance::SetAutomationAutoSellMaxRarity(EItemRarity Rarity)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetAutoSellMaxRarity(Rarity);
 	}
 }
 

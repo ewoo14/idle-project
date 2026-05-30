@@ -542,6 +542,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
 	bool IsAutomationFeatureUnlocked(EAutomationFeature Feature) const;
 
+	// ── 자동 장비(P3) BP 진입점. 데이터 구동 HUD(신규 C++ 위젯 없음) ──
+	// 인벤 아이템 수동 매각 → 골드 획득. 매각 불가(장착/잠금/범위)면 0.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Item")
+	int64 SellInventoryItem(int32 ItemIndex);
+
+	// 몬스터 드랍 처리: 자동 매각 대상이면 골드화(미보관), 아니면 보관(+자동 장착). bKept 반환.
+	bool HandleDroppedEquipment(class UInventoryComponent* Inv, const FItemInstance& Item);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationAutoEquip(bool bValue);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationAutoSell(bool bValue);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationAutoSellMaxRarity(EItemRarity Rarity);
+
 	// ── 스킬 자동 전술 규칙(P2) BP 진입점. 데이터 구동 HUD(신규 C++ 위젯 없음) ──
 	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
 	void SetAutomationSkillRule(const FSkillAutoRule& Rule);

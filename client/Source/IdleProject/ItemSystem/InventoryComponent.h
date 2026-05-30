@@ -50,6 +50,12 @@ public:
 	void CaptureState(TArray<FItemInstance>& OutItems, TMap<EItemSlot, int32>& OutEquipped) const;
 	void RestoreState(const TArray<FItemInstance>& InItems, const TMap<EItemSlot, int32>& InEquipped);
 
+	// 미장착·미잠금 아이템 매각: 제거 후 매각가 반환(불가 시 0). 장착 인덱스 보정.
+	int64 SellItem(int32 ItemIndex);
+
+	// 슬롯별 보유 아이템 중 파워 최고가 장착품보다 크면 교체. 교체 수 반환.
+	int32 AutoEquipBestPerSlot();
+
 private:
 	static constexpr int32 MaxItems = 100;
 

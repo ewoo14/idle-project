@@ -17,6 +17,12 @@ export {
 export * from "./dungeon.js";
 export * from "./enhance.js";
 export * from "./equipment.js";
+export {
+  computeItemPower,
+  computeItemSellValue,
+  type ItemPowerInput,
+  RARITY_SELL_BASE,
+} from "./itemSell.js";
 export * from "./level.js";
 export * from "./mastery.js";
 export * from "./mission.js";
