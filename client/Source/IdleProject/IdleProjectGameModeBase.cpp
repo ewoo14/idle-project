@@ -11,6 +11,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/ExponentialHeightFog.h"
+#include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/TextureCube.h"
@@ -57,26 +58,30 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	// 태양 역할의 DirectionalLight (Movable + 따뜻한 색온도). 멤버에 보관해 테마 적용 시 갱신.
+	// 기본값: 따뜻한 햇살 색(1.0/0.96/0.88), 강도 4.0, 소프트 섀도우(소스 각도 1.5°).
 	ThemeSun = World->SpawnActor<ADirectionalLight>(FVector(0.0f, 0.0f, 5000.0f), FRotator(-45.0f, 45.0f, 0.0f), Params);
 	if (ThemeSun)
 	{
-		if (ULightComponent* SunComp = ThemeSun->GetLightComponent())
+		if (UDirectionalLightComponent* SunComp = Cast<UDirectionalLightComponent>(ThemeSun->GetLightComponent()))
 		{
 			SunComp->SetMobility(EComponentMobility::Movable);
-			SunComp->SetIntensity(5.0f);
-			SunComp->SetUseTemperature(true);
-			SunComp->SetTemperature(5500.0f);
+			SunComp->SetIntensity(4.0f);
+			SunComp->SetUseTemperature(false);
+			// 따뜻한 오후 햇살 색조(황금빛 화이트)
+			SunComp->SetLightColor(FLinearColor(1.0f, 0.96f, 0.88f));
+			// 소프트 섀도우: 광원 각도 1.5° → 그림자 반음영 확대
+			SunComp->SetLightSourceAngle(1.5f);
 		}
 	}
 
-	// 전역 환경광 SkyLight
+	// 전역 환경광 SkyLight — 밝은 환경광으로 소프트한 Genshin 분위기
 	ThemeSky = World->SpawnActor<ASkyLight>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	if (ThemeSky)
 	{
 		if (USkyLightComponent* SkyComp = ThemeSky->GetLightComponent())
 		{
 			SkyComp->SetMobility(EComponentMobility::Movable);
-			SkyComp->SetIntensity(1.0f);
+			SkyComp->SetIntensity(1.5f); // 기존 1.0 → 1.5: 밝은 환경광으로 소프트한 느낌
 		}
 	}
 
@@ -99,7 +104,38 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 	}
 
 	// 안개(대기 무드). 색/밀도는 ApplyMapTheme에서 챕터별 갱신.
+	// 기본 밀도를 낮게 설정해 과도한 안개 없이 대기 원근감만 표현.
 	ThemeFog = World->SpawnActor<AExponentialHeightFog>(FVector(0.0f, 0.0f, 0.0f), FRotator::ZeroRotator, Params);
+	if (ThemeFog)
+	{
+		if (UExponentialHeightFogComponent* FogComp = ThemeFog->GetComponent())
+		{
+			FogComp->SetFogDensity(0.005f); // 낮은 기본 밀도: 대기 원근감만, 과도한 안개 방지
+		}
+	}
+
+	// 전역 PostProcessVolume(Unbound) — 따뜻한 Genshin 분위기 그레이드.
+	// 화이트밸런스 6800K(따뜻), 블룸 부드럽게, SSAO, 약한 비네트, 채도/대비 미세 부스트.
+	ThemePostProcess = World->SpawnActor<APostProcessVolume>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	if (APostProcessVolume* PP = ThemePostProcess)
+	{
+		PP->bUnbound = true;
+		FPostProcessSettings& S = PP->Settings;
+		// 화이트밸런스: 6800K → 약간 따뜻한 황금빛 화이트
+		S.bOverride_WhiteTemp = true;                  S.WhiteTemp = 6800.0f;
+		// 블룸: 부드러운 빛 번짐(강도 0.62, 임계값 1.0)
+		S.bOverride_BloomIntensity = true;             S.BloomIntensity = 0.62f;
+		S.bOverride_BloomThreshold = true;             S.BloomThreshold = 1.0f;
+		// SSAO: 50% 강도 + 80 unit 반경 → 소프트한 음영
+		S.bOverride_AmbientOcclusionIntensity = true;  S.AmbientOcclusionIntensity = 0.5f;
+		S.bOverride_AmbientOcclusionRadius = true;     S.AmbientOcclusionRadius = 80.0f;
+		// 비네트: 약한 테두리 어둠(0.4)
+		S.bOverride_VignetteIntensity = true;          S.VignetteIntensity = 0.4f;
+		// 채도 1.08: 살짝 선명한 Genshin 색감
+		S.bOverride_ColorSaturation = true;            S.ColorSaturation = FVector4(1.08f, 1.08f, 1.08f, 1.0f);
+		// 대비 1.05: 극히 미세한 대비 강화
+		S.bOverride_ColorContrast = true;              S.ColorContrast = FVector4(1.05f, 1.05f, 1.05f, 1.0f);
+	}
 
 	// 스카이 스피어(역방향 배경). M_Sky MID는 ApplyMapTheme에서 SkyTint 갱신.
 	if (UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")))
