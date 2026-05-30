@@ -5,6 +5,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/AchievementService.h"
+#include "GameCore/AttendanceService.h"
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonService.h"
 #include "GameCore/GuildTypes.h"
@@ -196,6 +197,14 @@ public:
 	UWeeklyBossService* GetWeeklyBossService() const { return WeeklyBossService; }
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UAttendanceService* GetAttendanceService() const
+	{
+		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장.
+		const_cast<UIdleGameInstance*>(this)->EnsureAttendanceService();
+		return AttendanceService;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	UGuildService* GetGuildService() const { return GuildService; }
 
 	/** 로그인/세이브 시 서버 `GET /v1/guilds/me` 스냅샷을 받아 GuildService 캐시에 반영. */
@@ -297,6 +306,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|WeeklyBoss")
 	bool ClaimWeeklyBossMilestone(int32 Milestone);
+
+	// 출석 마일스톤 보상 수령 단일 진입점. N<=GetReached && !Claimed 검증 → AttendanceService 마킹 후
+	// 보상(골드/정수/소비) 지급 + 자동저장. 성공 시 true. 미달/중복/무효 N 은 false(보상 미지급).
+	UFUNCTION(BlueprintCallable, Category = "Idle|Attendance")
+	bool ClaimAttendanceMilestone(int32 N);
+
+	// 주요 진행/로그인/세이브 시 호출. 오늘(UTC date) 첫 출석이면 누적++ 후 자동저장. 이미 출석이면 무동작.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Attendance")
+	bool CheckInAttendance();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection = false);
@@ -570,6 +588,9 @@ public:
 
 	void InitializeWeeklyBossServiceForTests(const FString& CurrentWeek);
 
+	// 출석 누적일을 직접 세팅(고임계 마일스톤 검증용). LastAttendanceDate/수령 집합은 보존하지 않고 초기화.
+	void SeedAttendanceForTests(int64 Total);
+
 	void InitializeGuildServiceForTests();
 
 	void InitializeRuneServiceForTests();
@@ -697,6 +718,9 @@ private:
 	TObjectPtr<UWeeklyBossService> WeeklyBossService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UAttendanceService> AttendanceService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UGuildService> GuildService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
@@ -800,6 +824,7 @@ private:
 	void EnsureLeaderboardService();
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();
+	void EnsureAttendanceService();
 	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);

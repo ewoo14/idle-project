@@ -20,7 +20,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 22;
+	int32 SaveVersion = 23;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -192,6 +192,16 @@ public:
 
 	UPROPERTY()
 	FString MissionWeeklyResetWeek;
+
+	// ── 출석 보상(SaveVer 23) — 누적 출석일/마지막 출석 UTC 날짜/수령 마일스톤 집합. 클라 로컬 권위. <23 세이브는 빈 값(회귀 안전) ──
+	UPROPERTY()
+	int64 AttendanceTotal = 0;
+
+	UPROPERTY()
+	FString LastAttendanceDate;
+
+	UPROPERTY()
+	TSet<int32> AttendanceClaimedMilestones;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()
