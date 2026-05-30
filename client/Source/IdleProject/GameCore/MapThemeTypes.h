@@ -24,6 +24,15 @@ struct FMapProp
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
 	FLinearColor Color = FLinearColor::White;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	float Metallic = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	float Roughness = 0.85f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	float EmissiveStrength = 0.15f;
 };
 
 // 챕터 1개 맵 테마. 조명이 주 무드, 프롭이 실루엣.
@@ -49,6 +58,15 @@ struct FMapTheme
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
 	FLinearColor GroundColor = FLinearColor(0.2f, 0.2f, 0.2f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	FLinearColor FogColor = FLinearColor(0.5f, 0.55f, 0.6f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	float FogDensity = 0.02f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
+	FLinearColor SkyTint = FLinearColor::White;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|MapTheme")
 	TArray<FMapProp> Props;
