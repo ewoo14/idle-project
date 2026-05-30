@@ -492,6 +492,7 @@ void UIdleGameInstance::Init()
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureAttendanceService();
+	EnsureRebirthPerkService();
 	EnsureGuildService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
@@ -530,6 +531,7 @@ void UIdleGameInstance::Shutdown()
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
 	AttendanceService = nullptr;
+	RebirthPerkService = nullptr;
 	GuildService = nullptr;
 	Super::Shutdown();
 }
@@ -572,7 +574,9 @@ void UIdleGameInstance::AddGold(int64 Amount)
 		const double TitleGoldPct = TitleBonus.Type == ETitleBonus::GoldPct ? static_cast<double>(TitleBonus.Value) : 0.0;
 		// 잠재 V2: 장착 잠재 GoldFindPercent 도 같은 단일 골드획득 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
 		const double PotentialGoldPct = static_cast<double>(GetEquippedPotentialGoldFindPercent());
-		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct + TitleGoldPct + PotentialGoldPct;
+		// 환생 특성 GoldPct 도 같은 단일 골드획득 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+		const double RebirthPerkGoldPct = static_cast<double>(GetRebirthPerkBonus(ERebirthPerk::GoldPct));
+		const double GoldMultiplier = 1.0 + GoldBuffPct + GuildGoldPct + TitleGoldPct + PotentialGoldPct + RebirthPerkGoldPct;
 		// (double)MAX_int64 * 배수는 int64 범위를 넘겨 RoundToInt64에서 오버플로(UB)하므로
 		// 범위 초과 시 EffectiveAmount를 MAX_int64로 포화시킨다(아래 합산 포화 로직과 정합).
 		const double ScaledAmount = static_cast<double>(Amount) * GoldMultiplier;
@@ -1729,9 +1733,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureAttendanceService();
+	EnsureRebirthPerkService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 23;
+	SaveGame->SaveVersion = 24;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1872,6 +1877,12 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->AttendanceTotal = AttendanceService->GetTotalAttendance();
 		SaveGame->LastAttendanceDate = AttendanceService->GetLastAttendanceDate();
 		SaveGame->AttendanceClaimedMilestones = AttendanceService->GetClaimedMilestones();
+	}
+
+	if (RebirthPerkService)
+	{
+		// 환생 특성 분배 직렬화(총 포인트는 RebirthCount 파생이라 미저장).
+		SaveGame->RebirthPerkAllocations = RebirthPerkService->GetAllocations();
 	}
 
 	if (GuildService)
@@ -2171,6 +2182,16 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		AttendanceService->RestoreState(RestoredTotal, RestoredDate, RestoredClaimedMilestones);
 		// 로그인 시점 출석 체크인(오늘 첫 접속이면 누적++).
 		AttendanceService->CheckIn(UQuestService::GetCurrentUtcDateString());
+	}
+
+	EnsureRebirthPerkService();
+	if (RebirthPerkService)
+	{
+		// SaveVer 24+ 만 분배 복원, 이전 버전은 빈 맵(회귀 안전). 총 포인트는 RebirthCount 파생.
+		const TMap<ERebirthPerk, int32> RestoredAllocations =
+			SaveGame->SaveVersion >= 24 ? SaveGame->RebirthPerkAllocations : TMap<ERebirthPerk, int32>();
+		RebirthPerkService->RestoreState(RestoredAllocations);
+		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -3004,11 +3025,14 @@ void UIdleGameInstance::AddExp(int64 Amount)
 	// 칭호 ExpPct 도 같은 단일 EXP 배수 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
 	const FTitleBonus TitleExpBonus = TitleService ? TitleService->GetEquippedTitleBonus() : FTitleBonus();
 	const double TitleExpPct = TitleExpBonus.Type == ETitleBonus::ExpPct ? static_cast<double>(TitleExpBonus.Value) : 0.0;
+	// 환생 특성 ExpPct 도 같은 단일 EXP 배수 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+	const double RebirthPerkExpPct = static_cast<double>(GetRebirthPerkBonus(ERebirthPerk::ExpPct));
 	const double ExpMultiplier =
 		1.0
 		+ static_cast<double>(BuffService ? BuffService->GetExpBuffPct(GetCurrentUnixSeconds()) : 0.0f)
 		+ static_cast<double>(MasteryService ? MasteryService->GetGlobalBonus().ExpBoostPct : 0.0f)
-		+ TitleExpPct;
+		+ TitleExpPct
+		+ RebirthPerkExpPct;
 	CurrentExp += FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Amount) * ExpMultiplier));
 	const bool bWasAutosaveSuppressed = bAutosaveSuppressed;
 	bAutosaveSuppressed = true;
@@ -3127,6 +3151,12 @@ bool UIdleGameInstance::Rebirth()
 	RecordQuestProgress(EQuestObjective::Rebirth, 1);
 	RecordAchievementMetric(EAchievementMetric::RebirthCount, RebirthCount);
 	RebirthBonusPoints += Reward;
+	// 환생 특성 총 포인트 = 환생 횟수(1/환생). 기존 분배는 유지(추가 1점 가용).
+	EnsureRebirthPerkService();
+	if (RebirthPerkService)
+	{
+		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
+	}
 	CharacterLevel = 1;
 	CurrentExp = 0;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
@@ -3152,6 +3182,52 @@ int32 UIdleGameInstance::PreviewRebirthReward() const
 	return FRebirthFormula::GetRebirthPointsReward(RebirthCount, CharacterLevel);
 }
 
+bool UIdleGameInstance::AllocateRebirthPerk(ERebirthPerk Perk)
+{
+	EnsureRebirthPerkService();
+	if (!RebirthPerkService || !RebirthPerkService->AllocatePerk(Perk))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::DeallocateRebirthPerk(ERebirthPerk Perk)
+{
+	EnsureRebirthPerkService();
+	if (!RebirthPerkService || !RebirthPerkService->DeallocatePerk(Perk))
+	{
+		return false;
+	}
+
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+	return true;
+}
+
+void UIdleGameInstance::ResetRebirthPerks()
+{
+	EnsureRebirthPerkService();
+	if (!RebirthPerkService)
+	{
+		return;
+	}
+
+	RebirthPerkService->ResetPerks();
+	RefreshPlayerCharacterStats();
+	RequestAutosave();
+}
+
+float UIdleGameInstance::GetRebirthPerkBonus(ERebirthPerk Perk) const
+{
+	// 환생 특성 보너스 비율 단일 소비 getter(6종 각 단일 집계 지점, 이중 적용 금지 #72).
+	const URebirthPerkService* Service = GetRebirthPerkService();
+	return Service ? Service->GetPerkBonus(Perk) : 0.0f;
+}
+
 bool UIdleGameInstance::CanTranscend() const
 {
 	return FTranscendFormula::CanTranscend(RebirthCount);
@@ -3169,6 +3245,13 @@ bool UIdleGameInstance::Transcend()
 	RecordAchievementMetric(EAchievementMetric::TranscendCount, TranscendCount);
 	RebirthCount = 0;
 	RebirthBonusPoints = 0;
+	// 초월은 환생 진행을 전부 리셋하므로 환생 특성 분배·총 포인트도 0 으로 초기화.
+	EnsureRebirthPerkService();
+	if (RebirthPerkService)
+	{
+		RebirthPerkService->ResetPerks();
+		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
+	}
 	CharacterLevel = 1;
 	CurrentExp = 0;
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
@@ -3228,6 +3311,18 @@ float UIdleGameInstance::GetTitleCritDamageBonus() const
 	}
 	const FTitleBonus Bonus = TitleService->GetEquippedTitleBonus();
 	return Bonus.Type == ETitleBonus::CritDmgPct ? Bonus.Value : 0.0f;
+}
+
+float UIdleGameInstance::GetRebirthPerkAllStatMultiplier() const
+{
+	// 환생 특성 AllStatPct → 1.0 + 보너스. RefreshDerivedStats 전역 배수 단일 지점(칭호/잠재 AllStat 옆)에서만 곱한다(이중 적용 금지 #72).
+	return 1.0f + GetRebirthPerkBonus(ERebirthPerk::AllStatPct);
+}
+
+float UIdleGameInstance::GetRebirthPerkCritDamageBonus() const
+{
+	// 환생 특성 CritDmgPct 가산. RefreshDerivedStats 크리뎀 가산 단일 지점(칭호/룬 CritDmg 옆)에서만 더한다(이중 적용 금지 #72).
+	return GetRebirthPerkBonus(ERebirthPerk::CritDmgPct);
 }
 
 float UIdleGameInstance::GetEquippedPotentialAllStatMultiplier() const
@@ -3361,7 +3456,9 @@ FOfflineRewardResult UIdleGameInstance::PreviewOfflineRewards(int64 NowUnixSec, 
 	FOfflineRewardResult Reward = FOfflineRewardFormula::ComputeOfflineRewards(CharacterLevel, LastSeenUnixSec, NowUnixSec, EffectiveRebirthCount);
 	// 탐험 마스터리 2종: 오프라인 보상 ×(1 + GetLocalBonus2(Explore)). 1종 퀘스트 보상과 별도 단일.
 	const double ExploreOfflineBonus = static_cast<double>(MasteryService ? MasteryService->GetLocalBonus2(EMasteryTrack::Explore) : 0.0f);
-	const double OfflineMultiplier = (1.0 + static_cast<double>(GetRuneOfflineEffBonus())) * (1.0 + ExploreOfflineBonus);
+	// 환생 특성 OfflineEffPct 도 오프라인 보상 배수 단일 합산 지점(여기)에만 더한다(이중 적용 금지, #72).
+	const double RebirthPerkOfflineEff = static_cast<double>(GetRebirthPerkBonus(ERebirthPerk::OfflineEffPct));
+	const double OfflineMultiplier = (1.0 + static_cast<double>(GetRuneOfflineEffBonus())) * (1.0 + ExploreOfflineBonus + RebirthPerkOfflineEff);
 	Reward.Gold = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Gold) * OfflineMultiplier));
 	Reward.Exp = FMath::Max<int64>(0, FMath::RoundToInt64(static_cast<double>(Reward.Exp) * OfflineMultiplier));
 	return Reward;
@@ -3836,7 +3933,9 @@ float UIdleGameInstance::ApplyEquippedPetDropBonusChance(float BaseChance) const
 	const float MasteryBonus = MasteryService ? MasteryService->GetGlobalBonus().DropRateAdd : 0.0f;
 	// 잠재 V2: 장착 잠재 DropRatePercent 도 펫 Drop 집계와 동일한 단일 가산 지점(여기)에만 합류한다(이중 적용 금지, #72).
 	const float PotentialDropBonus = GetEquippedPotentialDropRatePercent();
-	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus + PotentialDropBonus, 0.0f, 1.0f);
+	// 환생 특성 DropPct 도 펫 Drop 집계와 동일한 단일 가산 지점(여기)에만 합류한다(이중 적용 금지, #72).
+	const float RebirthPerkDropBonus = GetRebirthPerkBonus(ERebirthPerk::DropPct);
+	return FMath::Clamp(PetAdjusted + ConsumableBonus + MasteryBonus + PotentialDropBonus + RebirthPerkDropBonus, 0.0f, 1.0f);
 }
 
 int32 UIdleGameInstance::GetSeasonTokens() const
@@ -4111,6 +4210,16 @@ void UIdleGameInstance::EnsureAttendanceService()
 	if (!AttendanceService)
 	{
 		AttendanceService = NewObject<UAttendanceService>(this);
+	}
+}
+
+void UIdleGameInstance::EnsureRebirthPerkService()
+{
+	if (!RebirthPerkService)
+	{
+		RebirthPerkService = NewObject<URebirthPerkService>(this);
+		// 현재 환생 횟수로 총 포인트 동기화(환생 풀 = 1/환생, 서버 parity).
+		RebirthPerkService->SetTotalPoints(URebirthPerkService::GetTotalRebirthPerkPoints(RebirthCount));
 	}
 }
 

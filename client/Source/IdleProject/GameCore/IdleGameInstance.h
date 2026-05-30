@@ -15,6 +15,7 @@
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/RebirthPerkService.h"
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "GameCore/TitleService.h"
@@ -202,6 +203,14 @@ public:
 		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장.
 		const_cast<UIdleGameInstance*>(this)->EnsureAttendanceService();
 		return AttendanceService;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	URebirthPerkService* GetRebirthPerkService() const
+	{
+		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장(#91).
+		const_cast<UIdleGameInstance*>(this)->EnsureRebirthPerkService();
+		return RebirthPerkService;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
@@ -478,6 +487,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Rebirth")
 	int32 GetRebirthBonusPoints() const { return RebirthBonusPoints; }
 
+	// 환생 특성 분배(+1). RebirthPerkService 위임 후 성공 시 스탯 재계산·오토세이브.
+	UFUNCTION(BlueprintCallable, Category = "Idle|RebirthPerk")
+	bool AllocateRebirthPerk(ERebirthPerk Perk);
+
+	// 환생 특성 분배 해제(-1). 성공 시 스탯 재계산·오토세이브.
+	UFUNCTION(BlueprintCallable, Category = "Idle|RebirthPerk")
+	bool DeallocateRebirthPerk(ERebirthPerk Perk);
+
+	// 환생 특성 전체 초기화(가용 회수). 스탯 재계산·오토세이브.
+	UFUNCTION(BlueprintCallable, Category = "Idle|RebirthPerk")
+	void ResetRebirthPerks();
+
+	// 환생 특성 perk 보너스 비율(없으면 0). RefreshDerivedStats/AddGold 등 단일 소비.
+	float GetRebirthPerkBonus(ERebirthPerk Perk) const;
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	bool CanTranscend() const;
 
@@ -506,6 +530,14 @@ public:
 	// 장착 칭호 CritDmgPct 보너스를 가산값(비율)으로 반환. 미장착/타 타입=0.0. CritDmg 단일 가산 지점에서만 사용.
 	UFUNCTION(BlueprintPure, Category = "Idle|Title")
 	float GetTitleCritDamageBonus() const;
+
+	// 환생 특성 AllStatPct 를 곱 배수(1.0 + 보너스)로 반환. RefreshDerivedStats 전역 배수 단일 지점에서만 소비(이중 적용 금지 #72).
+	UFUNCTION(BlueprintPure, Category = "Idle|RebirthPerk")
+	float GetRebirthPerkAllStatMultiplier() const;
+
+	// 환생 특성 CritDmgPct 를 가산값(비율)으로 반환. CritDmg 단일 가산 지점에서만 소비(이중 적용 금지 #72).
+	UFUNCTION(BlueprintPure, Category = "Idle|RebirthPerk")
+	float GetRebirthPerkCritDamageBonus() const;
 
 	// 잠재 V2: 장착 장비 잠재 AllStatPercent 합을 곱 배수(1.0 + 합)로 반환. RefreshDerivedStats 전역 배수 단일 지점에서만 소비(이중 적용 금지 #72).
 	UFUNCTION(BlueprintPure, Category = "Idle|Item")
@@ -721,6 +753,9 @@ private:
 	TObjectPtr<UAttendanceService> AttendanceService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<URebirthPerkService> RebirthPerkService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UGuildService> GuildService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
@@ -825,6 +860,7 @@ private:
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();
 	void EnsureAttendanceService();
+	void EnsureRebirthPerkService();
 	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);

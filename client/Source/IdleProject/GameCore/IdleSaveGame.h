@@ -6,6 +6,7 @@
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonTypes.h"
 #include "GameCore/MasteryTypes.h"
+#include "GameCore/RebirthPerkTypes.h"
 #include "GameFramework/SaveGame.h"
 #include "GameCore/QuestService.h"
 #include "ItemSystem/ItemTypes.h"
@@ -20,7 +21,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 23;
+	int32 SaveVersion = 24;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -202,6 +203,11 @@ public:
 
 	UPROPERTY()
 	TSet<int32> AttendanceClaimedMilestones;
+
+	// ── 환생 특성(SaveVer 24) — perk→분배 레벨 맵. 클라 로컬 권위(서버 rebirthPerk.ts parity).
+	// 총 포인트는 RebirthCount 에서 파생(별도 저장 없음). <24 세이브는 빈 맵(회귀 안전) ──
+	UPROPERTY()
+	TMap<ERebirthPerk, int32> RebirthPerkAllocations;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()
