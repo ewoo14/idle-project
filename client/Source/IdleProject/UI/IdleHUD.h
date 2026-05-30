@@ -1192,6 +1192,7 @@ private:
 	void SelectClassFromHitBox(FName BoxName);
 	void DrawSkillHud(const USkillComponent& SkillComponent, float Now);
 	void DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotIndex, float X, float Y, float Width, float Height);
+	void DrawElementLegend(const FIdleHUDElementLegendViewModel& Legend, float X, float Y, float Width);
 	void DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height);
 	void DrawStageIndicator();
 	void DrawBossBar();
