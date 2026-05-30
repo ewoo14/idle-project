@@ -5,12 +5,15 @@
 #include "GameFramework/Character.h"
 #include "CombatSystem/CombatComponent.h"
 #include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Components/LightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
+#include "Engine/ExponentialHeightFog.h"
 #include "Engine/SkyLight.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/TextureCube.h"
 #include "Engine/StaticMeshActor.h"
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/MapThemeLibrary.h"
@@ -95,6 +98,25 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 		}
 	}
 
+	// 안개(대기 무드). 색/밀도는 ApplyMapTheme에서 챕터별 갱신.
+	ThemeFog = World->SpawnActor<AExponentialHeightFog>(FVector(0.0f, 0.0f, 0.0f), FRotator::ZeroRotator, Params);
+
+	// 스카이 스피어(역방향 배경). M_Sky MID는 ApplyMapTheme에서 SkyTint 갱신.
+	if (UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")))
+	{
+		ThemeSkySphere = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		if (ThemeSkySphere)
+		{
+			ThemeSkySphere->SetMobility(EComponentMobility::Movable);
+			if (UStaticMeshComponent* SphereComp = ThemeSkySphere->GetStaticMeshComponent())
+			{
+				SphereComp->SetStaticMesh(SphereMesh);
+				SphereComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			}
+			ThemeSkySphere->SetActorScale3D(FVector(-100.0f, -100.0f, -100.0f)); // 음수=역방향(안쪽이 보임)
+		}
+	}
+
 	// 챕터 테마 초기 적용 + 챕터 전환 바인딩. Sun/Sky/Ground 가 이미 spawn 된 뒤이며,
 	// StageService 미확보(테스트 등)면 바인딩 skip — ApplyMapTheme 직접 호출로 검증 가능.
 	if (UIdleGameInstance* GameInstance = GetGameInstance<UIdleGameInstance>())
@@ -141,6 +163,49 @@ void AIdleProjectGameModeBase::ApplyMapTheme(int32 Chapter)
 		bThemeMaterialLoadAttempted = true;
 		static const FSoftObjectPath ThemeMatPath(TEXT("/Game/Maps/M_MapTheme.M_MapTheme"));
 		ThemeMaterial = Cast<UMaterialInterface>(ThemeMatPath.TryLoad());
+	}
+
+	// 스카이 에셋 1회 lazy 로드(에셋 부재 시 폴백).
+	if (!bSkyAssetsLoadAttempted)
+	{
+		bSkyAssetsLoadAttempted = true;
+		SkyMaterial = Cast<UMaterialInterface>(FSoftObjectPath(TEXT("/Game/Maps/M_Sky.M_Sky")).TryLoad());
+		SkyCubemap = Cast<UTextureCube>(FSoftObjectPath(TEXT("/Game/Maps/TC_MapSky.TC_MapSky")).TryLoad());
+	}
+
+	// 안개 색/밀도(챕터별).
+	if (ThemeFog)
+	{
+		if (UExponentialHeightFogComponent* FogComp = ThemeFog->GetComponent())
+		{
+			FogComp->SetFogInscatteringColor(Theme.FogColor);
+			FogComp->SetFogDensity(Theme.FogDensity);
+		}
+	}
+
+	// 스카이 스피어 틴트(에셋 유효 시).
+	if (ThemeSkySphere && SkyMaterial)
+	{
+		if (UStaticMeshComponent* SphereComp = ThemeSkySphere->GetStaticMeshComponent())
+		{
+			SphereComp->SetMaterial(0, SkyMaterial);
+			if (UMaterialInstanceDynamic* SkyMID = SphereComp->CreateAndSetMaterialInstanceDynamic(0))
+			{
+				SkyMID->SetVectorParameterValue(TEXT("SkyTint"), Theme.SkyTint);
+			}
+		}
+	}
+
+	// SkyLight 큐브맵(에셋 유효 시) — 절차 스카이 환경광.
+	if (ThemeSky && SkyCubemap)
+	{
+		if (USkyLightComponent* SkyComp = ThemeSky->GetLightComponent())
+		{
+			SkyComp->Cubemap = SkyCubemap;
+			SkyComp->SourceType = SLS_SpecifiedCubemap;
+			SkyComp->SetLightColor(Theme.SkyColor);
+			SkyComp->RecaptureSky();
+		}
 	}
 
 	// 바닥 색(파라미터 머티리얼 있으면 실제 틴트, 없으면 기존 베이스 best-effort).
@@ -202,6 +267,9 @@ void AIdleProjectGameModeBase::ApplyMapTheme(int32 Chapter)
 				if (MID)
 				{
 					MID->SetVectorParameterValue(TEXT("Color"), Prop.Color);
+					MID->SetScalarParameterValue(TEXT("Metallic"), Prop.Metallic);
+					MID->SetScalarParameterValue(TEXT("Roughness"), Prop.Roughness);
+					MID->SetScalarParameterValue(TEXT("EmissiveStrength"), Prop.EmissiveStrength);
 				}
 			}
 		}
@@ -229,6 +297,48 @@ bool AIdleProjectGameModeBase::GetGroundColorForTest(FLinearColor& OutColor) con
 	if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(GetGroundMaterialForTest()))
 	{
 		return MID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), OutColor);
+	}
+	return false;
+}
+
+float AIdleProjectGameModeBase::GetFogDensityForTest() const
+{
+	if (ThemeFog)
+	{
+		if (UExponentialHeightFogComponent* FogComp = ThemeFog->GetComponent())
+		{
+			return FogComp->FogDensity;
+		}
+	}
+	return -1.0f;
+}
+
+bool AIdleProjectGameModeBase::GetSkyTintForTest(FLinearColor& OutTint) const
+{
+	if (ThemeSkySphere)
+	{
+		if (UStaticMeshComponent* SphereComp = ThemeSkySphere->GetStaticMeshComponent())
+		{
+			if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(SphereComp->GetMaterial(0)))
+			{
+				return MID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("SkyTint")), OutTint);
+			}
+		}
+	}
+	return false;
+}
+
+bool AIdleProjectGameModeBase::GetPropScalarForTest(int32 Index, const FName& Param, float& OutValue) const
+{
+	if (ThemeProps.IsValidIndex(Index) && ThemeProps[Index])
+	{
+		if (UStaticMeshComponent* Comp = ThemeProps[Index]->GetStaticMeshComponent())
+		{
+			if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(Comp->GetMaterial(0)))
+			{
+				return MID->GetScalarParameterValue(FMaterialParameterInfo(Param), OutValue);
+			}
+		}
 	}
 	return false;
 }

@@ -36,6 +36,13 @@ public:
 	// 테스트: 바닥 MID의 "Color" 벡터 파라미터 값 조회(MID 아니면 false).
 	bool GetGroundColorForTest(FLinearColor& OutColor) const;
 
+	// 테스트: 안개 컴포넌트의 현재 밀도(없으면 -1).
+	float GetFogDensityForTest() const;
+	// 테스트: 스카이 스피어 MID의 "SkyTint" 벡터 파라미터 값 조회(MID 아니면 false).
+	bool GetSkyTintForTest(FLinearColor& OutTint) const;
+	// 테스트: 프롭 Index MID의 스칼라 파라미터 값 조회(MID 아니면 false).
+	bool GetPropScalarForTest(int32 Index, const FName& Param, float& OutValue) const;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Battle")
 	TSubclassOf<AIdleMonster> MonsterClass;
@@ -80,6 +87,24 @@ private:
 	TObjectPtr<class UMaterialInterface> ThemeMaterial = nullptr;
 
 	bool bThemeMaterialLoadAttempted = false;
+
+	// 안개(ExponentialHeightFog). ApplyMapTheme 에서 챕터별 색/밀도 갱신.
+	UPROPERTY()
+	TObjectPtr<class AExponentialHeightFog> ThemeFog = nullptr;
+
+	// 스카이 스피어(역방향 배경, ThemeSky=SkyLight 와 별개). M_Sky MID로 SkyTint 갱신.
+	UPROPERTY()
+	TObjectPtr<class AStaticMeshActor> ThemeSkySphere = nullptr;
+
+	// 스카이 머티리얼(/Game/Maps/M_Sky) lazy 로드 캐시. 무효 시 폴백.
+	UPROPERTY()
+	TObjectPtr<class UMaterialInterface> SkyMaterial = nullptr;
+
+	// 스카이 큐브맵(/Game/Maps/TC_MapSky) lazy 로드 캐시. 무효 시 폴백.
+	UPROPERTY()
+	TObjectPtr<class UTextureCube> SkyCubemap = nullptr;
+
+	bool bSkyAssetsLoadAttempted = false;
 
 	bool bInitialMonstersSpawned = false;
 	bool bDefaultEnvironmentSpawned = false;

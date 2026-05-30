@@ -4,6 +4,7 @@
 #include "Factories/MaterialFactoryNew.h"
 #include "Materials/Material.h"
 #include "Materials/MaterialExpressionVectorParameter.h"
+#include "Materials/MaterialExpressionScalarParameter.h"
 #include "Materials/MaterialExpressionConstant.h"
 #include "Materials/MaterialExpressionMultiply.h"
 #include "MaterialEditingLibrary.h"
@@ -43,19 +44,30 @@ int32 UGenerateMapThemeMaterialCommandlet::Main(const FString& Params)
 	ColorParam->DefaultValue = FLinearColor::White;
 	UMaterialEditingLibrary::ConnectMaterialProperty(ColorParam, TEXT(""), MP_BaseColor);
 
-	UMaterialExpressionConstant* EmiScale = Cast<UMaterialExpressionConstant>(
-		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionConstant::StaticClass(), -500, 250));
-	EmiScale->R = 0.15f;
+	// Color * EmissiveStrength(스칼라 파라미터) → Emissive
+	UMaterialExpressionScalarParameter* EmiParam = Cast<UMaterialExpressionScalarParameter>(
+		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionScalarParameter::StaticClass(), -500, 250));
+	EmiParam->ParameterName = TEXT("EmissiveStrength");
+	EmiParam->DefaultValue = 0.15f;
 	UMaterialExpressionMultiply* Mul = Cast<UMaterialExpressionMultiply>(
 		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionMultiply::StaticClass(), -250, 150));
 	UMaterialEditingLibrary::ConnectMaterialExpressions(ColorParam, TEXT(""), Mul, TEXT("A"));
-	UMaterialEditingLibrary::ConnectMaterialExpressions(EmiScale, TEXT(""), Mul, TEXT("B"));
+	UMaterialEditingLibrary::ConnectMaterialExpressions(EmiParam, TEXT(""), Mul, TEXT("B"));
 	UMaterialEditingLibrary::ConnectMaterialProperty(Mul, TEXT(""), MP_EmissiveColor);
 
-	UMaterialExpressionConstant* Rough = Cast<UMaterialExpressionConstant>(
-		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionConstant::StaticClass(), -500, 450));
-	Rough->R = 0.85f;
-	UMaterialEditingLibrary::ConnectMaterialProperty(Rough, TEXT(""), MP_Roughness);
+	// Roughness(스칼라 파라미터)
+	UMaterialExpressionScalarParameter* RoughParam = Cast<UMaterialExpressionScalarParameter>(
+		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionScalarParameter::StaticClass(), -500, 450));
+	RoughParam->ParameterName = TEXT("Roughness");
+	RoughParam->DefaultValue = 0.85f;
+	UMaterialEditingLibrary::ConnectMaterialProperty(RoughParam, TEXT(""), MP_Roughness);
+
+	// Metallic(스칼라 파라미터)
+	UMaterialExpressionScalarParameter* MetalParam = Cast<UMaterialExpressionScalarParameter>(
+		UMaterialEditingLibrary::CreateMaterialExpression(Material, UMaterialExpressionScalarParameter::StaticClass(), -500, 600));
+	MetalParam->ParameterName = TEXT("Metallic");
+	MetalParam->DefaultValue = 0.0f;
+	UMaterialEditingLibrary::ConnectMaterialProperty(MetalParam, TEXT(""), MP_Metallic);
 
 	UMaterialEditingLibrary::RecompileMaterial(Material);
 	Material->PostEditChange();
