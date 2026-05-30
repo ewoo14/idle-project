@@ -79,6 +79,8 @@ const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
 const FString WeeklyBossClaimHitBoxPrefix(TEXT("WeeklyBossClaim_"));
 // 출석 보상 패널 — 고유 prefix(Attendance~)로 jumbo ODR 회피.
 const FString AttendanceClaimHitBoxPrefix(TEXT("AttendanceClaim_"));
+// 보물 상자(일일 뽑기) 패널 — 고유 prefix(Treasure~)로 jumbo ODR 회피.
+const FName TreasureBoxDrawHitBoxName(TEXT("TreasureBoxDraw"));
 const FName LeaderboardPowerTabHitBoxName(TEXT("LeaderboardTabPower"));
 const FName LeaderboardRebirthTabHitBoxName(TEXT("LeaderboardTabRebirth"));
 const FName LeaderboardWeeklyTabHitBoxName(TEXT("LeaderboardTabWeekly"));
@@ -140,6 +142,7 @@ constexpr float DungeonFeedbackDurationSeconds = 2.4f;
 constexpr float AchievementFeedbackDurationSeconds = 2.4f;
 constexpr float WeeklyBossFeedbackDurationSeconds = 2.4f;
 constexpr float AttendanceFeedbackDurationSeconds = 2.4f;
+constexpr float TreasureBoxFeedbackDurationSeconds = 3.2f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
 
@@ -428,6 +431,27 @@ FText AttendanceRewardTypeLabel(EAttendanceReward RewardType)
 	case EAttendanceReward::Gold:
 	default:
 		return IdleProject::Localization::UI(TEXT("ATTENDANCE_REWARD_GOLD"));
+	}
+}
+
+// 보물 상자 보상 종류 → 로컬라이즈 표시명(골드/룬정수/소비/보호서/재설정큐브/등급큐브).
+FText TreasureRewardTypeLabel(ETreasureReward Reward)
+{
+	switch (Reward)
+	{
+	case ETreasureReward::Essence:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_ESSENCE"));
+	case ETreasureReward::Consumable:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_CONSUMABLE"));
+	case ETreasureReward::ProtectionScroll:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_PROTECTION_SCROLL"));
+	case ETreasureReward::ResetCube:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_RESET_CUBE"));
+	case ETreasureReward::RankCube:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_RANK_CUBE"));
+	case ETreasureReward::Gold:
+	default:
+		return IdleProject::Localization::UI(TEXT("TREASURE_REWARD_GOLD"));
 	}
 }
 
@@ -3648,6 +3672,24 @@ FIdleHUDAttendancePanelViewModel IdleProject::UI::BuildAttendancePanelViewModel(
 	return ViewModel;
 }
 
+FIdleHUDTreasureBoxPanelViewModel IdleProject::UI::BuildTreasureBoxPanelViewModel(const UTreasureBoxService& TreasureBoxService, const FString& TodayUtcDate)
+{
+	FIdleHUDTreasureBoxPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("TREASURE_PANEL_TITLE"));
+	ViewModel.TotalDraws = TreasureBoxService.GetTotalDraws();
+	ViewModel.bCanDraw = TreasureBoxService.CanDrawToday(TodayUtcDate);
+	ViewModel.DrawHitBoxName = TreasureBoxDrawHitBoxName;
+	ViewModel.DrawLabel = IdleProject::Localization::UI(TEXT("TREASURE_DRAW"));
+	ViewModel.StatusLabel = ViewModel.bCanDraw
+		? IdleProject::Localization::UI(TEXT("TREASURE_STATUS_AVAILABLE"))
+		: IdleProject::Localization::UI(TEXT("TREASURE_STATUS_DONE"));
+	ViewModel.TotalDrawsLabel = FormatLocalizedUI(TEXT("TREASURE_TOTAL_DRAWS_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Total"), FText::FromString(FormatIntegerWithCommas(ViewModel.TotalDraws)));
+	});
+	return ViewModel;
+}
+
 FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UAchievementService& AchievementService)
 {
 	FIdleHUDAchievementViewModel ViewModel;
@@ -4460,6 +4502,7 @@ void AIdleHUD::DrawHUD()
 	DrawDungeonPanel();
 	DrawWeeklyBossPanel();
 	DrawAttendancePanel();
+	DrawTreasureBoxPanel();
 	DrawAchievementPanel();
 	DrawMasteryPanel();
 	DrawStatAllocationPanel();
@@ -4685,6 +4728,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(AttendanceClaimHitBoxPrefix))
 	{
 		ClaimAttendanceFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == TreasureBoxDrawHitBoxName)
+	{
+		DrawTreasureBoxFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(ConsumableUseHitBoxPrefix))
@@ -8317,6 +8365,99 @@ void AIdleHUD::ClaimAttendanceFromHitBox(FName BoxName)
 	if (const UWorld* World = GetWorld())
 	{
 		AttendanceFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawTreasureBoxPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UTreasureBoxService* TreasureBoxService = IdleGameInstance ? IdleGameInstance->GetTreasureBoxService() : nullptr;
+	if (!TreasureBoxService)
+	{
+		return;
+	}
+
+	const FIdleHUDTreasureBoxPanelViewModel ViewModel = BuildTreasureBoxPanelViewModel(*TreasureBoxService, UQuestService::GetCurrentUtcDateString());
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - TreasureBoxFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !TreasureBoxFeedbackLabel.IsEmpty() && FeedbackElapsed <= TreasureBoxFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	const float Padding = 14.0f * Scale;
+	const float Border = 2.0f * Scale;
+	const float ButtonHeight = 30.0f * Scale;
+	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
+	const float PanelHeight = 84.0f * Scale + ButtonHeight + Padding + FeedbackHeight;
+	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
+	const float Y = 120.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanDraw ? Theme::AccentGold : Theme::AccentBlue, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.TotalDrawsLabel.ToString(), Theme::TextMuted, X + Padding, Y + 58.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+
+	// 뽑기 버튼 — 가능 시 활성.
+	const float ButtonWidth = 96.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + 78.0f * Scale;
+	DrawRect(ViewModel.bCanDraw ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.DrawLabel.ToString(), ViewModel.bCanDraw ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 16.0f * Scale, ButtonY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	if (ViewModel.bCanDraw)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.DrawHitBoxName, true, 86);
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(TreasureBoxFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, ButtonY + ButtonHeight + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawTreasureBoxFromHitBox(FName BoxName)
+{
+	using namespace IdleProject::UI;
+
+	if (BoxName != TreasureBoxDrawHitBoxName)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const FTreasureReward Reward = IdleGameInstance->DrawTreasureBox();
+	TreasureBoxFeedbackLabel = (Reward.Reward != ETreasureReward::None && Reward.Amount > 0)
+		? FormatLocalizedUI(TEXT("TREASURE_DRAW_RESULT_FORMAT"), [&Reward](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Type"), TreasureRewardTypeLabel(Reward.Reward));
+			Args.Add(TEXT("Value"), FText::FromString(FormatIntegerWithCommas(Reward.Amount)));
+		})
+		: IdleProject::Localization::UI(TEXT("TREASURE_DRAW_BLOCKED"));
+	if (const UWorld* World = GetWorld())
+	{
+		TreasureBoxFeedbackStartTime = World->GetTimeSeconds();
 	}
 	RefreshMouseInteraction();
 }

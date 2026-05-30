@@ -1399,7 +1399,8 @@ bool FSkillHudDisplayModelTest::RunTest(const FString& Parameters)
 
 	const TArray<FIdleHUDSkillSlotViewModel> Slots = IdleProject::UI::BuildSkillSlotViewModels(*Skills, Now);
 
-	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 4);
+	// 전사 액티브 스킬 5종(heavy_strike/whirlwind/shield_up/charge + earthen_cleave[#96 신규]) — 패시브/궁극기 제외.
+	TestEqual(TEXT("Only active skills are shown in HUD slots"), Slots.Num(), 5);
 	TestEqual(TEXT("First active skill keeps localized display name"), Slots[0].DisplayName.ToString(), FString(TEXT("강타")));
 	TestEqual(TEXT("Cooldown ratio mirrors skill component"), Slots[0].CooldownRatio, Skills->GetCooldownRatio(TEXT("heavy_strike"), Now));
 	TestEqual(TEXT("Cooldown remaining mirrors skill component"), Slots[0].CooldownRemaining, Skills->GetCooldownRemaining(TEXT("heavy_strike"), Now));

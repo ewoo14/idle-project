@@ -31,6 +31,7 @@ class URuneService;
 class USkillComponent;
 class UWeeklyBossService;
 class UAttendanceService;
+class UTreasureBoxService;
 class UGuildService;
 class SIdleHUDWidget;
 
@@ -469,6 +470,19 @@ struct IDLEPROJECT_API FIdleHUDAttendancePanelViewModel
 	// 오늘 첫 출석이 아직 안 됐으면(체크인 가능) true — 보통 로그인 시 자동 체크인이므로 표시 위주.
 	bool bCheckedInToday = false;
 	TArray<FIdleHUDAttendanceMilestoneRowViewModel> Rows;
+};
+
+// ── 보물 상자(일일 뽑기) 패널 뷰모델 ─────────────────────────────────────────
+// 오늘 뽑기 가능 여부·뽑기 버튼·최근 결과(보상 종류/수량)·누적 뽑기 횟수.
+struct IDLEPROJECT_API FIdleHUDTreasureBoxPanelViewModel
+{
+	FText Title;
+	FText StatusLabel;     // 오늘 뽑기 가능 / 오늘 뽑기 완료
+	FText DrawLabel;       // 뽑기 버튼 라벨
+	FText TotalDrawsLabel; // 누적 뽑기 N회
+	FName DrawHitBoxName;
+	int64 TotalDraws = 0;
+	bool bCanDraw = false;
 };
 
 // ── 길드 패널 뷰모델(PR-G1) ──────────────────────────────────────────────────
@@ -1048,6 +1062,7 @@ IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(c
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
 IDLEPROJECT_API FIdleHUDAttendancePanelViewModel BuildAttendancePanelViewModel(const UAttendanceService& AttendanceService, const FString& TodayUtcDate);
+IDLEPROJECT_API FIdleHUDTreasureBoxPanelViewModel BuildTreasureBoxPanelViewModel(const UTreasureBoxService& TreasureBoxService, const FString& TodayUtcDate);
 IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems, bool bRankingsView, bool bRankingsLoading, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex, int32 TransferTargetOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
@@ -1179,6 +1194,8 @@ private:
 	void DrawAttendancePanel();
 	void DrawAttendanceMilestoneRow(const FIdleHUDAttendanceMilestoneRowViewModel& Row, float X, float Y, float Width, float Height);
 	void ClaimAttendanceFromHitBox(FName BoxName);
+	void DrawTreasureBoxPanel();
+	void DrawTreasureBoxFromHitBox(FName BoxName);
 	void DrawGuildPanel();
 	void DrawGuildListRow(const FIdleHUDGuildListRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawGuildMemberRow(const FIdleHUDGuildMemberRowViewModel& Row, float X, float Y, float Width, float Height);
@@ -1318,6 +1335,8 @@ private:
 	FText AchievementFeedbackLabel;
 	FText WeeklyBossFeedbackLabel;
 	FText AttendanceFeedbackLabel;
+	// 보물 상자 최근 뽑기 결과 캐시(예 "골드 +30,000"). 일정 시간 패널에 표시.
+	FText TreasureBoxFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
@@ -1336,6 +1355,7 @@ private:
 	float AchievementFeedbackStartTime = -1000.0f;
 	float WeeklyBossFeedbackStartTime = -1000.0f;
 	float AttendanceFeedbackStartTime = -1000.0f;
+	float TreasureBoxFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
