@@ -190,6 +190,54 @@ export function getStageWeakElement(globalStageIndex: number): StageElement {
       return "Fire";
     case 80:
       return "Dark";
+    case 81:
+      return "Dark";
+    case 82:
+      return "Fire";
+    case 83:
+      return "Lightning";
+    case 84:
+      return "Holy";
+    case 85:
+      return "Dark";
+    case 86:
+      return "Ice";
+    case 87:
+      return "Dark";
+    case 88:
+      return "Holy";
+    case 89:
+      return "Fire";
+    case 90:
+      return "Dark";
+    default:
+      return "None";
+  }
+}
+
+// 챕터 9 전용 부 저항 속성(스테이지 81~90). 1~80은 None(하위호환 — 기존 전투 불변).
+export function getStageResistElement(globalStageIndex: number): StageElement {
+  switch (Math.max(0, globalStageIndex)) {
+    case 81:
+      return "Ice";
+    case 82:
+      return "Holy";
+    case 83:
+      return "Dark";
+    case 84:
+      return "Fire";
+    case 85:
+      return "Holy";
+    case 86:
+      return "Lightning";
+    case 87:
+      return "Fire";
+    case 88:
+      return "Lightning";
+    case 89:
+      return "Holy";
+    case 90:
+      return "Ice";
     default:
       return "None";
   }

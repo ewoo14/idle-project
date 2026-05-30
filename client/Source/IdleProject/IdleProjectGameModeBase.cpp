@@ -414,6 +414,7 @@ AIdleMonster* AIdleProjectGameModeBase::SpawnMonsterAt(const FVector& SpawnLocat
 		Monster->SetStageStatMultiplier(FStageFormula::ComputeMonsterStatMultiplier(StageInfo.GlobalStageIndex));
 		Monster->SetStageGlobalIndex(StageInfo.GlobalStageIndex);
 		Monster->SetWeakElement(StageInfo.WeakElement);
+		Monster->SetResistElement(StageInfo.ResistElement);
 		Monster->FinishSpawning(FTransform(FRotator::ZeroRotator, SpawnLocation));
 		if (Monster->GetCombat())
 		{

@@ -6,6 +6,7 @@ import {
   computeDamage,
   computeElementMultiplier,
   computeMagicDamage,
+  computeResonanceMultiplier,
   rollCrit,
 } from "./combat.js";
 import type { DerivedStats } from "./stats.js";
@@ -83,6 +84,19 @@ describe("combat formulas", () => {
     expect(computeElementMultiplier("Dark", "Holy")).toBe(1.5);
     expect(computeElementMultiplier("Dark", "None")).toBe(1);
     expect(computeElementMultiplier("Dark", "Fire")).toBe(1);
+  });
+
+  it("computes resonance multipliers (weak/resist/backward-compat)", () => {
+    // 약점 우선
+    expect(computeResonanceMultiplier("Dark", "Dark", "Ice")).toBe(1.5);
+    // 명시 저항
+    expect(computeResonanceMultiplier("Ice", "Dark", "Ice")).toBe(0.5);
+    // 저항 None → computeElementMultiplier와 동일(하위호환)
+    expect(computeResonanceMultiplier("Fire", "Fire", "None")).toBe(1.5);
+    expect(computeResonanceMultiplier("Ice", "Fire", "None")).toBe(0.5);
+    expect(computeResonanceMultiplier("Lightning", "Fire", "None")).toBe(1);
+    // 약점·저항 모두 불일치 → 폴백
+    expect(computeResonanceMultiplier("Holy", "Dark", "Ice")).toBe(1.5); // Holy↔Dark 상극보정
   });
 
   it.each([

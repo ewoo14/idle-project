@@ -163,6 +163,11 @@ bool FCombatFormulasTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Dark attack stays neutral against no weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Dark, ESkillElement::None), 1.0f);
 	TestEqual(TEXT("Dark attack stays neutral against fire weakness"), FCombatFormulas::ComputeElementMultiplier(ESkillElement::Dark, ESkillElement::Fire), 1.0f);
 
+	// 공명: 약점 우선 / 명시 저항 / None 하위호환.
+	TestEqual(TEXT("Resonance weak priority"), FCombatFormulas::ComputeResonanceMultiplier(ESkillElement::Dark, ESkillElement::Dark, ESkillElement::Ice), 1.5f);
+	TestEqual(TEXT("Resonance explicit resist"), FCombatFormulas::ComputeResonanceMultiplier(ESkillElement::Ice, ESkillElement::Dark, ESkillElement::Ice), 0.5f);
+	TestEqual(TEXT("Resonance none == element mult"), FCombatFormulas::ComputeResonanceMultiplier(ESkillElement::Ice, ESkillElement::Fire, ESkillElement::None), 0.5f);
+
 	FRandomStream NeverCritStream(12345);
 	FRandomStream AlwaysCritStream(12345);
 	TestFalse(TEXT("Zero crit rate never crits"), FCombatFormulas::RollCrit(0.0f, NeverCritStream));

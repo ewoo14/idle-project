@@ -46,6 +46,19 @@ float FCombatFormulas::ComputeElementMultiplier(ESkillElement SkillElement, ESki
 	return bResisted ? 0.5f : 1.0f;
 }
 
+float FCombatFormulas::ComputeResonanceMultiplier(ESkillElement SkillElement, ESkillElement WeakElement, ESkillElement ResistElement)
+{
+	if (SkillElement != ESkillElement::None && SkillElement == WeakElement)
+	{
+		return 1.5f;
+	}
+	if (ResistElement != ESkillElement::None && SkillElement != ESkillElement::None && SkillElement == ResistElement)
+	{
+		return 0.5f;
+	}
+	return ComputeElementMultiplier(SkillElement, WeakElement);
+}
+
 float FCombatFormulas::ComputeDamage(const FDerivedStats& AttackerStats, EClassId ClassId, float Def)
 {
 	return ComputeDamage(AttackerStats, ClassId, Def, Def);
