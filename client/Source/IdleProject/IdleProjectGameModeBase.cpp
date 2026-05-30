@@ -15,6 +15,7 @@
 #include "GameCore/IdleGameInstance.h"
 #include "GameCore/MapThemeLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "GameCore/StageFormula.h"
 #include "GameCore/StageService.h"
 #include "TimerManager.h"
@@ -134,12 +135,24 @@ void AIdleProjectGameModeBase::ApplyMapTheme(int32 Chapter)
 			SkyComp->SetLightColor(Theme.SkyColor);
 		}
 	}
-	// 바닥 색(best-effort MID 틴트 — 파라미터 머티리얼 없으면 시각 no-op).
+	// 테마 머티리얼 1회 lazy 로드(에셋 부재 시 폴백).
+	if (!bThemeMaterialLoadAttempted)
+	{
+		bThemeMaterialLoadAttempted = true;
+		static const FSoftObjectPath ThemeMatPath(TEXT("/Game/Maps/M_MapTheme.M_MapTheme"));
+		ThemeMaterial = Cast<UMaterialInterface>(ThemeMatPath.TryLoad());
+	}
+
+	// 바닥 색(파라미터 머티리얼 있으면 실제 틴트, 없으면 기존 베이스 best-effort).
 	if (ThemeGround)
 	{
 		if (UStaticMeshComponent* GroundMesh = ThemeGround->GetStaticMeshComponent())
 		{
-			if (UMaterialInterface* Base = GroundMesh->GetMaterial(0))
+			if (ThemeMaterial)
+			{
+				GroundMesh->SetMaterial(0, ThemeMaterial);
+			}
+			if (GroundMesh->GetMaterial(0))
 			{
 				UMaterialInstanceDynamic* MID = GroundMesh->CreateAndSetMaterialInstanceDynamic(0);
 				if (MID)
@@ -179,7 +192,11 @@ void AIdleProjectGameModeBase::ApplyMapTheme(int32 Chapter)
 		{
 			Comp->SetStaticMesh(Mesh);
 			Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision); // 게임플레이 무간섭
-			if (UMaterialInterface* Base = Comp->GetMaterial(0))
+			if (ThemeMaterial)
+			{
+				Comp->SetMaterial(0, ThemeMaterial);
+			}
+			if (Comp->GetMaterial(0))
 			{
 				UMaterialInstanceDynamic* MID = Comp->CreateAndSetMaterialInstanceDynamic(0);
 				if (MID)
@@ -193,6 +210,27 @@ void AIdleProjectGameModeBase::ApplyMapTheme(int32 Chapter)
 	}
 
 	AppliedThemeChapter = FMath::Clamp(Chapter, 1, FMapThemeLibrary::ThemeCount);
+}
+
+UMaterialInterface* AIdleProjectGameModeBase::GetGroundMaterialForTest() const
+{
+	if (ThemeGround)
+	{
+		if (UStaticMeshComponent* GroundMesh = ThemeGround->GetStaticMeshComponent())
+		{
+			return GroundMesh->GetMaterial(0);
+		}
+	}
+	return nullptr;
+}
+
+bool AIdleProjectGameModeBase::GetGroundColorForTest(FLinearColor& OutColor) const
+{
+	if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(GetGroundMaterialForTest()))
+	{
+		return MID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), OutColor);
+	}
+	return false;
 }
 
 void AIdleProjectGameModeBase::HandleStageChangedForTheme(FStageInfo NewStageInfo)

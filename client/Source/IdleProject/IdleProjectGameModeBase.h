@@ -31,6 +31,11 @@ public:
 	void SpawnDefaultEnvironmentForTest() { SpawnDefaultEnvironment(); }
 	int32 GetThemePropCountForTest() const { return ThemeProps.Num(); }
 
+	// 테스트: 적용된 바닥 컴포넌트의 현재 머티리얼(0) 반환(MID 또는 베이스).
+	class UMaterialInterface* GetGroundMaterialForTest() const;
+	// 테스트: 바닥 MID의 "Color" 벡터 파라미터 값 조회(MID 아니면 false).
+	bool GetGroundColorForTest(FLinearColor& OutColor) const;
+
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Battle")
 	TSubclassOf<AIdleMonster> MonsterClass;
@@ -68,6 +73,13 @@ private:
 	TArray<TObjectPtr<class AStaticMeshActor>> ThemeProps;
 
 	int32 AppliedThemeChapter = -1;
+
+	// 맵 테마 파라미터 머티리얼(/Game/Maps/M_MapTheme). lazy 로드 캐시.
+	// 무효(에셋 부재/로드 실패) 시 기존 베이스 머티리얼 폴백.
+	UPROPERTY()
+	TObjectPtr<class UMaterialInterface> ThemeMaterial = nullptr;
+
+	bool bThemeMaterialLoadAttempted = false;
 
 	bool bInitialMonstersSpawned = false;
 	bool bDefaultEnvironmentSpawned = false;

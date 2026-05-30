@@ -3,6 +3,8 @@
 #include "Engine/World.h"
 #include "GameCore/MapThemeLibrary.h"
 #include "IdleProjectGameModeBase.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -29,6 +31,27 @@ bool FMapThemeLibraryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("clamp high to ch8 intensity"), High.SunIntensity, C8.SunIntensity);
 	// 챕터별 차별화: ch1(녹) vs ch7(적) 태양색 상이.
 	TestTrue(TEXT("ch1 vs ch7 distinct sun"), !FMapThemeLibrary::GetTheme(1).SunColor.Equals(FMapThemeLibrary::GetTheme(7).SunColor));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMapThemeMaterialAssetTest,
+	"IdleProject.MapTheme.MaterialAsset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMapThemeMaterialAssetTest::RunTest(const FString& Parameters)
+{
+	const FSoftObjectPath Path(TEXT("/Game/Maps/M_MapTheme.M_MapTheme"));
+	UMaterialInterface* Mat = Cast<UMaterialInterface>(Path.TryLoad());
+	TestNotNull(TEXT("M_MapTheme 로드"), Mat);
+	if (!Mat)
+	{
+		return false;
+	}
+	UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, nullptr);
+	FLinearColor Out;
+	const bool bHas = MID && MID->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Color")), Out);
+	TestTrue(TEXT("Color 벡터 파라미터 존재"), bHas);
 	return true;
 }
 
@@ -66,6 +89,18 @@ bool FMapThemeApplyTest::RunTest(const FString& Parameters)
 	GM->ApplyMapTheme(7);
 	const int32 Ch7Props = FMapThemeLibrary::GetTheme(7).Props.Num();
 	TestEqual(TEXT("ch7 prop count after switch"), GM->GetThemePropCountForTest(), Ch7Props);
+
+	// 에셋이 적용되면 바닥 머티리얼이 M_MapTheme 기반 MID + Color == 테마 GroundColor.
+	GM->ApplyMapTheme(1);
+	if (UMaterialInterface* GroundMat = GM->GetGroundMaterialForTest())
+	{
+		FLinearColor GroundColor;
+		if (GM->GetGroundColorForTest(GroundColor))
+		{
+			const FLinearColor Expected = FMapThemeLibrary::GetTheme(1).GroundColor;
+			TestTrue(TEXT("ground MID Color == ch1 GroundColor"), GroundColor.Equals(Expected, 0.01f));
+		}
+	}
 
 	World->DestroyWorld(false);
 	return true;
