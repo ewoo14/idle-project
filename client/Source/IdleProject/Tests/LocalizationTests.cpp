@@ -455,7 +455,16 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("REBIRTH_PERK_NAME_ALL_STAT"),
 				TEXT("REBIRTH_PERK_NAME_EXP"),
 				TEXT("REBIRTH_PERK_NAME_OFFLINE"),
-				// 내비 카테고리 키 (Task 5)
+			};
+
+			for (const FString& RequiredKey : RequiredCloudSyncKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("UI Korean contains required cloud sync key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("UI English contains required cloud sync key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+
+			// HUD 내비 카테고리/패널 라벨 키(32개).
+			const TArray<FString> RequiredNavKeys = {
 				TEXT("HUD_CAT_COMBAT"),
 				TEXT("HUD_CAT_GROWTH"),
 				TEXT("HUD_CAT_REBIRTH"),
@@ -463,7 +472,6 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("HUD_CAT_COLLECTION"),
 				TEXT("HUD_CAT_DAILY"),
 				TEXT("HUD_CAT_SOCIAL"),
-				// 내비 패널 키 (Task 5)
 				TEXT("HUD_PANEL_TOWER"),
 				TEXT("HUD_PANEL_DUNGEON"),
 				TEXT("HUD_PANEL_WEEKLYBOSS"),
@@ -491,10 +499,10 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TEXT("HUD_PANEL_LEADERBOARD"),
 			};
 
-			for (const FString& RequiredKey : RequiredCloudSyncKeys)
+			for (const FString& RequiredKey : RequiredNavKeys)
 			{
-				TestTrue(*FString::Printf(TEXT("UI Korean contains required cloud sync key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
-				TestTrue(*FString::Printf(TEXT("UI English contains required cloud sync key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("UI Korean contains required nav key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("UI English contains required nav key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
 		}
 
