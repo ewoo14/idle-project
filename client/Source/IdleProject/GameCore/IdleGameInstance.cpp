@@ -1742,7 +1742,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 26;
+	SaveGame->SaveVersion = 27;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1905,6 +1905,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->AutomationFarmLockStage = AutomationPolicyService->GetFarmLockStage();
 		SaveGame->bAutomationAutoBossChallenge = AutomationPolicyService->GetAutoBossChallenge();
 		SaveGame->AutomationPushDeathThreshold = AutomationPolicyService->GetPushDeathThreshold();
+		SaveGame->AutomationSkillRules = AutomationPolicyService->GetSkillRules();
 	}
 
 	if (GuildService)
@@ -2241,6 +2242,10 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 			// <26 세이브: 기본값(전진/보스자동ON/임계3) 마이그레이션
 			AutomationPolicyService->RestoreState(EProgressionMode::Advance, 1, true, 3);
 		}
+
+		// 스킬 규칙은 SaveVer 27+ 에서만 존재. 미만이면 빈(전부 Always).
+		AutomationPolicyService->RestoreSkillRules(
+			SaveGame->SaveVersion >= 27 ? SaveGame->AutomationSkillRules : TArray<FSkillAutoRule>());
 	}
 
 	OnGoldChanged.Broadcast(Gold);
@@ -2295,6 +2300,8 @@ bool UIdleGameInstance::ApplyCharacterSaveState(
 	if (USkillComponent* Skills = Character->FindComponentByClass<USkillComponent>())
 	{
 		Skills->RestoreRankState(SkillRanks, SkillPoints);
+		// 복원된 자동화 스킬 규칙을 플레이어 SkillComponent 에 주입(런타임 적용).
+		SyncSkillRulesTo(Skills);
 		bAppliedAnyState = true;
 	}
 
@@ -4377,6 +4384,39 @@ bool UIdleGameInstance::IsAutomationFeatureUnlocked(EAutomationFeature Feature) 
 {
 	const int32 HighestChapter = StageService ? StageService->GetHighestClearedChapter() : 0;
 	return UAutomationPolicyService::IsFeatureUnlocked(Feature, HighestChapter, RebirthCount);
+}
+
+void UIdleGameInstance::SetAutomationSkillRule(const FSkillAutoRule& Rule)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetSkillRule(Rule);
+	}
+}
+
+void UIdleGameInstance::ClearAutomationSkillRule(FName SkillId)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->ClearSkillRule(SkillId);
+	}
+}
+
+TArray<FSkillAutoRule> UIdleGameInstance::GetAutomationSkillRules() const
+{
+	const UAutomationPolicyService* Service = GetAutomationPolicyService();
+	return Service ? Service->GetSkillRules() : TArray<FSkillAutoRule>();
+}
+
+void UIdleGameInstance::SyncSkillRulesTo(USkillComponent* SkillComp)
+{
+	EnsureAutomationPolicyService();
+	if (SkillComp && AutomationPolicyService)
+	{
+		SkillComp->SetAutoRules(AutomationPolicyService->GetSkillRules());
+	}
 }
 
 void UIdleGameInstance::ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss)

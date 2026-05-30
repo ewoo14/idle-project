@@ -247,7 +247,7 @@ bool FAttendanceSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Capture writes V26"), SaveGame->SaveVersion, static_cast<int32>(26));
+	TestEqual(TEXT("Capture writes V27"), SaveGame->SaveVersion, static_cast<int32>(27));
 	// 세이브 시점 CheckIn 으로 누적이 14 로 증가(오늘 첫 출석).
 	TestTrue(TEXT("Saved attendance total at least seeded"), SaveGame->AttendanceTotal >= static_cast<int64>(13));
 	TestTrue(TEXT("Saved claimed contains milestone three"), SaveGame->AttendanceClaimedMilestones.Contains(3));

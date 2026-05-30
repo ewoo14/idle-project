@@ -158,7 +158,9 @@ void UBattleAIComponent::UpdateBattle()
 			{
 				AoeTargets.Add(TargetActor);
 			}
-			Skills->TickSkills(GetWorld()->GetTimeSeconds(), TargetActor, AoeTargets);
+			const AIdleMonster* TargetMonster = Cast<AIdleMonster>(TargetActor);
+			const bool bTargetBossElite = TargetMonster && (TargetMonster->IsBoss() || TargetMonster->IsElite());
+			Skills->TickSkills(GetWorld()->GetTimeSeconds(), TargetActor, AoeTargets, bTargetBossElite);
 		}
 		Attack(TargetActor);
 		return;

@@ -44,6 +44,14 @@ public:
 	// 효율 업그레이드 비용(efficiencyUpgradeCost). base*growth^level, 음수 level 0가드.
 	static int64 EfficiencyUpgradeCost(int64 Base, float Growth, int32 Level);
 
+	// 스킬 발동 규칙 평가(서버 evaluateSkillRule 1:1). hpThreshold/selfHpPct [0,1] 클램프.
+	static bool EvaluateSkillRule(
+		ESkillAutoCondition Condition,
+		float HpThresholdPct,
+		float SelfHpPct,
+		bool bIsBossElite,
+		bool bBuffActive);
+
 	// ── 정책 상태(클라 세이브 권위) ──
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
@@ -73,6 +81,18 @@ public:
 	// 세이브 복원(클램프 적용). 호출 측이 SaveVer>=26 가드 후 호출.
 	void RestoreState(EProgressionMode InMode, int32 InFarmLockStage, bool bInAutoBoss, int32 InThreshold);
 
+	// ── 스킬 자동 전술 규칙(P2, 클라 세이브 권위) ──
+
+	const TArray<FSkillAutoRule>& GetSkillRules() const { return SkillRules; }
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetSkillRule(const FSkillAutoRule& Rule); // 같은 SkillId 있으면 교체, 없으면 추가
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void ClearSkillRule(FName SkillId);
+
+	void RestoreSkillRules(const TArray<FSkillAutoRule>& InRules);
+
 private:
 	UPROPERTY()
 	EProgressionMode Mode = EProgressionMode::Advance;
@@ -85,4 +105,7 @@ private:
 
 	UPROPERTY()
 	int32 PushDeathThreshold = 3;
+
+	UPROPERTY()
+	TArray<FSkillAutoRule> SkillRules;
 };

@@ -4,6 +4,7 @@
 #include "CharacterSystem/StatFormulas.h"
 #include "Components/ActorComponent.h"
 #include "CombatSystem/StatusElementTypes.h"
+#include "GameCore/AutomationTypes.h"
 #include "SkillComponent.generated.h"
 
 UENUM(BlueprintType)
@@ -121,7 +122,11 @@ public:
 
 	/** 전투 틱에서 준비된 액티브/궁극기 스킬을 자동 발동합니다. */
 	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
-	void TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets);
+	void TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets, bool bIsBossElite = false);
+
+	// 자동화 정책의 스킬 규칙 주입(빈=전부 Always, 기존 동작).
+	UFUNCTION(BlueprintCallable, Category = "Idle|Skill")
+	void SetAutoRules(const TArray<FSkillAutoRule>& InRules);
 
 	/** 지정 스킬이 현재 시간 기준으로 쿨다운 없이 발동 가능한지 반환합니다. */
 	UFUNCTION(BlueprintPure, Category = "Idle|Skill")
@@ -189,6 +194,18 @@ private:
 	void ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Target);
 	void ApplyHeal(const FSkillDefinition& Skill);
 	void ApplySelfBuff(const FSkillDefinition& Skill, float Now);
+
+	// SkillId 의 규칙(없으면 Always 기본).
+	FSkillAutoRule GetRuleFor(FName SkillId) const;
+
+	// MaintainBuff 용: 해당 스킬 버프가 아직 활성인지(LastCast + BuffDuration).
+	bool IsSkillBuffActive(const FSkillDefinition& Skill, float Now) const;
+
+	// 평가 정렬용 유효 우선순위(궁극기 기본 -1, 규칙 있으면 rule.Priority).
+	int32 EffectivePriority(const FSkillDefinition& Skill) const;
+
+	UPROPERTY()
+	TArray<FSkillAutoRule> AutoRules;
 
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Skill")
 	TMap<FName, float> LastCastTimeBySkill;

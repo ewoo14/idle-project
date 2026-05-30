@@ -44,3 +44,32 @@ struct FProgressionDecision
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Automation")
 	int32 TargetGlobalStage = 1;
 };
+
+// 스킬 자동 전술 조건. 서버 automation.ts SkillAutoCondition 와 1:1.
+UENUM(BlueprintType)
+enum class ESkillAutoCondition : uint8
+{
+	Always,
+	BossEliteOnly,
+	HpBelow,
+	MaintainBuff
+};
+
+// 스킬별 자동 발동 규칙. 미설정 스킬은 Always(기존 동작).
+USTRUCT(BlueprintType)
+struct FSkillAutoRule
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Automation")
+	FName SkillId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Automation")
+	ESkillAutoCondition Condition = ESkillAutoCondition::Always;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Automation", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float HpThresholdPct = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Idle|Automation")
+	int32 Priority = 0;
+};

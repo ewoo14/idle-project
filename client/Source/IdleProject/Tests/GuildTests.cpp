@@ -182,7 +182,7 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture to save succeeds"), SourceInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Captured save writes V26"), SaveGame->SaveVersion, static_cast<int32>(26));
+	TestEqual(TEXT("Captured save writes V27"), SaveGame->SaveVersion, static_cast<int32>(27));
 	TestEqual(TEXT("Captured guild id"), SaveGame->CachedGuildId, FString(TEXT("guild-roundtrip")));
 	TestEqual(TEXT("Captured guild rank officer"), static_cast<int32>(SaveGame->CachedGuildRank), static_cast<int32>(EGuildRank::Officer));
 	TestEqual(TEXT("Captured guild level"), SaveGame->CachedGuildLevel, ExpectedLevel);

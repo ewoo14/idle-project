@@ -6,7 +6,9 @@ import {
   decideOnClear,
   decideOnDeath,
   efficiencyUpgradeCost,
+  evaluateSkillRule,
   isFeatureUnlocked,
+  type SkillRuleContext,
 } from "./automation.js";
 
 describe("automation decideOnClear (progression on clear)", () => {
@@ -172,5 +174,53 @@ describe("automation efficiency upgrade cost curve", () => {
   it("rounds the cost to the nearest integer (Math.round, not floor/ceil)", () => {
     // 100 * 1.5^3 = 337.5 → Math.round → 338 (floor 라면 337)
     expect(efficiencyUpgradeCost(100, 1.5, 3)).toBe(338);
+  });
+});
+
+describe("automation evaluateSkillRule (skill auto tactics)", () => {
+  const ctx = (over: Partial<SkillRuleContext> = {}): SkillRuleContext => ({
+    selfHpPct: 1,
+    isBossElite: false,
+    buffActive: false,
+    ...over,
+  });
+
+  it("Always fires unconditionally", () => {
+    expect(evaluateSkillRule("Always", 0, ctx())).toBe(true);
+  });
+
+  it("BossEliteOnly fires only against boss/elite targets", () => {
+    expect(
+      evaluateSkillRule("BossEliteOnly", 0, ctx({ isBossElite: true })),
+    ).toBe(true);
+    expect(
+      evaluateSkillRule("BossEliteOnly", 0, ctx({ isBossElite: false })),
+    ).toBe(false);
+  });
+
+  it("HpBelow fires when self HP is at or below the threshold", () => {
+    expect(evaluateSkillRule("HpBelow", 0.3, ctx({ selfHpPct: 0.3 }))).toBe(
+      true,
+    );
+    expect(evaluateSkillRule("HpBelow", 0.3, ctx({ selfHpPct: 0.29 }))).toBe(
+      true,
+    );
+    expect(evaluateSkillRule("HpBelow", 0.3, ctx({ selfHpPct: 0.31 }))).toBe(
+      false,
+    );
+  });
+
+  it("HpBelow clamps both threshold and selfHpPct into [0,1]", () => {
+    expect(evaluateSkillRule("HpBelow", 5, ctx({ selfHpPct: 1 }))).toBe(true);
+    expect(evaluateSkillRule("HpBelow", -1, ctx({ selfHpPct: 0 }))).toBe(true);
+  });
+
+  it("MaintainBuff fires only while the buff is inactive", () => {
+    expect(
+      evaluateSkillRule("MaintainBuff", 0, ctx({ buffActive: false })),
+    ).toBe(true);
+    expect(
+      evaluateSkillRule("MaintainBuff", 0, ctx({ buffActive: true })),
+    ).toBe(false);
   });
 });
