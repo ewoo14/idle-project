@@ -100,4 +100,26 @@ bool FHudNavStateMachineTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FHudNavLocKeyTest,
+    "IdleProject.UI.HUD.NavLocKey",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHudNavLocKeyTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("combat key"), CategoryLocKey(EHudCategory::Combat), FString(TEXT("HUD_CAT_COMBAT")));
+    TestEqual(TEXT("social key"), CategoryLocKey(EHudCategory::Social), FString(TEXT("HUD_CAT_SOCIAL")));
+    TestEqual(TEXT("tower key"), PanelLocKey(EHudPanel::Tower), FString(TEXT("HUD_PANEL_TOWER")));
+    TestEqual(TEXT("runecodex key"), PanelLocKey(EHudPanel::RuneCodex), FString(TEXT("HUD_PANEL_RUNECODEX")));
+    for (const EHudCategory Cat : AllHudCategories())
+    {
+        TestFalse(TEXT("category key non-empty"), CategoryLocKey(Cat).IsEmpty());
+        for (const EHudPanel P : PanelsForCategory(Cat))
+        {
+            TestFalse(TEXT("panel key non-empty"), PanelLocKey(P).IsEmpty());
+        }
+    }
+    return true;
+}
+
 #endif

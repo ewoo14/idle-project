@@ -86,4 +86,52 @@ namespace IdleProject::UI
         State.ActiveCategory = EHudCategory::None;
         State.ActivePanel = EHudPanel::None;
     }
+
+    FString CategoryLocKey(EHudCategory Category)
+    {
+        switch (Category)
+        {
+        case EHudCategory::Combat:     return TEXT("HUD_CAT_COMBAT");
+        case EHudCategory::Growth:     return TEXT("HUD_CAT_GROWTH");
+        case EHudCategory::Rebirth:    return TEXT("HUD_CAT_REBIRTH");
+        case EHudCategory::Gear:       return TEXT("HUD_CAT_GEAR");
+        case EHudCategory::Collection: return TEXT("HUD_CAT_COLLECTION");
+        case EHudCategory::Daily:      return TEXT("HUD_CAT_DAILY");
+        case EHudCategory::Social:     return TEXT("HUD_CAT_SOCIAL");
+        default:                       return FString();
+        }
+    }
+
+    FString PanelLocKey(EHudPanel Panel)
+    {
+        switch (Panel)
+        {
+        case EHudPanel::Tower:        return TEXT("HUD_PANEL_TOWER");
+        case EHudPanel::Dungeon:      return TEXT("HUD_PANEL_DUNGEON");
+        case EHudPanel::WeeklyBoss:   return TEXT("HUD_PANEL_WEEKLYBOSS");
+        case EHudPanel::StatAlloc:    return TEXT("HUD_PANEL_STATALLOC");
+        case EHudPanel::StatInfo:     return TEXT("HUD_PANEL_STATINFO");
+        case EHudPanel::Mastery:      return TEXT("HUD_PANEL_MASTERY");
+        case EHudPanel::RebirthPanel: return TEXT("HUD_PANEL_REBIRTH");
+        case EHudPanel::Transcend:    return TEXT("HUD_PANEL_TRANSCEND");
+        case EHudPanel::RebirthPerk:  return TEXT("HUD_PANEL_REBIRTHPERK");
+        case EHudPanel::Enhance:      return TEXT("HUD_PANEL_ENHANCE");
+        case EHudPanel::Potential:    return TEXT("HUD_PANEL_POTENTIAL");
+        case EHudPanel::Rune:         return TEXT("HUD_PANEL_RUNE");
+        case EHudPanel::RuneCodex:    return TEXT("HUD_PANEL_RUNECODEX");
+        case EHudPanel::Shop:         return TEXT("HUD_PANEL_SHOP");
+        case EHudPanel::Pet:          return TEXT("HUD_PANEL_PET");
+        case EHudPanel::Title:        return TEXT("HUD_PANEL_TITLE");
+        case EHudPanel::Achievement:  return TEXT("HUD_PANEL_ACHIEVEMENT");
+        case EHudPanel::TreasureBox:  return TEXT("HUD_PANEL_TREASUREBOX");
+        case EHudPanel::Quest:        return TEXT("HUD_PANEL_QUEST");
+        case EHudPanel::Mission:      return TEXT("HUD_PANEL_MISSION");
+        case EHudPanel::Attendance:   return TEXT("HUD_PANEL_ATTENDANCE");
+        case EHudPanel::Consumable:   return TEXT("HUD_PANEL_CONSUMABLE");
+        case EHudPanel::SeasonPass:   return TEXT("HUD_PANEL_SEASONPASS");
+        case EHudPanel::Guild:        return TEXT("HUD_PANEL_GUILD");
+        case EHudPanel::Leaderboard:  return TEXT("HUD_PANEL_LEADERBOARD");
+        default:                      return FString();
+        }
+    }
 }

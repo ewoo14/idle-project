@@ -49,4 +49,9 @@ namespace IdleProject::UI
     void SelectCategory(FHudNavState& State, EHudCategory Category); // 같은 카테고리 재선택=토글 닫힘
     void SelectPanel(FHudNavState& State, EHudPanel Panel);          // 활성 카테고리 내에서만 전환
     void CloseNav(FHudNavState& State);                             // 닫기
+
+    // 카테고리 라벨 로컬라이즈 키("HUD_CAT_*").
+    FString CategoryLocKey(EHudCategory Category);
+    // 패널 라벨 로컬라이즈 키("HUD_PANEL_*").
+    FString PanelLocKey(EHudPanel Panel);
 }
