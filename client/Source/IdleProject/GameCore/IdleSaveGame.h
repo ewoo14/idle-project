@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "GameCore/AchievementFormula.h"
+#include "GameCore/AutomationTypes.h"
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonTypes.h"
 #include "GameCore/MasteryTypes.h"
@@ -20,8 +21,9 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
+	// SaveVer 26: 자동화 정책(FAutomationPolicySave) 추가. <26 세이브는 기본값(전진/보스자동ON) 마이그레이션.
 	UPROPERTY()
-	int32 SaveVersion = 25;
+	int32 SaveVersion = 26;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -215,6 +217,19 @@ public:
 	// 총 포인트는 RebirthCount 에서 파생(별도 저장 없음). <24 세이브는 빈 맵(회귀 안전) ──
 	UPROPERTY()
 	TMap<ERebirthPerk, int32> RebirthPerkAllocations;
+
+	// 자동화 정책(P1: 자동 진행). SaveVer 26+. 클라 세이브 권위.
+	UPROPERTY()
+	EProgressionMode AutomationProgressionMode = EProgressionMode::Advance;
+
+	UPROPERTY()
+	int32 AutomationFarmLockStage = 1;
+
+	UPROPERTY()
+	bool bAutomationAutoBossChallenge = true;
+
+	UPROPERTY()
+	int32 AutomationPushDeathThreshold = 3;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()
