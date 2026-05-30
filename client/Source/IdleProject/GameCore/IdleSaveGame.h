@@ -21,10 +21,11 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
+	// SaveVer 29: 자동 소비/효율 정책(자동 버프 유지/매각가 업그레이드) 추가. <29 세이브는 정책 OFF/0 마이그레이션.
 	// SaveVer 28: 자동 장비 정책(자동 장착/자동 매각/매각 등급) 추가. <28 세이브는 정책 OFF/Common 마이그레이션.
 	// SaveVer 27: 자동화 스킬 규칙(SkillRules) 추가. <27 세이브는 빈 규칙(전부 Always) 마이그레이션.
 	UPROPERTY()
-	int32 SaveVersion = 28;
+	int32 SaveVersion = 29;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -245,6 +246,13 @@ public:
 
 	UPROPERTY()
 	EItemRarity AutomationAutoSellMaxRarity = EItemRarity::Common;
+
+	// 자동 소비/효율 정책(P4). SaveVer 29+. 클라 세이브 권위.
+	UPROPERTY()
+	bool bAutomationAutoMaintainBuff = false;
+
+	UPROPERTY()
+	int32 AutomationSellValueUpgradeLevel = 0;
 
 	// ── 길드 캐시(SaveVer 17, PR-G1) — 서버 권위 스냅샷의 최소 캐시 ──────────────
 	UPROPERTY()

@@ -1743,7 +1743,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 28;
+	SaveGame->SaveVersion = 29;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1911,6 +1911,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->bAutomationAutoEquipByPower = AutomationPolicyService->GetAutoEquipByPower();
 		SaveGame->bAutomationAutoSell = AutomationPolicyService->GetAutoSell();
 		SaveGame->AutomationAutoSellMaxRarity = AutomationPolicyService->GetAutoSellMaxRarity();
+		// 자동 소비/효율 정책 직렬화(SaveVer 29+).
+		SaveGame->bAutomationAutoMaintainBuff = AutomationPolicyService->GetAutoMaintainBuff();
+		SaveGame->AutomationSellValueUpgradeLevel = AutomationPolicyService->GetSellValueUpgradeLevel();
 	}
 
 	if (GuildService)
@@ -2263,6 +2266,18 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		else
 		{
 			AutomationPolicyService->RestoreGearPolicy(false, false, EItemRarity::Common);
+		}
+
+		// 자동 소비/효율 정책은 SaveVer 29+ 에서만 존재. 미만이면 기본(OFF/0).
+		if (SaveGame->SaveVersion >= 29)
+		{
+			AutomationPolicyService->RestoreConsumablePolicy(
+				SaveGame->bAutomationAutoMaintainBuff,
+				SaveGame->AutomationSellValueUpgradeLevel);
+		}
+		else
+		{
+			AutomationPolicyService->RestoreConsumablePolicy(false, 0);
 		}
 	}
 
