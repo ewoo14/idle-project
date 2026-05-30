@@ -349,7 +349,7 @@ bool FMissionSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Capture writes V26"), SaveGame->SaveVersion, static_cast<int32>(26));
+	TestEqual(TEXT("Capture writes V27"), SaveGame->SaveVersion, static_cast<int32>(27));
 	TestEqual(TEXT("Saved progress for daily_kill_300"), SaveGame->MissionProgress.FindRef(TEXT("daily_kill_300")), static_cast<int64>(120));
 	TestTrue(TEXT("Saved claimed contains daily_enhance_10"), SaveGame->MissionClaimed.Contains(TEXT("daily_enhance_10")));
 
