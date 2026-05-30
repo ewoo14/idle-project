@@ -2341,3 +2341,53 @@ bool FIdleMonsterBossConfigTest::RunTest(const FString& Parameters)
 
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSkillAutoRuleGateTest,
+	"IdleProject.Combat.SkillAutoRuleGate",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSkillAutoRuleGateTest::RunTest(const FString& Parameters)
+{
+	AActor* Owner = NewObject<AActor>();
+	UCombatComponent* OwnerCombat = NewObject<UCombatComponent>(Owner);
+	USkillComponent* Skills = NewObject<USkillComponent>(Owner);
+	Owner->AddInstanceComponent(OwnerCombat);
+	Owner->AddInstanceComponent(Skills);
+
+	AIdleMonster* Target = NewObject<AIdleMonster>();
+	UCombatComponent* TargetCombat = Target->GetCombat();
+	TestNotNull(TEXT("Monster combat component exists"), TargetCombat);
+	if (!TargetCombat)
+	{
+		return false;
+	}
+
+	OwnerCombat->InitializeCombat(1000.0f, 100.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.5f);
+	TargetCombat->InitializeCombat(1000000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.5f);
+	Skills->LoadDefaultWarriorSkills();
+
+	// 첫 액티브 스킬(heavy_strike)만 평가되도록 나머지 데미지 액티브는 쿨다운 상태로 둔다.
+	const FName HeavyStrike(TEXT("heavy_strike"));
+	Skills->MarkSkillCast(TEXT("whirlwind"), 99.0f);
+	Skills->MarkSkillCast(TEXT("charge"), 99.0f);
+	Skills->MarkSkillCast(TEXT("earthen_cleave"), 99.0f);
+
+	// heavy_strike 에 BossEliteOnly 규칙 → 일반 전투(bIsBossElite=false)에서 억제.
+	TArray<FSkillAutoRule> Rules;
+	FSkillAutoRule Rule;
+	Rule.SkillId = HeavyStrike;
+	Rule.Condition = ESkillAutoCondition::BossEliteOnly;
+	Rules.Add(Rule);
+	Skills->SetAutoRules(Rules);
+
+	const float HpBefore = TargetCombat->CurrentHp;
+	Skills->TickSkills(100.0f, Target, TArray<AActor*>{ Target }, /*bIsBossElite=*/false);
+	TestEqual(TEXT("boss-only skill suppressed in normal fight"), TargetCombat->CurrentHp, HpBefore);
+
+	// 보스/엘리트 전투면 발동(쿨다운 리셋 위해 Now 진행).
+	Skills->TickSkills(200.0f, Target, TArray<AActor*>{ Target }, /*bIsBossElite=*/true);
+	TestTrue(TEXT("boss-only skill fires vs boss"), TargetCombat->CurrentHp < HpBefore);
+
+	return true;
+}

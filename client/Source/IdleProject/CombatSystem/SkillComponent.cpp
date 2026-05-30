@@ -3,6 +3,7 @@
 #include "CharacterSystem/IdleMonster.h"
 #include "CombatSystem/CombatComponent.h"
 #include "CombatSystem/CombatFormulas.h"
+#include "GameCore/AutomationPolicyService.h"
 #include "Internationalization/IdleLocalization.h"
 
 namespace
@@ -227,26 +228,96 @@ void USkillComponent::LoadSkillsForClass(EClassId ClassId)
 	}
 }
 
-void USkillComponent::TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets)
+void USkillComponent::TickSkills(float Now, AActor* Target, const TArray<AActor*>& AoeTargets, bool bIsBossElite)
 {
 	UpdateTimedBuffs(Now);
 
-	for (const FSkillDefinition& Skill : Skills)
+	// 소유자 HP% (Combat 없으면 1.0). 클램프.
+	float SelfHpPct = 1.0f;
+	if (const UCombatComponent* Combat = GetOwner() ? GetOwner()->FindComponentByClass<UCombatComponent>() : nullptr)
 	{
-		if (Skill.Type == ESkillType::Ultimate && IsUltimateReady())
-		{
-			ExecuteSkill(Skill, Now, Target, AoeTargets);
-			return;
-		}
+		const float MaxHp = FMath::Max(1.0f, Combat->MaxHp);
+		SelfHpPct = FMath::Clamp(Combat->CurrentHp / MaxHp, 0.0f, 1.0f);
 	}
 
-	for (const FSkillDefinition& Skill : Skills)
+	// 평가 순서: Priority 오름차순(동률 선언 순서 안정 유지). 궁극기 기본 우선.
+	TArray<int32> Order;
+	Order.Reserve(Skills.Num());
+	for (int32 i = 0; i < Skills.Num(); ++i) { Order.Add(i); }
+	Order.StableSort([this](int32 A, int32 B)
 	{
-		if (Skill.Type == ESkillType::Active && IsReady(Skill.SkillId, Now))
+		const int32 PrA = EffectivePriority(Skills[A]);
+		const int32 PrB = EffectivePriority(Skills[B]);
+		return PrA < PrB;
+	});
+
+	bool bUltimateFired = false;
+	for (int32 Idx : Order)
+	{
+		const FSkillDefinition& Skill = Skills[Idx];
+		if (Skill.Type == ESkillType::Passive)
+		{
+			continue;
+		}
+		const FSkillAutoRule Rule = GetRuleFor(Skill.SkillId);
+		const bool bBuffActive = IsSkillBuffActive(Skill, Now);
+		if (!UAutomationPolicyService::EvaluateSkillRule(Rule.Condition, Rule.HpThresholdPct, SelfHpPct, bIsBossElite, bBuffActive))
+		{
+			continue;
+		}
+		if (Skill.Type == ESkillType::Ultimate)
+		{
+			if (!bUltimateFired && IsUltimateReady())
+			{
+				ExecuteSkill(Skill, Now, Target, AoeTargets);
+				bUltimateFired = true;
+			}
+			continue;
+		}
+		// Active
+		if (IsReady(Skill.SkillId, Now))
 		{
 			ExecuteSkill(Skill, Now, Target, AoeTargets);
 		}
 	}
+}
+
+void USkillComponent::SetAutoRules(const TArray<FSkillAutoRule>& InRules)
+{
+	AutoRules = InRules;
+}
+
+FSkillAutoRule USkillComponent::GetRuleFor(FName SkillId) const
+{
+	for (const FSkillAutoRule& Rule : AutoRules)
+	{
+		if (Rule.SkillId == SkillId)
+		{
+			return Rule;
+		}
+	}
+	return FSkillAutoRule{}; // 기본 Always
+}
+
+bool USkillComponent::IsSkillBuffActive(const FSkillDefinition& Skill, float Now) const
+{
+	if (Skill.BuffDuration <= 0.0f)
+	{
+		return false;
+	}
+	const float* LastCast = LastCastTimeBySkill.Find(Skill.SkillId);
+	return LastCast && (Now - *LastCast) < Skill.BuffDuration;
+}
+
+int32 USkillComponent::EffectivePriority(const FSkillDefinition& Skill) const
+{
+	// 궁극기는 기본 우선(-1), 규칙 Priority 가 명시되면 그 값 사용.
+	const FSkillAutoRule Rule = GetRuleFor(Skill.SkillId);
+	if (Rule.SkillId == Skill.SkillId)
+	{
+		return Rule.Priority;
+	}
+	return Skill.Type == ESkillType::Ultimate ? -1 : 0;
 }
 
 bool USkillComponent::IsReady(FName SkillId, float Now) const
