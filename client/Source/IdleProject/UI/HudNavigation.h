@@ -33,4 +33,6 @@ namespace IdleProject::UI
     const TArray<EHudPanel>& PanelsForCategory(EHudCategory Category);
     // 패널이 속한 상위 카테고리를 반환한다.
     EHudCategory CategoryForPanel(EHudPanel Panel);
+    // 종횡비(SizeX/SizeY) → 레이아웃. Current를 받아 데드존(1.25~1.35)에서 깜빡임 방지.
+    EHudLayoutMode ResolveLayoutMode(float AspectRatio, EHudLayoutMode Current);
 }

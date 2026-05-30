@@ -38,4 +38,24 @@ bool FHudNavCategoryRegistryTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FHudNavLayoutModeTest,
+    "IdleProject.UI.HUD.NavLayoutMode",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHudNavLayoutModeTest::RunTest(const FString& Parameters)
+{
+    // 명확히 가로 → Desktop.
+    TestEqual(TEXT("wide -> Desktop"), static_cast<int32>(ResolveLayoutMode(1.78f, EHudLayoutMode::Mobile)), static_cast<int32>(EHudLayoutMode::Desktop));
+    // 명확히 세로 → Mobile.
+    TestEqual(TEXT("tall -> Mobile"), static_cast<int32>(ResolveLayoutMode(0.56f, EHudLayoutMode::Desktop)), static_cast<int32>(EHudLayoutMode::Mobile));
+    // 히스테리시스 데드존(1.25~1.35): 현재 모드 유지.
+    TestEqual(TEXT("deadzone keeps Desktop"), static_cast<int32>(ResolveLayoutMode(1.30f, EHudLayoutMode::Desktop)), static_cast<int32>(EHudLayoutMode::Desktop));
+    TestEqual(TEXT("deadzone keeps Mobile"), static_cast<int32>(ResolveLayoutMode(1.30f, EHudLayoutMode::Mobile)), static_cast<int32>(EHudLayoutMode::Mobile));
+    // 경계 바깥에서만 전환.
+    TestEqual(TEXT("below 1.25 from Desktop -> Mobile"), static_cast<int32>(ResolveLayoutMode(1.24f, EHudLayoutMode::Desktop)), static_cast<int32>(EHudLayoutMode::Mobile));
+    TestEqual(TEXT("above 1.35 from Mobile -> Desktop"), static_cast<int32>(ResolveLayoutMode(1.36f, EHudLayoutMode::Mobile)), static_cast<int32>(EHudLayoutMode::Desktop));
+    return true;
+}
+
 #endif

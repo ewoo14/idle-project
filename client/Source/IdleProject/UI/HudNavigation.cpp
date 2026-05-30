@@ -47,4 +47,13 @@ namespace IdleProject::UI
         }
         return EHudCategory::None;
     }
+
+    EHudLayoutMode ResolveLayoutMode(float AspectRatio, EHudLayoutMode Current)
+    {
+        constexpr float LowerThreshold = 1.25f; // 이 아래 → Mobile
+        constexpr float UpperThreshold = 1.35f; // 이 위 → Desktop
+        if (AspectRatio <= LowerThreshold) { return EHudLayoutMode::Mobile; }
+        if (AspectRatio >= UpperThreshold) { return EHudLayoutMode::Desktop; }
+        return Current; // 데드존: 유지
+    }
 }
