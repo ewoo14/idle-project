@@ -261,7 +261,7 @@ bool FTreasureRewardGrantTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-// 세이브 v25 라운드트립 + 레거시(<25) 회귀 안전.
+// 세이브 v26 라운드트립 + 레거시(<26) 회귀 안전.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FTreasureSaveRoundTripTest,
 	"IdleProject.GameCore.TreasureBox.SaveRoundTrip",
