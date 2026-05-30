@@ -491,6 +491,7 @@ void UIdleGameInstance::Init()
 	EnsureLeaderboardService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
+	EnsureAttendanceService();
 	EnsureGuildService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
@@ -528,6 +529,7 @@ void UIdleGameInstance::Shutdown()
 	LeaderboardService = nullptr;
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
+	AttendanceService = nullptr;
 	GuildService = nullptr;
 	Super::Shutdown();
 }
@@ -1726,9 +1728,10 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureMissionService();
 	EnsureBuffService();
 	EnsureWeeklyBossService();
+	EnsureAttendanceService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 22;
+	SaveGame->SaveVersion = 23;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1860,6 +1863,15 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->WeeklyBossDamage = WeeklyBossState.Damage;
 		SaveGame->WeeklyBossChallengesUsed = WeeklyBossState.ChallengesUsed;
 		SaveGame->WeeklyBossClaimedMilestones = WeeklyBossState.ClaimedMilestones;
+	}
+
+	if (AttendanceService)
+	{
+		// 세이브 시점 출석 체크인(주요 진행 시 누적 갱신) 후 누적/날짜/수령 마일스톤 직렬화.
+		AttendanceService->CheckIn(UQuestService::GetCurrentUtcDateString());
+		SaveGame->AttendanceTotal = AttendanceService->GetTotalAttendance();
+		SaveGame->LastAttendanceDate = AttendanceService->GetLastAttendanceDate();
+		SaveGame->AttendanceClaimedMilestones = AttendanceService->GetClaimedMilestones();
 	}
 
 	if (GuildService)
@@ -2149,6 +2161,18 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		MissionService->EnsurePeriodFresh(UQuestService::GetCurrentUtcDateString(), UQuestService::GetCurrentUtcWeekString());
 	}
 
+	EnsureAttendanceService();
+	if (AttendanceService)
+	{
+		// SaveVer 23+ 만 출석 누적/날짜/수령 복원, 이전 버전은 빈 값(회귀 안전).
+		const int64 RestoredTotal = SaveGame->SaveVersion >= 23 ? FMath::Max<int64>(0, SaveGame->AttendanceTotal) : 0;
+		const FString RestoredDate = SaveGame->SaveVersion >= 23 ? SaveGame->LastAttendanceDate : FString();
+		const TSet<int32> RestoredClaimedMilestones = SaveGame->SaveVersion >= 23 ? SaveGame->AttendanceClaimedMilestones : TSet<int32>();
+		AttendanceService->RestoreState(RestoredTotal, RestoredDate, RestoredClaimedMilestones);
+		// 로그인 시점 출석 체크인(오늘 첫 접속이면 누적++).
+		AttendanceService->CheckIn(UQuestService::GetCurrentUtcDateString());
+	}
+
 	OnGoldChanged.Broadcast(Gold);
 	OnExpChanged.Broadcast(CurrentExp, NextExp);
 	OnStatPointsChanged.Broadcast();
@@ -2350,6 +2374,60 @@ bool UIdleGameInstance::ClaimWeeklyBossMilestone(int32 Milestone)
 			RuneEssence = RuneEssence > MAX_int64 - EssenceReward ? MAX_int64 : RuneEssence + EssenceReward;
 		}
 	}
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::CheckInAttendance()
+{
+	EnsureAttendanceService();
+	if (!AttendanceService)
+	{
+		return false;
+	}
+
+	if (!AttendanceService->CheckIn(UQuestService::GetCurrentUtcDateString()))
+	{
+		return false;
+	}
+
+	RequestAutosave();
+	return true;
+}
+
+bool UIdleGameInstance::ClaimAttendanceMilestone(int32 N)
+{
+	EnsureAttendanceService();
+	if (!AttendanceService)
+	{
+		return false;
+	}
+
+	// N>=1 && N<=GetReached && !Claimed 검증 + 수령 마킹(AttendanceService 가 단일 판정). 실패 시 보상 미지급.
+	if (!AttendanceService->ClaimMilestone(N))
+	{
+		return false;
+	}
+
+	// 보상 단일 지급 지점. 마일스톤 종류별로 골드/룬 정수/소비 아이템 지급(서버 attendance.ts parity).
+	EAttendanceReward RewardType = EAttendanceReward::Gold;
+	int64 RewardValue = 0;
+	UAttendanceService::GetMilestoneReward(N, RewardType, RewardValue);
+	switch (RewardType)
+	{
+	case EAttendanceReward::Gold:
+		AddGold(RewardValue);
+		break;
+	case EAttendanceReward::Essence:
+		RuneEssence = RuneEssence > MAX_int64 - RewardValue ? MAX_int64 : RuneEssence + RewardValue;
+		break;
+	case EAttendanceReward::Consumable:
+		AddConsumable(EConsumableType::AllStatElixir, EConsumableGrade::Standard, static_cast<int32>(FMath::Clamp<int64>(RewardValue, 0, MAX_int32)));
+		break;
+	default:
+		break;
+	}
+
 	RequestAutosave();
 	return true;
 }
@@ -3530,6 +3608,15 @@ void UIdleGameInstance::InitializeWeeklyBossServiceForTests(const FString& Curre
 	WeeklyBossService->EnsureWeek(CurrentWeek);
 }
 
+void UIdleGameInstance::SeedAttendanceForTests(int64 Total)
+{
+	EnsureAttendanceService();
+	if (AttendanceService)
+	{
+		AttendanceService->RestoreState(Total, AttendanceService->GetLastAttendanceDate(), TSet<int32>());
+	}
+}
+
 void UIdleGameInstance::InitializeGuildServiceForTests()
 {
 	GuildService = NewObject<UGuildService>(this);
@@ -4016,6 +4103,14 @@ void UIdleGameInstance::EnsureWeeklyBossService()
 	{
 		WeeklyBossService = NewObject<UWeeklyBossService>(this);
 		WeeklyBossService->EnsureWeek(UQuestService::GetCurrentUtcWeekString());
+	}
+}
+
+void UIdleGameInstance::EnsureAttendanceService()
+{
+	if (!AttendanceService)
+	{
+		AttendanceService = NewObject<UAttendanceService>(this);
 	}
 }
 
