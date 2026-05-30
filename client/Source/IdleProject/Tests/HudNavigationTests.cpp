@@ -55,6 +55,9 @@ bool FHudNavLayoutModeTest::RunTest(const FString& Parameters)
     // 경계 바깥에서만 전환.
     TestEqual(TEXT("below 1.25 from Desktop -> Mobile"), static_cast<int32>(ResolveLayoutMode(1.24f, EHudLayoutMode::Desktop)), static_cast<int32>(EHudLayoutMode::Mobile));
     TestEqual(TEXT("above 1.35 from Mobile -> Desktop"), static_cast<int32>(ResolveLayoutMode(1.36f, EHudLayoutMode::Mobile)), static_cast<int32>(EHudLayoutMode::Desktop));
+    // 정확 경계: 1.25는 Mobile, 1.35는 Desktop (경계 포함성 회귀 방지).
+    TestEqual(TEXT("exactly 1.25 -> Mobile"), static_cast<int32>(ResolveLayoutMode(1.25f, EHudLayoutMode::Desktop)), static_cast<int32>(EHudLayoutMode::Mobile));
+    TestEqual(TEXT("exactly 1.35 -> Desktop"), static_cast<int32>(ResolveLayoutMode(1.35f, EHudLayoutMode::Mobile)), static_cast<int32>(EHudLayoutMode::Desktop));
     return true;
 }
 
