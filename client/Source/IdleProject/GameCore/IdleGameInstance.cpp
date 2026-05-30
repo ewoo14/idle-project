@@ -4379,7 +4379,7 @@ bool UIdleGameInstance::IsAutomationFeatureUnlocked(EAutomationFeature Feature) 
 	return UAutomationPolicyService::IsFeatureUnlocked(Feature, HighestChapter, RebirthCount);
 }
 
-void UIdleGameInstance::ApplyProgressionPolicyOnClear()
+void UIdleGameInstance::ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss)
 {
 	EnsureAutomationPolicyService();
 	EnsureStageService();
@@ -4388,29 +4388,18 @@ void UIdleGameInstance::ApplyProgressionPolicyOnClear()
 		return;
 	}
 
-	const int32 ClearedGlobal = StageService->GetGlobalStageIndex();
-	const int32 HighestGlobal = ClearedGlobal; // P1: 현재 도달=현재(누적 최고치 정교화는 후속).
-	const bool bNextIsBoss = StageService->IsNextStageBoss();
-
 	const FProgressionDecision Decision = UAutomationPolicyService::DecideOnClear(
 		AutomationPolicyService->GetMode(),
-		ClearedGlobal,
-		HighestGlobal,
+		ClearedGlobalStage,
+		ClearedGlobalStage, // P1: 최고 도달=클리어 스테이지(누적 최고치 정교화는 후속)
 		AutomationPolicyService->GetFarmLockStage(),
 		AutomationPolicyService->GetAutoBossChallenge(),
-		bNextIsBoss);
+		bNextWasBoss);
 
-	switch (Decision.Action)
+	// RecordKill 이 이미 +1 전진했으므로 Advance 는 무동작. Hold/Retreat 만 위치 보정.
+	if (Decision.Action != EProgressionAction::Advance)
 	{
-	case EProgressionAction::Advance:
-		StageService->AdvanceStage();
-		break;
-	case EProgressionAction::Hold:
 		StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
-		break;
-	case EProgressionAction::Retreat:
-		StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
-		break;
 	}
 }
 

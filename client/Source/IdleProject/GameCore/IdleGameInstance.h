@@ -541,12 +541,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
 	bool IsAutomationFeatureUnlocked(EAutomationFeature Feature) const;
 
-	// 스테이지 클리어 시 자동 진행 정책 적용 진입점(Task 7/8). 현재 글로벌 스테이지를 클리어한 것으로
-	// 보고 정책 결정(전진/유지/후퇴)을 내려, Advance 면 AdvanceStage(), Hold/Retreat 면 목표 스테이지로
-	// JumpToGlobalStage() 한다. StageService 자체의 내부 자동 전진(RecordKill→AdvanceStage)과는 별개의
-	// 명시적 정책 라우팅 훅으로, 클리어 흐름(게임모드/HUD)이 호출한다.
+	// 스테이지 클리어로 자동 전진(+1)이 일어난 직후, 진행 정책에 따라 위치를 보정한다.
+	// Advance: 무동작(이미 전진 완료). Hold(FarmLock/보스게이트): 목표로 점프. Retreat: 클리어 경로엔 없음.
+	// ClearedGlobalStage = 전진 직전(클리어한) 글로벌 스테이지, bNextWasBoss = 전진해 들어간 스테이지가 보스였는지.
 	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
-	void ApplyProgressionPolicyOnClear();
+	void ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss);
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	bool CanTranscend() const;

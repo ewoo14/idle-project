@@ -865,7 +865,7 @@ git commit -m "feat(client): GameInstance 자동화 정책 소유/저장/복원/
 - Modify: `client/Source/IdleProject/GameCore/IdleGameInstance.cpp`
 - Test: `client/Source/IdleProject/Tests/AutomationPolicyServiceTests.cpp` (통합 케이스 추가)
 
-> StageService 의 클리어(`AdvanceStage`/`RecordKill`→advance)와 캐릭터 사망 이벤트를 GameInstance 가 중계하는 지점에 정책 결정을 삽입한다. StageService 자체는 순수 진행기로 두고, "전진할지/멈출지/후퇴할지"는 정책이 GameInstance 경유로 결정한다(관심사 분리).
+> StageService 의 클리어 흐름(`RecordKill` 이 임계 도달 시 내부적으로 +1 자동 전진)은 그대로 두고, 그 직후에 정책 보정을 적용한다(advance-then-correct). StageService/RecordKill/AdvanceStage 는 순수 진행기로 보존하여 기존 테스트를 유지하고, "전진 유지/멈춤(Hold)/후퇴(Retreat)"만 GameInstance 가 클리어 직후 보정한다(관심사 분리).
 
 - [ ] **Step 1: 통합 결정 헬퍼 추가(실패 테스트 먼저)**
 
@@ -897,40 +897,39 @@ bool FAutomationProgressionAdvanceFlowTest::RunTest(const FString& Parameters)
 Run: `./tools/ci/ue-automation.ps1 -Filter "IdleProject.GameCore.Automation.AdvanceFlow"`
 Expected: 신규 테스트 PASS (결정 함수가 이미 구현됨 → 통합 시나리오 검증)
 
-- [ ] **Step 3: GameInstance 클리어 중계에 정책 적용**
+- [ ] **Step 3: GameInstance 에 클리어 직후 보정 메서드 추가**
 
-`IdleGameInstance.cpp`에서 StageService 클리어/전진을 처리하는 지점(예: `OnStageChanged`/`RecordKill` 후 advance 판단 또는 `MarkCurrentChapterBossDefeated` 흐름)을 찾아, 무조건 `AdvanceStage()` 호출 대신 정책 결정을 경유하도록 수정:
+`IdleGameInstance.cpp`에 보정 메서드 `ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss)` 를 추가한다. `RecordKill` 이 이미 +1 전진을 끝낸 상태이므로, Advance 결정은 무동작(no-op)이고 Hold/Retreat 일 때만 `JumpToGlobalStage(Decision.TargetGlobalStage)` 로 위치를 보정한다:
 
 ```cpp
+void UIdleGameInstance::ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss)
+{
 	EnsureAutomationPolicyService();
-	if (StageService && AutomationPolicyService)
+	EnsureStageService();
+	if (!StageService || !AutomationPolicyService)
 	{
-		const int32 ClearedGlobal = StageService->GetGlobalStageIndex();
-		const int32 HighestGlobal = ClearedGlobal; // P1: 현재 최고 도달=현재(누적 최고치는 후속 정교화)
-		// 다음 스테이지가 보스인지: StageService 의 다음 stage 기준(StagesPerChapter 경계)
-		const bool bNextIsBoss = (StageService->GetCurrentStage() + 1) >= UStageService::StagesPerChapter
-			? false /* 챕터 경계 보스 판정은 StageService 규칙 사용 */
-			: false;
-
-		const FProgressionDecision Decision = UAutomationPolicyService::DecideOnClear(
-			AutomationPolicyService->GetMode(),
-			ClearedGlobal,
-			HighestGlobal,
-			AutomationPolicyService->GetFarmLockStage(),
-			AutomationPolicyService->GetAutoBossChallenge(),
-			bNextIsBoss);
-
-		if (Decision.Action == EProgressionAction::Advance)
-		{
-			StageService->AdvanceStage();
-		}
-		// Hold/Retreat: 현재 스테이지 유지(FarmLock/보스대기). 스테이지 강제 이동은
-		// StageService 에 SetCurrentStage 가 없으므로 P1 은 Advance 억제까지만 지원하고
-		// 명시적 점프(파밍 고정 스테이지로 이동/후퇴)는 Task 8 의 StageService 확장에서 처리.
+		return;
 	}
+
+	const FProgressionDecision Decision = UAutomationPolicyService::DecideOnClear(
+		AutomationPolicyService->GetMode(),
+		ClearedGlobalStage,
+		ClearedGlobalStage, // P1: 최고 도달=클리어 스테이지(누적 최고치 정교화는 후속)
+		AutomationPolicyService->GetFarmLockStage(),
+		AutomationPolicyService->GetAutoBossChallenge(),
+		bNextWasBoss);
+
+	// RecordKill 이 이미 +1 전진했으므로 Advance 는 무동작. Hold/Retreat 만 위치 보정.
+	if (Decision.Action != EProgressionAction::Advance)
+	{
+		StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
+	}
+}
 ```
 
-> 주: `bNextIsBoss` 정확 판정과 강제 점프(파밍 고정/후퇴 이동)는 StageService 가 목표 스테이지 세팅 API를 제공해야 완성된다 → Task 8.
+호출부: `IdleProjectGameModeBase.cpp::ScheduleRespawn` 가 `RecordKill` 전에 `IsNextStageBoss()` 를 캡처하고, `RecordKill` 후 글로벌 인덱스가 증가(전진)했으면 `ApplyProgressionPolicyAfterAdvance(PreviousGlobalStageIndex, bNextWasBoss)` 를 호출한다.
+
+> 주: 강제 점프(파밍 고정/후퇴 이동)와 `IsNextStageBoss()` 정확 판정은 StageService 가 목표 스테이지 세팅 API/보스 판정을 제공해야 완성된다 → Task 8.
 
 - [ ] **Step 4: 빌드 + GameCore Automation GREEN 확인**
 
@@ -940,8 +939,8 @@ Expected: 빌드 성공 + GREEN
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add client/Source/IdleProject/GameCore/IdleGameInstance.cpp client/Source/IdleProject/Tests/AutomationPolicyServiceTests.cpp
-git commit -m "feat(client): 자동 진행 정책을 스테이지 클리어 흐름에 연동(전진 억제)"
+git add client/Source/IdleProject/GameCore/IdleGameInstance.cpp client/Source/IdleProject/GameCore/IdleGameInstance.h client/Source/IdleProject/IdleProjectGameModeBase.cpp client/Source/IdleProject/Tests/AutomationPolicyServiceTests.cpp
+git commit -m "feat(client): 자동 진행 정책을 클리어 자동전진 직후 보정으로 연동(advance-then-correct)"
 ```
 
 ---
@@ -996,34 +995,25 @@ bool UStageService::IsNextStageBoss() const
 }
 ```
 
-- [ ] **Step 3: GameInstance 연동에 Hold/Retreat 점프 적용**
+- [ ] **Step 3: GameMode 호출부에서 advance-then-correct 보정 연동**
 
-Task 7 Step 3에서 추가한 블록의 `bNextIsBoss` 계산과 Hold/Retreat 처리를 다음으로 교체:
+`IdleProjectGameModeBase.cpp::ScheduleRespawn` 의 `RecordKill` 블록을 advance-then-correct 로 연동한다. `RecordKill` 전에 `IsNextStageBoss()` 를 캡처하고, 전진이 감지되면 Task 7 의 보정 메서드를 호출:
 
 ```cpp
-		const bool bNextIsBoss = StageService->IsNextStageBoss();
-
-		const FProgressionDecision Decision = UAutomationPolicyService::DecideOnClear(
-			AutomationPolicyService->GetMode(),
-			ClearedGlobal,
-			HighestGlobal,
-			AutomationPolicyService->GetFarmLockStage(),
-			AutomationPolicyService->GetAutoBossChallenge(),
-			bNextIsBoss);
-
-		switch (Decision.Action)
+		const int32 PreviousGlobalStageIndex = StageService->GetGlobalStageIndex();
+		const bool bHadFinalChapterCleared = StageService->HasFinalChapterCleared();
+		const bool bNextWasBoss = StageService->IsNextStageBoss();
+		StageService->RecordKill(bWasBoss);
+		const int32 NewGlobalStageIndex = StageService->GetGlobalStageIndex();
+		const bool bAdvanced = NewGlobalStageIndex > PreviousGlobalStageIndex;
+		// ... StagesCleared 메트릭 기록 ...
+		if (bAdvanced)
 		{
-		case EProgressionAction::Advance:
-			StageService->AdvanceStage();
-			break;
-		case EProgressionAction::Hold:
-			StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
-			break;
-		case EProgressionAction::Retreat:
-			StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
-			break;
+			GameInstance->ApplyProgressionPolicyAfterAdvance(PreviousGlobalStageIndex, bNextWasBoss);
 		}
 ```
+
+`ApplyProgressionPolicyAfterAdvance` 내부에서 Advance=무동작, Hold/Retreat=`JumpToGlobalStage(Decision.TargetGlobalStage)` 로 보정한다(Task 7 Step 3 참조).
 
 - [ ] **Step 4: 점프 회귀 테스트 추가**
 
