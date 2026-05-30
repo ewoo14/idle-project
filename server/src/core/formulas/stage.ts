@@ -130,6 +130,26 @@ export function getStageWeakElement(globalStageIndex: number): StageElement {
       return "Holy";
     case 50:
       return "Dark";
+    case 51:
+      return "Dark";
+    case 52:
+      return "Lightning";
+    case 53:
+      return "Ice";
+    case 54:
+      return "Holy";
+    case 55:
+      return "Dark";
+    case 56:
+      return "Fire";
+    case 57:
+      return "Dark";
+    case 58:
+      return "Ice";
+    case 59:
+      return "Holy";
+    case 60:
+      return "Dark";
     default:
       return "None";
   }

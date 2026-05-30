@@ -10,11 +10,13 @@ import {
   CHAPTER_3_STAGE_DEFINITIONS,
   CHAPTER_4_STAGE_DEFINITIONS,
   CHAPTER_5_STAGE_DEFINITIONS,
+  CHAPTER_6_STAGE_DEFINITIONS,
   getChapter1StageDefinition,
   getChapter2StageDefinition,
   getChapter3StageDefinition,
   getChapter4StageDefinition,
   getChapter5StageDefinition,
+  getChapter6StageDefinition,
   STAGES_PER_CHAPTER,
 } from "./stages.js";
 
@@ -258,5 +260,60 @@ describe("chapter 5 stage definitions", () => {
     expect(getChapter5StageDefinition(10)).toBe(CHAPTER_5_STAGE_DEFINITIONS[9]);
     expect(getChapter5StageDefinition(0)).toBeUndefined();
     expect(getChapter5StageDefinition(11)).toBeUndefined();
+  });
+});
+
+describe("chapter 6 stage definitions", () => {
+  it("defines the ten chapter 6 stages in order", () => {
+    expect(CHAPTER_6_STAGE_DEFINITIONS).toHaveLength(10);
+    expect(
+      CHAPTER_6_STAGE_DEFINITIONS.map(({ chapter, stage }) => ({
+        chapter,
+        stage,
+      })),
+    ).toEqual(
+      Array.from({ length: 10 }, (_, index) => ({
+        chapter: 6,
+        stage: index + 1,
+      })),
+    );
+  });
+
+  it("mirrors client kills-to-advance, boss, elite, and weak-element parity", () => {
+    for (const definition of CHAPTER_6_STAGE_DEFINITIONS) {
+      const globalStageIndex = computeGlobalStageIndex(
+        definition.chapter,
+        definition.stage,
+        STAGES_PER_CHAPTER,
+      );
+
+      expect(definition.killsToAdvance).toBe(
+        expectedKillsToAdvanceByStage.get(definition.stage),
+      );
+      expect(definition.boss).toBe(
+        isBossStage(definition.chapter, definition.stage, STAGES_PER_CHAPTER),
+      );
+      expect(definition.elite).toBe(definition.stage === 5);
+      expect(definition.weakElement).toBe(
+        getStageWeakElement(globalStageIndex),
+      );
+      expect(definition.weakElement).not.toBe("None");
+    }
+  });
+
+  it("marks the chapter 6 mini-boss and chapter boss stages", () => {
+    expect(CHAPTER_6_STAGE_DEFINITIONS[4].elite).toBe(true);
+    expect(CHAPTER_6_STAGE_DEFINITIONS[4].boss).toBe(false);
+    expect(CHAPTER_6_STAGE_DEFINITIONS[9].boss).toBe(true);
+    expect(computeGlobalStageIndex(6, 5, STAGES_PER_CHAPTER)).toBe(55);
+    expect(computeGlobalStageIndex(6, 10, STAGES_PER_CHAPTER)).toBe(60);
+  });
+
+  it("looks up chapter 6 stage definitions by stage number", () => {
+    expect(getChapter6StageDefinition(1)).toBe(CHAPTER_6_STAGE_DEFINITIONS[0]);
+    expect(getChapter6StageDefinition(5)).toBe(CHAPTER_6_STAGE_DEFINITIONS[4]);
+    expect(getChapter6StageDefinition(10)).toBe(CHAPTER_6_STAGE_DEFINITIONS[9]);
+    expect(getChapter6StageDefinition(0)).toBeUndefined();
+    expect(getChapter6StageDefinition(11)).toBeUndefined();
   });
 });

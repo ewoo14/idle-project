@@ -350,6 +350,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch5_004"), EQuestType::Main, TEXT("Silence the Void Herald"), EQuestObjective::ClimbTower, 35, 64500, 48000, TEXT("main_ch5_003"), TEXT("5-5"));
 	AddDefinition(TEXT("main_ch5_005"), EQuestType::Main, TEXT("Breach the Thunder Barrier"), EQuestObjective::KillMonster, 110, 73000, 54500, TEXT("main_ch5_004"), TEXT("5-8"));
 	AddDefinition(TEXT("main_ch5_006"), EQuestType::Main, TEXT("Defeat Verkas the Dimension Lord"), EQuestObjective::DefeatBoss, 1, 88000, 66000, TEXT("main_ch5_005"), TEXT("5-10"));
+	AddDefinition(TEXT("main_ch6_001"), EQuestType::Main, TEXT("Enter the Toppled Throne"), EQuestObjective::KillMonster, 125, 105000, 79000, TEXT("main_ch5_006"), TEXT("6-1"));
+	AddDefinition(TEXT("main_ch6_002"), EQuestType::Main, TEXT("Chart the Spilling Necropolis"), EQuestObjective::ClearMap, 1, 118000, 89000, TEXT("main_ch6_001"), TEXT("6-2"));
+	AddDefinition(TEXT("main_ch6_003"), EQuestType::Main, TEXT("Strength for the Collapsing Rift"), EQuestObjective::ReachLevel, 75, 133000, 100000, TEXT("main_ch6_002"), TEXT("6-4"));
+	AddDefinition(TEXT("main_ch6_004"), EQuestType::Main, TEXT("Silence the Echo of Collapse"), EQuestObjective::ClimbTower, 45, 150000, 112000, TEXT("main_ch6_003"), TEXT("6-5"));
+	AddDefinition(TEXT("main_ch6_005"), EQuestType::Main, TEXT("Cross the Crumbling Thunder Bridge"), EQuestObjective::KillMonster, 130, 169000, 126000, TEXT("main_ch6_004"), TEXT("6-8"));
+	AddDefinition(TEXT("main_ch6_006"), EQuestType::Main, TEXT("Seal the Hollow of Ending"), EQuestObjective::DefeatBoss, 1, 200000, 150000, TEXT("main_ch6_005"), TEXT("6-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);

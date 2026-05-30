@@ -29,6 +29,12 @@ main_ch5_003,Main,main_ch5_003,ReachLevel,60,57000,42500,main_ch5_002,5-4
 main_ch5_004,Main,main_ch5_004,ClimbTower,35,64500,48000,main_ch5_003,5-5
 main_ch5_005,Main,main_ch5_005,KillMonster,110,73000,54500,main_ch5_004,5-8
 main_ch5_006,Main,main_ch5_006,DefeatBoss,1,88000,66000,main_ch5_005,5-10
+main_ch6_001,Main,main_ch6_001,KillMonster,125,105000,79000,main_ch5_006,6-1
+main_ch6_002,Main,main_ch6_002,ClearMap,1,118000,89000,main_ch6_001,6-2
+main_ch6_003,Main,main_ch6_003,ReachLevel,75,133000,100000,main_ch6_002,6-4
+main_ch6_004,Main,main_ch6_004,ClimbTower,45,150000,112000,main_ch6_003,6-5
+main_ch6_005,Main,main_ch6_005,KillMonster,130,169000,126000,main_ch6_004,6-8
+main_ch6_006,Main,main_ch6_006,DefeatBoss,1,200000,150000,main_ch6_005,6-10
 daily_kill_monsters,Daily,daily_kill_monsters,KillMonster,30,500,240,,
 daily_claim_offline,Daily,daily_claim_offline,ClaimOffline,1,300,180,,
 daily_enhance_gear,Daily,daily_enhance_gear,Enhance,3,650,320,,
