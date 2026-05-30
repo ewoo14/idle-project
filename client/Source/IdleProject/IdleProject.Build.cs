@@ -33,5 +33,17 @@ public class IdleProject : ModuleRules
 		{
 			"VRM4U"
 		});
+
+		// 에디터 타깃에서만: 맵 테마 머티리얼 절차 생성 커맨드릿용 에디터 모듈.
+		// 런타임/패키지 빌드에는 포함되지 않아 시각 전용·무영향.
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[]
+			{
+				"UnrealEd",
+				"MaterialEditor",
+				"AssetTools"
+			});
+		}
 	}
 }
