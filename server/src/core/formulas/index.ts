@@ -1,5 +1,6 @@
 export * from "./achievement.js";
 export * from "./attendance.js";
+export * from "./automation.js";
 export * from "./bossPhase.js";
 export * from "./classRune.js";
 export * from "./combat.js";

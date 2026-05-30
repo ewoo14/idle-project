@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { type DecideOnClearInput, decideOnClear } from "./automation.js";
+import {
+  AUTOMATION_FEATURE,
+  type DecideOnClearInput,
+  type DecideOnDeathInput,
+  decideOnClear,
+  decideOnDeath,
+  efficiencyUpgradeCost,
+  isFeatureUnlocked,
+} from "./automation.js";
 
 describe("automation decideOnClear (progression on clear)", () => {
   const base: DecideOnClearInput = {
@@ -48,5 +56,86 @@ describe("automation decideOnClear (progression on clear)", () => {
       action: "advance",
       targetGlobalStage: 6,
     });
+  });
+});
+
+describe("automation decideOnDeath (progression on death)", () => {
+  const base: DecideOnDeathInput = {
+    mode: "AutoRetreat",
+    currentGlobalStage: 8,
+    consecutiveDeaths: 0,
+    deathThreshold: 3,
+  };
+
+  it("holds while consecutive deaths stay below the threshold", () => {
+    expect(decideOnDeath({ ...base, consecutiveDeaths: 2 })).toEqual({
+      action: "hold",
+      targetGlobalStage: 8,
+    });
+  });
+
+  it("retreats one stage once deaths reach the threshold", () => {
+    expect(decideOnDeath({ ...base, consecutiveDeaths: 3 })).toEqual({
+      action: "retreat",
+      targetGlobalStage: 7,
+    });
+  });
+
+  it("never retreats below stage 1 (floor)", () => {
+    expect(
+      decideOnDeath({ ...base, currentGlobalStage: 1, consecutiveDeaths: 5 }),
+    ).toEqual({ action: "hold", targetGlobalStage: 1 });
+  });
+
+  it("ignores deaths entirely outside AutoRetreat mode", () => {
+    expect(
+      decideOnDeath({ ...base, mode: "Advance", consecutiveDeaths: 9 }),
+    ).toEqual({ action: "hold", targetGlobalStage: 8 });
+    expect(
+      decideOnDeath({ ...base, mode: "FarmLock", consecutiveDeaths: 9 }),
+    ).toEqual({ action: "hold", targetGlobalStage: 8 });
+  });
+});
+
+describe("automation feature unlock gating", () => {
+  it("unlocks Progression from the very start", () => {
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.Progression, {
+        highestClearedChapter: 0,
+        rebirthCount: 0,
+      }),
+    ).toBe(true);
+  });
+
+  it("gates SkillTactics behind chapter 3", () => {
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.SkillTactics, {
+        highestClearedChapter: 2,
+        rebirthCount: 0,
+      }),
+    ).toBe(false);
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.SkillTactics, {
+        highestClearedChapter: 3,
+        rebirthCount: 0,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("automation efficiency upgrade cost curve", () => {
+  it("returns the base cost at level 0", () => {
+    expect(efficiencyUpgradeCost(1000, 1.5, 0)).toBe(1000);
+  });
+
+  it("grows geometrically and stays strictly monotonic (infinite, no cap)", () => {
+    expect(efficiencyUpgradeCost(1000, 1.5, 2)).toBe(2250);
+    expect(efficiencyUpgradeCost(1000, 1.5, 10)).toBeGreaterThan(
+      efficiencyUpgradeCost(1000, 1.5, 9),
+    );
+  });
+
+  it("guards negative levels back to the base cost", () => {
+    expect(efficiencyUpgradeCost(1000, 1.5, -3)).toBe(1000);
   });
 });
