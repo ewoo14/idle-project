@@ -274,6 +274,8 @@ void USkillComponent::TickSkills(float Now, AActor* Target, const TArray<AActor*
 			}
 			continue;
 		}
+		// 의도적 동작: 궁극기 발동 틱에도 준비된 액티브가 함께 발동된다(구버전은
+		// 궁극기 발동 시 return 으로 액티브를 1틱 억제했으나, 낭비 틱 제거가 더 정확).
 		// Active
 		if (IsReady(Skill.SkillId, Now))
 		{

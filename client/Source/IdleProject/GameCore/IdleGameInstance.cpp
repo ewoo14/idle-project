@@ -1742,7 +1742,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 26;
+	SaveGame->SaveVersion = 27;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
