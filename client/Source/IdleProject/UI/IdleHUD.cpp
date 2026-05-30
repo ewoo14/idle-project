@@ -7275,16 +7275,12 @@ void AIdleHUD::DrawStatAllocationPanel()
 	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + FooterHeight + Padding;
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = PanelRegionY; // 도킹 영역 기준
-	const float Border = 2.0f * Scale;
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
-	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
-	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
-	DrawText(ViewModel.AvailableLabel.ToString(), ViewModel.AvailablePoints > 0 ? Theme::AccentGold : Theme::TextMuted, X + PanelWidth - 118.0f * Scale, Y + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.AvailableLabel.ToString(), ViewModel.AvailablePoints > 0 ? Theme::AccentGold : Theme::TextWarmGray, X + PanelWidth - 118.0f * Scale, Y + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 
 	float RowY = Y + HeaderHeight;
 	for (const FIdleHUDStatRowViewModel& Row : ViewModel.Rows)
@@ -7297,8 +7293,9 @@ void AIdleHUD::DrawStatAllocationPanel()
 	const float ButtonHeight = 26.0f * Scale;
 	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
 	const float ButtonY = Y + PanelHeight - Padding - ButtonHeight;
-	DrawRect(ViewModel.bCanReset ? Theme::AccentRed.CopyWithNewOpacity(0.86f) : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(ViewModel.ResetLabel.ToString(), ViewModel.bCanReset ? Theme::TextPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	// 리셋 버튼: 파괴적 동작 유지(AccentRed), 비활성 텍스트 WarmGray
+	DrawRect(ViewModel.bCanReset ? Theme::AccentRed.CopyWithNewOpacity(0.86f) : Theme::PanelCream.CopyWithNewOpacity(0.70f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ResetLabel.ToString(), ViewModel.bCanReset ? Theme::TextOnSlate : Theme::TextWarmGray, ButtonX + 12.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 	if (ViewModel.bCanReset)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ResetHitBoxName, true, 88);
@@ -7312,16 +7309,18 @@ void AIdleHUD::DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float 
 	using namespace IdleProject::UI;
 
 	const float Scale = Height / 30.0f;
-	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
-	DrawRect(Row.AllocatedValue > 0 ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.42f), X, Y, 4.0f * Scale, Height);
-	DrawText(Row.StatLabel.ToString(), Row.AllocatedValue > 0 ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	DrawText(Row.ValueLabel.ToString(), Theme::TextMuted, X + 58.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	// 행 배경: 크림 패널 반투명
+	DrawRect(Theme::PanelCream.CopyWithNewOpacity(0.50f), X, Y, Width, Height);
+	// 좌측 강조선: 할당 시 골드, 미할당 시 골드 저불투명 구분선
+	DrawRect(Row.AllocatedValue > 0 ? Theme::AccentGold : Theme::FrameGold.CopyWithNewOpacity(0.25f), X, Y, 4.0f * Scale, Height);
+	DrawText(Row.StatLabel.ToString(), Row.AllocatedValue > 0 ? Theme::AccentGoldWarm : Theme::TextSlate, X + 10.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.ValueLabel.ToString(), Theme::TextWarmGray, X + 58.0f * Scale, Y + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 
 	const float ButtonSize = 22.0f * Scale;
 	const float ButtonX = X + Width - ButtonSize - 7.0f * Scale;
 	const float ButtonY = Y + 4.0f * Scale;
-	DrawRect(Row.bCanAllocate ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonSize, ButtonSize);
-	DrawText(TEXT("+"), Row.bCanAllocate ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 6.0f * Scale, ButtonY + 2.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
+	// + 배분 버튼: 골드 버튼 스타일
+	DrawGoldButton(ButtonX, ButtonY, ButtonSize, ButtonSize, TEXT("+"), Row.bCanAllocate, EBtnStyle::Gold);
 	if (Row.bCanAllocate)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), Row.AllocationHitBoxName, true, 88);
@@ -7565,18 +7564,14 @@ void AIdleHUD::DrawStatInfoPanel()
 	const float PanelHeight = HeaderHeight + RowCount * RowHeight + FMath::Max(0, RowCount - 1) * RowGap + Padding;
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = ToggleY + 38.0f * Scale;
-	const float Border = 2.0f * Scale;
 	const float ColumnGap = 12.0f * Scale;
 	const float ColumnWidth = (PanelWidth - Padding * 2.0f - ColumnGap) * 0.5f;
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.93f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
-	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
-	DrawText(ViewModel.HeaderLabel.ToString(), Theme::TextMuted, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.HeaderLabel.ToString(), Theme::TextWarmGray, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 60.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
 
 	float RowY = Y + HeaderHeight;
@@ -7601,8 +7596,9 @@ void AIdleHUD::DrawStatInfoToggle(const FIdleHUDStatInfoViewModel& ViewModel, fl
 
 	const float Width = 126.0f * Scale;
 	const float Height = 30.0f * Scale;
-	DrawRect(bStatInfoVisible ? Theme::AccentGold : Theme::BgPanel.CopyWithNewOpacity(0.94f), X, Y, Width, Height);
-	DrawText(ViewModel.ToggleLabel.ToString(), bStatInfoVisible ? Theme::BgPrimary : Theme::TextPrimary, X + 13.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	// 토글 배경: 활성 시 골드 강조, 비활성 시 크림 패널 반투명
+	DrawRect(bStatInfoVisible ? Theme::AccentGold : Theme::PanelCream.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	DrawText(ViewModel.ToggleLabel.ToString(), bStatInfoVisible ? Theme::TextOnSlate : Theme::TextSlate, X + 13.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	AddHitBox(FVector2D(X, Y), FVector2D(Width, Height), ViewModel.ToggleHitBoxName, true, 88);
 }
 
@@ -7611,10 +7607,12 @@ void AIdleHUD::DrawStatInfoRow(const FIdleHUDStatInfoRowViewModel& Row, float X,
 	using namespace IdleProject::UI;
 
 	const float Scale = Height / 25.0f;
-	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.88f), X, Y, Width, Height);
+	// 행 배경: 크림 패널 반투명
+	DrawRect(Theme::PanelCream.CopyWithNewOpacity(0.50f), X, Y, Width, Height);
+	// 좌측 강조선: 원래 액센트 색상 유지 (AccentBlue 기본/AccentGold 파생), 저불투명
 	DrawRect(AccentColor.CopyWithNewOpacity(0.85f), X, Y, 3.0f * Scale, Height);
-	DrawText(Row.StatLabel.ToString(), Theme::TextMuted, X + 9.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
-	DrawText(Row.ValueLabel.ToString(), Theme::TextPrimary, X + Width - 52.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.StatLabel.ToString(), Theme::TextWarmGray, X + 9.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.ValueLabel.ToString(), Theme::TextSlate, X + Width - 52.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 }
 
 void AIdleHUD::ToggleStatInfoPanel()
@@ -9887,15 +9885,11 @@ void AIdleHUD::DrawMasteryPanel()
 	const float PanelHeight = 72.0f * Scale + ViewModel.Rows.Num() * RowHeight + Padding;
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = PanelRegionY; // 도킹 영역 기준
-	const float Border = 2.0f * Scale;
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
-	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 	DrawText(ViewModel.WorldPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 44.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
 
 	float RowY = Y + 70.0f * Scale;
@@ -9903,16 +9897,19 @@ void AIdleHUD::DrawMasteryPanel()
 	{
 		const float RowX = X + Padding;
 		const float RowWidth = PanelWidth - Padding * 2.0f;
-		DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), RowX, RowY, RowWidth, RowHeight - 5.0f * Scale);
-		DrawRect(Theme::AccentBlue.CopyWithNewOpacity(0.52f), RowX, RowY + RowHeight - 10.0f * Scale, RowWidth, 4.0f * Scale);
-		DrawRect(Theme::AccentGold, RowX, RowY + RowHeight - 10.0f * Scale, RowWidth * Row.ProgressRatio, 4.0f * Scale);
+		// 행 배경: 크림 패널 반투명
+		DrawRect(Theme::PanelCream.CopyWithNewOpacity(0.50f), RowX, RowY, RowWidth, RowHeight - 5.0f * Scale);
+		// 진행 바 배경: 골드 구분선 저불투명
+		DrawRect(Theme::FrameGold.CopyWithNewOpacity(0.25f), RowX, RowY + RowHeight - 10.0f * Scale, RowWidth, 4.0f * Scale);
+		// 진행 바 채움: 골드 액센트
+		DrawRect(Theme::AccentGoldWarm, RowX, RowY + RowHeight - 10.0f * Scale, RowWidth * Row.ProgressRatio, 4.0f * Scale);
 
-		DrawText(Row.TrackLabel.ToString(), Theme::TextPrimary, RowX + 8.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
-		DrawText(Row.LevelLabel.ToString(), Theme::TextMuted, RowX + 78.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+		DrawText(Row.TrackLabel.ToString(), Theme::TextSlate, RowX + 8.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+		DrawText(Row.LevelLabel.ToString(), Theme::TextWarmGray, RowX + 78.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
 		DrawText(Row.LocalBonusLabel.ToString(), Theme::AccentGold, RowX + 132.0f * Scale, RowY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 		DrawText(Row.LocalBonus2Label.ToString(), Theme::AccentBlue, RowX + 132.0f * Scale, RowY + 21.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
-		DrawText(Row.XpLabel.ToString(), Theme::TextMuted, RowX + 8.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
-		DrawText(Row.TooltipLabel.ToString(), Theme::TextMuted, RowX + 8.0f * Scale, RowY + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
+		DrawText(Row.XpLabel.ToString(), Theme::TextWarmGray, RowX + 8.0f * Scale, RowY + 23.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+		DrawText(Row.TooltipLabel.ToString(), Theme::TextWarmGray, RowX + 8.0f * Scale, RowY + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.54f * Scale);
 		RowY += RowHeight;
 	}
 }
