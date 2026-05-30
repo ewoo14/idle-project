@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "CombatSystem/CombatComponent.h"
+#include "CombatSystem/StatusElementTypes.h"
 #include "GameFramework/HUD.h"
 #include "GameCore/DungeonTypes.h"
 #include "GameCore/IdleGameInstance.h"
@@ -46,6 +47,21 @@ struct IDLEPROJECT_API FIdleHUDSkillSlotViewModel
 	int32 MaxRank = 0;
 	bool bReady = true;
 	bool bCanRankUp = false;
+	ESkillElement Element = ESkillElement::None;
+};
+
+struct IDLEPROJECT_API FIdleHUDElementLegendEntry
+{
+	FText Label;
+	FText IconLabel;
+	FLinearColor Color = FLinearColor::White;
+};
+
+struct IDLEPROJECT_API FIdleHUDElementLegendViewModel
+{
+	TArray<FIdleHUDElementLegendEntry> Elements;
+	FText WeakNote;
+	FText ResistNote;
 };
 
 struct IDLEPROJECT_API FIdleHUDUltimateViewModel
@@ -1044,6 +1060,7 @@ IDLEPROJECT_API FText BuildAffixSummary(const FItemInstance& Item);
 IDLEPROJECT_API FText BuildUniqueTraitSummary(const FItemInstance& Item);
 IDLEPROJECT_API FIdleHUDSetSummaryViewModel BuildSetSummaryViewModel(const TArray<FItemInstance>& EquippedItems);
 IDLEPROJECT_API TArray<FIdleHUDSkillSlotViewModel> BuildSkillSlotViewModels(const USkillComponent& SkillComponent, float Now);
+IDLEPROJECT_API FIdleHUDElementLegendViewModel BuildElementLegendViewModel();
 IDLEPROJECT_API FIdleHUDUltimateViewModel BuildUltimateViewModel(const USkillComponent& SkillComponent);
 IDLEPROJECT_API FIdleHUDStageViewModel BuildStageViewModel(const FStageInfo& StageInfo);
 IDLEPROJECT_API FText BuildChapterEntryFeedbackLabel(int32 Chapter);

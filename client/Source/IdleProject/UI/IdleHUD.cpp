@@ -2219,10 +2219,28 @@ TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(con
 		Slot.MaxRank = SkillComponent.MaxRank;
 		Slot.bReady = Slot.CooldownRemaining <= 0.0f;
 		Slot.bCanRankUp = SkillComponent.CanRankUp(Skill.SkillId);
+		Slot.Element = Skill.Element;
 		Slots.Add(Slot);
 	}
 
 	return Slots;
+}
+
+FIdleHUDElementLegendViewModel IdleProject::UI::BuildElementLegendViewModel()
+{
+	FIdleHUDElementLegendViewModel Legend;
+	const ESkillElement Order[] = { ESkillElement::Fire, ESkillElement::Ice, ESkillElement::Lightning, ESkillElement::Holy, ESkillElement::Dark };
+	for (ESkillElement E : Order)
+	{
+		FIdleHUDElementLegendEntry Entry;
+		Entry.Label = StageWeakElementToLabel(E);
+		Entry.IconLabel = StageWeakElementToIconLabel(E);
+		Entry.Color = StageWeakElementToColor(E);
+		Legend.Elements.Add(Entry);
+	}
+	Legend.WeakNote = IdleProject::Localization::UI(TEXT("ELEMENT_LEGEND_WEAK"));
+	Legend.ResistNote = IdleProject::Localization::UI(TEXT("ELEMENT_LEGEND_RESIST"));
+	return Legend;
 }
 
 FIdleHUDUltimateViewModel IdleProject::UI::BuildUltimateViewModel(const USkillComponent& SkillComponent)
