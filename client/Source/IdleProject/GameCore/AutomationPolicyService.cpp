@@ -90,3 +90,46 @@ void UAutomationPolicyService::RestoreState(
 	bAutoBossChallenge = bInAutoBoss;
 	PushDeathThreshold = FMath::Max(1, InThreshold);
 }
+
+bool UAutomationPolicyService::EvaluateSkillRule(
+	ESkillAutoCondition Condition,
+	float HpThresholdPct,
+	float SelfHpPct,
+	bool bIsBossElite,
+	bool bBuffActive)
+{
+	switch (Condition)
+	{
+	case ESkillAutoCondition::BossEliteOnly:
+		return bIsBossElite;
+	case ESkillAutoCondition::HpBelow:
+		return FMath::Clamp(SelfHpPct, 0.0f, 1.0f) <= FMath::Clamp(HpThresholdPct, 0.0f, 1.0f);
+	case ESkillAutoCondition::MaintainBuff:
+		return !bBuffActive;
+	default:
+		return true; // Always
+	}
+}
+
+void UAutomationPolicyService::SetSkillRule(const FSkillAutoRule& Rule)
+{
+	for (FSkillAutoRule& Existing : SkillRules)
+	{
+		if (Existing.SkillId == Rule.SkillId)
+		{
+			Existing = Rule;
+			return;
+		}
+	}
+	SkillRules.Add(Rule);
+}
+
+void UAutomationPolicyService::ClearSkillRule(FName SkillId)
+{
+	SkillRules.RemoveAll([SkillId](const FSkillAutoRule& R) { return R.SkillId == SkillId; });
+}
+
+void UAutomationPolicyService::RestoreSkillRules(const TArray<FSkillAutoRule>& InRules)
+{
+	SkillRules = InRules;
+}

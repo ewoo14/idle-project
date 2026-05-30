@@ -98,4 +98,38 @@ bool FStageJumpTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAutomationSkillRuleTest,
+	"IdleProject.GameCore.Automation.SkillRule",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAutomationSkillRuleTest::RunTest(const FString& Parameters)
+{
+	using S = UAutomationPolicyService;
+	// Always
+	TestTrue(TEXT("always"), S::EvaluateSkillRule(ESkillAutoCondition::Always, 0.3f, 1.0f, false, false));
+	// BossEliteOnly
+	TestTrue(TEXT("boss true"), S::EvaluateSkillRule(ESkillAutoCondition::BossEliteOnly, 0.3f, 1.0f, true, false));
+	TestFalse(TEXT("boss false"), S::EvaluateSkillRule(ESkillAutoCondition::BossEliteOnly, 0.3f, 1.0f, false, false));
+	// HpBelow
+	TestTrue(TEXT("hp at threshold"), S::EvaluateSkillRule(ESkillAutoCondition::HpBelow, 0.3f, 0.3f, false, false));
+	TestFalse(TEXT("hp above"), S::EvaluateSkillRule(ESkillAutoCondition::HpBelow, 0.3f, 0.31f, false, false));
+	// HpBelow 클램프
+	TestTrue(TEXT("hp clamp hi"), S::EvaluateSkillRule(ESkillAutoCondition::HpBelow, 5.0f, 1.0f, false, false));
+	// MaintainBuff
+	TestTrue(TEXT("buff inactive"), S::EvaluateSkillRule(ESkillAutoCondition::MaintainBuff, 0.3f, 1.0f, false, false));
+	TestFalse(TEXT("buff active"), S::EvaluateSkillRule(ESkillAutoCondition::MaintainBuff, 0.3f, 1.0f, false, true));
+	// SetSkillRule 교체
+	UAutomationPolicyService* Svc = NewObject<UAutomationPolicyService>();
+	FSkillAutoRule R; R.SkillId = FName(TEXT("heavy_strike")); R.Condition = ESkillAutoCondition::BossEliteOnly;
+	Svc->SetSkillRule(R);
+	TestEqual(TEXT("one rule"), Svc->GetSkillRules().Num(), 1);
+	R.Condition = ESkillAutoCondition::HpBelow; Svc->SetSkillRule(R);
+	TestEqual(TEXT("replace not add"), Svc->GetSkillRules().Num(), 1);
+	TestEqual(TEXT("replaced cond"), (int32)Svc->GetSkillRules()[0].Condition, (int32)ESkillAutoCondition::HpBelow);
+	Svc->ClearSkillRule(FName(TEXT("heavy_strike")));
+	TestEqual(TEXT("cleared"), Svc->GetSkillRules().Num(), 0);
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS
