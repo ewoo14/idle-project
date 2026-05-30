@@ -6175,14 +6175,15 @@ void AIdleHUD::DrawLeaderboardPanel()
 	bLeaderboardLoading = false;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 340.0f * Scale, 440.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 30.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 12.0f * Scale;
 	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 8);
 	const float PanelHeight = 118.0f * Scale + RowHeight + Padding + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 688.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -8774,14 +8775,15 @@ void AIdleHUD::DrawGuildPanel()
 	const bool bShowFeedback = !GuildFeedbackLabel.IsEmpty() && FeedbackElapsed <= GuildFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float Padding = 14.0f * Scale;
 	const float RowHeight = 34.0f * Scale;
 	const float RowGap = 5.0f * Scale;
 	const float ButtonHeight = 26.0f * Scale;
 	const float Border = 2.0f * Scale;
-	const float X = 28.0f * Scale;
-	const float Y = 120.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 
 	// 화면 상태별 가시 행 수로 패널 높이 산출.
 	float PanelHeight = 0.0f;
@@ -8818,6 +8820,7 @@ void AIdleHUD::DrawGuildPanel()
 	}
 	PanelHeight += bShowFeedback ? 24.0f * Scale : 0.0f;
 	PanelHeight += Padding;
+	PanelHeight = FMath::Min(PanelHeight, PanelRegionH); // 도킹 영역 높이 클램프
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
 	DrawRect(Theme::Auth, X, Y, PanelWidth, Border);
