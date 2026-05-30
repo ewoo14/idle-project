@@ -1,5 +1,6 @@
 #include "Misc/AutomationTest.h"
 #include "GameCore/AutomationPolicyService.h"
+#include "GameCore/StageService.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -54,6 +55,46 @@ bool FAutomationProgressionDecisionTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("cost lv2"), S::EfficiencyUpgradeCost(1000, 1.5f, 2), (int64)2250);
 		TestEqual(TEXT("cost neg guard"), S::EfficiencyUpgradeCost(1000, 1.5f, -3), (int64)1000);
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAutomationProgressionAdvanceFlowTest,
+	"IdleProject.GameCore.Automation.AdvanceFlow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAutomationProgressionAdvanceFlowTest::RunTest(const FString& Parameters)
+{
+	using S = UAutomationPolicyService;
+	// FarmLock 고정: 클리어해도 항상 동일 스테이지 hold
+	const FProgressionDecision D1 = S::DecideOnClear(EProgressionMode::FarmLock, 4, 7, 4, true, false);
+	TestEqual(TEXT("farmlock hold stays"), D1.TargetGlobalStage, 4);
+	// AutoRetreat: 임계 미만 사망은 유지, 클리어 시엔 전진
+	const FProgressionDecision D2 = S::DecideOnDeath(EProgressionMode::AutoRetreat, 6, 1, 3);
+	TestEqual(TEXT("autoretreat hold below threshold"), (int32)D2.Action, (int32)EProgressionAction::Hold);
+	const FProgressionDecision D3 = S::DecideOnClear(EProgressionMode::AutoRetreat, 6, 6, 1, true, false);
+	TestEqual(TEXT("autoretreat advances on clear"), D3.TargetGlobalStage, 7);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FStageJumpTest,
+	"IdleProject.GameCore.Automation.StageJump",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FStageJumpTest::RunTest(const FString& Parameters)
+{
+	UStageService* Stage = NewObject<UStageService>();
+	Stage->InitializeDefaultStages();
+	Stage->JumpToGlobalStage(1);
+	TestEqual(TEXT("jump floor chapter"), Stage->GetCurrentChapter(), 1);
+	TestEqual(TEXT("jump floor stage"), Stage->GetCurrentStage(), 1);
+	// 9스테이지(다음이 10=보스)
+	Stage->JumpToGlobalStage(9);
+	TestTrue(TEXT("stage9 next is boss"), Stage->IsNextStageBoss());
+	// 10스테이지(보스): 다음은 새 챕터 1 → 보스 아님
+	Stage->JumpToGlobalStage(10);
+	TestFalse(TEXT("boss stage next not boss"), Stage->IsNextStageBoss());
 	return true;
 }
 

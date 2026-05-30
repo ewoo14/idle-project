@@ -4379,6 +4379,41 @@ bool UIdleGameInstance::IsAutomationFeatureUnlocked(EAutomationFeature Feature) 
 	return UAutomationPolicyService::IsFeatureUnlocked(Feature, HighestChapter, RebirthCount);
 }
 
+void UIdleGameInstance::ApplyProgressionPolicyOnClear()
+{
+	EnsureAutomationPolicyService();
+	EnsureStageService();
+	if (!StageService || !AutomationPolicyService)
+	{
+		return;
+	}
+
+	const int32 ClearedGlobal = StageService->GetGlobalStageIndex();
+	const int32 HighestGlobal = ClearedGlobal; // P1: 현재 도달=현재(누적 최고치 정교화는 후속).
+	const bool bNextIsBoss = StageService->IsNextStageBoss();
+
+	const FProgressionDecision Decision = UAutomationPolicyService::DecideOnClear(
+		AutomationPolicyService->GetMode(),
+		ClearedGlobal,
+		HighestGlobal,
+		AutomationPolicyService->GetFarmLockStage(),
+		AutomationPolicyService->GetAutoBossChallenge(),
+		bNextIsBoss);
+
+	switch (Decision.Action)
+	{
+	case EProgressionAction::Advance:
+		StageService->AdvanceStage();
+		break;
+	case EProgressionAction::Hold:
+		StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
+		break;
+	case EProgressionAction::Retreat:
+		StageService->JumpToGlobalStage(Decision.TargetGlobalStage);
+		break;
+	}
+}
+
 void UIdleGameInstance::EnsureGuildService()
 {
 	if (!GuildService)

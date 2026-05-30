@@ -44,6 +44,28 @@ void UStageService::AdvanceStage()
 	MarkCurrentChapterBossDefeated();
 }
 
+void UStageService::JumpToGlobalStage(int32 TargetGlobalStage)
+{
+	const int32 MaxGlobal = (HighestClearedChapter * StagesPerChapter) + StagesPerChapter; // 도달 가능 상한 근사
+	const int32 Clamped = FMath::Clamp(TargetGlobalStage, 1, FMath::Max(1, MaxGlobal));
+	const int32 NewChapter = ((Clamped - 1) / StagesPerChapter) + 1;
+	const int32 NewStage = ((Clamped - 1) % StagesPerChapter) + 1;
+	CurrentChapter = FMath::Clamp(NewChapter, 1, TotalChapters);
+	CurrentStage = FMath::Clamp(NewStage, 1, StagesPerChapter);
+	KillsThisStage = 0;
+	OnStageChanged.Broadcast(GetCurrentStageInfo());
+}
+
+bool UStageService::IsNextStageBoss() const
+{
+	// 다음 스테이지 번호(챕터 내). 현재가 보스면 다음은 새 챕터의 1스테이지 → 보스 아님.
+	if (CurrentStage >= StagesPerChapter)
+	{
+		return false;
+	}
+	return (CurrentStage + 1) == StagesPerChapter;
+}
+
 void UStageService::MarkCurrentChapterBossDefeated()
 {
 	if (!FStageFormula::IsBossStage(CurrentChapter, CurrentStage, StagesPerChapter)
