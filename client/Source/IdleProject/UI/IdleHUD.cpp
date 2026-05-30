@@ -2219,10 +2219,28 @@ TArray<FIdleHUDSkillSlotViewModel> IdleProject::UI::BuildSkillSlotViewModels(con
 		Slot.MaxRank = SkillComponent.MaxRank;
 		Slot.bReady = Slot.CooldownRemaining <= 0.0f;
 		Slot.bCanRankUp = SkillComponent.CanRankUp(Skill.SkillId);
+		Slot.Element = Skill.Element;
 		Slots.Add(Slot);
 	}
 
 	return Slots;
+}
+
+FIdleHUDElementLegendViewModel IdleProject::UI::BuildElementLegendViewModel()
+{
+	FIdleHUDElementLegendViewModel Legend;
+	const ESkillElement Order[] = { ESkillElement::Fire, ESkillElement::Ice, ESkillElement::Lightning, ESkillElement::Holy, ESkillElement::Dark };
+	for (ESkillElement E : Order)
+	{
+		FIdleHUDElementLegendEntry Entry;
+		Entry.Label = StageWeakElementToLabel(E);
+		Entry.IconLabel = StageWeakElementToIconLabel(E);
+		Entry.Color = StageWeakElementToColor(E);
+		Legend.Elements.Add(Entry);
+	}
+	Legend.WeakNote = IdleProject::Localization::UI(TEXT("ELEMENT_LEGEND_WEAK"));
+	Legend.ResistNote = IdleProject::Localization::UI(TEXT("ELEMENT_LEGEND_RESIST"));
+	return Legend;
 }
 
 FIdleHUDUltimateViewModel IdleProject::UI::BuildUltimateViewModel(const USkillComponent& SkillComponent)
@@ -7433,6 +7451,12 @@ void AIdleHUD::DrawSkillHud(const USkillComponent& SkillComponent, float Now)
 		DrawSkillSlot(Slots[Index], Index, StartX + Index * (SlotWidth + SlotGap), SlotY, SlotWidth, SlotHeight);
 	}
 
+	DrawElementLegend(
+		IdleProject::UI::BuildElementLegendViewModel(),
+		StartX,
+		SlotY - 108.0f * HudScale,
+		TotalWidth);
+
 	DrawUltimateGauge(
 		IdleProject::UI::BuildUltimateViewModel(SkillComponent),
 		StartX,
@@ -7500,6 +7524,40 @@ void AIdleHUD::DrawSkillSlot(const FIdleHUDSkillSlotViewModel& Slot, int32 SlotI
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonSize, ButtonSize), MakeSkillRankHitBoxName(Slot.SkillId), true, 88);
 	}
+
+	if (Slot.Element != ESkillElement::None)
+	{
+		const float BadgeSize = 16.0f * Scale;
+		const float BadgeX = X + 28.0f * Scale;
+		const float BadgeY = Y + Height - BadgeSize - 14.0f * Scale;
+		DrawRect(StageWeakElementToColor(Slot.Element).CopyWithNewOpacity(0.92f), BadgeX, BadgeY, BadgeSize, BadgeSize);
+		DrawText(StageWeakElementToIconLabel(Slot.Element).ToString(), Theme::BgPrimary, BadgeX + 4.0f * Scale, BadgeY + 1.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	}
+}
+
+void AIdleHUD::DrawElementLegend(const FIdleHUDElementLegendViewModel& Legend, float X, float Y, float Width)
+{
+	using namespace IdleProject::UI;
+	if (!Canvas || Legend.Elements.Num() <= 0)
+	{
+		return;
+	}
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelH = 40.0f * Scale;
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.86f), X, Y, Width, PanelH);
+	DrawText(IdleProject::Localization::UI(TEXT("ELEMENT_LEGEND_TITLE")).ToString(), Theme::TextMuted, X + 8.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+
+	float CursorX = X + 8.0f * Scale;
+	const float SwatchY = Y + 20.0f * Scale;
+	const float SwatchSize = 12.0f * Scale;
+	for (const FIdleHUDElementLegendEntry& Entry : Legend.Elements)
+	{
+		DrawRect(Entry.Color.CopyWithNewOpacity(0.92f), CursorX, SwatchY, SwatchSize, SwatchSize);
+		DrawText(Entry.Label.ToString(), Theme::TextPrimary, CursorX + SwatchSize + 3.0f * Scale, SwatchY - 1.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+		CursorX += SwatchSize + 52.0f * Scale;
+	}
+	const FString Notes = Legend.WeakNote.ToString() + TEXT("  /  ") + Legend.ResistNote.ToString();
+	DrawText(Notes, Theme::TextMuted, X + Width - 150.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
 }
 
 void AIdleHUD::DrawUltimateGauge(const FIdleHUDUltimateViewModel& Ultimate, float X, float Y, float Width, float Height)
