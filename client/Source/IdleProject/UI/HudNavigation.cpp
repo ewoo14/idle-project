@@ -56,4 +56,34 @@ namespace IdleProject::UI
         if (AspectRatio >= UpperThreshold) { return EHudLayoutMode::Desktop; }
         return Current; // 데드존: 유지
     }
+
+    bool IsNavOpen(const FHudNavState& State)
+    {
+        return State.ActiveCategory != EHudCategory::None && State.ActivePanel != EHudPanel::None;
+    }
+
+    void SelectCategory(FHudNavState& State, EHudCategory Category)
+    {
+        if (State.ActiveCategory == Category) { CloseNav(State); return; } // 토글 닫기
+        const TArray<EHudPanel>& Panels = PanelsForCategory(Category);
+        if (Panels.Num() == 0) { CloseNav(State); return; }
+        const EHudPanel* Last = State.LastPanelByCategory.Find(Category);
+        const EHudPanel Target = (Last && Panels.Contains(*Last)) ? *Last : Panels[0];
+        State.ActiveCategory = Category;
+        State.ActivePanel = Target;
+        State.LastPanelByCategory.Add(Category, Target);
+    }
+
+    void SelectPanel(FHudNavState& State, EHudPanel Panel)
+    {
+        if (CategoryForPanel(Panel) != State.ActiveCategory) { return; } // 교차 카테고리 무시
+        State.ActivePanel = Panel;
+        State.LastPanelByCategory.Add(State.ActiveCategory, Panel);
+    }
+
+    void CloseNav(FHudNavState& State)
+    {
+        State.ActiveCategory = EHudCategory::None;
+        State.ActivePanel = EHudPanel::None;
+    }
 }

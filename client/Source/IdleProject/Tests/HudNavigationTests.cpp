@@ -61,4 +61,43 @@ bool FHudNavLayoutModeTest::RunTest(const FString& Parameters)
     return true;
 }
 
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+    FHudNavStateMachineTest,
+    "IdleProject.UI.HUD.NavStateMachine",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FHudNavStateMachineTest::RunTest(const FString& Parameters)
+{
+    FHudNavState S;
+    TestFalse(TEXT("default closed"), IsNavOpen(S));
+    TestEqual(TEXT("default category None"), static_cast<int32>(S.ActiveCategory), static_cast<int32>(EHudCategory::None));
+
+    SelectCategory(S, EHudCategory::Gear);
+    TestTrue(TEXT("open after select"), IsNavOpen(S));
+    TestEqual(TEXT("Gear active"), static_cast<int32>(S.ActiveCategory), static_cast<int32>(EHudCategory::Gear));
+    TestEqual(TEXT("first panel = Enhance"), static_cast<int32>(S.ActivePanel), static_cast<int32>(EHudPanel::Enhance));
+
+    SelectPanel(S, EHudPanel::Rune);
+    TestEqual(TEXT("now Rune"), static_cast<int32>(S.ActivePanel), static_cast<int32>(EHudPanel::Rune));
+
+    SelectCategory(S, EHudCategory::Social);
+    TestEqual(TEXT("Social first = Guild"), static_cast<int32>(S.ActivePanel), static_cast<int32>(EHudPanel::Guild));
+    SelectCategory(S, EHudCategory::Gear);
+    TestEqual(TEXT("Gear restores Rune"), static_cast<int32>(S.ActivePanel), static_cast<int32>(EHudPanel::Rune));
+
+    SelectCategory(S, EHudCategory::Gear);
+    TestFalse(TEXT("re-select closes"), IsNavOpen(S));
+    TestEqual(TEXT("category cleared"), static_cast<int32>(S.ActiveCategory), static_cast<int32>(EHudCategory::None));
+
+    SelectCategory(S, EHudCategory::Daily);
+    CloseNav(S);
+    TestFalse(TEXT("closed by CloseNav"), IsNavOpen(S));
+
+    SelectCategory(S, EHudCategory::Combat);
+    SelectPanel(S, EHudPanel::Shop); // Shop은 Gear → 무시
+    TestEqual(TEXT("cross-category panel ignored"), static_cast<int32>(S.ActivePanel), static_cast<int32>(EHudPanel::Tower));
+    return true;
+}
+
 #endif
