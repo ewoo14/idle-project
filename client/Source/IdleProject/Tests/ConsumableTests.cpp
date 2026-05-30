@@ -348,7 +348,7 @@ bool FConsumableResetPersistenceTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* RoundTripSave = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("v16 consumable save captures"), GameInstance->CaptureToSave(RoundTripSave));
-	TestEqual(TEXT("Captured save version is v25"), RoundTripSave->SaveVersion, 25);
+	TestEqual(TEXT("Captured save version is v26"), RoundTripSave->SaveVersion, 26);
 	TestEqual(TEXT("Captured consumable payload has guard entry"), RoundTripSave->Consumables.Num(), 1);
 	TestEqual(TEXT("Captured consumable count persists"), RoundTripSave->Consumables[0].Count, 2);
 	TestEqual(TEXT("Captured active end timestamp persists"), RoundTripSave->Consumables[0].BuffEndUnixSec, static_cast<int64>(12345));

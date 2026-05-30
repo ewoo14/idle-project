@@ -180,11 +180,18 @@ void AIdleProjectGameModeBase::ScheduleRespawn(AActor* DyingActor)
 		{
 			const int32 PreviousGlobalStageIndex = StageService->GetGlobalStageIndex();
 			const bool bHadFinalChapterCleared = StageService->HasFinalChapterCleared();
+			const bool bNextWasBoss = StageService->IsNextStageBoss();
 			StageService->RecordKill(bWasBoss);
-			if (StageService->GetGlobalStageIndex() != PreviousGlobalStageIndex
+			const int32 NewGlobalStageIndex = StageService->GetGlobalStageIndex();
+			const bool bAdvanced = NewGlobalStageIndex > PreviousGlobalStageIndex;
+			if (NewGlobalStageIndex != PreviousGlobalStageIndex
 				|| (!bHadFinalChapterCleared && StageService->HasFinalChapterCleared()))
 			{
 				GameInstance->RecordAchievementMetric(EAchievementMetric::StagesCleared, 1);
+			}
+			if (bAdvanced)
+			{
+				GameInstance->ApplyProgressionPolicyAfterAdvance(PreviousGlobalStageIndex, bNextWasBoss);
 			}
 		}
 		if (bWasBoss)

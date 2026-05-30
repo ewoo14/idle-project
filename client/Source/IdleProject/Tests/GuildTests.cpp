@@ -68,6 +68,9 @@ bool FGuildServiceApplySnapshotTest::RunTest(const FString& Parameters)
 	Snapshot.Guild.Id = TEXT("guild-123");
 	Snapshot.Guild.Name = TEXT("Test Guild");
 	Snapshot.Guild.Level = 4;
+	// denorm 계약: FGuildSnapshot.GuildLevel 은 FGuildSummary.Level 과 동일 값.
+	// ApplySnapshot 은 GuildExp==0 일 때 top-level GuildLevel 을 신뢰하므로 함께 설정.
+	Snapshot.GuildLevel = 4;
 	Snapshot.Guild.MemberCount = 12;
 	Snapshot.Guild.JoinMode = EGuildJoinMode::Approval;
 
@@ -179,7 +182,7 @@ bool FGuildSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture to save succeeds"), SourceInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Captured save writes V25"), SaveGame->SaveVersion, static_cast<int32>(25));
+	TestEqual(TEXT("Captured save writes V26"), SaveGame->SaveVersion, static_cast<int32>(26));
 	TestEqual(TEXT("Captured guild id"), SaveGame->CachedGuildId, FString(TEXT("guild-roundtrip")));
 	TestEqual(TEXT("Captured guild rank officer"), static_cast<int32>(SaveGame->CachedGuildRank), static_cast<int32>(EGuildRank::Officer));
 	TestEqual(TEXT("Captured guild level"), SaveGame->CachedGuildLevel, ExpectedLevel);

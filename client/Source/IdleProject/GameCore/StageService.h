@@ -56,6 +56,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void AdvanceStage();
 
+	// 글로벌 스테이지 인덱스로 직접 이동(파밍 고정/자동 후퇴용). [1, 최대도달+1] 범위로 클램프.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
+	void JumpToGlobalStage(int32 TargetGlobalStage);
+
+	// 현재 스테이지의 "다음" 스테이지가 보스인지(클리어 시 자동 진행 판정용).
+	UFUNCTION(BlueprintPure, Category = "Idle|Stage")
+	bool IsNextStageBoss() const;
+
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void MarkCurrentChapterBossDefeated();
 

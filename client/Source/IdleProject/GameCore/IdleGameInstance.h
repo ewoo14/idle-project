@@ -6,6 +6,7 @@
 #include "CharacterSystem/StatPointFormula.h"
 #include "GameCore/AchievementService.h"
 #include "GameCore/AttendanceService.h"
+#include "GameCore/AutomationPolicyService.h"
 #include "GameCore/ConsumableTypes.h"
 #include "GameCore/DungeonService.h"
 #include "GameCore/GuildTypes.h"
@@ -220,6 +221,15 @@ public:
 		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장(#91).
 		const_cast<UIdleGameInstance*>(this)->EnsureRebirthPerkService();
 		return RebirthPerkService;
+	}
+
+	// 자동화 정책 서비스 접근자. 없으면 생성(lazy-ensure).
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	UAutomationPolicyService* GetAutomationPolicyService() const
+	{
+		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장.
+		const_cast<UIdleGameInstance*>(this)->EnsureAutomationPolicyService();
+		return AutomationPolicyService;
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
@@ -517,6 +527,26 @@ public:
 	// 환생 특성 perk 보너스 비율(없으면 0). RefreshDerivedStats/AddGold 등 단일 소비.
 	float GetRebirthPerkBonus(ERebirthPerk Perk) const;
 
+	// ── 자동화 진행 탭용 정책 변경 래퍼(BP 바인딩). 데이터 구동 HUD 진입점(신규 C++ 위젯 없음) ──
+	// 변경 후 자동 저장 트리거는 기존 세이브 흐름 따름.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationProgressionMode(EProgressionMode InMode);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationFarmLockStage(int32 InGlobalStage);
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutomationAutoBossChallenge(bool bValue);
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	bool IsAutomationFeatureUnlocked(EAutomationFeature Feature) const;
+
+	// 스테이지 클리어로 자동 전진(+1)이 일어난 직후, 진행 정책에 따라 위치를 보정한다.
+	// Advance: 무동작(이미 전진 완료). Hold(FarmLock/보스게이트): 목표로 점프. Retreat: 클리어 경로엔 없음.
+	// ClearedGlobalStage = 전진 직전(클리어한) 글로벌 스테이지, bNextWasBoss = 전진해 들어간 스테이지가 보스였는지.
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void ApplyProgressionPolicyAfterAdvance(int32 ClearedGlobalStage, bool bNextWasBoss);
+
 	UFUNCTION(BlueprintPure, Category = "Idle|Transcend")
 	bool CanTranscend() const;
 
@@ -777,6 +807,9 @@ private:
 	TObjectPtr<URebirthPerkService> RebirthPerkService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UAutomationPolicyService> AutomationPolicyService = nullptr;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UGuildService> GuildService;
 
 	/** 환경 변수 IDLE_API_BASE_URL이 없을 때 사용하는 로컬 기본 주소입니다. */
@@ -884,6 +917,7 @@ private:
 	void EnsureAttendanceService();
 	void EnsureTreasureBoxService();
 	void EnsureRebirthPerkService();
+	void EnsureAutomationPolicyService();
 	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
 	bool TryBuyShopResource(int64 Cost, int64& ResourceCount);

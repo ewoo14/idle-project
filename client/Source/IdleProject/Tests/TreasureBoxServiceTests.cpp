@@ -261,7 +261,7 @@ bool FTreasureRewardGrantTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-// 세이브 v25 라운드트립 + 레거시(<25) 회귀 안전.
+// 세이브 v26 라운드트립 + 레거시(<26) 회귀 안전.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FTreasureSaveRoundTripTest,
 	"IdleProject.GameCore.TreasureBox.SaveRoundTrip",
@@ -292,7 +292,7 @@ bool FTreasureSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Capture writes V25"), SaveGame->SaveVersion, static_cast<int32>(25));
+	TestEqual(TEXT("Capture writes V26"), SaveGame->SaveVersion, static_cast<int32>(26));
 	TestEqual(TEXT("Saved total treasure draws"), SaveGame->TotalTreasureDraws, SavedTotal);
 	TestEqual(TEXT("Saved last treasure draw date"), SaveGame->LastTreasureDrawDate, SavedDate);
 
