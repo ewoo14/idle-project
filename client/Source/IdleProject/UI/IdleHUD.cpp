@@ -5083,7 +5083,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 
 void AIdleHUD::ToggleQuestLog()
 {
-	bQuestLogVisible = !bQuestLogVisible;
+	// 퀘스트 로그는 이제 내브 디스패치가 매 프레임 bQuestLogVisible 을 결정하므로,
+	// 직접 토글 대신 일일 카테고리 → 퀘스트 패널로 내비게이션한다.
+	using namespace IdleProject::UI;
+	SelectCategory(HudNav, EHudCategory::Daily);
+	SelectPanel(HudNav, EHudPanel::Quest);
 	if (PlayerOwner)
 	{
 		RefreshMouseInteraction();
@@ -6047,14 +6051,15 @@ void AIdleHUD::DrawConsumablePanel()
 		UIdleGameInstance::GetCurrentUnixSeconds());
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.20f, 300.0f * Scale, 360.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.20f, 300.0f * Scale, 360.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 42.0f * Scale;
 	const float RowGap = 5.0f * Scale;
 	const float ActiveHeight = 34.0f * Scale;
 	const float Padding = 12.0f * Scale;
 	const float PanelHeight = 54.0f * Scale + ActiveHeight + Padding + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 360.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -7866,7 +7871,8 @@ void AIdleHUD::DrawQuestLog()
 
 	const FIdleHUDQuestLogViewModel ViewModel = BuildQuestLogViewModel(IdleGameInstance->GetActiveQuestStates());
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.36f, 420.0f * Scale, 620.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.36f, 420.0f * Scale, 620.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 58.0f * Scale;
 	const float SectionHeight = 26.0f * Scale;
 	const float HeaderHeight = 54.0f * Scale;
@@ -7876,8 +7882,8 @@ void AIdleHUD::DrawQuestLog()
 		? 52.0f * Scale
 		: VisibleSectionCount * SectionHeight + ViewModel.Rows.Num() * (RowHeight + 8.0f * Scale);
 	const float PanelHeight = FMath::Min(HeaderHeight + Padding + ContentHeight + Padding, Canvas->SizeY - 120.0f * Scale);
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 92.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.94f), X, Y, PanelWidth, PanelHeight);
@@ -8536,15 +8542,16 @@ void AIdleHUD::DrawAttendancePanel()
 	const bool bShowFeedback = !AttendanceFeedbackLabel.IsEmpty() && FeedbackElapsed <= AttendanceFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 44.0f * Scale;
 	const float RowGap = 6.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 5);
 	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
 	const float PanelHeight = 78.0f * Scale + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding + FeedbackHeight;
-	const float X = 28.0f * Scale;
-	const float Y = 120.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -10263,7 +10270,8 @@ void AIdleHUD::DrawMissionPanel()
 	const FIdleHUDMissionPanelViewModel ViewModel = BuildMissionPanelViewModel(*MissionService, SelectedMissionPeriod);
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 470.0f * Scale;
+	float PanelWidth = 470.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 44.0f * Scale;
 	const float TabHeight = 26.0f * Scale;
 	const float RowHeight = 50.0f * Scale;
@@ -10271,8 +10279,8 @@ void AIdleHUD::DrawMissionPanel()
 	const float Padding = 14.0f * Scale;
 	const int32 RowCount = FMath::Max(1, ViewModel.Rows.Num());
 	const float PanelHeight = HeaderHeight + TabHeight + 8.0f * Scale + RowCount * RowHeight + FMath::Max(0, RowCount - 1) * RowGap + Padding;
-	const float X = 28.0f * Scale;
-	const float Y = 360.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -10409,14 +10417,15 @@ void AIdleHUD::DrawSeasonPassPanel()
 		});
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 460.0f * Scale;
+	float PanelWidth = 460.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 54.0f * Scale;
 	const float RowHeight = 23.0f * Scale;
 	const float RowGap = 3.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = HeaderHeight + 24.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
-	const float X = 28.0f * Scale;
-	const float Y = 724.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
