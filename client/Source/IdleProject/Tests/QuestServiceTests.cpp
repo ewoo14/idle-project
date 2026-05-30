@@ -277,7 +277,7 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
 	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
-	TestEqual(TEXT("Quest definition count matches chapter five client contract"), Definitions.Num(), 41);
+	TestEqual(TEXT("Quest definition count matches chapter six client contract"), Definitions.Num(), 47);
 
 	struct FExpectedQuestDefinition
 	{
@@ -322,6 +322,12 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("main_ch5_004"), EQuestType::Main, EQuestObjective::ClimbTower, 35, 64500, 48000, TEXT("main_ch5_003"), TEXT("5-5")},
 		{TEXT("main_ch5_005"), EQuestType::Main, EQuestObjective::KillMonster, 110, 73000, 54500, TEXT("main_ch5_004"), TEXT("5-8")},
 		{TEXT("main_ch5_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 88000, 66000, TEXT("main_ch5_005"), TEXT("5-10")},
+		{TEXT("main_ch6_001"), EQuestType::Main, EQuestObjective::KillMonster, 125, 105000, 79000, TEXT("main_ch5_006"), TEXT("6-1")},
+		{TEXT("main_ch6_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 118000, 89000, TEXT("main_ch6_001"), TEXT("6-2")},
+		{TEXT("main_ch6_003"), EQuestType::Main, EQuestObjective::ReachLevel, 75, 133000, 100000, TEXT("main_ch6_002"), TEXT("6-4")},
+		{TEXT("main_ch6_004"), EQuestType::Main, EQuestObjective::ClimbTower, 45, 150000, 112000, TEXT("main_ch6_003"), TEXT("6-5")},
+		{TEXT("main_ch6_005"), EQuestType::Main, EQuestObjective::KillMonster, 130, 169000, 126000, TEXT("main_ch6_004"), TEXT("6-8")},
+		{TEXT("main_ch6_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 200000, 150000, TEXT("main_ch6_005"), TEXT("6-10")},
 		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
 		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
 		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
@@ -450,7 +456,34 @@ bool FQuestServiceChapterFourPrerequisiteChainTest::RunTest(const FString& Param
 	Quests->RecordProgress(EQuestObjective::KillMonster, 110);
 	TestTrue(TEXT("Chapter five barrier quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_005")).bSuccess);
 	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
-	TestTrue(TEXT("Chapter five boss quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch5_006")).bSuccess);
+	FQuestClaimResult ChapterFiveBossClaim = Quests->ClaimQuest(TEXT("main_ch5_006"));
+	TestTrue(TEXT("Chapter five boss quest can be claimed"), ChapterFiveBossClaim.bSuccess);
+	TestTrue(TEXT("Chapter five finale unlocks chapter six start"), ChapterFiveBossClaim.UnlockedQuestIds.Contains(TEXT("main_ch6_001")));
+
+	FQuestState ChapterSixStart;
+	TestTrue(TEXT("Claiming chapter five finale unlocks chapter six start"), Quests->GetQuestState(TEXT("main_ch6_001"), ChapterSixStart));
+	TestEqual(TEXT("Chapter six quest starts on map 6-1"), ChapterSixStart.ChapterMapId, FString(TEXT("6-1")));
+
+	Quests->RecordProgress(EQuestObjective::KillMonster, 125);
+	FQuestClaimResult ChapterSixFirstClaim = Quests->ClaimQuest(TEXT("main_ch6_001"));
+	TestTrue(TEXT("Chapter six first quest can be claimed"), ChapterSixFirstClaim.bSuccess);
+	TestTrue(TEXT("Chapter six first quest unlocks spilling necropolis"), ChapterSixFirstClaim.UnlockedQuestIds.Contains(TEXT("main_ch6_002")));
+
+	Quests->RecordProgress(EQuestObjective::ClearMap, 1);
+	TestTrue(TEXT("Chapter six necropolis can be claimed"), Quests->ClaimQuest(TEXT("main_ch6_002")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 75);
+	TestTrue(TEXT("Chapter six level gate can be claimed"), Quests->ClaimQuest(TEXT("main_ch6_003")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ClimbTower, 45);
+	TestTrue(TEXT("Chapter six echo quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch6_004")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::KillMonster, 130);
+	TestTrue(TEXT("Chapter six bridge quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch6_005")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
+	FQuestClaimResult ChapterSixBossClaim = Quests->ClaimQuest(TEXT("main_ch6_006"));
+	TestTrue(TEXT("Chapter six boss quest can be claimed"), ChapterSixBossClaim.bSuccess);
+
+	FQuestState ChapterSixBoss;
+	TestTrue(TEXT("Chapter six boss quest resolves on map 6-10"), Quests->GetQuestState(TEXT("main_ch6_006"), ChapterSixBoss));
+	TestEqual(TEXT("Chapter six finale resolves on map 6-10"), ChapterSixBoss.ChapterMapId, FString(TEXT("6-10")));
 
 	return true;
 }
