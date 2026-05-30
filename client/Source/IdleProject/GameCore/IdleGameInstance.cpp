@@ -1905,6 +1905,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->AutomationFarmLockStage = AutomationPolicyService->GetFarmLockStage();
 		SaveGame->bAutomationAutoBossChallenge = AutomationPolicyService->GetAutoBossChallenge();
 		SaveGame->AutomationPushDeathThreshold = AutomationPolicyService->GetPushDeathThreshold();
+		SaveGame->AutomationSkillRules = AutomationPolicyService->GetSkillRules();
 	}
 
 	if (GuildService)
@@ -2241,6 +2242,10 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 			// <26 세이브: 기본값(전진/보스자동ON/임계3) 마이그레이션
 			AutomationPolicyService->RestoreState(EProgressionMode::Advance, 1, true, 3);
 		}
+
+		// 스킬 규칙은 SaveVer 27+ 에서만 존재. 미만이면 빈(전부 Always).
+		AutomationPolicyService->RestoreSkillRules(
+			SaveGame->SaveVersion >= 27 ? SaveGame->AutomationSkillRules : TArray<FSkillAutoRule>());
 	}
 
 	OnGoldChanged.Broadcast(Gold);
