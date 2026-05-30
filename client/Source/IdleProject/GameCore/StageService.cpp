@@ -143,6 +143,7 @@ FStageInfo UStageService::GetCurrentStageInfo() const
 	Info.bBossStage = FStageFormula::IsBossStage(CurrentChapter, CurrentStage, StagesPerChapter);
 	Info.bEliteStage = FStageFormula::IsEliteStage(CurrentStage);
 	Info.WeakElement = FStageFormula::GetStageWeakElement(Info.GlobalStageIndex);
+	Info.ResistElement = FStageFormula::GetStageResistElement(Info.GlobalStageIndex);
 	return Info;
 }
 

@@ -185,7 +185,45 @@ ESkillElement FStageFormula::GetStageWeakElement(int32 GlobalStageIndex)
 		return ESkillElement::Fire;
 	case 80:
 		return ESkillElement::Dark;
+	case 81:
+		return ESkillElement::Dark;
+	case 82:
+		return ESkillElement::Fire;
+	case 83:
+		return ESkillElement::Lightning;
+	case 84:
+		return ESkillElement::Holy;
+	case 85:
+		return ESkillElement::Dark;
+	case 86:
+		return ESkillElement::Ice;
+	case 87:
+		return ESkillElement::Dark;
+	case 88:
+		return ESkillElement::Holy;
+	case 89:
+		return ESkillElement::Fire;
+	case 90:
+		return ESkillElement::Dark;
 	default:
 		return ESkillElement::None;
+	}
+}
+
+ESkillElement FStageFormula::GetStageResistElement(int32 GlobalStageIndex)
+{
+	switch (FMath::Max(0, GlobalStageIndex))
+	{
+	case 81: return ESkillElement::Ice;
+	case 82: return ESkillElement::Holy;
+	case 83: return ESkillElement::Dark;
+	case 84: return ESkillElement::Fire;
+	case 85: return ESkillElement::Holy;
+	case 86: return ESkillElement::Lightning;
+	case 87: return ESkillElement::Fire;
+	case 88: return ESkillElement::Lightning;
+	case 89: return ESkillElement::Holy;
+	case 90: return ESkillElement::Ice;
+	default: return ESkillElement::None;
 	}
 }

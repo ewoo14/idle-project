@@ -41,6 +41,12 @@ public:
 	ESkillElement GetWeakElement() const { return WeakElement; }
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
+	void SetResistElement(ESkillElement InResistElement) { ResistElement = InResistElement; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Monster")
+	ESkillElement GetResistElement() const { return ResistElement; }
+
+	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
 	void SetStageStatMultiplier(float InStageStatMultiplier);
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Monster")
@@ -85,6 +91,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	ESkillElement WeakElement = ESkillElement::Fire;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
+	ESkillElement ResistElement = ESkillElement::None;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Idle|Monster")
 	float StageStatMultiplier = 1.0f;

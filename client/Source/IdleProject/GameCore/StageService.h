@@ -33,6 +33,9 @@ struct FStageInfo
 
 	UPROPERTY(BlueprintReadOnly, Category = "Idle|Stage")
 	ESkillElement WeakElement = ESkillElement::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Idle|Stage")
+	ESkillElement ResistElement = ESkillElement::None;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStageChanged, FStageInfo, NewStageInfo);
@@ -45,7 +48,7 @@ class IDLEPROJECT_API UStageService : public UObject
 
 public:
 	static constexpr int32 StagesPerChapter = 10;
-	static constexpr int32 TotalChapters = 8;
+	static constexpr int32 TotalChapters = 9;
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Stage")
 	void InitializeDefaultStages();

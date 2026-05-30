@@ -722,7 +722,10 @@ void USkillComponent::ApplyDamageSkill(const FSkillDefinition& Skill, AActor* Ta
 	const ESkillElement TargetWeakElement = Target && Target->IsA<AIdleMonster>()
 		? CastChecked<AIdleMonster>(Target)->GetWeakElement()
 		: ESkillElement::None;
-	const float ElementDamage = BaseDamage * FCombatFormulas::ComputeElementMultiplier(Skill.Element, TargetWeakElement);
+	const ESkillElement TargetResistElement = Target && Target->IsA<AIdleMonster>()
+		? CastChecked<AIdleMonster>(Target)->GetResistElement()
+		: ESkillElement::None;
+	const float ElementDamage = BaseDamage * FCombatFormulas::ComputeResonanceMultiplier(Skill.Element, TargetWeakElement, TargetResistElement);
 	const float FinalDamage = FCombatFormulas::ApplyCrit(ElementDamage, bWasCrit, OwnerCombat->CritDmg);
 	const EDamageKind DamageKind = bMagicDamage ? EDamageKind::Magic : EDamageKind::Physical;
 
