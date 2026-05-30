@@ -492,12 +492,14 @@ void UIdleGameInstance::Init()
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureAttendanceService();
+	EnsureTreasureBoxService();
 	EnsureRebirthPerkService();
 	EnsureGuildService();
 	NextExp = FLevelFormulas::ExpToNext(CharacterLevel);
 	EnhanceRandomStream.Initialize(FPlatformTime::Cycles());
 	RuneRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x51f15e);
 	PotentialRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x71e4d);
+	TreasureRandomStream.Initialize(FPlatformTime::Cycles() ^ 0x7b0c2e);
 	LoadLanguage();
 	LoadLastSeenUnixSec();
 	LoadProgress();
@@ -531,6 +533,7 @@ void UIdleGameInstance::Shutdown()
 	BuffService = nullptr;
 	WeeklyBossService = nullptr;
 	AttendanceService = nullptr;
+	TreasureBoxService = nullptr;
 	RebirthPerkService = nullptr;
 	GuildService = nullptr;
 	Super::Shutdown();
@@ -1733,10 +1736,11 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureBuffService();
 	EnsureWeeklyBossService();
 	EnsureAttendanceService();
+	EnsureTreasureBoxService();
 	EnsureRebirthPerkService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 24;
+	SaveGame->SaveVersion = 25;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1877,6 +1881,13 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->AttendanceTotal = AttendanceService->GetTotalAttendance();
 		SaveGame->LastAttendanceDate = AttendanceService->GetLastAttendanceDate();
 		SaveGame->AttendanceClaimedMilestones = AttendanceService->GetClaimedMilestones();
+	}
+
+	if (TreasureBoxService)
+	{
+		// 보물 상자 마지막 뽑기 UTC 날짜/누적 뽑기 횟수 직렬화(SaveVer 25). 클라 로컬 권위.
+		SaveGame->LastTreasureDrawDate = TreasureBoxService->GetLastDrawDate();
+		SaveGame->TotalTreasureDraws = TreasureBoxService->GetTotalDraws();
 	}
 
 	if (RebirthPerkService)
@@ -2184,6 +2195,15 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		AttendanceService->CheckIn(UQuestService::GetCurrentUtcDateString());
 	}
 
+	EnsureTreasureBoxService();
+	if (TreasureBoxService)
+	{
+		// SaveVer 25+ 만 보물 상자 마지막 뽑기 날짜/누적 복원, 이전 버전은 빈 값(회귀 안전).
+		const FString RestoredTreasureDate = SaveGame->SaveVersion >= 25 ? SaveGame->LastTreasureDrawDate : FString();
+		const int64 RestoredTreasureTotal = SaveGame->SaveVersion >= 25 ? FMath::Max<int64>(0, SaveGame->TotalTreasureDraws) : 0;
+		TreasureBoxService->RestoreState(RestoredTreasureDate, RestoredTreasureTotal);
+	}
+
 	EnsureRebirthPerkService();
 	if (RebirthPerkService)
 	{
@@ -2451,6 +2471,58 @@ bool UIdleGameInstance::ClaimAttendanceMilestone(int32 N)
 
 	RequestAutosave();
 	return true;
+}
+
+FTreasureReward UIdleGameInstance::DrawTreasureBox()
+{
+	EnsureTreasureBoxService();
+	FTreasureReward Result;
+	if (!TreasureBoxService)
+	{
+		return Result;
+	}
+
+	const FString Today = UQuestService::GetCurrentUtcDateString();
+	if (!TreasureBoxService->CanDrawToday(Today))
+	{
+		return Result;
+	}
+
+	// RNG 클라 권위(#71): roll·수량은 TreasureRandomStream 멤버로 결정. PickReward 는 서버 결정적 함수 1:1.
+	Result = TreasureBoxService->DrawTreasure(Today, TreasureRandomStream);
+	if (Result.Reward == ETreasureReward::None)
+	{
+		return Result;
+	}
+
+	// 보상 단일 지급 지점(이중 지급 금지). 보상 종류별 실존 재화 반영(서버 treasureBox.ts parity).
+	const int32 ClampedAmount = static_cast<int32>(FMath::Clamp<int64>(Result.Amount, 0, MAX_int32));
+	switch (Result.Reward)
+	{
+	case ETreasureReward::Gold:
+		AddGold(Result.Amount);
+		break;
+	case ETreasureReward::Essence:
+		RuneEssence = RuneEssence > MAX_int64 - Result.Amount ? MAX_int64 : RuneEssence + Result.Amount;
+		break;
+	case ETreasureReward::Consumable:
+		AddConsumable(EConsumableType::AllStatElixir, EConsumableGrade::Standard, ClampedAmount);
+		break;
+	case ETreasureReward::ProtectionScroll:
+		ProtectionScrolls = ProtectionScrolls > MAX_int64 - Result.Amount ? MAX_int64 : ProtectionScrolls + Result.Amount;
+		break;
+	case ETreasureReward::ResetCube:
+		ResetCubes = ResetCubes > MAX_int64 - Result.Amount ? MAX_int64 : ResetCubes + Result.Amount;
+		break;
+	case ETreasureReward::RankCube:
+		RankCubes = RankCubes > MAX_int64 - Result.Amount ? MAX_int64 : RankCubes + Result.Amount;
+		break;
+	default:
+		break;
+	}
+
+	RequestAutosave();
+	return Result;
 }
 
 FEnhanceAttemptResult UIdleGameInstance::TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection)
@@ -3714,6 +3786,12 @@ void UIdleGameInstance::SeedAttendanceForTests(int64 Total)
 	}
 }
 
+void UIdleGameInstance::SeedTreasureBoxRngForTests(int32 Seed)
+{
+	EnsureTreasureBoxService();
+	TreasureRandomStream.Initialize(Seed);
+}
+
 void UIdleGameInstance::InitializeGuildServiceForTests()
 {
 	GuildService = NewObject<UGuildService>(this);
@@ -4210,6 +4288,14 @@ void UIdleGameInstance::EnsureAttendanceService()
 	if (!AttendanceService)
 	{
 		AttendanceService = NewObject<UAttendanceService>(this);
+	}
+}
+
+void UIdleGameInstance::EnsureTreasureBoxService()
+{
+	if (!TreasureBoxService)
+	{
+		TreasureBoxService = NewObject<UTreasureBoxService>(this);
 	}
 }
 

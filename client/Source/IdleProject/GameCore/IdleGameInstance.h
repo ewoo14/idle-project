@@ -20,6 +20,7 @@
 #include "GameCore/StageService.h"
 #include "GameCore/TitleService.h"
 #include "GameCore/TowerService.h"
+#include "GameCore/TreasureBoxService.h"
 #include "GameCore/WeeklyBossTypes.h"
 #include "ItemSystem/ItemTypes.h"
 #include "RuneSystem/RuneTypes.h"
@@ -206,6 +207,14 @@ public:
 	}
 
 	UFUNCTION(BlueprintPure, Category = "Idle|Services")
+	UTreasureBoxService* GetTreasureBoxService() const
+	{
+		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장(#91).
+		const_cast<UIdleGameInstance*>(this)->EnsureTreasureBoxService();
+		return TreasureBoxService;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Services")
 	URebirthPerkService* GetRebirthPerkService() const
 	{
 		// 지연 초기화: Init() 미경유 컨텍스트(테스트 등)에서도 null 을 반환하지 않도록 보장(#91).
@@ -324,6 +333,12 @@ public:
 	// 주요 진행/로그인/세이브 시 호출. 오늘(UTC date) 첫 출석이면 누적++ 후 자동저장. 이미 출석이면 무동작.
 	UFUNCTION(BlueprintCallable, Category = "Idle|Attendance")
 	bool CheckInAttendance();
+
+	// 보물 상자(일일 뽑기) 단일 진입점. 오늘(UTC date) CanDrawToday 검증 → DrawTreasure(RNG 멤버) →
+	// 보상 단일 지급(Gold→AddGold / Essence→RuneEssence / Consumable→AddConsumable / ProtectionScroll/
+	// ResetCube/RankCube→해당 재화 누적) + 자동저장. 이미 오늘 뽑았으면 빈 보상(Reward=None, 미지급).
+	UFUNCTION(BlueprintCallable, Category = "Idle|TreasureBox")
+	FTreasureReward DrawTreasureBox();
 
 	UFUNCTION(BlueprintCallable, Category = "Idle|Enhance")
 	FEnhanceAttemptResult TryEnhanceEquipped(EItemSlot Slot, bool bUseProtection = false);
@@ -623,6 +638,9 @@ public:
 	// 출석 누적일을 직접 세팅(고임계 마일스톤 검증용). LastAttendanceDate/수령 집합은 보존하지 않고 초기화.
 	void SeedAttendanceForTests(int64 Total);
 
+	// 보물 상자 RNG 시드를 고정하여 결정적 뽑기를 검증한다(테스트 전용). 서비스도 초기화.
+	void SeedTreasureBoxRngForTests(int32 Seed);
+
 	void InitializeGuildServiceForTests();
 
 	void InitializeRuneServiceForTests();
@@ -753,6 +771,9 @@ private:
 	TObjectPtr<UAttendanceService> AttendanceService;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UTreasureBoxService> TreasureBoxService;
+
+	UPROPERTY(Transient)
 	TObjectPtr<URebirthPerkService> RebirthPerkService;
 
 	UPROPERTY(Transient)
@@ -823,6 +844,7 @@ private:
 	FRandomStream EnhanceRandomStream;
 	FRandomStream PotentialRandomStream;
 	FRandomStream RuneRandomStream;
+	FRandomStream TreasureRandomStream;
 	ECloudSyncState CloudSyncState = ECloudSyncState::Idle;
 
 	static const TCHAR* SaveSlotName;
@@ -860,6 +882,7 @@ private:
 	void EnsureBuffService();
 	void EnsureWeeklyBossService();
 	void EnsureAttendanceService();
+	void EnsureTreasureBoxService();
 	void EnsureRebirthPerkService();
 	void EnsureGuildService();
 	void RefreshPlayerCharacterStats();
