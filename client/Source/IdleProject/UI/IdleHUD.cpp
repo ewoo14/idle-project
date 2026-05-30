@@ -22,6 +22,7 @@
 #include "GameCore/MasteryService.h"
 #include "GameCore/PetLevelFormula.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/RebirthPerkService.h"
 #include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
 #include "GameCore/AttendanceService.h"
@@ -95,6 +96,10 @@ const FName RuneTransferHitBoxName(TEXT("RuneTransfer"));
 const FName RuneTransferCycleHitBoxName(TEXT("RuneTransferCycle"));
 const FName StatResetHitBoxName(TEXT("StatReset"));
 const FName StatInfoToggleHitBoxName(TEXT("StatInfoToggle"));
+// 환생 특성 패널(plan/rebirth-perks) — 고유 prefix(RebirthPerk~)로 jumbo ODR 회피.
+const FString RebirthPerkAllocHitBoxPrefix(TEXT("RebirthPerkAlloc_"));
+const FString RebirthPerkDeallocHitBoxPrefix(TEXT("RebirthPerkDealloc_"));
+const FName RebirthPerkResetHitBoxName(TEXT("RebirthPerkReset"));
 // 길드 패널(PR-G1) — 고유 prefix(Guild~)로 jumbo ODR 회피.
 const FName GuildRefreshListHitBoxName(TEXT("GuildRefreshList"));
 const FName GuildCreateNameCycleHitBoxName(TEXT("GuildCreateNameCycle"));
@@ -1558,6 +1563,53 @@ FName MakeRuneDisenchantHitBoxName(int32 OwnedIndex)
 FName MakeStatAllocationHitBoxName(EPrimaryStat Stat)
 {
 	return FName(*(StatAllocationHitBoxPrefix + FString::FromInt(static_cast<int32>(Stat))));
+}
+
+// 환생 특성 패널 — 6종 표시 순서/라벨 키. 익명 헬퍼는 RebirthPerk~ prefix(jumbo ODR 회피).
+const ERebirthPerk* RebirthPerkDisplayOrder()
+{
+	static const ERebirthPerk Order[] = {
+		ERebirthPerk::GoldPct,
+		ERebirthPerk::DropPct,
+		ERebirthPerk::CritDmgPct,
+		ERebirthPerk::AllStatPct,
+		ERebirthPerk::ExpPct,
+		ERebirthPerk::OfflineEffPct
+	};
+	return Order;
+}
+
+constexpr int32 RebirthPerkDisplayCount = 6;
+
+const TCHAR* RebirthPerkNameLocalizationKey(ERebirthPerk Perk)
+{
+	switch (Perk)
+	{
+	case ERebirthPerk::GoldPct:
+		return TEXT("REBIRTH_PERK_NAME_GOLD");
+	case ERebirthPerk::DropPct:
+		return TEXT("REBIRTH_PERK_NAME_DROP");
+	case ERebirthPerk::CritDmgPct:
+		return TEXT("REBIRTH_PERK_NAME_CRIT_DMG");
+	case ERebirthPerk::AllStatPct:
+		return TEXT("REBIRTH_PERK_NAME_ALL_STAT");
+	case ERebirthPerk::ExpPct:
+		return TEXT("REBIRTH_PERK_NAME_EXP");
+	case ERebirthPerk::OfflineEffPct:
+		return TEXT("REBIRTH_PERK_NAME_OFFLINE");
+	default:
+		return TEXT("REBIRTH_PERK_NAME_GOLD");
+	}
+}
+
+FName MakeRebirthPerkAllocHitBoxName(ERebirthPerk Perk)
+{
+	return FName(*(RebirthPerkAllocHitBoxPrefix + FString::FromInt(static_cast<int32>(Perk))));
+}
+
+FName MakeRebirthPerkDeallocHitBoxName(ERebirthPerk Perk)
+{
+	return FName(*(RebirthPerkDeallocHitBoxPrefix + FString::FromInt(static_cast<int32>(Perk))));
 }
 
 FName MakeDungeonEnterHitBoxName(EDungeonType Type)
@@ -3249,6 +3301,49 @@ FIdleHUDStatPanelViewModel IdleProject::UI::BuildStatPanelViewModel(const FPrima
 	return ViewModel;
 }
 
+FIdleHUDRebirthPerkPanelViewModel IdleProject::UI::BuildRebirthPerkPanelViewModel(const URebirthPerkService& RebirthPerkService)
+{
+	FIdleHUDRebirthPerkPanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("REBIRTH_PERK_PANEL_TITLE"));
+
+	const int32 Available = FMath::Max(0, RebirthPerkService.GetAvailable());
+	const int32 Total = FMath::Max(0, RebirthPerkService.GetTotalPoints());
+	ViewModel.AvailablePoints = Available;
+	ViewModel.PointsLabel = FormatLocalizedUI(TEXT("REBIRTH_PERK_POINTS_FORMAT"), [Available, Total](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Available"), FText::AsNumber(Available));
+		Args.Add(TEXT("Total"), FText::AsNumber(Total));
+	});
+	ViewModel.ResetLabel = IdleProject::Localization::UI(TEXT("REBIRTH_PERK_RESET"));
+	ViewModel.ResetHitBoxName = RebirthPerkResetHitBoxName;
+
+	const ERebirthPerk* PerkOrder = RebirthPerkDisplayOrder();
+	ViewModel.Rows.Reserve(RebirthPerkDisplayCount);
+	for (int32 Index = 0; Index < RebirthPerkDisplayCount; ++Index)
+	{
+		const ERebirthPerk Perk = PerkOrder[Index];
+		FIdleHUDRebirthPerkRowViewModel Row;
+		Row.Perk = Perk;
+		Row.NameLabel = IdleProject::Localization::UI(RebirthPerkNameLocalizationKey(Perk));
+		Row.Level = FMath::Max(0, RebirthPerkService.GetPerkLevel(Perk));
+		const int32 BonusPercent = FMath::RoundToInt(FMath::Max(0.0f, RebirthPerkService.GetPerkBonus(Perk)) * 100.0f);
+		Row.DetailLabel = FormatLocalizedUI(TEXT("REBIRTH_PERK_DETAIL_FORMAT"), [&Row, BonusPercent](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Level"), FText::AsNumber(Row.Level));
+			Args.Add(TEXT("Percent"), FText::AsNumber(BonusPercent));
+		});
+		Row.AllocHitBoxName = MakeRebirthPerkAllocHitBoxName(Perk);
+		Row.DeallocHitBoxName = MakeRebirthPerkDeallocHitBoxName(Perk);
+		Row.bCanAllocate = Available > 0;
+		Row.bCanDeallocate = Row.Level > 0;
+
+		ViewModel.bCanReset = ViewModel.bCanReset || Row.Level > 0;
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDStatInfoViewModel IdleProject::UI::BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower)
 {
 	FIdleHUDStatInfoViewModel ViewModel;
@@ -4368,6 +4463,7 @@ void AIdleHUD::DrawHUD()
 	DrawAchievementPanel();
 	DrawMasteryPanel();
 	DrawStatAllocationPanel();
+	DrawRebirthPerkPanel();
 	DrawStatInfoPanel();
 	DrawShopPanel();
 	DrawConsumablePanel();
@@ -4534,6 +4630,21 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName == StatResetHitBoxName)
 	{
 		ResetStatAllocation();
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RebirthPerkAllocHitBoxPrefix))
+	{
+		AllocateRebirthPerkFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(RebirthPerkDeallocHitBoxPrefix))
+	{
+		DeallocateRebirthPerkFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName == RebirthPerkResetHitBoxName)
+	{
+		ResetRebirthPerkAllocation();
 		return;
 	}
 	if (BoxName == StatInfoToggleHitBoxName)
@@ -6956,6 +7067,160 @@ void AIdleHUD::ResetStatAllocation()
 	if (IdleGameInstance)
 	{
 		IdleGameInstance->ResetStatPoints();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawRebirthPerkPanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const URebirthPerkService* PerkService = IdleGameInstance ? IdleGameInstance->GetRebirthPerkService() : nullptr;
+	if (!PerkService)
+	{
+		return;
+	}
+
+	const FIdleHUDRebirthPerkPanelViewModel ViewModel = BuildRebirthPerkPanelViewModel(*PerkService);
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = 320.0f * Scale;
+	const float HeaderHeight = 46.0f * Scale;
+	const float RowHeight = 34.0f * Scale;
+	const float RowGap = 5.0f * Scale;
+	const float Padding = 12.0f * Scale;
+	const float FooterHeight = 36.0f * Scale;
+	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + FooterHeight + Padding;
+	const float X = 28.0f * Scale;
+	const float Y = 454.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.PointsLabel.ToString(), ViewModel.AvailablePoints > 0 ? Theme::AccentGold : Theme::TextMuted, X + PanelWidth - 132.0f * Scale, Y + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+
+	float RowY = Y + HeaderHeight;
+	for (const FIdleHUDRebirthPerkRowViewModel& Row : ViewModel.Rows)
+	{
+		DrawRebirthPerkRow(Row, X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	const float ButtonWidth = 82.0f * Scale;
+	const float ButtonHeight = 26.0f * Scale;
+	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
+	const float ButtonY = Y + PanelHeight - Padding - ButtonHeight;
+	DrawRect(ViewModel.bCanReset ? Theme::AccentRed.CopyWithNewOpacity(0.86f) : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(ViewModel.ResetLabel.ToString(), ViewModel.bCanReset ? Theme::TextPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	if (ViewModel.bCanReset)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ResetHitBoxName, true, 88);
+	}
+
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawRebirthPerkRow(const FIdleHUDRebirthPerkRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 34.0f;
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(Row.Level > 0 ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.42f), X, Y, 4.0f * Scale, Height);
+	DrawText(Row.NameLabel.ToString(), Row.Level > 0 ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 4.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.DetailLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 18.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+
+	const float ButtonSize = 22.0f * Scale;
+	const float ButtonGap = 6.0f * Scale;
+	const float PlusX = X + Width - ButtonSize - 7.0f * Scale;
+	const float MinusX = PlusX - ButtonSize - ButtonGap;
+	const float ButtonY = Y + (Height - ButtonSize) * 0.5f;
+
+	// − 버튼(현재 레벨>0 이면 활성).
+	DrawRect(Row.bCanDeallocate ? Theme::AccentRed.CopyWithNewOpacity(0.86f) : Theme::BgPanel, MinusX, ButtonY, ButtonSize, ButtonSize);
+	DrawText(TEXT("-"), Row.bCanDeallocate ? Theme::TextPrimary : Theme::TextMuted, MinusX + 7.0f * Scale, ButtonY + 2.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
+	if (Row.bCanDeallocate)
+	{
+		AddHitBox(FVector2D(MinusX, ButtonY), FVector2D(ButtonSize, ButtonSize), Row.DeallocHitBoxName, true, 88);
+	}
+
+	// + 버튼(가용 포인트>0 이면 활성).
+	DrawRect(Row.bCanAllocate ? Theme::AccentGold : Theme::BgPanel, PlusX, ButtonY, ButtonSize, ButtonSize);
+	DrawText(TEXT("+"), Row.bCanAllocate ? Theme::BgPrimary : Theme::TextMuted, PlusX + 6.0f * Scale, ButtonY + 2.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.72f * Scale);
+	if (Row.bCanAllocate)
+	{
+		AddHitBox(FVector2D(PlusX, ButtonY), FVector2D(ButtonSize, ButtonSize), Row.AllocHitBoxName, true, 88);
+	}
+}
+
+void AIdleHUD::AllocateRebirthPerkFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawPerk = BoxName.ToString();
+	RawPerk.RightChopInline(RebirthPerkAllocHitBoxPrefix.Len());
+	const int32 PerkValue = FCString::Atoi(*RawPerk);
+	if (PerkValue <= static_cast<int32>(ERebirthPerk::None) || PerkValue > static_cast<int32>(ERebirthPerk::OfflineEffPct))
+	{
+		return;
+	}
+
+	IdleGameInstance->AllocateRebirthPerk(static_cast<ERebirthPerk>(PerkValue));
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DeallocateRebirthPerkFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	FString RawPerk = BoxName.ToString();
+	RawPerk.RightChopInline(RebirthPerkDeallocHitBoxPrefix.Len());
+	const int32 PerkValue = FCString::Atoi(*RawPerk);
+	if (PerkValue <= static_cast<int32>(ERebirthPerk::None) || PerkValue > static_cast<int32>(ERebirthPerk::OfflineEffPct))
+	{
+		return;
+	}
+
+	IdleGameInstance->DeallocateRebirthPerk(static_cast<ERebirthPerk>(PerkValue));
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::ResetRebirthPerkAllocation()
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (IdleGameInstance)
+	{
+		IdleGameInstance->ResetRebirthPerks();
 	}
 	RefreshMouseInteraction();
 }
