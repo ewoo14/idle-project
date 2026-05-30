@@ -8211,29 +8211,24 @@ void AIdleHUD::DrawTowerPanel()
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Padding = 14.0f * Scale;
-	const float Border = 2.0f * Scale;
-	const FLinearColor StateColor = ViewModel.bCanClimb ? Theme::AccentGold : Theme::TextMuted.CopyWithNewOpacity(0.72f);
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(StateColor, X, Y, PanelWidth, Border);
-	DrawRect(StateColor, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(StateColor, X, Y, Border, PanelHeight);
-	DrawRect(StateColor, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 	DrawText(ViewModel.StatusLabel.ToString(), ViewModel.bCanClimb ? Theme::AccentGold : Theme::AccentRed, X + PanelWidth - 128.0f * Scale, Y + 17.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
-	DrawText(ViewModel.HighestFloorLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
+	DrawText(ViewModel.HighestFloorLabel.ToString(), Theme::TextSlate, X + Padding, Y + 50.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.86f * Scale);
 	DrawText(ViewModel.NextRequiredPowerLabel.ToString(), ViewModel.bCanClimb ? Theme::AccentBlue : Theme::AccentRed, X + Padding, Y + 76.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGold, X + Padding, Y + 102.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
-	DrawText(ViewModel.MilestoneMultiplierLabel.ToString(), Theme::TextPrimary, X + Padding, Y + 128.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
-	DrawText(ViewModel.NextMilestoneLabel.ToString(), Theme::TextMuted, X + Padding, Y + 152.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(ViewModel.CombatPowerLabel.ToString(), Theme::AccentGoldWarm, X + Padding, Y + 102.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.82f * Scale);
+	DrawText(ViewModel.MilestoneMultiplierLabel.ToString(), Theme::TextSlate, X + Padding, Y + 128.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.80f * Scale);
+	DrawText(ViewModel.NextMilestoneLabel.ToString(), Theme::TextWarmGray, X + Padding, Y + 152.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
 
 	const float ButtonWidth = 94.0f * Scale;
 	const float ButtonHeight = 32.0f * Scale;
 	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
 	const float ButtonY = Y + 142.0f * Scale;
-	DrawRect(ViewModel.bCanClimb ? Theme::AccentGold : Theme::BgPrimary.CopyWithNewOpacity(0.94f), ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(ViewModel.ButtonLabel.ToString(), ViewModel.bCanClimb ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 24.0f * Scale, ButtonY + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	// 등반 버튼: 골드 버튼 스타일
+	DrawGoldButton(ButtonX, ButtonY, ButtonWidth, ButtonHeight, ViewModel.ButtonLabel.ToString(), ViewModel.bCanClimb, EBtnStyle::Gold);
 	if (ViewModel.bCanClimb)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ClimbHitBoxName, true, 82);
@@ -8304,15 +8299,11 @@ void AIdleHUD::DrawDungeonPanel()
 	const float PanelHeight = 54.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = PanelRegionY; // 도킹 영역 기준
-	const float Border = 2.0f * Scale;
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
-	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 12.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.92f * Scale);
 
 	float RowY = Y + 48.0f * Scale;
 	for (const FIdleHUDDungeonRowViewModel& Row : ViewModel.Rows)
@@ -8335,24 +8326,26 @@ void AIdleHUD::DrawDungeonRow(const FIdleHUDDungeonRowViewModel& Row, float X, f
 	const float Scale = Height / 82.0f;
 	const FLinearColor StateColor = Row.bCanEnter
 		? Theme::AccentGold
-		: (Row.bNeedsPower ? Theme::AccentRed : Theme::TextMuted.CopyWithNewOpacity(0.62f));
-	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
-	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+		: (Row.bNeedsPower ? Theme::AccentRed : Theme::TextWarmGray.CopyWithNewOpacity(0.62f));
+	// 던전 행 배경: 크림 패널 반투명 (하위 행 강조)
+	DrawRect(Theme::PanelCream.CopyWithNewOpacity(0.50f), X, Y, Width, Height);
+	// 좌측 상태 강조선: 골드 저불투명 구분선
+	DrawRect(Theme::FrameGold.CopyWithNewOpacity(0.25f), X, Y, 4.0f * Scale, Height);
 
-	DrawText(Row.NameLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : Theme::TextPrimary, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
-	DrawText(Row.EntriesLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
-	DrawText(Row.TierLabel.ToString(), Row.MaxAccessibleTier > 0 ? Theme::AccentGold : Theme::TextMuted, X + 12.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
-	DrawText(Row.NextTierLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawText(Row.NameLabel.ToString(), Row.bCanEnter ? Theme::AccentGoldWarm : Theme::TextSlate, X + 12.0f * Scale, Y + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.84f * Scale);
+	DrawText(Row.EntriesLabel.ToString(), Theme::TextWarmGray, X + 142.0f * Scale, Y + 8.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	DrawText(Row.TierLabel.ToString(), Row.MaxAccessibleTier > 0 ? Theme::AccentGoldWarm : Theme::TextWarmGray, X + 12.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(Row.NextTierLabel.ToString(), Theme::TextWarmGray, X + 142.0f * Scale, Y + 27.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 	DrawText(Row.RequiredPowerLabel.ToString(), Row.bNeedsPower ? Theme::AccentRed : Theme::AccentBlue, X + 12.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
-	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 142.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
-	DrawText(Row.StatusLabel.ToString(), Row.bCanEnter ? Theme::AccentGold : StateColor, X + 12.0f * Scale, Y + 67.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextWarmGray, X + 142.0f * Scale, Y + 47.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(Row.StatusLabel.ToString(), Row.bCanEnter ? Theme::AccentGoldWarm : StateColor, X + 12.0f * Scale, Y + 67.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 
 	const float ButtonWidth = 72.0f * Scale;
 	const float ButtonHeight = 26.0f * Scale;
 	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
 	const float ButtonY = Y + 7.0f * Scale;
-	DrawRect(Row.bCanEnter ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(Row.ActionLabel.ToString(), Row.bCanEnter ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 16.0f * Scale, ButtonY + 6.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	// 입장 버튼: 골드 버튼 스타일
+	DrawGoldButton(ButtonX, ButtonY, ButtonWidth, ButtonHeight, Row.ActionLabel.ToString(), Row.bCanEnter, EBtnStyle::Gold);
 	if (Row.bCanEnter)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.EnterHitBoxName, true, 85);
@@ -8413,34 +8406,32 @@ void AIdleHUD::DrawWeeklyBossPanel()
 	const float PanelHeight = 132.0f * Scale + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding + FeedbackHeight;
 	const float X = PanelRegionX; // 도킹 영역 기준
 	const float Y = PanelRegionY; // 도킹 영역 기준
-	const float Border = 2.0f * Scale;
 
-	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
-	DrawRect(Theme::AccentBlue, X, Y, PanelWidth, Border);
-	DrawRect(Theme::AccentBlue, X, Y + PanelHeight - Border, PanelWidth, Border);
-	DrawRect(Theme::AccentBlue, X, Y, Border, PanelHeight);
-	DrawRect(Theme::AccentBlue, X + PanelWidth - Border, Y, Border, PanelHeight);
+	// 패널 배경: 원신 크림 패널 (그림자+골드 프레임 포함)
+	DrawPanelChrome(X, Y, PanelWidth, PanelHeight, EPanelStyle::Cream);
 
-	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
-	DrawText(ViewModel.WeekLabel.ToString(), Theme::TextMuted, X + 150.0f * Scale, Y + 13.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
+	DrawText(ViewModel.Title.ToString(), Theme::TextSlate, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.WeekLabel.ToString(), Theme::TextWarmGray, X + 150.0f * Scale, Y + 13.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.64f * Scale);
 	DrawText(ViewModel.DamageLabel.ToString(), Theme::AccentBlue, X + Padding, Y + 40.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
-	DrawText(ViewModel.RemainingLabel.ToString(), ViewModel.bCanChallenge ? Theme::AccentGold : Theme::AccentRed, X + Padding, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
-	DrawText(ViewModel.MilestoneSummaryLabel.ToString(), Theme::TextMuted, X + 152.0f * Scale, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
+	DrawText(ViewModel.RemainingLabel.ToString(), ViewModel.bCanChallenge ? Theme::AccentGoldWarm : Theme::AccentRed, X + Padding, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+	DrawText(ViewModel.MilestoneSummaryLabel.ToString(), Theme::TextWarmGray, X + 152.0f * Scale, Y + 62.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.68f * Scale);
 
 	const float BarX = X + Padding;
 	const float BarY = Y + 88.0f * Scale;
 	const float BarWidth = PanelWidth - Padding * 2.0f - 98.0f * Scale;
 	const float BarHeight = 10.0f * Scale;
-	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.92f), BarX, BarY, BarWidth, BarHeight);
-	DrawRect(Theme::AccentBlue, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
-	DrawText(ViewModel.ResetLabel.ToString(), Theme::TextMuted, BarX, BarY + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	// 진행 바 배경: 골드 구분선 저불투명
+	DrawRect(Theme::FrameGold.CopyWithNewOpacity(0.25f), BarX, BarY, BarWidth, BarHeight);
+	// 진행 바 채움: 골드 액센트
+	DrawRect(Theme::AccentGoldWarm, BarX, BarY, BarWidth * ViewModel.ProgressRatio, BarHeight);
+	DrawText(ViewModel.ResetLabel.ToString(), Theme::TextWarmGray, BarX, BarY + 14.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
 
 	const float ButtonWidth = 88.0f * Scale;
 	const float ButtonHeight = 30.0f * Scale;
 	const float ButtonX = X + PanelWidth - Padding - ButtonWidth;
 	const float ButtonY = Y + 82.0f * Scale;
-	DrawRect(ViewModel.bCanChallenge ? Theme::AccentGold : Theme::BgPrimary, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(ViewModel.ChallengeLabel.ToString(), ViewModel.bCanChallenge ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 13.0f * Scale, ButtonY + 7.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	// 도전 버튼: 골드 버튼 스타일
+	DrawGoldButton(ButtonX, ButtonY, ButtonWidth, ButtonHeight, ViewModel.ChallengeLabel.ToString(), ViewModel.bCanChallenge, EBtnStyle::Gold);
 	if (ViewModel.bCanChallenge)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), ViewModel.ChallengeHitBoxName, true, 86);
@@ -8466,22 +8457,24 @@ void AIdleHUD::DrawWeeklyBossMilestoneRow(const FIdleHUDWeeklyBossMilestoneRowVi
 
 	const float Scale = Height / 44.0f;
 	const FLinearColor StateColor = Row.bCanClaim
-		? Theme::AccentGold
-		: (Row.bReached ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.62f));
+		? Theme::AccentGoldWarm
+		: (Row.bReached ? Theme::AccentBlue : Theme::TextWarmGray.CopyWithNewOpacity(0.62f));
 
-	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
-	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
-	DrawText(Row.MilestoneLabel.ToString(), Row.bCanClaim ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
-	DrawText(Row.ThresholdLabel.ToString(), Theme::TextMuted, X + 86.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
-	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	// 마일스톤 행 배경: 크림 패널 반투명
+	DrawRect(Theme::PanelCream.CopyWithNewOpacity(0.50f), X, Y, Width, Height);
+	// 좌측 상태 강조선: 골드 저불투명 구분선
+	DrawRect(Theme::FrameGold.CopyWithNewOpacity(0.25f), X, Y, 4.0f * Scale, Height);
+	DrawText(Row.MilestoneLabel.ToString(), Row.bCanClaim ? Theme::AccentGoldWarm : Theme::TextSlate, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.ThresholdLabel.ToString(), Theme::TextWarmGray, X + 86.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextWarmGray, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
 	DrawText(Row.StatusLabel.ToString(), StateColor, X + 180.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
 
 	const float ButtonWidth = 58.0f * Scale;
 	const float ButtonHeight = 24.0f * Scale;
 	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
 	const float ButtonY = Y + 10.0f * Scale;
-	DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
-	DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	// 수령 버튼: 골드 버튼 스타일
+	DrawGoldButton(ButtonX, ButtonY, ButtonWidth, ButtonHeight, Row.ActionLabel.ToString(), Row.bCanClaim, EBtnStyle::Gold);
 	if (Row.bCanClaim)
 	{
 		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.ClaimHitBoxName, true, 86);
