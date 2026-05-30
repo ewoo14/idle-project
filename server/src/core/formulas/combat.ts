@@ -79,6 +79,28 @@ export function computeElementMultiplier(
   return isResistedElementPair(skillElement, targetWeakElement) ? 0.5 : 1;
 }
 
+/**
+ * 속성 공명(챕터 9): 약점 우선(1.5) → 명시 저항(0.5) → 기존 상극/중립 폴백.
+ * resistElement === "None"(스테이지 1~80)이면 computeElementMultiplier와 동일(하위호환).
+ */
+export function computeResonanceMultiplier(
+  skillElement: SkillElement,
+  weakElement: SkillElement,
+  resistElement: SkillElement,
+): number {
+  if (skillElement !== "None" && skillElement === weakElement) {
+    return 1.5;
+  }
+  if (
+    resistElement !== "None" &&
+    skillElement !== "None" &&
+    skillElement === resistElement
+  ) {
+    return 0.5;
+  }
+  return computeElementMultiplier(skillElement, weakElement);
+}
+
 function isResistedElementPair(
   skillElement: SkillElement,
   targetWeakElement: SkillElement,

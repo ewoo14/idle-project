@@ -5,6 +5,7 @@ import {
   computeMonsterStatMultiplier,
   computeRewardMultiplier,
   DEFAULT_STAGES_PER_CHAPTER,
+  getStageResistElement,
   getStageWeakElement,
   isBossStage,
   isEliteStage,
@@ -136,6 +137,40 @@ describe("stage formulas", () => {
       "Dark",
     ]);
     expect(ch8).not.toContain("None");
+  });
+
+  it("defines chapter 9 weak and resist elements (81~90, weak != resist)", () => {
+    const weak: Record<number, string> = {
+      81: "Dark",
+      82: "Fire",
+      83: "Lightning",
+      84: "Holy",
+      85: "Dark",
+      86: "Ice",
+      87: "Dark",
+      88: "Holy",
+      89: "Fire",
+      90: "Dark",
+    };
+    const resist: Record<number, string> = {
+      81: "Ice",
+      82: "Holy",
+      83: "Dark",
+      84: "Fire",
+      85: "Holy",
+      86: "Lightning",
+      87: "Fire",
+      88: "Lightning",
+      89: "Holy",
+      90: "Ice",
+    };
+    for (let i = 81; i <= 90; i++) {
+      expect(getStageWeakElement(i)).toBe(weak[i]);
+      expect(getStageResistElement(i)).toBe(resist[i]);
+      expect(getStageWeakElement(i)).not.toBe(getStageResistElement(i));
+    }
+    expect(getStageResistElement(80)).toBe("None");
+    expect(getStageResistElement(1)).toBe("None");
   });
 
   it.each([
