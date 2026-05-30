@@ -193,6 +193,7 @@ UI,STAGE_PROGRESS_FORMAT,"스테이지 {Chapter}-{Stage} {Current}/{Target}","�
 UI,STAGE_BOSS_BADGE,"보스","스테이지 HUD"
 UI,STAGE_ELITE_BADGE,"정예","스테이지 HUD"
 UI,STAGE_WEAKNESS_FORMAT,"약점: {Element}","스테이지 HUD"
+UI,STAGE_RESIST_FORMAT,"저항: {Element}","스테이지 HUD"
 UI,STAGE_CHAPTER_ENTRY_FORMAT,"챕터 {Chapter} 진입","스테이지 HUD"
 UI,STAGE_CHAPTER_CLEAR_FORMAT,"챕터 {Chapter} 클리어","스테이지 HUD"
 UI,BOSS_HUD_TITLE,"보스","보스 HUD"
