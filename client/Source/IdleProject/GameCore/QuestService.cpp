@@ -368,6 +368,12 @@ void UQuestService::BuildDefaultDefinitions()
 	AddDefinition(TEXT("main_ch8_004"), EQuestType::Main, TEXT("Quiet the Risen Remnant"), EQuestObjective::ClimbTower, 55, 698000, 524000, TEXT("main_ch8_003"), TEXT("8-5"));
 	AddDefinition(TEXT("main_ch8_005"), EQuestType::Main, TEXT("Through the Afterrift Expanse"), EQuestObjective::KillMonster, 165, 789000, 592000, TEXT("main_ch8_004"), TEXT("8-8"));
 	AddDefinition(TEXT("main_ch8_006"), EQuestType::Main, TEXT("Confront What the Rift Sealed"), EQuestObjective::DefeatBoss, 1, 928000, 696000, TEXT("main_ch8_005"), TEXT("8-10"));
+	AddDefinition(TEXT("main_ch9_001"), EQuestType::Main, TEXT("Resonance of the Afterworld"), EQuestObjective::KillMonster, 130, 615000, 461000, TEXT("main_ch8_006"), TEXT("9-1"));
+	AddDefinition(TEXT("main_ch9_002"), EQuestType::Main, TEXT("Map the Twofold Echo"), EQuestObjective::ClearMap, 1, 695000, 521000, TEXT("main_ch9_001"), TEXT("9-2"));
+	AddDefinition(TEXT("main_ch9_003"), EQuestType::Main, TEXT("Strength to Pierce the Reverberation"), EQuestObjective::ReachLevel, 105, 785000, 588000, TEXT("main_ch9_002"), TEXT("9-4"));
+	AddDefinition(TEXT("main_ch9_004"), EQuestType::Main, TEXT("Still the Resonant Ascent"), EQuestObjective::ClimbTower, 60, 887000, 665000, TEXT("main_ch9_003"), TEXT("9-5"));
+	AddDefinition(TEXT("main_ch9_005"), EQuestType::Main, TEXT("Through the Echoing Expanse"), EQuestObjective::KillMonster, 185, 1002000, 752000, TEXT("main_ch9_004"), TEXT("9-8"));
+	AddDefinition(TEXT("main_ch9_006"), EQuestType::Main, TEXT("Sever the Doubled Resonance"), EQuestObjective::DefeatBoss, 1, 1179000, 884000, TEXT("main_ch9_005"), TEXT("9-10"));
 	AddDefinition(TEXT("daily_kill_monsters"), EQuestType::Daily, TEXT("Daily Hunt"), EQuestObjective::KillMonster, 30, 500, 240);
 	AddDefinition(TEXT("daily_claim_offline"), EQuestType::Daily, TEXT("Claim Rest Rewards"), EQuestObjective::ClaimOffline, 1, 300, 180);
 	AddDefinition(TEXT("daily_enhance_gear"), EQuestType::Daily, TEXT("Temper Equipment"), EQuestObjective::Enhance, 3, 650, 320);
