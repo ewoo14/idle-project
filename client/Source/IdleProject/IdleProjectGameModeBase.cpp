@@ -146,6 +146,12 @@ void AIdleProjectGameModeBase::SpawnDefaultEnvironment()
 		S.bOverride_ColorSaturation = true;            S.ColorSaturation = FVector4(1.08f, 1.08f, 1.08f, 1.0f);
 		// 대비 1.05: 극히 미세한 대비 강화
 		S.bOverride_ColorContrast = true;              S.ColorContrast = FVector4(1.05f, 1.05f, 1.05f, 1.0f);
+
+		// 툰 아웃라인 포스트프로세스 머티리얼(깊이 에지 윤곽선) 합성. 에셋 미존재 시 스킵.
+		if (UMaterialInterface* Outline = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Render/M_ToonOutline.M_ToonOutline")))
+		{
+			S.AddBlendable(Outline, 1.0f);
+		}
 	}
 
 	// 스카이 스피어(역방향 배경). M_Sky MID는 ApplyMapTheme에서 SkyTint 갱신.
