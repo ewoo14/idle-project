@@ -8654,14 +8654,15 @@ void AIdleHUD::DrawTreasureBoxPanel()
 	const bool bShowFeedback = !TreasureBoxFeedbackLabel.IsEmpty() && FeedbackElapsed <= TreasureBoxFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float Padding = 14.0f * Scale;
 	const float Border = 2.0f * Scale;
 	const float ButtonHeight = 30.0f * Scale;
 	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
 	const float PanelHeight = 84.0f * Scale + ButtonHeight + Padding + FeedbackHeight;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 120.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
 	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
@@ -9791,14 +9792,15 @@ void AIdleHUD::DrawAchievementPanel()
 	const bool bShowFeedback = !AchievementFeedbackLabel.IsEmpty() && FeedbackElapsed <= AchievementFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.22f, 320.0f * Scale, 420.0f * Scale);
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float RowHeight = 28.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowFeedback ? 26.0f * Scale : 0.0f;
 	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 5);
 	const float PanelHeight = 82.0f * Scale + VisibleRows * RowHeight + FeedbackHeight;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 722.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -9931,15 +9933,16 @@ void AIdleHUD::DrawPetPanel()
 	const bool bShowPetFeedback = !PetFeedbackLabel.IsEmpty() && PetFeedbackElapsed <= PetFeedbackDurationSeconds;
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 460.0f * Scale;
+	float PanelWidth = 460.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 44.0f * Scale;
 	const float RowHeight = 52.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float FeedbackHeight = bShowPetFeedback ? 26.0f * Scale : 0.0f;
 	const float PanelHeight = HeaderHeight + 38.0f * Scale + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding + FeedbackHeight;
-	const float X = 28.0f * Scale;
-	const float Y = 300.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
@@ -10121,14 +10124,15 @@ void AIdleHUD::DrawTitlePanel()
 	const FIdleHUDTitlePanelViewModel ViewModel = BuildTitlePanelViewModel(*TitleService, *AchievementService);
 
 	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
-	const float PanelWidth = 470.0f * Scale;
+	float PanelWidth = 470.0f * Scale;
+	PanelWidth = FMath::Min(PanelWidth, PanelRegionW);
 	const float HeaderHeight = 44.0f * Scale;
 	const float RowHeight = 44.0f * Scale;
 	const float RowGap = 4.0f * Scale;
 	const float Padding = 14.0f * Scale;
 	const float PanelHeight = HeaderHeight + ViewModel.Rows.Num() * RowHeight + FMath::Max(0, ViewModel.Rows.Num() - 1) * RowGap + Padding;
-	const float X = Canvas->SizeX - PanelWidth - 28.0f * Scale;
-	const float Y = 28.0f * Scale;
+	const float X = PanelRegionX; // 도킹 영역 기준
+	const float Y = PanelRegionY; // 도킹 영역 기준
 	const float Border = 2.0f * Scale;
 
 	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
