@@ -273,7 +273,7 @@ bool FIdleGameInstanceDungeonSaveMigrationTest::RunTest(const FString& Parameter
 
 	UIdleSaveGame* Captured = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture after migration succeeds"), GameInstance->CaptureToSave(Captured));
-	TestEqual(TEXT("Captured save writes V28"), Captured->SaveVersion, static_cast<int32>(28));
+	TestEqual(TEXT("Captured save writes V29"), Captured->SaveVersion, static_cast<int32>(29));
 	TestEqual(TEXT("Captured dungeon entry array has three rows"), Captured->DungeonEntriesUsed.Num(), 3);
 
 	return true;

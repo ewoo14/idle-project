@@ -244,7 +244,7 @@ bool FRebirthPerkSaveRoundTripTest::RunTest(const FString& Parameters)
 
 	UIdleSaveGame* SaveGame = NewObject<UIdleSaveGame>();
 	TestTrue(TEXT("Capture succeeds"), GameInstance->CaptureToSave(SaveGame));
-	TestEqual(TEXT("Capture writes V28"), SaveGame->SaveVersion, static_cast<int32>(28));
+	TestEqual(TEXT("Capture writes V29"), SaveGame->SaveVersion, static_cast<int32>(29));
 	TestTrue(TEXT("Saved allocations contain DropPct"), SaveGame->RebirthPerkAllocations.Contains(ERebirthPerk::DropPct));
 	TestEqual(TEXT("Saved DropPct level"), SaveGame->RebirthPerkAllocations.FindRef(ERebirthPerk::DropPct), 2);
 
