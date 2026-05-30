@@ -1198,6 +1198,16 @@ private:
 	void DrawStageIndicator();
 	void DrawBossBar();
 	void DrawBossSpecialWarning(float Now);
+
+	// 내비 셸 + 활성 패널 디스패치(Task 7).
+	void DrawNavShell();
+	void DrawCategoryRail();
+	void DrawCategoryTabBar();
+	void DrawPanelSubTabs();
+	void DrawActivePanel();
+	FName NavCategoryHitBox(IdleProject::UI::EHudCategory Category) const;
+	FName NavPanelHitBox(IdleProject::UI::EHudPanel Panel) const;
+
 	void DrawShopPanel();
 	void TryBuyGearRoll();
 	void TryBuyProtectionScroll();

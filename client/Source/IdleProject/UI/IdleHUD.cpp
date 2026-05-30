@@ -4516,40 +4516,29 @@ void AIdleHUD::DrawHUD()
 	const UWorld* World = GetWorld();
 	BindPlayerCombat();
 
+	if (Canvas && Canvas->SizeY > 0.0f)
+	{
+		const float Aspect = Canvas->SizeX / Canvas->SizeY;
+		HudLayoutMode = IdleProject::UI::ResolveLayoutMode(Aspect, HudLayoutMode);
+	}
+
+	// (1) 상시 요소
 	const USkillComponent* PlayerSkills = ResolvePlayerSkills();
 	if (World && PlayerSkills)
 	{
 		DrawSkillHud(*PlayerSkills, World->GetTimeSeconds());
 	}
-
 	DrawStageIndicator();
 	DrawBossBar();
-	DrawRebirthPanel();
-	DrawTranscendPanel();
-	DrawTowerPanel();
-	DrawDungeonPanel();
-	DrawWeeklyBossPanel();
-	DrawAttendancePanel();
-	DrawTreasureBoxPanel();
-	DrawAchievementPanel();
-	DrawMasteryPanel();
-	DrawStatAllocationPanel();
-	DrawRebirthPerkPanel();
-	DrawStatInfoPanel();
-	DrawShopPanel();
-	DrawConsumablePanel();
-	DrawLeaderboardPanel();
-	DrawGuildPanel();
-	DrawRunePanel();
-	DrawRuneCodexPanel();
-	DrawEnhancePanel();
-	DrawPotentialPanel();
+
+	// (2) 내비 셸
+	DrawNavShell();
+
+	// (3) 활성 패널 1개
+	DrawActivePanel();
+
+	// (4) 모달/오버레이(최우선)
 	DrawClassSelectionPanel();
-	DrawPetPanel();
-	DrawTitlePanel();
-	DrawMissionPanel();
-	DrawSeasonPassPanel();
-	DrawQuestLog();
 	DrawOfflineRewardModal();
 	if (World)
 	{
@@ -4561,8 +4550,183 @@ void AIdleHUD::DrawHUD()
 	}
 }
 
+FName AIdleHUD::NavCategoryHitBox(IdleProject::UI::EHudCategory Category) const
+{
+	return FName(*FString::Printf(TEXT("NavCat_%d"), (int32)Category));
+}
+
+FName AIdleHUD::NavPanelHitBox(IdleProject::UI::EHudPanel Panel) const
+{
+	return FName(*FString::Printf(TEXT("NavPanel_%d"), (int32)Panel));
+}
+
+void AIdleHUD::DrawNavShell()
+{
+	using namespace IdleProject::UI;
+	if (!Canvas)
+	{
+		return;
+	}
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+
+	if (HudLayoutMode == EHudLayoutMode::Desktop)
+	{
+		DrawCategoryRail();
+		PanelRegionW = FMath::Clamp(Canvas->SizeX * 0.34f, 380.0f * Scale, 560.0f * Scale);
+		PanelRegionX = Canvas->SizeX - PanelRegionW - 16.0f * Scale;
+		PanelRegionY = 92.0f * Scale;
+		PanelRegionH = Canvas->SizeY - PanelRegionY - 16.0f * Scale;
+	}
+	else
+	{
+		DrawCategoryTabBar();
+		const float TabBarH = 84.0f * Scale;
+		PanelRegionW = FMath::Min(Canvas->SizeX - 24.0f * Scale, 560.0f * Scale);
+		PanelRegionX = (Canvas->SizeX - PanelRegionW) * 0.5f;
+		PanelRegionY = 96.0f * Scale;
+		PanelRegionH = Canvas->SizeY - PanelRegionY - TabBarH - 12.0f * Scale;
+	}
+
+	if (IsNavOpen(HudNav))
+	{
+		DrawPanelSubTabs();
+	}
+}
+
+void AIdleHUD::DrawCategoryRail()
+{
+	using namespace IdleProject::UI;
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float W = 64.0f * Scale, H = 52.0f * Scale;
+	float Y = 92.0f * Scale;
+	for (const EHudCategory Cat : AllHudCategories())
+	{
+		const bool bActive = (HudNav.ActiveCategory == Cat);
+		DrawRect(bActive ? Theme::AccentBlue : Theme::BgPanel.CopyWithNewOpacity(0.85f), 12.0f * Scale, Y, W, H);
+		DrawText(IdleProject::Localization::UI(*CategoryLocKey(Cat)).ToString(),
+			bActive ? Theme::TextPrimary : Theme::TextMuted,
+			16.0f * Scale, Y + 16.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.7f * Scale);
+		AddHitBox(FVector2D(12.0f * Scale, Y), FVector2D(W, H), NavCategoryHitBox(Cat), true);
+		Y += H + 6.0f * Scale;
+	}
+}
+
+void AIdleHUD::DrawCategoryTabBar()
+{
+	using namespace IdleProject::UI;
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const TArray<EHudCategory>& Cats = AllHudCategories();
+	const float BarH = 84.0f * Scale;
+	const float Y = Canvas->SizeY - BarH;
+	const float W = Canvas->SizeX / Cats.Num();
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.95f), 0.0f, Y, Canvas->SizeX, BarH);
+	for (int32 i = 0; i < Cats.Num(); ++i)
+	{
+		const bool bActive = (HudNav.ActiveCategory == Cats[i]);
+		const float X = i * W;
+		if (bActive)
+		{
+			DrawRect(Theme::AccentBlue.CopyWithNewOpacity(0.4f), X, Y, W, BarH);
+		}
+		DrawText(IdleProject::Localization::UI(*CategoryLocKey(Cats[i])).ToString(),
+			bActive ? Theme::TextPrimary : Theme::TextMuted,
+			X + 8.0f * Scale, Y + 30.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.7f * Scale);
+		AddHitBox(FVector2D(X, Y), FVector2D(W, BarH), NavCategoryHitBox(Cats[i]), true);
+	}
+}
+
+void AIdleHUD::DrawPanelSubTabs()
+{
+	using namespace IdleProject::UI;
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const TArray<EHudPanel>& Panels = PanelsForCategory(HudNav.ActiveCategory);
+	const float TabH = 30.0f * Scale;
+	float X = PanelRegionX;
+	float Y = PanelRegionY;
+	const float MaxX = PanelRegionX + PanelRegionW;
+	for (const EHudPanel P : Panels)
+	{
+		const FString Label = IdleProject::Localization::UI(*PanelLocKey(P)).ToString();
+		const float TabW = 86.0f * Scale;
+		if (X + TabW > MaxX)
+		{
+			X = PanelRegionX;
+			Y += TabH + 4.0f * Scale;
+		}
+		const bool bActive = (HudNav.ActivePanel == P);
+		DrawRect(bActive ? Theme::AccentBlue : Theme::BgPanel.CopyWithNewOpacity(0.7f), X, Y, TabW, TabH);
+		DrawText(Label, bActive ? Theme::TextPrimary : Theme::TextMuted, X + 6.0f * Scale, Y + 6.0f * Scale,
+			GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+		AddHitBox(FVector2D(X, Y), FVector2D(TabW, TabH), NavPanelHitBox(P), true);
+		X += TabW + 4.0f * Scale;
+	}
+	const float Used = (Y + TabH) - PanelRegionY;
+	PanelRegionY += Used + 8.0f * Scale;
+	PanelRegionH -= Used + 8.0f * Scale;
+}
+
+void AIdleHUD::DrawActivePanel()
+{
+	using namespace IdleProject::UI;
+	if (!IsNavOpen(HudNav))
+	{
+		return;
+	}
+
+	// 내부 토글로 self-gate 하는 두 패널은 활성 여부에 맞춰 플래그를 매 프레임 설정
+	// (이번 단계 한정 호환 처리; 이후 태스크에서 정식 통합).
+	bQuestLogVisible = (HudNav.ActivePanel == EHudPanel::Quest);
+	bStatInfoVisible = (HudNav.ActivePanel == EHudPanel::StatInfo);
+
+	switch (HudNav.ActivePanel)
+	{
+	case EHudPanel::Tower:        DrawTowerPanel(); break;
+	case EHudPanel::Dungeon:      DrawDungeonPanel(); break;
+	case EHudPanel::WeeklyBoss:   DrawWeeklyBossPanel(); break;
+	case EHudPanel::StatAlloc:    DrawStatAllocationPanel(); break;
+	case EHudPanel::StatInfo:     DrawStatInfoPanel(); break;
+	case EHudPanel::Mastery:      DrawMasteryPanel(); break;
+	case EHudPanel::RebirthPanel: DrawRebirthPanel(); break;
+	case EHudPanel::Transcend:    DrawTranscendPanel(); break;
+	case EHudPanel::RebirthPerk:  DrawRebirthPerkPanel(); break;
+	case EHudPanel::Enhance:      DrawEnhancePanel(); break;
+	case EHudPanel::Potential:    DrawPotentialPanel(); break;
+	case EHudPanel::Rune:         DrawRunePanel(); break;
+	case EHudPanel::RuneCodex:    DrawRuneCodexPanel(); break;
+	case EHudPanel::Shop:         DrawShopPanel(); break;
+	case EHudPanel::Pet:          DrawPetPanel(); break;
+	case EHudPanel::Title:        DrawTitlePanel(); break;
+	case EHudPanel::Achievement:  DrawAchievementPanel(); break;
+	case EHudPanel::TreasureBox:  DrawTreasureBoxPanel(); break;
+	case EHudPanel::Quest:        DrawQuestLog(); break;
+	case EHudPanel::Mission:      DrawMissionPanel(); break;
+	case EHudPanel::Attendance:   DrawAttendancePanel(); break;
+	case EHudPanel::Consumable:   DrawConsumablePanel(); break;
+	case EHudPanel::SeasonPass:   DrawSeasonPassPanel(); break;
+	case EHudPanel::Guild:        DrawGuildPanel(); break;
+	case EHudPanel::Leaderboard:  DrawLeaderboardPanel(); break;
+	default: break;
+	}
+}
+
 void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 {
+	{
+		const FString Name = BoxName.ToString();
+		if (Name.StartsWith(TEXT("NavCat_")))
+		{
+			const int32 Id = FCString::Atoi(*Name.RightChop(7));
+			IdleProject::UI::SelectCategory(HudNav, (IdleProject::UI::EHudCategory)Id);
+			return;
+		}
+		if (Name.StartsWith(TEXT("NavPanel_")))
+		{
+			const int32 Id = FCString::Atoi(*Name.RightChop(9));
+			IdleProject::UI::SelectPanel(HudNav, (IdleProject::UI::EHudPanel)Id);
+			return;
+		}
+	}
+
 	if (BoxName == OfflineRewardClaimHitBoxName)
 	{
 		ClaimOfflineRewardModal();
