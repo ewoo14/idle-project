@@ -121,6 +121,36 @@ describe("automation feature unlock gating", () => {
       }),
     ).toBe(true);
   });
+
+  it("gates AutoGear behind chapter 5", () => {
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.AutoGear, {
+        highestClearedChapter: 4,
+        rebirthCount: 0,
+      }),
+    ).toBe(false);
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.AutoGear, {
+        highestClearedChapter: 5,
+        rebirthCount: 0,
+      }),
+    ).toBe(true);
+  });
+
+  it("gates AutoConsumable behind the rebirth axis (chapter alone is insufficient)", () => {
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.AutoConsumable, {
+        highestClearedChapter: 9,
+        rebirthCount: 0,
+      }),
+    ).toBe(false);
+    expect(
+      isFeatureUnlocked(AUTOMATION_FEATURE.AutoConsumable, {
+        highestClearedChapter: 9,
+        rebirthCount: 1,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("automation efficiency upgrade cost curve", () => {
@@ -137,5 +167,10 @@ describe("automation efficiency upgrade cost curve", () => {
 
   it("guards negative levels back to the base cost", () => {
     expect(efficiencyUpgradeCost(1000, 1.5, -3)).toBe(1000);
+  });
+
+  it("rounds the cost to the nearest integer (Math.round, not floor/ceil)", () => {
+    // 100 * 1.5^3 = 337.5 → Math.round → 338 (floor 라면 337)
+    expect(efficiencyUpgradeCost(100, 1.5, 3)).toBe(338);
   });
 });
