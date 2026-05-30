@@ -165,6 +165,26 @@ ESkillElement FStageFormula::GetStageWeakElement(int32 GlobalStageIndex)
 		return ESkillElement::Holy;
 	case 70:
 		return ESkillElement::Dark;
+	case 71:
+		return ESkillElement::Dark;
+	case 72:
+		return ESkillElement::Lightning;
+	case 73:
+		return ESkillElement::Holy;
+	case 74:
+		return ESkillElement::Fire;
+	case 75:
+		return ESkillElement::Dark;
+	case 76:
+		return ESkillElement::Ice;
+	case 77:
+		return ESkillElement::Dark;
+	case 78:
+		return ESkillElement::Holy;
+	case 79:
+		return ESkillElement::Fire;
+	case 80:
+		return ESkillElement::Dark;
 	default:
 		return ESkillElement::None;
 	}

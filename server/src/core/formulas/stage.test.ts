@@ -119,6 +119,25 @@ describe("stage formulas", () => {
     expect(weakElement).toBe(expectedWeakElement);
   });
 
+  it("챕터8 약점 71~80 (None 없음, Dark 가중)", () => {
+    const ch8 = [71, 72, 73, 74, 75, 76, 77, 78, 79, 80].map(
+      getStageWeakElement,
+    );
+    expect(ch8).toEqual([
+      "Dark",
+      "Lightning",
+      "Holy",
+      "Fire",
+      "Dark",
+      "Ice",
+      "Dark",
+      "Holy",
+      "Fire",
+      "Dark",
+    ]);
+    expect(ch8).not.toContain("None");
+  });
+
   it.each([
     { chapter: 0, stage: 0, expectedGlobalStageIndex: 1 },
     { chapter: 1, stage: 1, expectedGlobalStageIndex: 1 },

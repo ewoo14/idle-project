@@ -277,7 +277,7 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 	Quests->InitializeDefaultQuests(TEXT("2026-05-26"));
 
 	const TArray<FQuestDefinition> Definitions = Quests->GetQuestDefinitions();
-	TestEqual(TEXT("Quest definition count matches chapter seven client contract"), Definitions.Num(), 53);
+	TestEqual(TEXT("Quest definition count matches chapter eight client contract"), Definitions.Num(), 59);
 
 	struct FExpectedQuestDefinition
 	{
@@ -334,6 +334,12 @@ bool FQuestServiceDefinitionParityTest::RunTest(const FString& Parameters)
 		{TEXT("main_ch7_004"), EQuestType::Main, EQuestObjective::ClimbTower, 50, 322000, 242000, TEXT("main_ch7_003"), TEXT("7-5")},
 		{TEXT("main_ch7_005"), EQuestType::Main, EQuestObjective::KillMonster, 145, 363000, 273000, TEXT("main_ch7_004"), TEXT("7-8")},
 		{TEXT("main_ch7_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 428000, 321000, TEXT("main_ch7_005"), TEXT("7-10")},
+		{TEXT("main_ch8_001"), EQuestType::Main, EQuestObjective::KillMonster, 130, 484000, 363000, TEXT("main_ch7_006"), TEXT("8-1")},
+		{TEXT("main_ch8_002"), EQuestType::Main, EQuestObjective::ClearMap, 1, 547000, 410000, TEXT("main_ch8_001"), TEXT("8-2")},
+		{TEXT("main_ch8_003"), EQuestType::Main, EQuestObjective::ReachLevel, 95, 618000, 463000, TEXT("main_ch8_002"), TEXT("8-4")},
+		{TEXT("main_ch8_004"), EQuestType::Main, EQuestObjective::ClimbTower, 55, 698000, 524000, TEXT("main_ch8_003"), TEXT("8-5")},
+		{TEXT("main_ch8_005"), EQuestType::Main, EQuestObjective::KillMonster, 165, 789000, 592000, TEXT("main_ch8_004"), TEXT("8-8")},
+		{TEXT("main_ch8_006"), EQuestType::Main, EQuestObjective::DefeatBoss, 1, 928000, 696000, TEXT("main_ch8_005"), TEXT("8-10")},
 		{TEXT("daily_kill_monsters"), EQuestType::Daily, EQuestObjective::KillMonster, 30, 500, 240, TEXT(""), TEXT("")},
 		{TEXT("daily_claim_offline"), EQuestType::Daily, EQuestObjective::ClaimOffline, 1, 300, 180, TEXT(""), TEXT("")},
 		{TEXT("daily_enhance_gear"), EQuestType::Daily, EQuestObjective::Enhance, 3, 650, 320, TEXT(""), TEXT("")},
@@ -508,10 +514,32 @@ bool FQuestServiceChapterFourPrerequisiteChainTest::RunTest(const FString& Param
 	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
 	FQuestClaimResult ChapterSevenBossClaim = Quests->ClaimQuest(TEXT("main_ch7_006"));
 	TestTrue(TEXT("Chapter seven boss quest can be claimed"), ChapterSevenBossClaim.bSuccess);
+	TestTrue(TEXT("Chapter seven finale unlocks chapter eight start"), ChapterSevenBossClaim.UnlockedQuestIds.Contains(TEXT("main_ch8_001")));
 
-	FQuestState ChapterSevenBoss;
-	TestTrue(TEXT("Chapter seven boss quest resolves on map 7-10"), Quests->GetQuestState(TEXT("main_ch7_006"), ChapterSevenBoss));
-	TestEqual(TEXT("Chapter seven finale resolves on map 7-10"), ChapterSevenBoss.ChapterMapId, FString(TEXT("7-10")));
+	FQuestState ChapterEightStart;
+	TestTrue(TEXT("Claiming chapter seven finale unlocks chapter eight start"), Quests->GetQuestState(TEXT("main_ch8_001"), ChapterEightStart));
+	TestEqual(TEXT("Chapter eight quest starts on map 8-1"), ChapterEightStart.ChapterMapId, FString(TEXT("8-1")));
+
+	Quests->RecordProgress(EQuestObjective::KillMonster, 130);
+	FQuestClaimResult ChapterEightFirstClaim = Quests->ClaimQuest(TEXT("main_ch8_001"));
+	TestTrue(TEXT("Chapter eight first quest can be claimed"), ChapterEightFirstClaim.bSuccess);
+	TestTrue(TEXT("Chapter eight first quest unlocks stillness wake"), ChapterEightFirstClaim.UnlockedQuestIds.Contains(TEXT("main_ch8_002")));
+
+	Quests->RecordProgress(EQuestObjective::ClearMap, 1);
+	TestTrue(TEXT("Chapter eight wake can be claimed"), Quests->ClaimQuest(TEXT("main_ch8_002")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ReachLevel, 95);
+	TestTrue(TEXT("Chapter eight level gate can be claimed"), Quests->ClaimQuest(TEXT("main_ch8_003")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::ClimbTower, 55);
+	TestTrue(TEXT("Chapter eight remnant quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch8_004")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::KillMonster, 165);
+	TestTrue(TEXT("Chapter eight expanse quest can be claimed"), Quests->ClaimQuest(TEXT("main_ch8_005")).bSuccess);
+	Quests->RecordProgress(EQuestObjective::DefeatBoss, 1);
+	FQuestClaimResult ChapterEightBossClaim = Quests->ClaimQuest(TEXT("main_ch8_006"));
+	TestTrue(TEXT("Chapter eight boss quest can be claimed"), ChapterEightBossClaim.bSuccess);
+
+	FQuestState ChapterEightBoss;
+	TestTrue(TEXT("Chapter eight boss quest resolves on map 8-10"), Quests->GetQuestState(TEXT("main_ch8_006"), ChapterEightBoss));
+	TestEqual(TEXT("Chapter eight finale resolves on map 8-10"), ChapterEightBoss.ChapterMapId, FString(TEXT("8-10")));
 
 	return true;
 }

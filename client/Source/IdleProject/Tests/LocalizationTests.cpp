@@ -553,6 +553,41 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TestTrue(*FString::Printf(TEXT("Story Korean contains required chapter 7 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
 				TestTrue(*FString::Printf(TEXT("Story English contains required chapter 7 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
+
+			const TArray<FString> RequiredChapter8StoryKeys = {
+				TEXT("STORY_CHAPTER_08_TITLE"),
+				TEXT("STORY_CHAPTER_08_SUMMARY"),
+				TEXT("STORY_MAP_C08_M01_NAME"),
+				TEXT("STORY_MAP_C08_M01_SUMMARY"),
+				TEXT("STORY_MAP_C08_M02_NAME"),
+				TEXT("STORY_MAP_C08_M02_SUMMARY"),
+				TEXT("STORY_MAP_C08_M03_NAME"),
+				TEXT("STORY_MAP_C08_M03_SUMMARY"),
+				TEXT("STORY_MAP_C08_M04_NAME"),
+				TEXT("STORY_MAP_C08_M04_SUMMARY"),
+				TEXT("STORY_MAP_C08_M05_NAME"),
+				TEXT("STORY_MAP_C08_M05_SUMMARY"),
+				TEXT("STORY_MAP_C08_M06_NAME"),
+				TEXT("STORY_MAP_C08_M06_SUMMARY"),
+				TEXT("STORY_MAP_C08_M07_NAME"),
+				TEXT("STORY_MAP_C08_M07_SUMMARY"),
+				TEXT("STORY_MAP_C08_M08_NAME"),
+				TEXT("STORY_MAP_C08_M08_SUMMARY"),
+				TEXT("STORY_MAP_C08_M09_NAME"),
+				TEXT("STORY_MAP_C08_M09_SUMMARY"),
+				TEXT("STORY_MAP_C08_M10_NAME"),
+				TEXT("STORY_MAP_C08_M10_SUMMARY"),
+				TEXT("STORY_ELITE_C08_RISEN_REMNANT_NAME"),
+				TEXT("STORY_ELITE_C08_RISEN_REMNANT_SUMMARY"),
+				TEXT("STORY_BOSS_C08_SEALED_APEX_NAME"),
+				TEXT("STORY_BOSS_C08_SEALED_APEX_SUMMARY"),
+			};
+
+			for (const FString& RequiredKey : RequiredChapter8StoryKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("Story Korean contains required chapter 8 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("Story English contains required chapter 8 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
 		}
 
 		if (TableName == TEXT("StoryText"))
@@ -638,6 +673,38 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TestTrue(*FString::Printf(TEXT("StoryText Korean contains required chapter 7 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
 				TestTrue(*FString::Printf(TEXT("StoryText English contains required chapter 7 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
+
+			const TArray<FString> RequiredChapter8StoryTextKeys = {
+				TEXT("STORY_C08_M01_INTRO_01"),
+				TEXT("STORY_C08_M01_CLEAR_01"),
+				TEXT("STORY_C08_M02_INTRO_01"),
+				TEXT("STORY_C08_M02_CLEAR_01"),
+				TEXT("STORY_C08_M03_INTRO_01"),
+				TEXT("STORY_C08_M03_CLEAR_01"),
+				TEXT("STORY_C08_M04_INTRO_01"),
+				TEXT("STORY_C08_M04_CLEAR_01"),
+				TEXT("STORY_C08_M05_ELITE_01"),
+				TEXT("STORY_C08_M05_ELITE_02"),
+				TEXT("STORY_C08_M05_CLEAR_01"),
+				TEXT("STORY_C08_M06_INTRO_01"),
+				TEXT("STORY_C08_M06_CLEAR_01"),
+				TEXT("STORY_C08_M07_INTRO_01"),
+				TEXT("STORY_C08_M07_CLEAR_01"),
+				TEXT("STORY_C08_M08_INTRO_01"),
+				TEXT("STORY_C08_M08_CLEAR_01"),
+				TEXT("STORY_C08_M09_INTRO_01"),
+				TEXT("STORY_C08_M09_CLEAR_01"),
+				TEXT("STORY_C08_M10_BOSS_01"),
+				TEXT("STORY_C08_M10_BOSS_02"),
+				TEXT("STORY_C08_M10_CLEAR_01"),
+				TEXT("STORY_C08_M10_CLEAR_02"),
+			};
+
+			for (const FString& RequiredKey : RequiredChapter8StoryTextKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("StoryText Korean contains required chapter 8 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("StoryText English contains required chapter 8 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
 		}
 
 		if (TableName == TEXT("Rune"))
@@ -700,6 +767,21 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 			{
 				TestTrue(*FString::Printf(TEXT("Quest Korean contains required chapter 7 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
 				TestTrue(*FString::Printf(TEXT("Quest English contains required chapter 7 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
+
+			const TArray<FString> RequiredChapter8QuestKeys = {
+				TEXT("main_ch8_001"),
+				TEXT("main_ch8_002"),
+				TEXT("main_ch8_003"),
+				TEXT("main_ch8_004"),
+				TEXT("main_ch8_005"),
+				TEXT("main_ch8_006"),
+			};
+
+			for (const FString& RequiredKey : RequiredChapter8QuestKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("Quest Korean contains required chapter 8 key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("Quest English contains required chapter 8 key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
 		}
 	}
