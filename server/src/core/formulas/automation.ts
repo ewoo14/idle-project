@@ -134,6 +134,52 @@ export function isFeatureUnlocked(
   );
 }
 
+// 스킬 자동 사용 조건(클라 ESkillAutoCondition parity).
+// Always: 항상 / BossEliteOnly: 보스·정예 대상만 / HpBelow: 자기 HP 임계치 이하 /
+// MaintainBuff: 버프 미적용 시(유지 목적).
+export type SkillAutoCondition =
+  | "Always"
+  | "BossEliteOnly"
+  | "HpBelow"
+  | "MaintainBuff";
+
+// 스킬 룰 평가 컨텍스트. selfHpPct 는 0~1 비율, isBossElite 는 현재 대상 보스/정예 여부,
+// buffActive 는 해당 버프 활성 여부.
+export type SkillRuleContext = {
+  selfHpPct: number;
+  isBossElite: boolean;
+  buffActive: boolean;
+};
+
+// 0~1 클램프. 비유한값(NaN/Infinity)은 0 으로 보정.
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(1, Math.max(0, value));
+}
+
+// 스킬 자동 전술 룰 평가(클라 parity). 조건별로 발동 여부(boolean)를 반환.
+// 입력 무작위·시각 의존 없음(동일 입력→동일 결과).
+export function evaluateSkillRule(
+  condition: SkillAutoCondition,
+  hpThresholdPct: number,
+  ctx: SkillRuleContext,
+): boolean {
+  switch (condition) {
+    case "Always":
+      return true;
+    case "BossEliteOnly":
+      return ctx.isBossElite;
+    case "HpBelow":
+      // 자기 HP 비율이 임계치 이하일 때 발동. 양쪽 모두 0~1 클램프 후 비교.
+      return clamp01(ctx.selfHpPct) <= clamp01(hpThresholdPct);
+    case "MaintainBuff":
+      // 버프가 꺼져 있을 때만 발동(유지 목적).
+      return !ctx.buffActive;
+  }
+}
+
 // 효율 업그레이드 비용 곡선(클라 parity). base × growth^level, 기하 무한 성장(캡 없음).
 // 음수 level 은 0 가드(=base). 정수 비용으로 반올림.
 export function efficiencyUpgradeCost(
