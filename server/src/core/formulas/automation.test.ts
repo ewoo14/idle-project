@@ -9,6 +9,7 @@ import {
   evaluateSkillRule,
   isFeatureUnlocked,
   type SkillRuleContext,
+  sellValueMultiplier,
 } from "./automation.js";
 
 describe("automation decideOnClear (progression on clear)", () => {
@@ -222,5 +223,20 @@ describe("automation evaluateSkillRule (skill auto tactics)", () => {
     expect(
       evaluateSkillRule("MaintainBuff", 0, ctx({ buffActive: true })),
     ).toBe(false);
+  });
+});
+
+describe("automation sellValueMultiplier (auto-sell efficiency bonus)", () => {
+  it("returns 1.0 at level 0 (no bonus)", () => {
+    expect(sellValueMultiplier(0)).toBe(1);
+  });
+
+  it("adds +2% per level", () => {
+    expect(sellValueMultiplier(1)).toBeCloseTo(1.02, 10);
+    expect(sellValueMultiplier(10)).toBeCloseTo(1.2, 10);
+  });
+
+  it("guards negative levels back to 1.0", () => {
+    expect(sellValueMultiplier(-5)).toBe(1);
   });
 });

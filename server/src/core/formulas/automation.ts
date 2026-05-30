@@ -189,3 +189,8 @@ export function efficiencyUpgradeCost(
 ): number {
   return Math.round(base * growth ** Math.max(0, Math.trunc(level)));
 }
+
+// 자동 매각가 효율 보너스(P4). 레벨당 +2%, 무한. 음수 0가드. 클라 GetSellValueMultiplier 1:1.
+export function sellValueMultiplier(level: number): number {
+  return 1 + 0.02 * Math.max(0, Math.trunc(level));
+}

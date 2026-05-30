@@ -82,6 +82,17 @@ int64 UAutomationPolicyService::EfficiencyUpgradeCost(int64 Base, float Growth, 
 	return static_cast<int64>(FMath::RoundToDouble(Cost));
 }
 
+float UAutomationPolicyService::GetSellValueMultiplier(int32 Level)
+{
+	return 1.0f + 0.02f * static_cast<float>(FMath::Max(0, Level));
+}
+
+int64 UAutomationPolicyService::SellUpgradeNextCost(int32 Level)
+{
+	// base 50000, growth 1.5, P1 EfficiencyUpgradeCost 재사용(기하급수 무한).
+	return EfficiencyUpgradeCost(50000, 1.5f, Level);
+}
+
 void UAutomationPolicyService::RestoreState(
 	EProgressionMode InMode, int32 InFarmLockStage, bool bInAutoBoss, int32 InThreshold)
 {
@@ -139,4 +150,10 @@ void UAutomationPolicyService::RestoreGearPolicy(bool bInAutoEquip, bool bInAuto
 	bAutoEquipByPower = bInAutoEquip;
 	bAutoSell = bInAutoSell;
 	AutoSellMaxRarity = InMaxRarity;
+}
+
+void UAutomationPolicyService::RestoreConsumablePolicy(bool bInMaintain, int32 InSellLevel)
+{
+	bAutoMaintainBuff = bInMaintain;
+	SellValueUpgradeLevel = FMath::Max(0, InSellLevel);
 }

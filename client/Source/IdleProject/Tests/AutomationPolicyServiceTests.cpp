@@ -1,5 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "GameCore/AutomationPolicyService.h"
+#include "GameCore/BuffService.h"
+#include "GameCore/ConsumableTypes.h"
+#include "GameCore/IdleGameInstance.h"
 #include "GameCore/StageService.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -129,6 +132,75 @@ bool FAutomationSkillRuleTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("replaced cond"), (int32)Svc->GetSkillRules()[0].Condition, (int32)ESkillAutoCondition::HpBelow);
 	Svc->ClearSkillRule(FName(TEXT("heavy_strike")));
 	TestEqual(TEXT("cleared"), Svc->GetSkillRules().Num(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAutomationSellUpgradeTest,
+	"IdleProject.GameCore.Automation.SellUpgrade",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAutomationSellUpgradeTest::RunTest(const FString& Parameters)
+{
+	using S = UAutomationPolicyService;
+	TestEqual(TEXT("mult lv0"), S::GetSellValueMultiplier(0), 1.0f);
+	TestTrue(TEXT("mult lv10"), FMath::IsNearlyEqual(S::GetSellValueMultiplier(10), 1.2f, 1e-4f));
+	TestEqual(TEXT("mult neg guard"), S::GetSellValueMultiplier(-5), 1.0f);
+	TestEqual(TEXT("cost lv0 base"), S::SellUpgradeNextCost(0), (int64)50000);
+	TestTrue(TEXT("cost grows"), S::SellUpgradeNextCost(5) > S::SellUpgradeNextCost(4));
+	// 상태 setter 클램프
+	UAutomationPolicyService* Svc = NewObject<UAutomationPolicyService>();
+	Svc->SetSellValueUpgradeLevel(-3);
+	TestEqual(TEXT("level clamp"), Svc->GetSellValueUpgradeLevel(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAutomationConsumablePolicyTest,
+	"IdleProject.GameCore.Automation.ConsumablePolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAutomationConsumablePolicyTest::RunTest(const FString& Parameters)
+{
+	UIdleGameInstance* GI = NewObject<UIdleGameInstance>();
+	if (!GI)
+	{
+		return false;
+	}
+
+	// 효율 업그레이드: 골드 충분 시 레벨++ & 골드 차감(첫 비용 = 50000).
+	GI->AddGold(100000);
+	const int64 Cost = GI->GetSellValueUpgradeCost();
+	TestEqual(TEXT("first upgrade cost is base"), Cost, (int64)50000);
+	const bool bUp = GI->UpgradeSellValue();
+	TestTrue(TEXT("upgrade succeeds"), bUp);
+	TestEqual(TEXT("gold deducted"), GI->GetGold(), (int64)50000);
+	TestEqual(TEXT("level 1"), GI->GetAutomationPolicyService()->GetSellValueUpgradeLevel(), 1);
+
+	// 골드 부족 시 거부(레벨 유지). 잔여 골드 전액 차감.
+	GI->AddGold(-GI->GetGold());
+	TestEqual(TEXT("gold drained"), GI->GetGold(), (int64)0);
+	TestFalse(TEXT("upgrade refused when poor"), GI->UpgradeSellValue());
+	TestEqual(TEXT("level unchanged after refusal"), GI->GetAutomationPolicyService()->GetSellValueUpgradeLevel(), 1);
+
+	// 자동 버프 유지: 보유 소비 + 토글 ON + 처치 틱 → 버프 활성화.
+	// AddConsumable 이 BuffService 를 ensure 하므로 먼저 호출한 뒤 서비스를 조회.
+	GI->AddConsumable(EConsumableType::AttackTonic, EConsumableGrade::Standard, 1);
+	UBuffService* Buff = GI->GetBuffService();
+	TestNotNull(TEXT("buff service available"), Buff);
+	if (Buff)
+	{
+		const int64 Now = UIdleGameInstance::GetCurrentUnixSeconds();
+		TestFalse(TEXT("buff inactive before maintain"), Buff->IsBuffActive(EConsumableType::AttackTonic, Now));
+		// 토글 OFF 면 무동작.
+		GI->SetAutomationAutoMaintainBuff(false);
+		GI->MaintainBuffsIfEnabled();
+		TestFalse(TEXT("maintain off does nothing"), Buff->IsBuffActive(EConsumableType::AttackTonic, Now));
+		// 토글 ON 이면 보유분으로 자동 재사용 → 활성.
+		GI->SetAutomationAutoMaintainBuff(true);
+		GI->MaintainBuffsIfEnabled();
+		TestTrue(TEXT("maintain on activates buff"), Buff->IsBuffActive(EConsumableType::AttackTonic, Now));
+	}
 	return true;
 }
 

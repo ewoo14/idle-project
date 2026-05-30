@@ -1743,7 +1743,7 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 	EnsureAutomationPolicyService();
 	EnsureGuildService();
 
-	SaveGame->SaveVersion = 28;
+	SaveGame->SaveVersion = 29;
 	SaveGame->bHasSave = true;
 	SaveGame->Gold = Gold;
 	SaveGame->RuneEssence = RuneEssence;
@@ -1911,6 +1911,9 @@ bool UIdleGameInstance::CaptureToSave(UIdleSaveGame* SaveGame)
 		SaveGame->bAutomationAutoEquipByPower = AutomationPolicyService->GetAutoEquipByPower();
 		SaveGame->bAutomationAutoSell = AutomationPolicyService->GetAutoSell();
 		SaveGame->AutomationAutoSellMaxRarity = AutomationPolicyService->GetAutoSellMaxRarity();
+		// 자동 소비/효율 정책 직렬화(SaveVer 29+).
+		SaveGame->bAutomationAutoMaintainBuff = AutomationPolicyService->GetAutoMaintainBuff();
+		SaveGame->AutomationSellValueUpgradeLevel = AutomationPolicyService->GetSellValueUpgradeLevel();
 	}
 
 	if (GuildService)
@@ -2263,6 +2266,18 @@ bool UIdleGameInstance::ApplyFromSave(const UIdleSaveGame* SaveGame)
 		else
 		{
 			AutomationPolicyService->RestoreGearPolicy(false, false, EItemRarity::Common);
+		}
+
+		// 자동 소비/효율 정책은 SaveVer 29+ 에서만 존재. 미만이면 기본(OFF/0).
+		if (SaveGame->SaveVersion >= 29)
+		{
+			AutomationPolicyService->RestoreConsumablePolicy(
+				SaveGame->bAutomationAutoMaintainBuff,
+				SaveGame->AutomationSellValueUpgradeLevel);
+		}
+		else
+		{
+			AutomationPolicyService->RestoreConsumablePolicy(false, 0);
 		}
 	}
 
@@ -4405,12 +4420,18 @@ int64 UIdleGameInstance::SellInventoryItem(int32 ItemIndex)
 	{
 		return 0;
 	}
-	const int64 GoldGained = Inv->SellItem(ItemIndex);
-	if (GoldGained > 0)
+	EnsureAutomationPolicyService();
+	const int64 BaseGold = Inv->SellItem(ItemIndex);
+	if (BaseGold <= 0)
 	{
-		AddGold(GoldGained);
-		RefreshPlayerCharacterStats();
+		return 0;
 	}
+	const float Mult = AutomationPolicyService
+		? UAutomationPolicyService::GetSellValueMultiplier(AutomationPolicyService->GetSellValueUpgradeLevel())
+		: 1.0f;
+	const int64 GoldGained = static_cast<int64>(FMath::RoundToDouble(static_cast<double>(BaseGold) * Mult));
+	AddGold(GoldGained);
+	RefreshPlayerCharacterStats();
 	return GoldGained;
 }
 
@@ -4430,7 +4451,9 @@ bool UIdleGameInstance::HandleDroppedEquipment(UInventoryComponent* Inv, const F
 		&& Item.PotentialGrade == EPotentialGrade::None
 		&& Item.UniqueTrait1 == EUniqueTrait::None && Item.UniqueTrait2 == EUniqueTrait::None)
 	{
-		AddGold(FItemSellFormula::ComputeSellValue(Item.Rarity, Item.EnhanceLevel));
+		const int64 BaseSell = FItemSellFormula::ComputeSellValue(Item.Rarity, Item.EnhanceLevel);
+		const float Mult = UAutomationPolicyService::GetSellValueMultiplier(AutomationPolicyService->GetSellValueUpgradeLevel());
+		AddGold(static_cast<int64>(FMath::RoundToDouble(static_cast<double>(BaseSell) * Mult)));
 		return false; // 매각됨, 미보관
 	}
 
@@ -4470,6 +4493,69 @@ void UIdleGameInstance::SetAutomationAutoSellMaxRarity(EItemRarity Rarity)
 	if (AutomationPolicyService)
 	{
 		AutomationPolicyService->SetAutoSellMaxRarity(Rarity);
+	}
+}
+
+void UIdleGameInstance::MaintainBuffsIfEnabled()
+{
+	EnsureAutomationPolicyService();
+	EnsureBuffService();
+	if (!AutomationPolicyService || !BuffService || !AutomationPolicyService->GetAutoMaintainBuff())
+	{
+		return;
+	}
+	const int64 Now = GetCurrentUnixSeconds();
+	static const EConsumableType Types[] = {
+		EConsumableType::AttackTonic, EConsumableType::GuardTonic, EConsumableType::AllStatElixir,
+		EConsumableType::FortuneScroll, EConsumableType::GoldFeast, EConsumableType::WisdomBooster };
+	bool bUsedAny = false;
+	for (const EConsumableType Type : Types)
+	{
+		if (!BuffService->IsBuffActive(Type, Now) && BuffService->GetTotalCount(Type) > 0)
+		{
+			if (BuffService->UseConsumable(Type, Now))
+			{
+				bUsedAny = true;
+			}
+		}
+	}
+	if (bUsedAny)
+	{
+		RefreshPlayerCharacterStats();
+	}
+}
+
+int64 UIdleGameInstance::GetSellValueUpgradeCost() const
+{
+	const UAutomationPolicyService* Service = GetAutomationPolicyService();
+	const int32 Level = Service ? Service->GetSellValueUpgradeLevel() : 0;
+	return UAutomationPolicyService::SellUpgradeNextCost(Level);
+}
+
+bool UIdleGameInstance::UpgradeSellValue()
+{
+	EnsureAutomationPolicyService();
+	if (!AutomationPolicyService)
+	{
+		return false;
+	}
+	const int32 Level = AutomationPolicyService->GetSellValueUpgradeLevel();
+	const int64 UpgradeCost = UAutomationPolicyService::SellUpgradeNextCost(Level);
+	if (Gold < UpgradeCost)
+	{
+		return false;
+	}
+	AddGold(-UpgradeCost);
+	AutomationPolicyService->SetSellValueUpgradeLevel(Level + 1);
+	return true;
+}
+
+void UIdleGameInstance::SetAutomationAutoMaintainBuff(bool bValue)
+{
+	EnsureAutomationPolicyService();
+	if (AutomationPolicyService)
+	{
+		AutomationPolicyService->SetAutoMaintainBuff(bValue);
 	}
 }
 
