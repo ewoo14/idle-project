@@ -5572,6 +5572,24 @@ void AIdleHUD::DrawStageIndicator()
 	DrawRect(ViewModel.WeaknessColor.CopyWithNewOpacity(0.92f), WeaknessIconX, WeaknessIconY, WeaknessIconSize, WeaknessIconSize);
 	DrawText(ViewModel.WeaknessIconLabel.ToString(), BgPrimary, WeaknessIconX + 7.0f * Scale, WeaknessIconY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
 	DrawText(ViewModel.WeaknessLabel.ToString(), ViewModel.WeaknessColor, X + PanelWidth - 128.0f * Scale, Y + 15.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	if (ViewModel.bHasResist)
+	{
+		// 저항 배지는 약점 배지(채움) 아래 외곽선 스타일로 그린다.
+		// 보스/엘리트 배지(BadgeY=Y+42, 우측 패딩 정렬)와의 좌표 충돌을 피하기 위해
+		// 보스/엘리트 스테이지에서는 저항 배지를 좌측(진행 라벨 우측 영역)으로 이동한다.
+		const bool bHasStageBadge = ViewModel.bBossStage || ViewModel.bEliteStage;
+		const float ResistIconY = bHasStageBadge ? (Y + 31.0f * Scale) : (WeaknessIconY + 24.0f * Scale);
+		const float ResistIconX = bHasStageBadge ? (X + PanelWidth * 0.5f) : WeaknessIconX;
+		const float ResistLabelX = ResistIconX + 28.0f * Scale;
+		const float Edge = 1.5f * Scale;
+		DrawRect(ViewModel.ResistColor.CopyWithNewOpacity(0.30f), ResistIconX, ResistIconY, WeaknessIconSize, WeaknessIconSize);
+		DrawRect(ViewModel.ResistColor, ResistIconX, ResistIconY, WeaknessIconSize, Edge);
+		DrawRect(ViewModel.ResistColor, ResistIconX, ResistIconY + WeaknessIconSize - Edge, WeaknessIconSize, Edge);
+		DrawRect(ViewModel.ResistColor, ResistIconX, ResistIconY, Edge, WeaknessIconSize);
+		DrawRect(ViewModel.ResistColor, ResistIconX + WeaknessIconSize - Edge, ResistIconY, Edge, WeaknessIconSize);
+		DrawText(ViewModel.ResistIconLabel.ToString(), ViewModel.ResistColor, ResistIconX + 7.0f * Scale, ResistIconY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.72f * Scale);
+		DrawText(ViewModel.ResistLabel.ToString(), ViewModel.ResistColor, ResistLabelX, ResistIconY + 3.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.78f * Scale);
+	}
 	if (ViewModel.bBossStage || ViewModel.bEliteStage)
 	{
 		const bool bEliteBadge = ViewModel.bEliteStage && !ViewModel.bBossStage;
