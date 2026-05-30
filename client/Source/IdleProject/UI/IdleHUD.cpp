@@ -24,6 +24,7 @@
 #include "GameCore/QuestService.h"
 #include "GameCore/TowerMilestoneFormula.h"
 #include "GameCore/TranscendFormula.h"
+#include "GameCore/AttendanceService.h"
 #include "GameCore/WeeklyBossFormula.h"
 #include "GameCore/WeeklyBossService.h"
 #include "Internationalization/IdleLocalization.h"
@@ -75,6 +76,8 @@ const FString StatAllocationHitBoxPrefix(TEXT("StatAlloc_"));
 const FString DungeonEnterHitBoxPrefix(TEXT("DungeonEnter_"));
 const FString ConsumableUseHitBoxPrefix(TEXT("ConsumableUse_"));
 const FString WeeklyBossClaimHitBoxPrefix(TEXT("WeeklyBossClaim_"));
+// 출석 보상 패널 — 고유 prefix(Attendance~)로 jumbo ODR 회피.
+const FString AttendanceClaimHitBoxPrefix(TEXT("AttendanceClaim_"));
 const FName LeaderboardPowerTabHitBoxName(TEXT("LeaderboardTabPower"));
 const FName LeaderboardRebirthTabHitBoxName(TEXT("LeaderboardTabRebirth"));
 const FName LeaderboardWeeklyTabHitBoxName(TEXT("LeaderboardTabWeekly"));
@@ -131,6 +134,7 @@ constexpr float TowerFeedbackDurationSeconds = 2.4f;
 constexpr float DungeonFeedbackDurationSeconds = 2.4f;
 constexpr float AchievementFeedbackDurationSeconds = 2.4f;
 constexpr float WeeklyBossFeedbackDurationSeconds = 2.4f;
+constexpr float AttendanceFeedbackDurationSeconds = 2.4f;
 constexpr float ProgressSavedFeedbackDurationSeconds = 1.6f;
 constexpr float CloudSyncFeedbackDurationSeconds = 2.4f;
 
@@ -393,6 +397,33 @@ int32 WeeklyBossMilestoneFromHitBoxName(FName BoxName)
 	FString MilestoneText = BoxName.ToString();
 	MilestoneText.RemoveFromStart(WeeklyBossClaimHitBoxPrefix);
 	return FCString::Atoi(*MilestoneText);
+}
+
+FName MakeAttendanceClaimHitBoxName(int32 Milestone)
+{
+	return FName(*FString::Printf(TEXT("%s%d"), *AttendanceClaimHitBoxPrefix, Milestone));
+}
+
+int32 AttendanceMilestoneFromHitBoxName(FName BoxName)
+{
+	FString MilestoneText = BoxName.ToString();
+	MilestoneText.RemoveFromStart(AttendanceClaimHitBoxPrefix);
+	return FCString::Atoi(*MilestoneText);
+}
+
+// 출석 마일스톤 보상 종류 → 로컬라이즈 표시명(골드/룬정수/소비).
+FText AttendanceRewardTypeLabel(EAttendanceReward RewardType)
+{
+	switch (RewardType)
+	{
+	case EAttendanceReward::Essence:
+		return IdleProject::Localization::UI(TEXT("ATTENDANCE_REWARD_ESSENCE"));
+	case EAttendanceReward::Consumable:
+		return IdleProject::Localization::UI(TEXT("ATTENDANCE_REWARD_CONSUMABLE"));
+	case EAttendanceReward::Gold:
+	default:
+		return IdleProject::Localization::UI(TEXT("ATTENDANCE_REWARD_GOLD"));
+	}
 }
 
 const EConsumableType* GetConsumableDisplayOrder()
@@ -3447,6 +3478,81 @@ FIdleHUDWeeklyBossPanelViewModel IdleProject::UI::BuildWeeklyBossPanelViewModel(
 	return ViewModel;
 }
 
+FIdleHUDAttendancePanelViewModel IdleProject::UI::BuildAttendancePanelViewModel(const UAttendanceService& AttendanceService, const FString& TodayUtcDate)
+{
+	FIdleHUDAttendancePanelViewModel ViewModel;
+	ViewModel.Title = IdleProject::Localization::UI(TEXT("ATTENDANCE_PANEL_TITLE"));
+	ViewModel.TotalAttendance = AttendanceService.GetTotalAttendance();
+	ViewModel.ReachedMilestones = AttendanceService.GetReachedMilestones();
+	ViewModel.ClaimedMilestones = AttendanceService.GetClaimedMilestones().Num();
+	// 오늘 출석 처리 여부: 마지막 출석일이 오늘(UTC date)과 같으면 완료(보통 로그인 시 자동 체크인).
+	ViewModel.bCheckedInToday = !TodayUtcDate.IsEmpty() && AttendanceService.GetLastAttendanceDate() == TodayUtcDate;
+
+	ViewModel.TotalLabel = FormatLocalizedUI(TEXT("ATTENDANCE_TOTAL_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Total"), FText::FromString(FormatIntegerWithCommas(ViewModel.TotalAttendance)));
+	});
+	ViewModel.CheckInLabel = ViewModel.bCheckedInToday
+		? IdleProject::Localization::UI(TEXT("ATTENDANCE_CHECKIN_DONE"))
+		: IdleProject::Localization::UI(TEXT("ATTENDANCE_CHECKIN_AVAILABLE"));
+	ViewModel.MilestoneSummaryLabel = FormatLocalizedUI(TEXT("ATTENDANCE_MILESTONE_SUMMARY_FORMAT"), [&ViewModel](FFormatNamedArguments& Args)
+	{
+		Args.Add(TEXT("Reached"), FText::AsNumber(ViewModel.ReachedMilestones));
+		Args.Add(TEXT("Claimed"), FText::AsNumber(ViewModel.ClaimedMilestones));
+	});
+
+	// 무한 마일스톤: 수령분은 접고(수령+1부터) 도달 미수령 + 다음 미도달 일부를 합리적 범위로 표시.
+	const int32 FirstDisplayedMilestone = FMath::Max(1, ViewModel.ClaimedMilestones + 1);
+	constexpr int32 DisplayMilestoneCount = 5;
+	for (int32 Offset = 0; Offset < DisplayMilestoneCount; ++Offset)
+	{
+		const int32 MilestoneN = FirstDisplayedMilestone + Offset;
+		const FAttendanceMilestone Milestone = AttendanceService.GetMilestone(MilestoneN);
+
+		FIdleHUDAttendanceMilestoneRowViewModel Row;
+		Row.Milestone = MilestoneN;
+		Row.Threshold = Milestone.Threshold;
+		Row.bReached = MilestoneN <= ViewModel.ReachedMilestones;
+		Row.bClaimed = AttendanceService.IsMilestoneClaimed(MilestoneN);
+		Row.bCanClaim = Row.bReached && !Row.bClaimed;
+		Row.ClaimHitBoxName = MakeAttendanceClaimHitBoxName(MilestoneN);
+		Row.ActionLabel = IdleProject::Localization::UI(TEXT("ATTENDANCE_CLAIM"));
+		Row.MilestoneLabel = FormatLocalizedUI(TEXT("ATTENDANCE_MILESTONE_FORMAT"), [MilestoneN](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Milestone"), FText::AsNumber(MilestoneN));
+		});
+		Row.ThresholdLabel = FormatLocalizedUI(TEXT("ATTENDANCE_THRESHOLD_FORMAT"), [&Row](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(Row.Threshold)));
+		});
+		Row.RewardLabel = FormatLocalizedUI(TEXT("ATTENDANCE_REWARD_FORMAT"), [&Milestone](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Type"), AttendanceRewardTypeLabel(Milestone.RewardType));
+			Args.Add(TEXT("Value"), FText::FromString(FormatIntegerWithCommas(Milestone.RewardValue)));
+		});
+		if (Row.bClaimed)
+		{
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ATTENDANCE_STATUS_CLAIMED"));
+		}
+		else if (Row.bReached)
+		{
+			Row.StatusLabel = IdleProject::Localization::UI(TEXT("ATTENDANCE_STATUS_REACHED"));
+		}
+		else
+		{
+			// 미달 진행: 누적 출석일 / 필요 임계.
+			Row.StatusLabel = FormatLocalizedUI(TEXT("ATTENDANCE_STATUS_PROGRESS_FORMAT"), [&ViewModel, &Row](FFormatNamedArguments& Args)
+			{
+				Args.Add(TEXT("Total"), FText::FromString(FormatIntegerWithCommas(ViewModel.TotalAttendance)));
+				Args.Add(TEXT("Threshold"), FText::FromString(FormatIntegerWithCommas(Row.Threshold)));
+			});
+		}
+		ViewModel.Rows.Add(Row);
+	}
+
+	return ViewModel;
+}
+
 FIdleHUDAchievementViewModel IdleProject::UI::BuildAchievementViewModel(const UAchievementService& AchievementService)
 {
 	FIdleHUDAchievementViewModel ViewModel;
@@ -4258,6 +4364,7 @@ void AIdleHUD::DrawHUD()
 	DrawTowerPanel();
 	DrawDungeonPanel();
 	DrawWeeklyBossPanel();
+	DrawAttendancePanel();
 	DrawAchievementPanel();
 	DrawMasteryPanel();
 	DrawStatAllocationPanel();
@@ -4462,6 +4569,11 @@ void AIdleHUD::NotifyHitBoxClick(FName BoxName)
 	if (BoxName.ToString().StartsWith(WeeklyBossClaimHitBoxPrefix))
 	{
 		ClaimWeeklyBossFromHitBox(BoxName);
+		return;
+	}
+	if (BoxName.ToString().StartsWith(AttendanceClaimHitBoxPrefix))
+	{
+		ClaimAttendanceFromHitBox(BoxName);
 		return;
 	}
 	if (BoxName.ToString().StartsWith(ConsumableUseHitBoxPrefix))
@@ -7822,6 +7934,124 @@ void AIdleHUD::ClaimWeeklyBossFromHitBox(FName BoxName)
 	if (const UWorld* World = GetWorld())
 	{
 		WeeklyBossFeedbackStartTime = World->GetTimeSeconds();
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawAttendancePanel()
+{
+	using namespace IdleProject::UI;
+
+	if (!Canvas)
+	{
+		return;
+	}
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	const UAttendanceService* AttendanceService = IdleGameInstance ? IdleGameInstance->GetAttendanceService() : nullptr;
+	if (!AttendanceService)
+	{
+		return;
+	}
+
+	const FIdleHUDAttendancePanelViewModel ViewModel = BuildAttendancePanelViewModel(*AttendanceService, UQuestService::GetCurrentUtcDateString());
+	const UWorld* World = GetWorld();
+	const float FeedbackElapsed = World ? World->GetTimeSeconds() - AttendanceFeedbackStartTime : 0.0f;
+	const bool bShowFeedback = !AttendanceFeedbackLabel.IsEmpty() && FeedbackElapsed <= AttendanceFeedbackDurationSeconds;
+
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float PanelWidth = FMath::Clamp(Canvas->SizeX * 0.24f, 360.0f * Scale, 460.0f * Scale);
+	const float RowHeight = 44.0f * Scale;
+	const float RowGap = 6.0f * Scale;
+	const float Padding = 14.0f * Scale;
+	const int32 VisibleRows = FMath::Min(ViewModel.Rows.Num(), 5);
+	const float FeedbackHeight = bShowFeedback ? 24.0f * Scale : 0.0f;
+	const float PanelHeight = 78.0f * Scale + VisibleRows * RowHeight + FMath::Max(0, VisibleRows - 1) * RowGap + Padding + FeedbackHeight;
+	const float X = 28.0f * Scale;
+	const float Y = 120.0f * Scale;
+	const float Border = 2.0f * Scale;
+
+	DrawRect(Theme::BgPanel.CopyWithNewOpacity(0.91f), X, Y, PanelWidth, PanelHeight);
+	DrawRect(Theme::AccentGold, X, Y, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y + PanelHeight - Border, PanelWidth, Border);
+	DrawRect(Theme::AccentGold, X, Y, Border, PanelHeight);
+	DrawRect(Theme::AccentGold, X + PanelWidth - Border, Y, Border, PanelHeight);
+
+	DrawText(ViewModel.Title.ToString(), Theme::TextPrimary, X + Padding, Y + 10.0f * Scale, GEngine ? GEngine->GetMediumFont() : nullptr, 0.88f * Scale);
+	DrawText(ViewModel.TotalLabel.ToString(), Theme::AccentGold, X + Padding, Y + 38.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.76f * Scale);
+	DrawText(ViewModel.CheckInLabel.ToString(), ViewModel.bCheckedInToday ? Theme::AccentBlue : Theme::AccentGold, X + 180.0f * Scale, Y + 40.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.70f * Scale);
+	DrawText(ViewModel.MilestoneSummaryLabel.ToString(), Theme::TextMuted, X + Padding, Y + 58.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+
+	float RowY = Y + 78.0f * Scale;
+	for (int32 Index = 0; Index < VisibleRows; ++Index)
+	{
+		DrawAttendanceMilestoneRow(ViewModel.Rows[Index], X + Padding, RowY, PanelWidth - Padding * 2.0f, RowHeight);
+		RowY += RowHeight + RowGap;
+	}
+
+	if (bShowFeedback)
+	{
+		DrawText(AttendanceFeedbackLabel.ToString(), Theme::AccentGold, X + Padding, RowY + 2.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.74f * Scale);
+	}
+	RefreshMouseInteraction();
+}
+
+void AIdleHUD::DrawAttendanceMilestoneRow(const FIdleHUDAttendanceMilestoneRowViewModel& Row, float X, float Y, float Width, float Height)
+{
+	using namespace IdleProject::UI;
+
+	const float Scale = Height / 44.0f;
+	const FLinearColor StateColor = Row.bCanClaim
+		? Theme::AccentGold
+		: (Row.bReached ? Theme::AccentBlue : Theme::TextMuted.CopyWithNewOpacity(0.62f));
+
+	DrawRect(Theme::BgPrimary.CopyWithNewOpacity(0.90f), X, Y, Width, Height);
+	DrawRect(StateColor, X, Y, 4.0f * Scale, Height);
+	DrawText(Row.MilestoneLabel.ToString(), Row.bCanClaim ? Theme::AccentGold : Theme::TextPrimary, X + 10.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.66f * Scale);
+	DrawText(Row.ThresholdLabel.ToString(), Theme::TextMuted, X + 86.0f * Scale, Y + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.60f * Scale);
+	DrawText(Row.RewardLabel.ToString(), Theme::TextMuted, X + 10.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+	DrawText(Row.StatusLabel.ToString(), StateColor, X + 180.0f * Scale, Y + 24.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.58f * Scale);
+
+	const float ButtonWidth = 58.0f * Scale;
+	const float ButtonHeight = 24.0f * Scale;
+	const float ButtonX = X + Width - ButtonWidth - 8.0f * Scale;
+	const float ButtonY = Y + 10.0f * Scale;
+	DrawRect(Row.bCanClaim ? Theme::AccentGold : Theme::BgPanel, ButtonX, ButtonY, ButtonWidth, ButtonHeight);
+	DrawText(Row.ActionLabel.ToString(), Row.bCanClaim ? Theme::BgPrimary : Theme::TextMuted, ButtonX + 12.0f * Scale, ButtonY + 5.0f * Scale, GEngine ? GEngine->GetSmallFont() : nullptr, 0.62f * Scale);
+	if (Row.bCanClaim)
+	{
+		AddHitBox(FVector2D(ButtonX, ButtonY), FVector2D(ButtonWidth, ButtonHeight), Row.ClaimHitBoxName, true, 86);
+	}
+}
+
+void AIdleHUD::ClaimAttendanceFromHitBox(FName BoxName)
+{
+	if (!IdleGameInstance)
+	{
+		IdleGameInstance = GetGameInstance<UIdleGameInstance>();
+	}
+	if (!IdleGameInstance)
+	{
+		return;
+	}
+
+	const int32 Milestone = AttendanceMilestoneFromHitBoxName(BoxName);
+	const UAttendanceService* AttendanceService = IdleGameInstance->GetAttendanceService();
+	const FAttendanceMilestone Info = AttendanceService ? AttendanceService->GetMilestone(Milestone) : FAttendanceMilestone();
+	const bool bClaimed = IdleGameInstance->ClaimAttendanceMilestone(Milestone);
+	AttendanceFeedbackLabel = bClaimed
+		? FormatLocalizedUI(TEXT("ATTENDANCE_CLAIM_RESULT_FORMAT"), [Milestone, &Info](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Milestone"), FText::AsNumber(Milestone));
+			Args.Add(TEXT("Type"), AttendanceRewardTypeLabel(Info.RewardType));
+			Args.Add(TEXT("Value"), FText::FromString(FormatIntegerWithCommas(Info.RewardValue)));
+		})
+		: IdleProject::Localization::UI(TEXT("ATTENDANCE_CLAIM_BLOCKED"));
+	if (const UWorld* World = GetWorld())
+	{
+		AttendanceFeedbackStartTime = World->GetTimeSeconds();
 	}
 	RefreshMouseInteraction();
 }

@@ -28,6 +28,7 @@ class UMasteryService;
 class URuneService;
 class USkillComponent;
 class UWeeklyBossService;
+class UAttendanceService;
 class UGuildService;
 class SIdleHUDWidget;
 
@@ -435,6 +436,37 @@ struct IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel
 	float ProgressRatio = 0.0f;
 	bool bCanChallenge = false;
 	TArray<FIdleHUDWeeklyBossMilestoneRowViewModel> Rows;
+};
+
+// ── 출석 보상 패널 뷰모델(출석 보상) ─────────────────────────────────────────
+// 마일스톤 1행: 임계 출석일·보상(종류/수치)·진행/상태·수령 버튼.
+struct IDLEPROJECT_API FIdleHUDAttendanceMilestoneRowViewModel
+{
+	int32 Milestone = 0;
+	FText MilestoneLabel;
+	FText ThresholdLabel;
+	FText RewardLabel;
+	FText StatusLabel;
+	FText ActionLabel;
+	FName ClaimHitBoxName;
+	int64 Threshold = 0;
+	bool bReached = false;
+	bool bClaimed = false;
+	bool bCanClaim = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDAttendancePanelViewModel
+{
+	FText Title;
+	FText TotalLabel;
+	FText CheckInLabel;
+	FText MilestoneSummaryLabel;
+	int64 TotalAttendance = 0;
+	int32 ReachedMilestones = 0;
+	int32 ClaimedMilestones = 0;
+	// 오늘 첫 출석이 아직 안 됐으면(체크인 가능) true — 보통 로그인 시 자동 체크인이므로 표시 위주.
+	bool bCheckedInToday = false;
+	TArray<FIdleHUDAttendanceMilestoneRowViewModel> Rows;
 };
 
 // ── 길드 패널 뷰모델(PR-G1) ──────────────────────────────────────────────────
@@ -989,6 +1021,7 @@ IDLEPROJECT_API FIdleHUDShopPanelViewModel BuildShopPanelViewModel(int64 GearRol
 IDLEPROJECT_API FIdleHUDConsumablePanelViewModel BuildConsumablePanelViewModel(const UBuffService& BuffService, int64 NowUnixSec);
 IDLEPROJECT_API FIdleHUDLeaderboardPanelViewModel BuildLeaderboardPanelViewModel(const ULeaderboardService& LeaderboardService, ELeaderboardKind Kind, int32 SeasonId, const FString& WeekId, bool bLoading, bool bOffline);
 IDLEPROJECT_API FIdleHUDWeeklyBossPanelViewModel BuildWeeklyBossPanelViewModel(const UWeeklyBossService& WeeklyBossService);
+IDLEPROJECT_API FIdleHUDAttendancePanelViewModel BuildAttendancePanelViewModel(const UAttendanceService& AttendanceService, const FString& TodayUtcDate);
 IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuildService& GuildService, const TArray<FGuildSummary>& BrowseList, const FString& PendingCreateName, bool bLoading, bool bOffline, int64 PlayerGold, int64 DonateAmount, const TArray<FGuildShopItemInfo>& ShopItems, bool bRankingsView, bool bRankingsLoading, const TArray<FGuildRankingEntry>& Rankings, const FGuildRankingEntry& MyRanking);
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex, int32 TransferTargetOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
@@ -1116,6 +1149,9 @@ private:
 	void DrawWeeklyBossMilestoneRow(const FIdleHUDWeeklyBossMilestoneRowViewModel& Row, float X, float Y, float Width, float Height);
 	void TryChallengeWeeklyBoss();
 	void ClaimWeeklyBossFromHitBox(FName BoxName);
+	void DrawAttendancePanel();
+	void DrawAttendanceMilestoneRow(const FIdleHUDAttendanceMilestoneRowViewModel& Row, float X, float Y, float Width, float Height);
+	void ClaimAttendanceFromHitBox(FName BoxName);
 	void DrawGuildPanel();
 	void DrawGuildListRow(const FIdleHUDGuildListRowViewModel& Row, float X, float Y, float Width, float Height);
 	void DrawGuildMemberRow(const FIdleHUDGuildMemberRowViewModel& Row, float X, float Y, float Width, float Height);
@@ -1249,6 +1285,7 @@ private:
 	FText DungeonFeedbackLabel;
 	FText AchievementFeedbackLabel;
 	FText WeeklyBossFeedbackLabel;
+	FText AttendanceFeedbackLabel;
 	FText ProgressSavedFeedbackLabel;
 	FIdleHUDCloudSyncViewModel CloudSyncViewModel;
 	ELeaderboardKind SelectedLeaderboardKind = ELeaderboardKind::Power;
@@ -1266,6 +1303,7 @@ private:
 	float DungeonFeedbackStartTime = -1000.0f;
 	float AchievementFeedbackStartTime = -1000.0f;
 	float WeeklyBossFeedbackStartTime = -1000.0f;
+	float AttendanceFeedbackStartTime = -1000.0f;
 	float ProgressSavedFeedbackStartTime = -1000.0f;
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
