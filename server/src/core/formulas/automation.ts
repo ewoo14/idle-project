@@ -40,7 +40,10 @@ function clamp(value: number, min: number, max: number): number {
 // cleared 는 1 하한·절삭, highest 는 cleared 와 입력 최고치 중 큰 값으로 정규화.
 export function decideOnClear(input: DecideOnClearInput): ProgressionDecision {
   const cleared = Math.max(1, Math.trunc(input.clearedGlobalStage));
-  const highest = Math.max(cleared, Math.trunc(input.highestClearedGlobalStage));
+  const highest = Math.max(
+    cleared,
+    Math.trunc(input.highestClearedGlobalStage),
+  );
   const next = cleared + 1;
 
   // FarmLock: 지정 스테이지 고정. 도달 가능 범위 [1, highest+1] 로 클램프.
@@ -138,5 +141,5 @@ export function efficiencyUpgradeCost(
   growth: number,
   level: number,
 ): number {
-  return Math.round(base * Math.pow(growth, Math.max(0, Math.trunc(level))));
+  return Math.round(base * growth ** Math.max(0, Math.trunc(level)));
 }
