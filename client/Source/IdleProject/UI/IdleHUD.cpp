@@ -6,6 +6,7 @@
 #include "CombatSystem/SkillComponent.h"
 #include "CharacterSystem/IdleCharacter.h"
 #include "CharacterSystem/IdleMonster.h"
+#include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
@@ -10701,4 +10702,136 @@ void AIdleHUD::RefreshMouseInteraction()
 	const bool bNeedsPointer = ResolvePlayerCharacter() || PlayerInventory || bHasRunePanel || bHasDungeonPanel || bHasConsumablePanel || bHasLeaderboardPanel || bQuestLogVisible || bStatInfoVisible || OfflineRewardModal.bVisible || bRebirthReady || bTranscendReady;
 	PlayerOwner->bShowMouseCursor = bNeedsPointer;
 	PlayerOwner->bEnableClickEvents = bNeedsPointer;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 크롬 9-slice 드로잉 헬퍼(비주얼 파운데이션 Task V4)
+//   원신풍 9-slice 텍스처(Task V3)를 Canvas 타일로 렌더. 텍스처 부재 시
+//   모두 DrawRect/DrawText 폴백 → 에셋 누락이 크래시/공백을 만들지 않음.
+//   타일 드로잉은 FCanvasTileItem + Canvas->DrawItem(코드베이스 첫 텍스처 타일).
+// ─────────────────────────────────────────────────────────────────────────────
+
+UTexture2D* AIdleHUD::ResolveChrome(const TCHAR* AssetName, TObjectPtr<UTexture2D>& Cache)
+{
+	// lazy 로드 + 캐시. 경로 규칙 /Game/UI/Chrome/<Name>.<Name>.
+	if (!Cache)
+	{
+		const FString Path = FString::Printf(TEXT("/Game/UI/Chrome/%s.%s"), AssetName, AssetName);
+		Cache = LoadObject<UTexture2D>(nullptr, *Path);
+	}
+	return Cache;
+}
+
+void AIdleHUD::DrawNineSlice(UTexture2D* Tex, float X, float Y, float W, float H, float CornerUVPx, const FLinearColor& Tint)
+{
+	using namespace IdleProject::UI;
+	if (!Canvas || !Tex)
+	{
+		return;
+	}
+	FTextureResource* Resource = Tex->GetResource();
+	if (!Resource)
+	{
+		return;
+	}
+	const float Scale = FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f);
+	const float TexSize = (float)Tex->GetSizeX();
+	// 코너 dst가 패널 절반을 넘지 않도록 클램프(작은 패널에서 9칸 겹침 방지).
+	const float CornerDst = FMath::Min(Theme::PanelCornerRadius * Scale, FMath::Min(W, H) * 0.45f);
+	FNineSliceCell Cells[9];
+	ComputeNineSlice(FUiRect{ X, Y, W, H }, CornerDst, TexSize, CornerUVPx, Cells);
+	for (int32 i = 0; i < 9; ++i)
+	{
+		const FNineSliceCell& C = Cells[i];
+		FCanvasTileItem Tile(
+			FVector2D(C.Dst.X, C.Dst.Y), Resource,
+			FVector2D(C.Dst.W, C.Dst.H),
+			FVector2D(C.UV.X, C.UV.Y),
+			FVector2D(C.UV.X + C.UV.W, C.UV.Y + C.UV.H), Tint);
+		Tile.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Tile);
+	}
+}
+
+void AIdleHUD::DrawPanelChrome(float X, float Y, float W, float H, IdleProject::UI::EPanelStyle Style)
+{
+	using namespace IdleProject::UI;
+	const float Scale = Canvas ? FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f) : 1.0f;
+	// 소프트 섀도(프레임 없는 방사형 → 코너 ~40px 무난), 살짝 아래로 오프셋.
+	if (UTexture2D* Sh = ResolveChrome(TEXT("T_SoftShadow"), ChromeShadow))
+	{
+		const float M = 10.0f * Scale;
+		DrawNineSlice(Sh, X - M, Y - M + 4.0f * Scale, W + 2.0f * M, H + 2.0f * M, 40.0f, FLinearColor(0.0f, 0.0f, 0.0f, 0.32f));
+	}
+	UTexture2D* Tex = ResolveChrome(*PanelTextureName(Style),
+		Style == EPanelStyle::Slate ? ChromePanelSlate : ChromePanel);
+	if (Tex)
+	{
+		DrawNineSlice(Tex, X, Y, W, H, 28.0f, FLinearColor::White);
+	}
+	else
+	{
+		// 폴백: 텍스처 누락 시 평면 패널 색.
+		DrawRect(Style == EPanelStyle::Slate ? Theme::PanelSlate : Theme::PanelCream, X, Y, W, H);
+	}
+}
+
+void AIdleHUD::DrawGoldButton(float X, float Y, float W, float H, const FString& Label, bool bEnabled, IdleProject::UI::EBtnStyle Style)
+{
+	using namespace IdleProject::UI;
+	const float Scale = Canvas ? FMath::Clamp(Canvas->SizeY / 1080.0f, 1.0f, 2.0f) : 1.0f;
+	// 비활성 시 어둡게 틴트.
+	const FLinearColor Tint = bEnabled ? FLinearColor::White : FLinearColor(0.55f, 0.55f, 0.55f, 0.9f);
+	UTexture2D* Tex = ResolveChrome(*ButtonTextureName(Style),
+		Style == EBtnStyle::Slate ? ChromeButtonSlate : ChromeButtonGold);
+	if (Tex)
+	{
+		DrawNineSlice(Tex, X, Y, W, H, 18.0f, Tint);
+	}
+	else
+	{
+		// 폴백: 따뜻한 금색 평면 버튼.
+		const FLinearColor Fallback = bEnabled ? Theme::AccentGoldWarm : Theme::AccentGoldWarm.CopyWithNewOpacity(0.5f);
+		DrawRect(Fallback, X, Y, W, H);
+	}
+	// 라벨(두 스타일 모두 TextOnSlate). 폭/높이 기준 대략 중앙 배치.
+	UFont* Font = GEngine ? GEngine->GetMediumFont() : nullptr;
+	const float TextScale = 0.82f * Scale;
+	float TextW = 0.0f, TextHgt = 0.0f;
+	if (Font)
+	{
+		GetTextSize(Label, TextW, TextHgt, Font, TextScale);
+	}
+	const FLinearColor TextColor = bEnabled ? Theme::TextOnSlate : Theme::TextOnSlate.CopyWithNewOpacity(0.6f);
+	DrawText(Label, TextColor, X + (W - TextW) * 0.5f, Y + (H - TextHgt) * 0.5f, Font, TextScale);
+}
+
+void AIdleHUD::DrawRarityStars(float X, float Y, int32 Count, float Scale)
+{
+	using namespace IdleProject::UI;
+	if (Count <= 0)
+	{
+		return;
+	}
+	const TArray<FUiRect> Rects = ComputeStarRects(X, Y, Count, 14.0f * Scale, 3.0f * Scale);
+	UTexture2D* Star = ResolveChrome(TEXT("T_GoldStar"), ChromeStar);
+	FTextureResource* Resource = (Canvas && Star) ? Star->GetResource() : nullptr;
+	for (const FUiRect& R : Rects)
+	{
+		if (Resource)
+		{
+			// 별 텍스처는 full-UV(0..1)로 단순 타일.
+			FCanvasTileItem Tile(
+				FVector2D(R.X, R.Y), Resource,
+				FVector2D(R.W, R.H),
+				FVector2D(0.0f, 0.0f), FVector2D(1.0f, 1.0f), Theme::StarGold);
+			Tile.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(Tile);
+		}
+		else
+		{
+			// 폴백: 별 글리프.
+			DrawText(TEXT("★"), Theme::StarGold, R.X, R.Y, GEngine ? GEngine->GetSmallFont() : nullptr, Scale * 0.7f);
+		}
+	}
 }
