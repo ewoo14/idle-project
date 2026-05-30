@@ -188,7 +188,9 @@ void AIdleCharacter::RefreshDerivedStats()
 	const float TitleAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetTitleAllStatMultiplier() : 1.0f;
 	// 잠재 V2: 장착 장비 잠재 AllStatPercent 전역 스탯 배수(칭호 AllStat 옆 동일 단일 지점, 이중 적용 금지 #72).
 	const float PotentialAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetEquippedPotentialAllStatMultiplier() : 1.0f;
-	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier * TitleAllStatMultiplier * PotentialAllStatMultiplier;
+	// 환생 특성 AllStatPct 전역 스탯 배수(칭호/잠재 AllStat 옆 동일 단일 지점, 이중 적용 금지 #72).
+	const float RebirthPerkAllStatMultiplier = IdleGameInstance ? IdleGameInstance->GetRebirthPerkAllStatMultiplier() : 1.0f;
+	const float StatMultiplier = TranscendMultiplier * TowerMultiplier * AchievementMultiplier * MasteryCoreMultiplier * TitleAllStatMultiplier * PotentialAllStatMultiplier * RebirthPerkAllStatMultiplier;
 	Derived.Hp *= StatMultiplier;
 	Derived.PhysAtk *= StatMultiplier;
 	Derived.MagicAtk *= StatMultiplier;
@@ -228,6 +230,9 @@ void AIdleCharacter::RefreshDerivedStats()
 
 		// 칭호 CritDmgPct 가산(장착 1개, 단일 적용 지점 — 룬 CritDamage 가산과 동일 차원, 이중 적용 금지 #72).
 		Derived.CritDmg += IdleGameInstance->GetTitleCritDamageBonus();
+
+		// 환생 특성 CritDmgPct 가산(칭호/룬 CritDamage 가산과 동일 차원, 단일 적용 지점, 이중 적용 금지 #72).
+		Derived.CritDmg += IdleGameInstance->GetRebirthPerkCritDamageBonus();
 
 		const FPetStatBonus PetStatBonus = IdleGameInstance->GetEquippedPetStatBonus();
 		Derived.PhysAtk *= 1.0f + PetStatBonus.PhysAtkPct;

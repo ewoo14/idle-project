@@ -10,6 +10,7 @@
 #include "GameCore/OfflineRewardFormula.h"
 #include "GameCore/PetService.h"
 #include "GameCore/QuestService.h"
+#include "GameCore/RebirthPerkTypes.h"
 #include "GameCore/SeasonService.h"
 #include "GameCore/StageService.h"
 #include "ItemSystem/ItemTypes.h"
@@ -20,6 +21,7 @@ class UIdleGameInstance;
 class UBuffService;
 class UDungeonService;
 class ULeaderboardService;
+class URebirthPerkService;
 class AIdleCharacter;
 class AIdleMonster;
 class UBattleAIComponent;
@@ -809,6 +811,30 @@ struct IDLEPROJECT_API FIdleHUDStatPanelViewModel
 	TArray<FIdleHUDStatRowViewModel> Rows;
 };
 
+// 환생 특성(Rebirth Perks) 패널 — 6종 특성 +/− 분배 행 뷰모델.
+struct IDLEPROJECT_API FIdleHUDRebirthPerkRowViewModel
+{
+	ERebirthPerk Perk = ERebirthPerk::GoldPct;
+	FText NameLabel;
+	FText DetailLabel; // 현재 레벨·보너스% 표시.
+	FName AllocHitBoxName;
+	FName DeallocHitBoxName;
+	int32 Level = 0;
+	bool bCanAllocate = false;
+	bool bCanDeallocate = false;
+};
+
+struct IDLEPROJECT_API FIdleHUDRebirthPerkPanelViewModel
+{
+	FText Title;
+	FText PointsLabel; // 가용/총 포인트.
+	FText ResetLabel;
+	FName ResetHitBoxName;
+	int32 AvailablePoints = 0;
+	bool bCanReset = false;
+	TArray<FIdleHUDRebirthPerkRowViewModel> Rows;
+};
+
 struct IDLEPROJECT_API FIdleHUDStatInfoRowViewModel
 {
 	FText StatLabel;
@@ -1026,6 +1052,7 @@ IDLEPROJECT_API FIdleHUDGuildPanelViewModel BuildGuildPanelViewModel(const UGuil
 IDLEPROJECT_API FIdleHUDRuneViewModel BuildRuneViewModel(const URuneService& RuneService, int64 RuneEssence, int64 Gold, int32 ProgressIndex, int32 SelectedOwnedIndex, int32 TransferTargetOwnedIndex);
 IDLEPROJECT_API FIdleHUDRuneCodexViewModel BuildRuneCodexViewModel(const URuneService& RuneService);
 IDLEPROJECT_API FIdleHUDStatPanelViewModel BuildStatPanelViewModel(const FPrimaryStats& BaseStats, const FPrimaryStats& AllocatedStats, int32 AvailablePoints);
+IDLEPROJECT_API FIdleHUDRebirthPerkPanelViewModel BuildRebirthPerkPanelViewModel(const URebirthPerkService& RebirthPerkService);
 IDLEPROJECT_API FIdleHUDStatInfoViewModel BuildStatInfoViewModel(const FPrimaryStats& PrimaryStats, const FDerivedStats& DerivedStats, int32 Level, EClassId ClassId, int32 RebirthCount, int64 CombatPower);
 IDLEPROJECT_API FIdleHUDTowerViewModel BuildTowerViewModel(int32 HighestFloor, int64 NextRequiredPower, int64 CombatPower, float MilestoneMultiplier = -1.0f);
 IDLEPROJECT_API FText BuildTowerClimbFeedbackLabel(int32 NewHighestFloor, int64 TotalReward);
@@ -1208,6 +1235,11 @@ private:
 	void DrawStatAllocationRow(const FIdleHUDStatRowViewModel& Row, float X, float Y, float Width, float Height);
 	void AllocateStatFromHitBox(FName BoxName);
 	void ResetStatAllocation();
+	void DrawRebirthPerkPanel();
+	void DrawRebirthPerkRow(const FIdleHUDRebirthPerkRowViewModel& Row, float X, float Y, float Width, float Height);
+	void AllocateRebirthPerkFromHitBox(FName BoxName);
+	void DeallocateRebirthPerkFromHitBox(FName BoxName);
+	void ResetRebirthPerkAllocation();
 	void DrawStatInfoPanel();
 	void DrawStatInfoToggle(const FIdleHUDStatInfoViewModel& ViewModel, float X, float Y, float Scale);
 	void DrawStatInfoRow(const FIdleHUDStatInfoRowViewModel& Row, float X, float Y, float Width, float Height, const FLinearColor& AccentColor);
