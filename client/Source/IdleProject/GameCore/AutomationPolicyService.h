@@ -45,6 +45,12 @@ public:
 	// 효율 업그레이드 비용(efficiencyUpgradeCost). base*growth^level, 음수 level 0가드.
 	static int64 EfficiencyUpgradeCost(int64 Base, float Growth, int32 Level);
 
+	// 자동 매각가 효율 보너스(서버 sellValueMultiplier 1:1). 1 + 0.02×max(0,level).
+	static float GetSellValueMultiplier(int32 Level);
+
+	// 매각가 업그레이드 다음 비용(P1 EfficiencyUpgradeCost 재사용, base 50000 × 1.5^level).
+	static int64 SellUpgradeNextCost(int32 Level);
+
 	// 스킬 발동 규칙 평가(서버 evaluateSkillRule 1:1). hpThreshold/selfHpPct [0,1] 클램프.
 	static bool EvaluateSkillRule(
 		ESkillAutoCondition Condition,
@@ -113,6 +119,19 @@ public:
 
 	void RestoreGearPolicy(bool bInAutoEquip, bool bInAutoSell, EItemRarity InMaxRarity);
 
+	// ── 자동 소비/효율 정책(P4, 클라 세이브 권위) ──
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	bool GetAutoMaintainBuff() const { return bAutoMaintainBuff; }
+	UFUNCTION(BlueprintCallable, Category = "Idle|Automation")
+	void SetAutoMaintainBuff(bool b) { bAutoMaintainBuff = b; }
+
+	UFUNCTION(BlueprintPure, Category = "Idle|Automation")
+	int32 GetSellValueUpgradeLevel() const { return SellValueUpgradeLevel; }
+	void SetSellValueUpgradeLevel(int32 L) { SellValueUpgradeLevel = FMath::Max(0, L); }
+
+	void RestoreConsumablePolicy(bool bInMaintain, int32 InSellLevel);
+
 private:
 	UPROPERTY()
 	EProgressionMode Mode = EProgressionMode::Advance;
@@ -138,4 +157,11 @@ private:
 
 	UPROPERTY()
 	EItemRarity AutoSellMaxRarity = EItemRarity::Common;
+
+	// 자동 소비/효율 정책(P4). SaveVer 29+.
+	UPROPERTY()
+	bool bAutoMaintainBuff = false;
+
+	UPROPERTY()
+	int32 SellValueUpgradeLevel = 0;
 };

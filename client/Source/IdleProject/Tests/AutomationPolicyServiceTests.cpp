@@ -1,5 +1,8 @@
 #include "Misc/AutomationTest.h"
 #include "GameCore/AutomationPolicyService.h"
+#include "GameCore/BuffService.h"
+#include "GameCore/ConsumableTypes.h"
+#include "GameCore/IdleGameInstance.h"
 #include "GameCore/StageService.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -129,6 +132,26 @@ bool FAutomationSkillRuleTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("replaced cond"), (int32)Svc->GetSkillRules()[0].Condition, (int32)ESkillAutoCondition::HpBelow);
 	Svc->ClearSkillRule(FName(TEXT("heavy_strike")));
 	TestEqual(TEXT("cleared"), Svc->GetSkillRules().Num(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FAutomationSellUpgradeTest,
+	"IdleProject.GameCore.Automation.SellUpgrade",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FAutomationSellUpgradeTest::RunTest(const FString& Parameters)
+{
+	using S = UAutomationPolicyService;
+	TestEqual(TEXT("mult lv0"), S::GetSellValueMultiplier(0), 1.0f);
+	TestTrue(TEXT("mult lv10"), FMath::IsNearlyEqual(S::GetSellValueMultiplier(10), 1.2f, 1e-4f));
+	TestEqual(TEXT("mult neg guard"), S::GetSellValueMultiplier(-5), 1.0f);
+	TestEqual(TEXT("cost lv0 base"), S::SellUpgradeNextCost(0), (int64)50000);
+	TestTrue(TEXT("cost grows"), S::SellUpgradeNextCost(5) > S::SellUpgradeNextCost(4));
+	// 상태 setter 클램프
+	UAutomationPolicyService* Svc = NewObject<UAutomationPolicyService>();
+	Svc->SetSellValueUpgradeLevel(-3);
+	TestEqual(TEXT("level clamp"), Svc->GetSellValueUpgradeLevel(), 0);
 	return true;
 }
 
