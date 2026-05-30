@@ -21,7 +21,7 @@ class IDLEPROJECT_API UIdleSaveGame : public USaveGame
 
 public:
 	UPROPERTY()
-	int32 SaveVersion = 24;
+	int32 SaveVersion = 25;
 
 	UPROPERTY()
 	bool bHasSave = false;
@@ -203,6 +203,13 @@ public:
 
 	UPROPERTY()
 	TSet<int32> AttendanceClaimedMilestones;
+
+	// ── 보물 상자(SaveVer 25) — 마지막 뽑기 UTC 날짜/누적 뽑기 횟수. 클라 로컬 권위. <25 세이브는 빈 값(회귀 안전) ──
+	UPROPERTY()
+	FString LastTreasureDrawDate;
+
+	UPROPERTY()
+	int64 TotalTreasureDraws = 0;
 
 	// ── 환생 특성(SaveVer 24) — perk→분배 레벨 맵. 클라 로컬 권위(서버 rebirthPerk.ts parity).
 	// 총 포인트는 RebirthCount 에서 파생(별도 저장 없음). <24 세이브는 빈 맵(회귀 안전) ──
