@@ -2270,6 +2270,16 @@ FIdleHUDStageViewModel IdleProject::UI::BuildStageViewModel(const FStageInfo& St
 		? Theme::AccentGold
 		: (ViewModel.bEliteStage ? Theme::ElementDark : Theme::AccentBlue);
 	ViewModel.WeaknessColor = StageWeakElementToColor(StageInfo.WeakElement);
+	ViewModel.bHasResist = StageInfo.ResistElement != ESkillElement::None;
+	if (ViewModel.bHasResist)
+	{
+		ViewModel.ResistLabel = FormatLocalizedUI(TEXT("STAGE_RESIST_FORMAT"), [&StageInfo](FFormatNamedArguments& Args)
+		{
+			Args.Add(TEXT("Element"), StageWeakElementToLabel(StageInfo.ResistElement));
+		});
+		ViewModel.ResistIconLabel = StageWeakElementToIconLabel(StageInfo.ResistElement);
+		ViewModel.ResistColor = StageWeakElementToColor(StageInfo.ResistElement);
+	}
 	return ViewModel;
 }
 

@@ -231,6 +231,10 @@ struct IDLEPROJECT_API FIdleHUDStageViewModel
 	FText WeaknessIconLabel;
 	FLinearColor BorderColor = FLinearColor::White;
 	FLinearColor WeaknessColor = FLinearColor::White;
+	FText ResistLabel;
+	FText ResistIconLabel;
+	FLinearColor ResistColor = FLinearColor::White;
+	bool bHasResist = false;
 	float ProgressRatio = 0.0f;
 	bool bBossStage = false;
 	bool bEliteStage = false;
