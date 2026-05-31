@@ -16,6 +16,7 @@
 #include "GameCore/StageService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "RuneSystem/RuneCodexTypes.h"
+#include "UI/HudChrome.h"
 #include "UI/HudNavigation.h"
 #include "IdleHUD.generated.h"
 
@@ -1329,6 +1330,14 @@ private:
 	void ClaimSeasonTierFromHitBox(FName BoxName);
 	void DrawFloatingDamageTexts(float Now);
 	void DrawStatusIndicators(float Now);
+
+	// ── 크롬 9-slice 드로잉 헬퍼(비주얼 파운데이션 Task V4) ──────────────
+	// 텍스처 부재 시 모두 DrawRect/DrawText 폴백 → 에셋 누락이 크래시/공백을 만들지 않음.
+	UTexture2D* ResolveChrome(const TCHAR* AssetName, TObjectPtr<UTexture2D>& Cache);
+	void DrawNineSlice(UTexture2D* Tex, float X, float Y, float W, float H, float CornerUVPx, const FLinearColor& Tint);
+	void DrawPanelChrome(float X, float Y, float W, float H, IdleProject::UI::EPanelStyle Style);
+	void DrawGoldButton(float X, float Y, float W, float H, const FString& Label, bool bEnabled, IdleProject::UI::EBtnStyle Style);
+	void DrawRarityStars(float X, float Y, int32 Count, float Scale);
 	void DrawProgressSavedIndicator(float Now);
 	void DrawCloudSyncIndicator(float Now);
 	void RefreshMouseInteraction();
@@ -1344,6 +1353,20 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryComponent> PlayerInventory;
+
+	// ── 크롬 텍스처 캐시(Task V4, lazy 로드 — ResolveChrome) ──────────────
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromePanel;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromePanelSlate;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromeButtonGold;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromeButtonSlate;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromeShadow;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> ChromeStar;
 
 	TSharedPtr<SIdleHUDWidget> RootWidget;
 	FIdleHUDOfflineRewardViewModel OfflineRewardModal;

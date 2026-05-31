@@ -92,6 +92,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<class AExponentialHeightFog> ThemeFog = nullptr;
 
+	// 전역 PostProcessVolume(Unbound). 따뜻한 Genshin 분위기 그레이드(화이트밸런스/블룸/AO/비네트/채도/대비).
+	UPROPERTY(Transient)
+	TObjectPtr<class APostProcessVolume> ThemePostProcess = nullptr;
+
 	// 스카이 스피어(역방향 배경, ThemeSky=SkyLight 와 별개). M_Sky MID로 SkyTint 갱신.
 	UPROPERTY()
 	TObjectPtr<class AStaticMeshActor> ThemeSkySphere = nullptr;
@@ -105,6 +109,10 @@ private:
 	TObjectPtr<class UTextureCube> SkyCubemap = nullptr;
 
 	bool bSkyAssetsLoadAttempted = false;
+
+	// 대기 산란 하늘(ASkyAtmosphere). ThemeSun 을 대기 광원으로 연결.
+	UPROPERTY(Transient)
+	TObjectPtr<class ASkyAtmosphere> ThemeAtmosphere = nullptr;
 
 	bool bInitialMonstersSpawned = false;
 	bool bDefaultEnvironmentSpawned = false;
