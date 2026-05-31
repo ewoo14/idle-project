@@ -2,10 +2,18 @@
 
 #include "Components/SkeletalMeshComponent.h"
 #include "TimerManager.h"
+#include "CharacterSystem/CharacterFaceMotion.h"
 
 UFacialExpressionComponent::UFacialExpressionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+}
+
+void UFacialExpressionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+	// 첫 깜빡임 간격을 2~6s 사이 랜덤 초기화
+	NextBlinkInterval = FMath::RandRange(2.0f, 6.0f);
 }
 
 void UFacialExpressionComponent::SetExpression(EFacialExpression NewExpression, float Duration)
@@ -37,6 +45,41 @@ void UFacialExpressionComponent::SetExpression(EFacialExpression NewExpression, 
 void UFacialExpressionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	UpdateBlink(DeltaTime);
+}
+
+void UFacialExpressionComponent::UpdateBlink(float DeltaTime)
+{
+	USkeletalMeshComponent* Mesh = GetTargetMesh();
+	if (!Mesh) { return; }
+
+	if (bBlinking)
+	{
+		BlinkElapsed += DeltaTime;
+		const float W = IdleProject::Character::ComputeBlinkWeight(BlinkElapsed, BlinkDuration);
+		Mesh->SetMorphTarget(TEXT("Blink"),   W);
+		Mesh->SetMorphTarget(TEXT("Blink_L"), W); // 있으면 적용, 없으면 무동작
+		Mesh->SetMorphTarget(TEXT("Blink_R"), W);
+		if (BlinkElapsed >= BlinkDuration)
+		{
+			// 깜빡임 종료 — 모프 초기화 및 다음 간격 설정
+			bBlinking = false;
+			Mesh->SetMorphTarget(TEXT("Blink"),   0.0f);
+			Mesh->SetMorphTarget(TEXT("Blink_L"), 0.0f);
+			Mesh->SetMorphTarget(TEXT("Blink_R"), 0.0f);
+			BlinkTimer = 0.0f;
+			NextBlinkInterval = FMath::RandRange(2.0f, 6.0f);
+		}
+	}
+	else
+	{
+		BlinkTimer += DeltaTime;
+		if (BlinkTimer >= NextBlinkInterval)
+		{
+			bBlinking = true;
+			BlinkElapsed = 0.0f;
+		}
+	}
 }
 
 USkeletalMeshComponent* UFacialExpressionComponent::GetTargetMesh() const

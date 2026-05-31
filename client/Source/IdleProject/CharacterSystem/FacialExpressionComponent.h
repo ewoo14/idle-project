@@ -33,14 +33,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Idle|Facial")
 	EFacialExpression GetCurrentExpression() const { return CurrentExpression; }
 
-protected:
+public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+protected:
+	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Facial")
 	EFacialExpression CurrentExpression = EFacialExpression::Idle;
 
 	FTimerHandle RevertTimerHandle;
+
+	// --- 자동 깜빡임 ---
+	void UpdateBlink(float DeltaTime);
+	float BlinkTimer = 0.0f;          // 다음 깜빡임까지 누적 시간
+	float NextBlinkInterval = 3.0f;   // 랜덤 2~6s 간격
+	bool bBlinking = false;           // 현재 깜빡임 중 여부
+	float BlinkElapsed = 0.0f;        // 깜빡임 시작 후 경과 시간
+	static constexpr float BlinkDuration = 0.12f; // 눈 감는 데 걸리는 초
 
 	USkeletalMeshComponent* GetTargetMesh() const;
 	void ApplyBlendShapes(EFacialExpression Expression);
