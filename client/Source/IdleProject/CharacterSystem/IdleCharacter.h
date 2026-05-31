@@ -14,6 +14,7 @@ class UCameraComponent;
 class UBattleAIComponent;
 class UCombatComponent;
 class UFacialExpressionComponent;
+class UCharacterLipSyncComponent;
 class UIdleAnimInstance;
 class UInventoryComponent;
 class UInputAction;
@@ -88,6 +89,10 @@ protected:
 	/** VRoid Blend Shape 기반 표정 제어 컴포넌트입니다. */
 	UPROPERTY(VisibleAnywhere, Category = "Idle|Character")
 	TObjectPtr<UFacialExpressionComponent> Facial;
+
+	/** TTS 진폭으로 VRM 입모양(A) 모프를 구동하는 립싱크 컴포넌트입니다. */
+	UPROPERTY(VisibleAnywhere, Category = "Idle|Character")
+	TObjectPtr<UCharacterLipSyncComponent> LipSync;
 
 	/** 자동 전투에 사용하는 전투 능력치 컴포넌트입니다. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Idle|Combat")
