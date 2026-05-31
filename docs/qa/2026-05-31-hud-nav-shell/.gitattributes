@@ -1,0 +1,2 @@
+# QA 스크린샷은 PR 코멘트 인라인 렌더를 위해 LFS 미사용(일반 blob)
+*.png !filter !diff !merge text=auto

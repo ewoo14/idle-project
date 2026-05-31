@@ -16,6 +16,7 @@
 #include "GameCore/StageService.h"
 #include "ItemSystem/ItemTypes.h"
 #include "RuneSystem/RuneCodexTypes.h"
+#include "UI/HudNavigation.h"
 #include "IdleHUD.generated.h"
 
 class UIdleGameInstance;
@@ -1197,6 +1198,16 @@ private:
 	void DrawStageIndicator();
 	void DrawBossBar();
 	void DrawBossSpecialWarning(float Now);
+
+	// 내비 셸 + 활성 패널 디스패치(Task 7).
+	void DrawNavShell();
+	void DrawCategoryRail();
+	void DrawCategoryTabBar();
+	void DrawPanelSubTabs();
+	void DrawActivePanel();
+	FName NavCategoryHitBox(IdleProject::UI::EHudCategory Category) const;
+	FName NavPanelHitBox(IdleProject::UI::EHudPanel Panel) const;
+
 	void DrawShopPanel();
 	void TryBuyGearRoll();
 	void TryBuyProtectionScroll();
@@ -1382,6 +1393,15 @@ private:
 	float CloudSyncFeedbackStartTime = -1000.0f;
 	bool bQuestLogVisible = false;
 	bool bStatInfoVisible = false;
+
+	// ── 내비게이션 셸 상태(런타임 전용·비영속) ──────────────────
+	IdleProject::UI::FHudNavState HudNav;
+	IdleProject::UI::EHudLayoutMode HudLayoutMode = IdleProject::UI::EHudLayoutMode::Desktop;
+	// 활성 패널이 그려질 도킹/오버레이 영역(DrawActivePanel이 매 프레임 설정).
+	float PanelRegionX = 0.0f;
+	float PanelRegionY = 0.0f;
+	float PanelRegionW = 0.0f;
+	float PanelRegionH = 0.0f;
 
 	// ── 길드 패널 UI 상태(PR-G1, 서버 권위 — 캐시/표시 전용) ──────────────────
 	TArray<FGuildSummary> GuildBrowseList;     // 무소속 화면 목록 캐시(서버 ListGuilds)

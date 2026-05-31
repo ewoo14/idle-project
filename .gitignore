@@ -92,3 +92,6 @@ client/Content/Characters/*.vrm
 codex/prompts/_pr*.md
 codex/prompts/_task-*.md
 codex/prompts/pr[0-9]*.md
+
+# Superpowers 브레인스토밍 시각 동반(로컬 목업, 커밋 제외)
+.superpowers/

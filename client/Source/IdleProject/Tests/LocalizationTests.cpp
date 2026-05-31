@@ -462,6 +462,48 @@ bool FIdleLocalizationCsvIntegrityTest::RunTest(const FString& Parameters)
 				TestTrue(*FString::Printf(TEXT("UI Korean contains required cloud sync key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
 				TestTrue(*FString::Printf(TEXT("UI English contains required cloud sync key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
 			}
+
+			// HUD 내비 카테고리/패널 라벨 키(32개).
+			const TArray<FString> RequiredNavKeys = {
+				TEXT("HUD_CAT_COMBAT"),
+				TEXT("HUD_CAT_GROWTH"),
+				TEXT("HUD_CAT_REBIRTH"),
+				TEXT("HUD_CAT_GEAR"),
+				TEXT("HUD_CAT_COLLECTION"),
+				TEXT("HUD_CAT_DAILY"),
+				TEXT("HUD_CAT_SOCIAL"),
+				TEXT("HUD_PANEL_TOWER"),
+				TEXT("HUD_PANEL_DUNGEON"),
+				TEXT("HUD_PANEL_WEEKLYBOSS"),
+				TEXT("HUD_PANEL_STATALLOC"),
+				TEXT("HUD_PANEL_STATINFO"),
+				TEXT("HUD_PANEL_MASTERY"),
+				TEXT("HUD_PANEL_REBIRTH"),
+				TEXT("HUD_PANEL_TRANSCEND"),
+				TEXT("HUD_PANEL_REBIRTHPERK"),
+				TEXT("HUD_PANEL_ENHANCE"),
+				TEXT("HUD_PANEL_POTENTIAL"),
+				TEXT("HUD_PANEL_RUNE"),
+				TEXT("HUD_PANEL_RUNECODEX"),
+				TEXT("HUD_PANEL_SHOP"),
+				TEXT("HUD_PANEL_PET"),
+				TEXT("HUD_PANEL_TITLE"),
+				TEXT("HUD_PANEL_ACHIEVEMENT"),
+				TEXT("HUD_PANEL_TREASUREBOX"),
+				TEXT("HUD_PANEL_QUEST"),
+				TEXT("HUD_PANEL_MISSION"),
+				TEXT("HUD_PANEL_ATTENDANCE"),
+				TEXT("HUD_PANEL_CONSUMABLE"),
+				TEXT("HUD_PANEL_SEASONPASS"),
+				TEXT("HUD_PANEL_GUILD"),
+				TEXT("HUD_PANEL_LEADERBOARD"),
+			};
+
+			for (const FString& RequiredKey : RequiredNavKeys)
+			{
+				TestTrue(*FString::Printf(TEXT("UI Korean contains required nav key %s"), *RequiredKey), KoreanKeys.Contains(RequiredKey));
+				TestTrue(*FString::Printf(TEXT("UI English contains required nav key %s"), *RequiredKey), EnglishKeys.Contains(RequiredKey));
+			}
 		}
 
 		if (TableName == TEXT("Story"))
