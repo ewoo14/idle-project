@@ -6,6 +6,7 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/FacialExpressionComponent.h"
+#include "CharacterSystem/CharacterLipSyncComponent.h"
 #include "CharacterSystem/IdleMonster.h"
 #include "CharacterSystem/IdleAnimInstance.h"
 #include "Components/CapsuleComponent.h"
@@ -81,6 +82,7 @@ AIdleCharacter::AIdleCharacter()
 	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 	Facial = CreateDefaultSubobject<UFacialExpressionComponent>(TEXT("Facial"));
+	LipSync = CreateDefaultSubobject<UCharacterLipSyncComponent>(TEXT("LipSync"));
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
 	Movement->MaxWalkSpeed = MoveSpeed;
