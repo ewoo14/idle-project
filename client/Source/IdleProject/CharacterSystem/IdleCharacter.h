@@ -3,9 +3,12 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "CharacterSystem/CharacterAnimState.h"
 #include "CharacterSystem/StatFormulas.h"
 #include "ItemSystem/ItemTypes.h"
 #include "IdleCharacter.generated.h"
+
+class UAnimSequence;
 
 class UCameraComponent;
 class UBattleAIComponent;
@@ -20,6 +23,7 @@ class USkeletalMeshComponent;
 class USpringArmComponent;
 class UStaticMeshComponent;
 enum class EBattleState : uint8;
+enum class EDamageKind : uint8;
 
 /**
  * M1 클라이언트 코어 부트용 임시 플레이어 캐릭터입니다.
@@ -149,12 +153,16 @@ private:
 	UFUNCTION()
 	void HandleDeath(AActor* DyingActor);
 
+	UFUNCTION()
+	void HandleDamageReceived(float Amount, bool bWasCrit, EDamageKind Kind);
+
 	void ConfigureInputActions();
 	void RegisterDefaultMappingContext();
 	void ConfigureCharacterVisuals();
 	/** VRoid/VRM4U 모델의 액세서리(백팩·로봇팔 등) 머티리얼 슬롯을 INI 키워드 기준으로 숨깁니다. */
 	void HideAccessoryMaterialSlots();
 	void UpdateAnimInstanceVariables();
+	void UpdateLocomotionAnimation();
 	void UpdateBattleFacialExpression();
 	void Move(const FInputActionValue& Value);
 	void Attack(const FInputActionValue& Value);
@@ -164,4 +172,17 @@ private:
 
 	float LastObservedHp = 0.0f;
 	EBattleState LastObservedBattleState;
+
+	// config 구동 애님 시퀀스(에셋 없으면 nullptr → 폴백, 현 동작 불변).
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> IdleAnimSeq;
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> MoveAnimSeq;
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> AttackAnimSeq;
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> HitAnimSeq;
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> DeathAnimSeq;
+
+	IdleProject::Character::ECharAnimState CurrentAnimState = IdleProject::Character::ECharAnimState::Idle;
+	bool bAnimOneShotPlaying = false;
+	bool bPendingAttackAnim = false;   // 공격 진입 에지에서 set
+	bool bPendingHitAnim = false;      // 피격 델리게이트에서 set
+	bool bPrevAttackState = false;     // BattleAI Attack 상태 에지 검출용
 };

@@ -2,6 +2,8 @@
 
 #include "Camera/CameraComponent.h"
 #include "Animation/AnimInstance.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimSingleNodeInstance.h"
 #include "CharacterSystem/CombatPowerFormula.h"
 #include "CharacterSystem/FacialExpressionComponent.h"
 #include "CharacterSystem/IdleMonster.h"
@@ -124,6 +126,8 @@ void AIdleCharacter::BeginPlay()
 	{
 		Combat->OnHpChanged.AddDynamic(this, &AIdleCharacter::HandleHpChanged);
 		Combat->OnDeath.AddDynamic(this, &AIdleCharacter::HandleDeath);
+		// 피격 애님 트리거: 본인 Combat 이 데미지를 받으면 원샷 Hit 요청.
+		Combat->OnDamageReceived.AddDynamic(this, &AIdleCharacter::HandleDamageReceived);
 	}
 
 }
@@ -133,6 +137,7 @@ void AIdleCharacter::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	UpdateAnimInstanceVariables();
+	UpdateLocomotionAnimation();
 	UpdateBattleFacialExpression();
 }
 
@@ -358,6 +363,12 @@ void AIdleCharacter::HandleDeath(AActor* DyingActor)
 	}
 }
 
+void AIdleCharacter::HandleDamageReceived(float Amount, bool bWasCrit, EDamageKind Kind)
+{
+	// 다음 Tick 의 UpdateLocomotionAnimation 에서 원샷 Hit 애님으로 소비된다.
+	bPendingHitAnim = true;
+}
+
 void AIdleCharacter::HandleLevelUp(int32 NewLevel)
 {
 	Level = FMath::Max(1, NewLevel);
@@ -456,6 +467,22 @@ void AIdleCharacter::ConfigureCharacterVisuals()
 			UE_LOG(LogTemp, Warning, TEXT("[CharacterVisual] SkeletalMesh load failed: %s"), *SkeletalMeshPath);
 		}
 	}
+
+	// config 구동 애님 시퀀스 로드. 키가 없거나 로드 실패 시 nullptr → UpdateLocomotionAnimation 폴백(재생 안 함).
+	auto LoadAnim = [](const TCHAR* Key) -> UAnimSequence*
+	{
+		FString Path;
+		if (GConfig && GConfig->GetString(IdleCharacterConfigSection, Key, Path, GEngineIni) && !Path.IsEmpty())
+		{
+			return Cast<UAnimSequence>(StaticLoadObject(UAnimSequence::StaticClass(), nullptr, *Path));
+		}
+		return nullptr;
+	};
+	IdleAnimSeq   = LoadAnim(TEXT("IdleAnimPath"));
+	MoveAnimSeq   = LoadAnim(TEXT("MoveAnimPath"));
+	AttackAnimSeq = LoadAnim(TEXT("AttackAnimPath"));
+	HitAnimSeq    = LoadAnim(TEXT("HitAnimPath"));
+	DeathAnimSeq  = LoadAnim(TEXT("DeathAnimPath"));
 
 	FString AnimClassPath;
 	if (GConfig)
@@ -571,6 +598,81 @@ void AIdleCharacter::UpdateAnimInstanceVariables()
 	IdleAnimInstance->bIsMoving = Speed > 10.0f;
 	IdleAnimInstance->bIsAttacking = BattleAI && BattleAI->State == EBattleState::Attack;
 	IdleAnimInstance->bIsDead = Combat && Combat->IsDead();
+}
+
+void AIdleCharacter::UpdateLocomotionAnimation()
+{
+	using namespace IdleProject::Character;
+	// 메시 없으면(큐브 플레이스홀더) 미적용 → 현 동작 불변(회귀 0).
+	if (!CharacterMesh || !CharacterMesh->GetSkeletalMeshAsset())
+	{
+		return;
+	}
+
+	const bool bDead = Combat && Combat->IsDead();
+
+	// 공격 진입 에지 → 원샷 요청.
+	const bool bAttackNow = (BattleAI && BattleAI->State == EBattleState::Attack);
+	if (bAttackNow && !bPrevAttackState)
+	{
+		bPendingAttackAnim = true;
+	}
+	bPrevAttackState = bAttackNow;
+
+	const float Speed = GetVelocity().Size();
+	const bool bMoving = Speed > 10.0f;
+
+	const ECharAnimState Desired = SelectAnimState(CurrentAnimState, bDead, bAnimOneShotPlaying,
+		bPendingAttackAnim, bPendingHitAnim, bMoving);
+	bPendingAttackAnim = false;
+	bPendingHitAnim = false;
+
+	// 원샷 완료 판정. UE5.7 UAnimSingleNodeInstance 에는 GetTimeRemaining 이 없으므로
+	// GetLength()-GetCurrentTime() 잔여 시간 또는 정지(!IsPlaying)로 판정한다.
+	if (bAnimOneShotPlaying)
+	{
+		if (UAnimSingleNodeInstance* Single = CharacterMesh->GetSingleNodeInstance())
+		{
+			const float Remaining = Single->GetLength() - Single->GetCurrentTime();
+			if (!Single->IsPlaying() || Remaining <= KINDA_SMALL_NUMBER)
+			{
+				bAnimOneShotPlaying = false;
+			}
+		}
+		else
+		{
+			bAnimOneShotPlaying = false;
+		}
+	}
+
+	if (Desired != CurrentAnimState)
+	{
+		UAnimSequence* Seq = nullptr;
+		bool bLoop = false;
+		switch (Desired)
+		{
+		case ECharAnimState::Death:  Seq = DeathAnimSeq;  bLoop = false; break;
+		case ECharAnimState::Attack: Seq = AttackAnimSeq; bLoop = false; break;
+		case ECharAnimState::Hit:    Seq = HitAnimSeq;    bLoop = false; break;
+		case ECharAnimState::Move:   Seq = MoveAnimSeq;   bLoop = true;  break;
+		case ECharAnimState::Idle:   Seq = IdleAnimSeq;   bLoop = true;  break;
+		}
+		if (Seq)
+		{
+			CharacterMesh->PlayAnimation(Seq, bLoop);
+			bAnimOneShotPlaying = (Desired == ECharAnimState::Attack || Desired == ECharAnimState::Hit || Desired == ECharAnimState::Death);
+			CurrentAnimState = Desired;
+		}
+		else
+		{
+			// 해당 시퀀스 없음 → 상태만 갱신(폴백: 재생 안 함).
+			CurrentAnimState = Desired;
+			if (Desired != ECharAnimState::Attack && Desired != ECharAnimState::Hit && Desired != ECharAnimState::Death)
+			{
+				bAnimOneShotPlaying = false;
+			}
+		}
+	}
 }
 
 void AIdleCharacter::UpdateBattleFacialExpression()
